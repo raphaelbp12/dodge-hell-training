@@ -185,7 +185,7 @@ Acceptance: focused tests, typecheck, and lint pass; importing the models/config
 
 ### Step 3.2 - Implement Fixed-Step Player Movement And Pursuit
 
-Status: pending. Dependencies: 3.1.
+Status: complete. Dependencies: 3.1.
 
 **Implementation prompt**
 
@@ -194,6 +194,19 @@ Introduce one fixed-step simulation entry point, driven by supplied elapsed time
 Write failing tests for no input, opposite inputs, equal axial/diagonal speed, movement over a known number of ticks, arena edge movement, enemy distance reduction, and enemy speed below player speed. Verify equivalent simulated elapsed time split across different render-frame schedules produces equivalent state within a stated tolerance. Bound catch-up work according to an explicit policy; do not award survival time for simulation time that was discarded.
 
 Acceptance: focused movement/timing tests and typecheck pass. No renderer, event bus, pathfinding, or unrelated physics features are introduced.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 3.1 complete and the worktree clean. Read the existing preset, entity/input types, and approved movement/arena/session rules. No previously selected tick rate or catch-up limit existed, so asked before introducing those values.
+- The user delegated the timing decision for later review. Selected a 60 Hz fixed step, at most 8 ticks per elapsed-time update, excess whole-tick discard with fractional remainder retention, player-first update order, and collision-adjusted radial arena projection. Recorded this as delegated trainer policy in [the mechanics contract](docs/mechanics.md#simulation-timing-and-movement-policy), not an explicit numeric endorsement or ROTMG fidelity claim. This establishes the initial v1 simulation baseline; no earlier playable attempt/history implementation exists. Future comparison-breaking policy changes require a reviewed rules-version bump.
+- Added `app/src/game/simulation/simulation.test.ts` first. The focused command from `app/`, `npm.cmd run test -- --project node src/game/simulation/simulation.test.ts`, initially failed on the missing simulation module; after the smallest implementation it passed 38 cases.
+- Added `ENCOUNTER_CONFIG.simulation.fixedStepSeconds` and `maxStepsPerUpdate` to the existing typed configuration and extended its finite/positive/safe-integer checks. All existing approved encounter, preset, and arithmetic values remain unchanged; no package or bootstrap changes were needed.
+- Added `createSimulation` and the single externally driven `advanceSimulation` entry point in `app/src/game/simulation/simulation.ts`. State copies deterministic spawns, full health, zero combat time, and initial emitter phase. The accumulator uses supplied elapsed seconds only, processes bounded whole ticks, reports discarded seconds, and retains a fractional remainder. Survival seconds derive from executed tick count; there is no wall-clock API, independent timer, delayed catch-up backlog, or credit for discarded time.
+- Implemented independent-axis input cancellation, normalized diagonals, approved world directions/speed, player-first movement, slower pursuit toward the updated player position, and stop-distance clamping without overshoot/division by zero. Circle projection keeps both collision extents inside the arena while permitting tangential movement; bodies neither damage nor block the player.
+- Tests cover no input, all opposite/cardinal directions, diagonal speed, 120-tick distance, fresh independent initialization, pursuit speed/order/distance reduction, exact/inside/coincident stopping cases, overlap behavior, outward wall rejection/tangential sliding, 600 edge-movement ticks, fractional carry, bounded/discarded time including a very large finite duration, invalid elapsed-time rejection without mutation, and invalid timing configuration.
+- Verified equivalent simulated time across 30/60/120 Hz, three-tick, and irregular frame schedules with constant sampled input and no discarded time. Position tolerance is 1e-9 tile and remainder tolerance 1e-12 second; integer tick counts/time agree. Equivalence is not claimed across intentional time discard or differently sampled per-tick inputs. Tick-boundary allowance is machine precision, not gameplay tuning.
+- All established gates passed from `app/` using Node 24.22.1 / npm 12.2.1: `npm run test` (86 tests: prior 48 plus 38 movement/timing), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one existing Chromium smoke test). Editor diagnostics reported no errors in touched source/test files. Formatted only the three touched TypeScript files with temporary npm-exec Prettier; no formatter dependency was added.
+- Updated [the README](README.md#fixed-step-movement) with API/time accounting, scope, test command, and verification tolerances. No new browser movement is expected yet: the unchanged starter remains the UI. No firing, emitter rotation updates, shard motion, health update loop, session lifecycle, renderer, event bus, pathfinding, storage, CI/deployment, commit, push, or step 3.3 implementation was introduced. No unresolved blocker remains; step 3.3 stays pending.
 
 ### Step 3.3 - Implement Rotating Bursts And Returning Shards
 

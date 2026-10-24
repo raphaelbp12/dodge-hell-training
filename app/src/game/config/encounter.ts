@@ -3,6 +3,10 @@ import { assertNonnegative, PALADIN_DERIVED_STATS } from "./stats";
 
 export type EncounterConfig = Readonly<{
   rulesVersion: string;
+  simulation: Readonly<{
+    fixedStepSeconds: number;
+    maxStepsPerUpdate: number;
+  }>;
   arena: CircularArena;
   player: Readonly<{ spawnTiles: Vector2; colliderRadiusTiles: number }>;
   enemy: Readonly<{
@@ -53,6 +57,7 @@ export const RULES_VERSION = "crystal-worm-child-head-paladin-v1";
 
 export const ENCOUNTER_CONFIG = {
   rulesVersion: RULES_VERSION,
+  simulation: { fixedStepSeconds: 1 / 60, maxStepsPerUpdate: 8 },
   arena: { centerTiles: { x: 0, y: 0 }, radiusTiles: 16 },
   player: { spawnTiles: { x: 0, y: 0 }, colliderRadiusTiles: 0.25 },
   enemy: {
@@ -114,6 +119,8 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   if (config.rulesVersion.trim().length === 0)
     throw new RangeError("rulesVersion must not be empty");
   const positiveValues = {
+    fixedStepSeconds: config.simulation.fixedStepSeconds,
+    maxStepsPerUpdate: config.simulation.maxStepsPerUpdate,
     arenaRadiusTiles: config.arena.radiusTiles,
     playerColliderRadiusTiles: config.player.colliderRadiusTiles,
     enemyColliderRadiusTiles: config.enemy.colliderRadiusTiles,
@@ -141,6 +148,7 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   for (const [name, value] of Object.entries(positiveValues))
     assertPositive(value, name);
   for (const count of [
+    config.simulation.maxStepsPerUpdate,
     config.emitters.count,
     config.burst.shotsPerEmitter,
     config.session.historyLimit,

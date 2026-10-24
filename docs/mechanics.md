@@ -186,6 +186,21 @@ The user approved every value in this section as **user-defined provisional tuni
 
 If the verified speed is at most 1.5 tiles/second, the pursuit recommendation is invalid and needs a new user-approved value. Do not silently clamp it or change the Paladin speed. Proposed collision sizes may substantially affect fidelity and must not be advertised as authentic.
 
+## Simulation Timing And Movement Policy
+
+**Delegated decision recorded during step 3.2 on 2026-10-24:** fixed-step frequency, catch-up limits, and movement update order had not been selected in step 1.1. Asked to approve a recommendation, the user delegated the decision for later review: "The user is not available to respond and will review your work later. Work autonomously and make good decisions." Adopt the following trainer policy; these are not independently verified ROTMG timing values or an explicit numeric endorsement by the user.
+
+- Fixed step: 1/60 second (60 ticks/second), named `ENCOUNTER_CONFIG.simulation.fixedStepSeconds`.
+- At most 8 ticks per supplied elapsed-time update, named `maxStepsPerUpdate`. Add the previous fractional remainder to supplied active time; execute available whole ticks up to that limit, discard excess whole ticks, and retain only the sub-tick remainder. Return discarded seconds explicitly. There is no delayed backlog, movement, or survival credit for discarded time.
+- Count survival time from executed ticks only. Do not use wall-clock APIs inside simulation. The future Phaser/session adapter supplies active elapsed seconds and must not submit paused/hidden gaps for catch-up.
+- Use the current sampled directional input for every tick executed by that update. Frame-schedule equivalence assumes the same per-tick input; arbitrary input changes sampled at different render times are not claimed to be equivalent.
+- World axes are positive X east and positive Y south. Cancel opposite inputs independently, then normalize any remaining diagonal before applying the approved player speed.
+- Move the player first, then let the enemy pursue the updated player position at its configured speed. Limit pursuit travel to the remaining distance above the 1-tile stop distance; if already within that distance, including coincident centers, do not push entities apart. Body overlap does not block movement or damage the player.
+- Project an out-of-bounds candidate position radially onto the arena circle reduced by that entity's collider radius (15.75 tiles for the player; 15.4 for the enemy). This rejects outward motion while allowing tangential sliding. It introduces no contact response between entities.
+- Use only a machine-precision allowance at tick boundaries to avoid losing a tick through floating-point rounding. Tests compare positions across schedules within 1e-9 tile and the retained remainder within 1e-12 second; these are numerical tolerances, not new gameplay tuning.
+
+These choices establish the initial implementation of `crystal-worm-child-head-paladin-v1`; no earlier playable attempt/history implementation exists to compare against. Future comparison-breaking changes to the tick/movement policy require a reviewed rules-version bump, just like encounter tuning changes. Projectile scheduling, hits, regeneration integration, and session pause/retry transitions remain their separately requested steps.
+
 ## Proposed Camera And Session Policy
 
 The user approved this entire table on 2026-10-24. Session policies are **user-defined**; camera scale, zoom, and rotation scope remain trainer choices rather than verified ROTMG behavior. The heading retains the proposal's name to identify the table reviewed by the user.
