@@ -160,7 +160,7 @@ Acceptance: lint, typecheck, unit tests, production build, and the local browser
 
 ### Step 3.1 - Define Preset Data, Models, And Derived Stats
 
-Status: pending. Dependencies: 1.1, 2.2.
+Status: complete. Dependencies: 1.1, 2.2.
 
 **Implementation prompt**
 
@@ -169,6 +169,19 @@ Implement only the models and configuration needed for one Paladin, one enemy, s
 Write failing tests for the fixed Paladin stat totals, approved derived speed/regeneration/damage formulas, and configuration constraints such as positive lifetime and reversal within lifetime. Test rounding and bounds from the mechanics contract. Unknown values are blockers, not TODO defaults in playable code. Avoid a generic configuration/schema framework unless the existing toolchain makes it genuinely simpler.
 
 Acceptance: focused tests, typecheck, and lint pass; importing the models/configuration does not require DOM, React, Phaser, or localStorage. Record the correspondence between approved mechanics and named configuration values.
+
+**Execution record - 2026-10-24**
+
+- Confirmed steps 1.1 and 2.2 complete with recorded approval/tooling evidence and a clean worktree. Used the existing Node Vitest project; no packages, bootstrap files, test infrastructure, or runtime components were changed.
+- Added `app/src/game/config/config.test.ts` first. The focused command from `app/`, `npm.cmd run test -- --project node src/game/config/config.test.ts`, initially failed because the domain configuration modules did not exist. After implementation it passed 46 cases in Node, including assertions that `document`, `window`, and `localStorage` are absent.
+- Added plain types in `app/src/game/models.ts` for primary/derived stats, one player/enemy, shards, circular arena, directional simulation input, session phases, and readonly snapshot shapes. Shards include age, velocity, explicit reversal/lifetime, and per-shard reversal/hit flags; no stored firing origin, rendering object, global invulnerability, or collision-despawn state was introduced.
+- Added `app/src/game/config/stats.ts`: `PALADIN_BASE_STATS` uses the delegated S2 published integer averages; `PALADIN_EQUIPMENT_BONUSES` records only relevant passives from S7/S11/S13/S14. `calculateEquippedStats` derives 775 HP / 32 DEF / 41 SPD / 42 VIT without mutating base data. `STAT_RULES` names the S3/S9 coefficients and delegated trigger brackets/rounding, while pure functions calculate speed, fractional regeneration rates, bounded combat duration/trigger, and incoming damage. These do not apply hits or advance health/combat time.
+- Added typed `ENCOUNTER_CONFIG` in `app/src/game/config/encounter.ts`, with explicit unit-bearing names for approved arena/spawns/collision radii, pursuit, emitter rotation, burst intervals/cooldowns, independent shard reversal/lifetime, camera scale/zoom, countdowns and retention limit. `validateEncounterConfig` rejects nonfinite/nonpositive quantities, noninteger counts, invalid reversal/lifetime ordering, invalid zoom bounds, out-of-arena collision extents, and pursuit at least as fast as the player. Timing and policy values remain the approved provisional trainer rules, not new fidelity claims.
+- Kept comparison identity explicit: `RULES_VERSION` is `crystal-worm-child-head-paladin-v1` and appears in configuration and snapshot data. Documented that comparison-breaking preset/formula/encounter changes must bump it, while viewing zoom does not split records. Best/history comparison behavior remains step 5.2 work.
+- Recorded the contract-to-code correspondence in [the README's Domain Data section](README.md#domain-data): source averages/equipment, delegated arithmetic, encounter tuning, provisional shard timings, camera/session numbers, model shapes, and comparison version all map to named exports/properties. No required value was replaced by an unknown/TODO default.
+- Focused coverage includes all 11 specified DEF trigger boundaries plus saturation/fractional cases, zero/minimum/ceiling damage, zero-stat movement/regeneration, VIT duration floor, invalid negative/nonfinite rule inputs, exact approved tuning, and invalid configuration constraints. Temporal combat refresh, expiry-split regeneration, health caps/death, movement and projectile updates are intentionally not implemented in this step.
+- All established gates passed from `app/` using Node 24.22.1 / npm 12.2.1: `npm run test` (48 tests: 46 Node plus two React/CSS Module), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one Chromium smoke test with normal pointer interaction/assets/error checks). Editor diagnostics reported no errors in the new source/test files. Production output remains the unchanged starter because these modules are not wired into the UI/runtime yet.
+- No simulation clock, movement, firing, health update loop, UI change, Phaser integration, storage, CI/deployment, commit, push, or later-step implementation was introduced. No new gameplay choice or approval was needed; step 3.2 remains pending.
 
 ### Step 3.2 - Implement Fixed-Step Player Movement And Pursuit
 

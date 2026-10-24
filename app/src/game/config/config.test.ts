@@ -1,0 +1,162 @@
+import { expect, test } from 'vitest'
+import type { SessionSnapshot } from '../models'
+import { ENCOUNTER_CONFIG, RULES_VERSION, validateEncounterConfig } from './encounter'
+import {
+  PALADIN_BASE_STATS,
+  PALADIN_EQUIPMENT_BONUSES,
+  PALADIN_STATS,
+  PALADIN_DERIVED_STATS,
+  calculateEquippedStats,
+  calculateDamageHp,
+  calculateCombatTriggerHp,
+  calculateCombatDurationSeconds,
+  derivePlayerStats,
+} from './stats'
+
+test('keeps published base stats, passive bonuses, and equipped totals separate', () => {
+  expect(PALADIN_BASE_STATS).toEqual({ healthHp: 675, defense: 10, speed: 41, vitality: 42 })
+  expect(PALADIN_EQUIPMENT_BONUSES.vengeanceArmor.defense).toBe(22)
+  expect(PALADIN_EQUIPMENT_BONUSES.ringOfParamountHealth.healthHp).toBe(100)
+  expect(PALADIN_EQUIPMENT_BONUSES.archonSword).toEqual({ healthHp: 0, defense: 0, speed: 0, vitality: 0 })
+  expect(PALADIN_EQUIPMENT_BONUSES.sealOfTheDivine).toEqual({ healthHp: 0, defense: 0, speed: 0, vitality: 0 })
+  expect(PALADIN_STATS).toEqual({ healthHp: 775, defense: 32, speed: 41, vitality: 42 })
+  expect(calculateEquippedStats(PALADIN_BASE_STATS, Object.values(PALADIN_EQUIPMENT_BONUSES))).toEqual(PALADIN_STATS)
+  expect(PALADIN_BASE_STATS.healthHp).toBe(675)
+})
+
+test('derives the approved speed, fractional regeneration, combat duration and trigger', () => {
+  expect(PALADIN_DERIVED_STATS.speedTilesPerSecond).toBeCloseTo(7.061333333333333)
+  expect(PALADIN_DERIVED_STATS.regenerationHpPerSecond).toBeCloseTo(12.1094)
+  expect(PALADIN_DERIVED_STATS.inCombatRegenerationHpPerSecond).toBeCloseTo(6.0547)
+  expect(PALADIN_DERIVED_STATS.combatDurationSeconds).toBeCloseTo(5.32)
+  expect(PALADIN_DERIVED_STATS.combatTriggerHp).toBe(27)
+  expect(calculateDamageHp(ENCOUNTER_CONFIG.shard.damageHp, PALADIN_STATS.defense)).toBe(128)
+})
+
+test('uses the source formulas at zero stats and at the speed formula denominator', () => {
+  const atZero = derivePlayerStats({ healthHp: 1, defense: 0, speed: 0, vitality: 0 })
+  expect(atZero).toEqual({
+    speedTilesPerSecond: 4,
+    regenerationHpPerSecond: 2,
+    inCombatRegenerationHpPerSecond: 1,
+    combatDurationSeconds: 7,
+    combatTriggerHp: 1,
+  })
+  expect(derivePlayerStats({ ...PALADIN_STATS, speed: 75 }).speedTilesPerSecond).toBeCloseTo(9.6)
+})
+
+test.each([
+  [160, 32, 128], [160, 144, 16], [160, 145, 16],
+  [7, 100, 1], [0.1, 100, 1], [10.1, 0, 11], [0, 0, 0], [0, 100, 0],
+])('damage for raw %s HP and DEF %s rounds up to %s HP', (rawDamageHp, defense, expected) => {
+  expect(calculateDamageHp(rawDamageHp, defense)).toBe(expected)
+})
+
+test.each([
+  [0, 1], [12, 12], [15, 15], [25, 22], [32, 27], [35, 30],
+  [45, 35], [65, 45], [77, 48], [125, 60], [126, 60], [1_000, 60], [25.5, 22],
+])('DEF %s produces the floored, bounded combat trigger %s HP', (defense, expected) => {
+  expect(calculateCombatTriggerHp(defense)).toBe(expected)
+})
+
+test.each([[0, 7], [42, 5.32], [150, 1], [151, 1], [1_000, 1]])(
+  'VIT %s gives a combat duration of %s seconds', (vitality, expected) => {
+    expect(calculateCombatDurationSeconds(vitality)).toBeCloseTo(expected)
+  },
+)
+
+test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+  'rejects invalid rule input %s instead of propagating it', (invalid) => {
+    expect(() => calculateDamageHp(invalid, 0)).toThrow(RangeError)
+    expect(() => calculateDamageHp(1, invalid)).toThrow(RangeError)
+    expect(() => calculateCombatTriggerHp(invalid)).toThrow(RangeError)
+    expect(() => calculateCombatDurationSeconds(invalid)).toThrow(RangeError)
+    for (const stat of ['healthHp', 'defense', 'speed', 'vitality'] as const) {
+      expect(() => derivePlayerStats({ ...PALADIN_STATS, [stat]: invalid })).toThrow(RangeError)
+      expect(() => calculateEquippedStats(PALADIN_BASE_STATS, [{ ...PALADIN_STATS, [stat]: invalid }])).toThrow(RangeError)
+    }
+  },
+)
+
+test('encodes approved tuning and independent reversal/lifetime values with explicit units', () => {
+  expect(RULES_VERSION).toBe('crystal-worm-child-head-paladin-v1')
+  expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION)
+  expect(ENCOUNTER_CONFIG.arena).toEqual({ centerTiles: { x: 0, y: 0 }, radiusTiles: 16 })
+  expect(ENCOUNTER_CONFIG.player).toEqual({ spawnTiles: { x: 0, y: 0 }, colliderRadiusTiles: 0.25 })
+  expect(ENCOUNTER_CONFIG.enemy).toEqual({
+    spawnTiles: { x: 0, y: -13 }, colliderRadiusTiles: 0.6,
+    speedTilesPerSecond: 1.5, stopDistanceTiles: 1,
+    contactDamageHp: 0, blocksPlayer: false,
+  })
+  expect(ENCOUNTER_CONFIG.emitters).toEqual({
+    count: 4, radiusTiles: 0.75, initialPhaseRadians: 0,
+    clockwiseDegreesPerSecond: 45, rotateDuringCooldown: true,
+  })
+  expect(ENCOUNTER_CONFIG.burst).toEqual({
+    shotsPerEmitter: 4, shotIntervalSeconds: 0.15,
+    cooldownAfterLastShotSeconds: 2, initialCooldownSeconds: 2,
+  })
+  expect(ENCOUNTER_CONFIG.shard).toEqual({
+    damageHp: 160, speedTilesPerSecond: 8, colliderRadiusTiles: 0.15,
+    reversalAgeSeconds: 1.2, lifetimeSeconds: 2.4,
+    expiration: 'lifetime-only', hitPolicy: 'once-per-shard',
+  })
+  expect(ENCOUNTER_CONFIG.camera).toEqual({ cssPixelsPerTile: 32, defaultZoom: 1, minZoom: 0.75, maxZoom: 1.5, zoomStep: 0.125 })
+  expect(ENCOUNTER_CONFIG.session).toEqual({ startCountdownSeconds: 3, retryCountdownSeconds: 0, historyLimit: 100 })
+  expect(() => validateEncounterConfig(ENCOUNTER_CONFIG)).not.toThrow()
+})
+
+test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('rejects invalid shard lifetime %s', (lifetimeSeconds) => {
+  expect(() => validateEncounterConfig({
+    ...ENCOUNTER_CONFIG, shard: { ...ENCOUNTER_CONFIG.shard, lifetimeSeconds },
+  })).toThrow(RangeError)
+})
+
+test.each([0, -1, 2.4, 2.5, Number.NaN, Number.POSITIVE_INFINITY])('rejects reversal outside the lifetime: %s', (reversalAgeSeconds) => {
+  expect(() => validateEncounterConfig({
+    ...ENCOUNTER_CONFIG, shard: { ...ENCOUNTER_CONFIG.shard, reversalAgeSeconds },
+  })).toThrow(RangeError)
+})
+
+test('rejects invalid geometry, counts, timings, zoom bounds, version, and pursuit speed', () => {
+  const invalidConfigs = [
+    { ...ENCOUNTER_CONFIG, rulesVersion: ' ' },
+    { ...ENCOUNTER_CONFIG, arena: { ...ENCOUNTER_CONFIG.arena, radiusTiles: 0 } },
+    { ...ENCOUNTER_CONFIG, player: { ...ENCOUNTER_CONFIG.player, colliderRadiusTiles: -1 } },
+    { ...ENCOUNTER_CONFIG, player: { ...ENCOUNTER_CONFIG.player, spawnTiles: { x: 16, y: 0 } } },
+    { ...ENCOUNTER_CONFIG, enemy: { ...ENCOUNTER_CONFIG.enemy, spawnTiles: { x: Number.NaN, y: 0 } } },
+    { ...ENCOUNTER_CONFIG, enemy: { ...ENCOUNTER_CONFIG.enemy, spawnTiles: { x: 16, y: 0 } } },
+    { ...ENCOUNTER_CONFIG, enemy: { ...ENCOUNTER_CONFIG.enemy, speedTilesPerSecond: PALADIN_DERIVED_STATS.speedTilesPerSecond } },
+    { ...ENCOUNTER_CONFIG, emitters: { ...ENCOUNTER_CONFIG.emitters, count: 0 } },
+    { ...ENCOUNTER_CONFIG, emitters: { ...ENCOUNTER_CONFIG.emitters, count: 1.5 } },
+    { ...ENCOUNTER_CONFIG, burst: { ...ENCOUNTER_CONFIG.burst, shotsPerEmitter: 1.5 } },
+    { ...ENCOUNTER_CONFIG, burst: { ...ENCOUNTER_CONFIG.burst, shotIntervalSeconds: 0 } },
+    { ...ENCOUNTER_CONFIG, burst: { ...ENCOUNTER_CONFIG.burst, cooldownAfterLastShotSeconds: -1 } },
+    { ...ENCOUNTER_CONFIG, camera: { ...ENCOUNTER_CONFIG.camera, minZoom: 2 } },
+    { ...ENCOUNTER_CONFIG, camera: { ...ENCOUNTER_CONFIG.camera, defaultZoom: 2 } },
+    { ...ENCOUNTER_CONFIG, session: { ...ENCOUNTER_CONFIG.session, historyLimit: 0 } },
+  ]
+  for (const config of invalidConfigs) {
+    expect(() => validateEncounterConfig(config)).toThrow(RangeError)
+  }
+})
+
+test('imports in Node and carries the comparison version in plain session snapshots', () => {
+  expect(typeof document).toBe('undefined')
+  expect(typeof window).toBe('undefined')
+  expect(typeof localStorage).toBe('undefined')
+  const snapshot: SessionSnapshot = {
+    rulesVersion: RULES_VERSION,
+    phase: 'playing', elapsedSeconds: 0, hitsTaken: 0,
+    player: { positionTiles: ENCOUNTER_CONFIG.player.spawnTiles, healthHp: PALADIN_STATS.healthHp, combatRemainingSeconds: 0 },
+    enemy: { positionTiles: ENCOUNTER_CONFIG.enemy.spawnTiles, emitterPhaseRadians: ENCOUNTER_CONFIG.emitters.initialPhaseRadians },
+    shards: [{
+      id: 0, positionTiles: { x: 0, y: 0 }, velocityTilesPerSecond: { x: 8, y: 0 },
+      ageSeconds: 0, reversalAgeSeconds: 1.2, lifetimeSeconds: 2.4,
+      hasReversed: false, hasHitPlayer: false,
+    }],
+  }
+  expect(snapshot.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion)
+  expect(snapshot.shards[0]).not.toHaveProperty('origin')
+  expect(snapshot.shards[0].hasHitPlayer).toBe(false)
+})
