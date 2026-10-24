@@ -235,7 +235,7 @@ Acceptance: focused attack/shard tests and typecheck pass; multiple frame schedu
 
 ### Step 3.4 - Implement Hits, Health, And Survival End
 
-Status: pending. Dependencies: 3.3.
+Status: complete. Dependencies: 3.3.
 
 **Implementation prompt**
 
@@ -246,6 +246,20 @@ On a shard's first registered hit, apply damage and set `hasHitPlayer`; later co
 Write failing tests for defense boundaries, first hit, repeated overlap, return collision, multiple shards, fast crossings, regeneration timing/caps, lethal damage, and immutable results after death. Handle ordering between damage and regeneration explicitly according to the contract.
 
 Acceptance: focused collision/health tests, existing simulation tests, and typecheck pass. No projectile is destroyed by collision and no player attack/ability behavior is introduced.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 3.3 complete with recorded validation and a clean worktree. Read the approved damage/combat, collision-circle, reversal, lifetime, and lethal-tick rules. No new tuning, gameplay decision, or rules-version change was needed.
+- Added collision/health/death tests before implementation. From `app/`, `npm.cmd run test -- --project node src/game/simulation` initially passed the prior 55 simulation cases, failed all 21 new simulation cases, and failed to import the missing health module. After implementation, 91 cases passed and one prior test still assumed overlapping shards could not damage; updated that obsolete expectation while retaining its lifetime-only removal assertions. The same focused command then passed. Added three emission-boundary cases and reran focused tests; the final focused result is 95 passing cases (79 simulation, 16 health).
+- Installed typed, MIT-licensed `@flatten-js/core` 1.6.14 through `npm.cmd --prefix app install @flatten-js/core`, preserving the npm lockfile. npm reported zero vulnerabilities. Verified tangent and zero-length segment distances in pure Node without DOM globals before integration; simulation does not import React, Phaser, DOM, or storage APIs.
+- Isolated the library behind a pure relative swept-circle check in `app/src/game/simulation/simulation.ts`. Each shard segment subtracts the player's matching interpolated movement endpoints and compares distance against the combined approved radii. Preserve separate outbound/return segments and clip both shard and player motion at expiry. Newborn shards test only overlap at the firing boundary, never player movement before birth.
+- Added `app/src/game/simulation/health.ts` and its focused tests. `applyPlayerHit` reuses approved defense/minimum/ceiling arithmetic and the inclusive combat trigger; `regeneratePlayer` retains fractional HP, splits combat-expiry time between half/full rates, clamps health, and cannot resurrect a dead player. The fixed-preset shard applies 128 HP damage and refreshes 5.32 seconds of combat before that tick's regeneration.
+- Registered hits in stable spawn order using per-shard `hasHitPlayer`; separate shards can each hit with no global immunity. Hits do not remove or redirect shards, including consumed return paths and off-arena shards. Only lifetime expiry removes them. Adapted the earlier overlap test to the newly implemented hit behavior rather than disabling its collision coverage.
+- Added minimal simulation `phase` (`playing`/`ended`) and `hitsTaken`. On lethal damage, clamp HP to zero, stop later hits and regeneration, include the lethal tick in survival time, stop remaining catch-up ticks, clear the accumulator, and report remaining supplied time as discarded. Later advance calls execute no ticks and leave ended state unchanged. No start/pause/retry controller was added.
+- Coverage includes defense/minimum/ceiling boundaries; exact/below/above combat trigger and refresh; normal/combat fractional regeneration, expiry splits, and caps; fast crossings, moving-player paths, tangent/near-miss cases; outbound/return reversal paths and expiry clipping; emission-time collisions without pre-birth sweeps; repeated overlap/return immunity per shard; independent hits; stable lethal ordering; and frozen results after death. Existing frame-schedule tests also continue to compare complete simulation state.
+- Typecheck initially exposed phase narrowing across the mutating collision callback; changed local post-collision control flow to use the lethal health outcome. Focused tests and typecheck then passed. All established gates passed under Node 24.22.1 / npm 12.2.1: `npm run test` (143 cases: 46 configuration, 79 simulation, 16 health, two React/CSS Module), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one existing Chromium starter smoke test). Formatted only the four touched TypeScript files with temporary npm-exec Prettier; no formatter dependency was added.
+- Final editor diagnostics initially retained missing-module errors for the test imports despite passing CLI checks. Explicit `.ts` paths for those two local imports, supported by the generated `allowImportingTsExtensions` configuration, cleared the diagnostics. Reran all 95 focused cases and typecheck after that change; both passed. Final source/test editor diagnostics are clean, and documentation links, step statuses, and package/lockfile metadata checks passed.
+- Updated [the README](README.md#hits-health-and-survival-end) with collision/health/death semantics, dependency, checks, and current scope. Manual encounter verification is unavailable until Phaser integration; the starter UI is unchanged. No blockers or approved deviations remain. Step 4.1 stays pending; no renderer, input/camera integration, session controls, storage, CI/deployment, commit, or push was introduced.
 
 ## Phase 4: Playable Engine Integration
 

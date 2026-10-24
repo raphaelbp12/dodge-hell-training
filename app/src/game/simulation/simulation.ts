@@ -1,3 +1,4 @@
+import { Point, Segment } from "@flatten-js/core";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import {
   assertNonnegative,
@@ -11,9 +12,12 @@ import type {
   SimulationInput,
   Vector2,
 } from "../models";
+import { applyPlayerHit, regeneratePlayer } from "./health";
 
 export type SimulationState = {
   rulesVersion: string;
+  phase: "playing" | "ended";
+  hitsTaken: number;
   player: PlayerState;
   enemy: EnemyState;
   shards: ShardState[];
@@ -41,6 +45,8 @@ const burstGroupSeconds =
 export function createSimulation(): SimulationState {
   return {
     rulesVersion: ENCOUNTER_CONFIG.rulesVersion,
+    phase: "playing",
+    hitsTaken: 0,
     player: {
       positionTiles: { ...ENCOUNTER_CONFIG.player.spawnTiles },
       healthHp: PALADIN_STATS.healthHp,
@@ -117,14 +123,78 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   );
 }
 
-function moveShard(shard: ShardState, elapsedSeconds: number): void {
+function sweptCirclesOverlap(
+  shardStart: Vector2,
+  shardEnd: Vector2,
+  playerStart: Vector2,
+  playerEnd: Vector2,
+): boolean {
+  const relativePath = new Segment(
+    new Point(shardStart.x - playerStart.x, shardStart.y - playerStart.y),
+    new Point(shardEnd.x - playerEnd.x, shardEnd.y - playerEnd.y),
+  );
+  const [distanceTiles] = relativePath.distanceTo(new Point(0, 0));
+  return (
+    distanceTiles <=
+    ENCOUNTER_CONFIG.player.colliderRadiusTiles +
+      ENCOUNTER_CONFIG.shard.colliderRadiusTiles
+  );
+}
+
+function interpolatePosition(
+  start: Vector2,
+  end: Vector2,
+  fraction: number,
+): Vector2 {
+  return {
+    x: start.x + (end.x - start.x) * fraction,
+    y: start.y + (end.y - start.y) * fraction,
+  };
+}
+
+function moveShard(
+  shard: ShardState,
+  elapsedSeconds: number,
+  playerStart: Vector2,
+  playerEnd: Vector2,
+): boolean {
+  const shardStart = shard.positionTiles;
   shard.positionTiles = {
     x: shard.positionTiles.x + shard.velocityTilesPerSecond.x * elapsedSeconds,
     y: shard.positionTiles.y + shard.velocityTilesPerSecond.y * elapsedSeconds,
   };
+  return (
+    !shard.hasHitPlayer &&
+    sweptCirclesOverlap(shardStart, shard.positionTiles, playerStart, playerEnd)
+  );
 }
 
-function advanceShard(shard: ShardState, elapsedSeconds: number): boolean {
+function advanceShard(
+  shard: ShardState,
+  elapsedSeconds: number,
+  playerStart: Vector2,
+  playerEnd: Vector2,
+): { alive: boolean; hitPlayer: boolean } {
+  const initialAgeSeconds = shard.ageSeconds;
+  let hitPlayer = false;
+  let segmentPlayerStart = playerStart;
+  function moveSegment(segmentSeconds: number): void {
+    const endFraction =
+      (shard.ageSeconds - initialAgeSeconds + segmentSeconds) / elapsedSeconds;
+    const segmentPlayerEnd = interpolatePosition(
+      playerStart,
+      playerEnd,
+      endFraction,
+    );
+    const segmentHit = moveShard(
+      shard,
+      segmentSeconds,
+      segmentPlayerStart,
+      segmentPlayerEnd,
+    );
+    hitPlayer = hitPlayer || segmentHit;
+    segmentPlayerStart = segmentPlayerEnd;
+  }
   const boundaryToleranceSeconds = shard.lifetimeSeconds * Number.EPSILON * 16;
   let targetAgeSeconds = Math.min(
     shard.ageSeconds + elapsedSeconds,
@@ -140,7 +210,7 @@ function advanceShard(shard: ShardState, elapsedSeconds: number): boolean {
       targetAgeSeconds = boundarySeconds;
   }
   if (!shard.hasReversed && targetAgeSeconds >= shard.reversalAgeSeconds) {
-    moveShard(shard, shard.reversalAgeSeconds - shard.ageSeconds);
+    moveSegment(shard.reversalAgeSeconds - shard.ageSeconds);
     shard.ageSeconds = shard.reversalAgeSeconds;
     shard.velocityTilesPerSecond = {
       x: -shard.velocityTilesPerSecond.x,
@@ -148,9 +218,16 @@ function advanceShard(shard: ShardState, elapsedSeconds: number): boolean {
     };
     shard.hasReversed = true;
   }
-  moveShard(shard, targetAgeSeconds - shard.ageSeconds);
+  moveSegment(targetAgeSeconds - shard.ageSeconds);
   shard.ageSeconds = targetAgeSeconds;
-  return shard.ageSeconds < shard.lifetimeSeconds;
+  return { alive: shard.ageSeconds < shard.lifetimeSeconds, hitPlayer };
+}
+
+function registerShardHit(state: SimulationState, shard: ShardState): void {
+  shard.hasHitPlayer = true;
+  state.hitsTaken++;
+  applyPlayerHit(state.player, ENCOUNTER_CONFIG.shard.damageHp);
+  if (state.player.healthHp === 0) state.phase = "ended";
 }
 
 function updateAttacks(state: SimulationState): void {
@@ -202,13 +279,15 @@ export function advanceSimulation(
   input: SimulationInput,
 ): AdvanceResult {
   assertNonnegative(elapsedSeconds, "elapsedSeconds");
+  if (state.phase === "ended")
+    return { stepsExecuted: 0, discardedSeconds: elapsedSeconds };
   const pendingSeconds = state.accumulatorSeconds + elapsedSeconds;
   assertNonnegative(pendingSeconds, "pendingSeconds");
   const { fixedStepSeconds, maxStepsPerUpdate } = ENCOUNTER_CONFIG.simulation;
   const availableSteps = Math.floor(
     (pendingSeconds + timeRoundingToleranceSeconds) / fixedStepSeconds,
   );
-  const stepsExecuted = Math.min(availableSteps, maxStepsPerUpdate);
+  const maximumSteps = Math.min(availableSteps, maxStepsPerUpdate);
   let remainderSeconds = pendingSeconds % fixedStepSeconds;
   if (
     remainderSeconds <= timeRoundingToleranceSeconds ||
@@ -220,18 +299,55 @@ export function advanceSimulation(
     availableSteps > maxStepsPerUpdate
       ? Math.max(
           0,
-          pendingSeconds - stepsExecuted * fixedStepSeconds - remainderSeconds,
+          pendingSeconds - maximumSteps * fixedStepSeconds - remainderSeconds,
         )
       : 0;
 
-  for (let step = 0; step < stepsExecuted; step++) {
+  let stepsExecuted = 0;
+  while (stepsExecuted < maximumSteps) {
+    const playerStart = state.player.positionTiles;
     updateMovement(state, input);
-    state.shards = state.shards.filter((shard) =>
-      advanceShard(shard, fixedStepSeconds),
-    );
     state.ticksElapsed++;
     state.elapsedSeconds = state.ticksElapsed * fixedStepSeconds;
-    updateAttacks(state);
+    state.shards = state.shards.filter((shard) => {
+      if (state.phase === "ended") return true;
+      const result = advanceShard(
+        shard,
+        fixedStepSeconds,
+        playerStart,
+        state.player.positionTiles,
+      );
+      if (result.hitPlayer) registerShardHit(state, shard);
+      return result.alive;
+    });
+    if (state.player.healthHp > 0) {
+      const existingCount = state.shards.length;
+      updateAttacks(state);
+      for (const shard of state.shards.slice(existingCount)) {
+        if (
+          sweptCirclesOverlap(
+            shard.positionTiles,
+            shard.positionTiles,
+            state.player.positionTiles,
+            state.player.positionTiles,
+          )
+        )
+          registerShardHit(state, shard);
+        if (state.player.healthHp === 0) break;
+      }
+      regeneratePlayer(state.player, fixedStepSeconds);
+    }
+    stepsExecuted++;
+    if (state.player.healthHp === 0) {
+      state.accumulatorSeconds = 0;
+      return {
+        stepsExecuted,
+        discardedSeconds: Math.max(
+          0,
+          pendingSeconds - stepsExecuted * fixedStepSeconds,
+        ),
+      };
+    }
   }
   state.accumulatorSeconds = remainderSeconds;
   return { stepsExecuted, discardedSeconds };

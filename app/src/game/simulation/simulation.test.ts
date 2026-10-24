@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { ENCOUNTER_CONFIG, validateEncounterConfig } from "../config/encounter";
 import { PALADIN_DERIVED_STATS, PALADIN_STATS } from "../config/stats";
 import type { ShardState, SimulationInput, Vector2 } from "../models";
-import { advanceSimulation, createSimulation } from "./simulation";
+import { advanceSimulation, createSimulation } from "./simulation.ts";
 
 const idle: SimulationInput = {
   north: false,
@@ -519,8 +519,13 @@ test.each([false, true])(
     runTicks(state, 1);
     expect(state.shards).toEqual([outside, overlap]);
     expect(outside.positionTiles.x).toBeGreaterThan(1000);
-    expect(overlap.hasHitPlayer).toBe(hasHitPlayer);
-    expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
+    expect(outside.hasHitPlayer).toBe(hasHitPlayer);
+    expect(overlap.hasHitPlayer).toBe(true);
+    expect(state.hitsTaken).toBe(Number(!hasHitPlayer));
+    expect(state.player.healthHp).toBeCloseTo(
+      hasHitPlayer ? PALADIN_STATS.healthHp : 775 - 128 + 6.0547 * stepSeconds,
+      10,
+    );
   },
 );
 
@@ -598,4 +603,302 @@ test("discarded time advances neither rotation nor the attack scheduler", () => 
     (state.elapsedSeconds * Math.PI) / 4,
     12,
   );
+});
+
+test("initializes a live simulation with no registered hits", () => {
+  const state = createSimulation();
+  expect(state.phase).toBe("playing");
+  expect(state.hitsTaken).toBe(0);
+});
+
+test("applies one defense-reduced hit before fractional in-combat regeneration without removing the shard", () => {
+  const state = createSimulation();
+  const shard = makeShard();
+  state.shards.push(shard);
+  runTicks(state, 1);
+  expect(shard.hasHitPlayer).toBe(true);
+  expect(state.shards).toContain(shard);
+  expect(state.hitsTaken).toBe(1);
+  expect(state.player.healthHp).toBeCloseTo(
+    775 - 128 + 6.0547 * stepSeconds,
+    10,
+  );
+  expect(state.player.combatRemainingSeconds).toBeCloseTo(
+    5.32 - stepSeconds,
+    12,
+  );
+});
+
+test("repeated overlap never reapplies damage or refreshes combat for the same shard", () => {
+  const state = createSimulation();
+  const shard = makeShard({ velocityTilesPerSecond: { x: 0, y: 0 } });
+  state.shards.push(shard);
+  runTicks(state, 60);
+  expect(state.hitsTaken).toBe(1);
+  expect(state.player.healthHp).toBeCloseTo(775 - 128 + 6.0547, 9);
+  expect(state.player.combatRemainingSeconds).toBeCloseTo(4.32, 10);
+  expect(state.shards).toContain(shard);
+});
+
+test("independent shards can each hit in one tick without global invulnerability", () => {
+  const state = createSimulation();
+  state.shards.push(makeShard({ id: 1 }), makeShard({ id: 2 }));
+  runTicks(state, 1);
+  expect(state.hitsTaken).toBe(2);
+  expect(state.player.healthHp).toBeCloseTo(
+    775 - 256 + 6.0547 * stepSeconds,
+    10,
+  );
+  expect(state.shards.every((shard) => shard.hasHitPlayer)).toBe(true);
+  expect(state.shards).toHaveLength(2);
+});
+
+test.each([
+  [0, true],
+  [0.4, true],
+  [0.400001, false],
+] as const)(
+  "sweeps a fast shard at y=%s against the combined circle radii",
+  (offsetY, expectedHit) => {
+    const state = createSimulation();
+    const shard = makeShard({
+      positionTiles: { x: -2, y: offsetY },
+      velocityTilesPerSecond: { x: 240, y: 0 },
+    });
+    state.shards.push(shard);
+    runTicks(state, 1);
+    expect(shard.positionTiles.x).toBe(2);
+    expect(shard.hasHitPlayer).toBe(expectedHit);
+    expect(state.hitsTaken).toBe(Number(expectedHit));
+  },
+);
+
+test("detects a player crossing a stationary shard even with both endpoints outside", () => {
+  const state = createSimulation();
+  const travelTiles = PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
+  state.player.positionTiles = { x: -travelTiles / 2, y: 0 };
+  const shard = makeShard({
+    positionTiles: { x: 0, y: 0.399 },
+    velocityTilesPerSecond: { x: 0, y: 0 },
+  });
+  expect(
+    distance(state.player.positionTiles, shard.positionTiles),
+  ).toBeGreaterThan(0.4);
+  state.shards.push(shard);
+  runTicks(state, 1, east);
+  expect(
+    distance(state.player.positionTiles, shard.positionTiles),
+  ).toBeGreaterThan(0.4);
+  expect(state.hitsTaken).toBe(1);
+});
+
+test("does not confuse crossing world paths at different times with a relative-motion hit", () => {
+  const state = createSimulation();
+  const travelTiles = PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
+  state.player.positionTiles = { x: -0.45, y: 0 };
+  const shard = makeShard({
+    positionTiles: { x: 0, y: 0 },
+    velocityTilesPerSecond: { x: travelTiles / stepSeconds, y: 0 },
+  });
+  state.shards.push(shard);
+  runTicks(state, 1, east);
+  expect(state.hitsTaken).toBe(0);
+});
+
+test("detects the outbound excursion of a reversal tick even when the endpoints coincide", () => {
+  const state = createSimulation();
+  const shard = makeShard({
+    positionTiles: { x: -1, y: 0 },
+    velocityTilesPerSecond: { x: 240, y: 0 },
+    ageSeconds: 1.2 - stepSeconds / 2,
+  });
+  state.shards.push(shard);
+  runTicks(state, 1);
+  expect(shard.positionTiles.x).toBeCloseTo(-1, 10);
+  expect(shard.hasReversed).toBe(true);
+  expect(shard.hasHitPlayer).toBe(true);
+  expect(state.hitsTaken).toBe(1);
+});
+
+test("detects a return-only crossing within a reversal tick", () => {
+  const state = createSimulation();
+  const shard = makeShard({
+    positionTiles: { x: 1, y: 0 },
+    velocityTilesPerSecond: { x: 240, y: 0 },
+    ageSeconds: 1.2 - stepSeconds / 4,
+  });
+  state.shards.push(shard);
+  runTicks(state, 1);
+  expect(shard.positionTiles.x).toBeCloseTo(-1, 10);
+  expect(state.hitsTaken).toBe(1);
+});
+
+test("never hits again when a previously consumed shard returns through the player", () => {
+  const state = createSimulation();
+  const shard = makeShard();
+  state.shards.push(shard);
+  runTicks(state, 144);
+  expect(state.hitsTaken).toBe(1);
+  expect(shard.hasHitPlayer).toBe(true);
+  expect(shard.positionTiles.x).toBeCloseTo(0, 9);
+  expect(state.shards).not.toContain(shard);
+});
+
+test.each([
+  [-0.5, true],
+  [-1, false],
+] as const)(
+  "checks only the live part of an expiring shard path from x=%s",
+  (startX, expectedHit) => {
+    const state = createSimulation();
+    const shard = makeShard({
+      positionTiles: { x: startX, y: 0 },
+      velocityTilesPerSecond: { x: 120, y: 0 },
+      ageSeconds: 2.4 - stepSeconds / 4,
+      hasReversed: true,
+    });
+    state.shards.push(shard);
+    runTicks(state, 1);
+    expect(shard.hasHitPlayer).toBe(expectedHit);
+    expect(state.hitsTaken).toBe(Number(expectedHit));
+    expect(state.shards).not.toContain(shard);
+  },
+);
+
+test("does not extend the player's sweep past a shard's expiry", () => {
+  const state = createSimulation();
+  state.player.positionTiles = { x: -0.48, y: 0 };
+  state.shards.push(
+    makeShard({
+      velocityTilesPerSecond: { x: 0, y: 0 },
+      ageSeconds: 2.4 - stepSeconds / 4,
+      hasReversed: true,
+    }),
+  );
+  runTicks(state, 1, east);
+  expect(state.player.positionTiles.x).toBeGreaterThan(-0.4);
+  expect(state.hitsTaken).toBe(0);
+});
+
+test("uses the matching portion of player movement for each reversal segment", () => {
+  const state = createSimulation();
+  state.player.positionTiles = { x: -0.5, y: 0 };
+  state.shards.push(
+    makeShard({
+      positionTiles: { x: -0.07, y: 0 },
+      ageSeconds: 1.2 - stepSeconds * 0.9,
+    }),
+  );
+  runTicks(state, 1, east);
+  expect(state.hitsTaken).toBe(0);
+});
+
+test("regenerates fractionally at the normal rate and caps health", () => {
+  const state = createSimulation();
+  state.player.healthHp = 700;
+  runTicks(state, 60);
+  expect(state.player.healthHp).toBeCloseTo(712.1094, 9);
+  state.player.healthHp = 774.99;
+  runTicks(state, 1);
+  expect(state.player.healthHp).toBe(775);
+});
+
+test("splits regeneration when combat expires partway through a tick", () => {
+  const state = createSimulation();
+  state.player.healthHp = 700;
+  state.player.combatRemainingSeconds = stepSeconds / 4;
+  runTicks(state, 1);
+  expect(state.player.healthHp).toBeCloseTo(
+    700 + (6.0547 * stepSeconds) / 4 + (12.1094 * stepSeconds * 3) / 4,
+    10,
+  );
+  expect(state.player.combatRemainingSeconds).toBe(0);
+});
+
+test("a fresh qualifying hit refreshes combat before regeneration spans the old expiry", () => {
+  const state = createSimulation();
+  state.player.combatRemainingSeconds = stepSeconds / 4;
+  state.shards.push(makeShard());
+  runTicks(state, 1);
+  expect(state.player.healthHp).toBeCloseTo(647 + 6.0547 * stepSeconds, 10);
+  expect(state.player.combatRemainingSeconds).toBeCloseTo(
+    5.32 - stepSeconds,
+    12,
+  );
+});
+
+test("stops on lethal damage in stable spawn order before later hits or regeneration", () => {
+  const state = createSimulation();
+  state.player.healthHp = 128;
+  const first = makeShard({ id: 1 });
+  const later = makeShard({ id: 2 });
+  state.shards.push(first, later);
+  const result = advanceSimulation(state, stepSeconds * 3.5, idle);
+  expect(state.phase).toBe("ended");
+  expect(state.player.healthHp).toBe(0);
+  expect(state.hitsTaken).toBe(1);
+  expect(first.hasHitPlayer).toBe(true);
+  expect(later.hasHitPlayer).toBe(false);
+  expect(state.shards).toContain(first);
+  expect(state.elapsedSeconds).toBe(stepSeconds);
+  expect(state.ticksElapsed).toBe(1);
+  expect(state.accumulatorSeconds).toBe(0);
+  expect(result.stepsExecuted).toBe(1);
+});
+
+test("includes the lethal tick in survival time and freezes all state after death", () => {
+  const state = createSimulation();
+  runTicks(state, 5);
+  state.player.healthHp = 1;
+  state.shards.push(makeShard());
+  runTicks(state, 1);
+  expect(state.elapsedSeconds).toBe(6 * stepSeconds);
+  expect(state.player.healthHp).toBe(0);
+  const ended = structuredClone(state);
+  for (const duration of [0, stepSeconds / 2, stepSeconds, 100]) {
+    expect(advanceSimulation(state, duration, east).stepsExecuted).toBe(0);
+    expect(state).toEqual(ended);
+  }
+});
+
+test("checks newborn overlap at the exact firing boundary", () => {
+  const state = createSimulation();
+  runTicks(state, 119);
+  state.enemy.positionTiles = { x: 0, y: 0 };
+  state.player.positionTiles = { x: 0, y: 0.75 };
+  runTicks(state, 1);
+  expect(state.elapsedSeconds).toBe(2);
+  expect(state.shards).toHaveLength(4);
+  expect(state.shards[0].ageSeconds).toBe(0);
+  expect(state.shards[0].hasHitPlayer).toBe(true);
+  expect(state.hitsTaken).toBe(1);
+  expect(state.player.healthHp).toBeCloseTo(647 + 6.0547 * stepSeconds, 10);
+});
+
+test("a lethal boundary-spawn hit prevents later newborn hits and regeneration", () => {
+  const state = createSimulation();
+  runTicks(state, 119);
+  state.enemy.positionTiles = { x: 0, y: 0 };
+  state.player.positionTiles = { x: 0, y: 0.75 };
+  state.player.healthHp = 128;
+  runTicks(state, 1);
+  expect(state.phase).toBe("ended");
+  expect(state.elapsedSeconds).toBe(2);
+  expect(state.player.healthHp).toBe(0);
+  expect(state.hitsTaken).toBe(1);
+  expect(state.shards.filter((shard) => shard.hasHitPlayer)).toHaveLength(1);
+  expect(state.shards).toHaveLength(4);
+});
+
+test("does not sweep a newborn shard against player movement before its firing time", () => {
+  const state = createSimulation();
+  runTicks(state, 119);
+  state.enemy.positionTiles = { x: 0, y: 0 };
+  state.player.positionTiles = { x: 0.35, y: 0.75 };
+  runTicks(state, 1, east);
+  expect(state.player.positionTiles.x).toBeGreaterThan(0.4);
+  expect(state.shards).toHaveLength(4);
+  expect(state.shards.every((shard) => shard.ageSeconds === 0)).toBe(true);
+  expect(state.hitsTaken).toBe(0);
+  expect(state.player.healthHp).toBe(775);
 });
