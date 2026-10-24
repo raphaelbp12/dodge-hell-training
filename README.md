@@ -4,7 +4,9 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 3.4 is complete: `app/` contains the command-generated React + TypeScript + Vite starter, runtime/test dependencies, domain configuration, pure stat formulas, and fixed-step movement, pursuit, rotating bursts, returning shards, swept hits, regeneration, and survival end. It still displays the Vite starter screen and counter, not a playable encounter. Phaser integration, session controls, and GitHub Pages deployment belong to later plan steps.
+Step 4.1 is complete: the temporary React entry launches a playable Phaser encounter with WASD movement, pursuit, rotating bursts, returning shards, hits, health loss, player-centered camera, and O/P zoom. Focus loss pauses play until Resume. Full session/countdown/retry controls, the final practice interface, records, and GitHub Pages deployment remain later steps.
+
+Current local preview: http://127.0.0.1:5174/.
 
 ## Domain Data
 
@@ -42,7 +44,7 @@ From `app/`, run the focused 95-case simulation/health suites (79 simulation cas
 npm.cmd run test -- --project node src/game/simulation
 ```
 
-Tests cover initialization, directions/opposite inputs, normalized speed, known tick counts, boundaries, pursuit/stopping, frame schedules, invalid time, and catch-up accounting. Equivalent schedules with the same per-tick input and no dropped time match within 1e-9 tile; the remainder tolerance is 1e-12 second. At low frame rates that exceed the catch-up limit, intentional dropped time means results are not expected to equal an undropped schedule. No new browser keyboard behavior is expected until Phaser integration.
+Tests cover initialization, directions/opposite inputs, normalized speed, known tick counts, boundaries, pursuit/stopping, frame schedules, invalid time, and catch-up accounting. Equivalent schedules with the same per-tick input and no dropped time match within 1e-9 tile; the remainder tolerance is 1e-12 second. At low frame rates that exceed the catch-up limit, intentional dropped time means results are not expected to equal an undropped schedule. The Phaser adapter now supplies active elapsed seconds and sampled keyboard input to this same simulation.
 
 ## Rotating Bursts And Shards
 
@@ -52,7 +54,7 @@ All approved shot times align with the 60 Hz tick boundaries. Each tick moves th
 
 Shard updates split displacement at reversal and expiry, reversing velocity exactly once at 1.2 seconds and expiring at 2.4 seconds. Only lifetime removes a shard; arena exit, player overlap, and `hasHitPlayer` do not. Shards store no origin or target, and later enemy movement cannot alter their velocity. Hit flags initialize false and prevent repeated damage without stopping shard movement.
 
-The focused suite retains 17 attack/shard cases covering cooldown and shot boundaries, all emitter offsets, resampling, clockwise rotation, partial-step reversal/expiry, symmetric return, lifetime-only removal, and discarded time. Five frame schedules over ten simulated seconds agree on all 64 emitted shard times within 1e-12 second and on final state. No rendered shards or manual gameplay verification are available until step 4.1.
+The focused suite retains 17 attack/shard cases covering cooldown and shot boundaries, all emitter offsets, resampling, clockwise rotation, partial-step reversal/expiry, symmetric return, lifetime-only removal, and discarded time. Five frame schedules over ten simulated seconds agree on all 64 emitted shard times within 1e-12 second and on final state. Phaser draws these same shards; it does not own a separate projectile simulation or expiration policy.
 
 ## Hits, Health, And Survival End
 
@@ -62,7 +64,21 @@ The simulation uses `@flatten-js/core` segment-distance geometry behind a pure c
 
 Fresh state has `phase: "playing"` and zero hits. Lethal damage clamps HP to zero and sets `phase: "ended"`; no later hits or regeneration can change the result. Count the lethal tick in survival time, stop the rest of a multi-tick update, clear the accumulator, and report unexecuted supplied time as discarded. Later advancement calls execute zero ticks and leave the entire ended state unchanged. The session controller, UI, and persistence remain separate later steps.
 
-Step 3.4 adds 40 cases for defense/minimum/ceiling damage, combat trigger and refresh, fractional regeneration/expiry/caps, fast and moving-player crossings, tangencies/near misses, reversal/expiry segments, birth-time overlap, consumed return hits, independent simultaneous hits, lethal ordering, and post-death state freezing. Manual gameplay verification awaits step 4.1; the existing Chromium smoke test still checks only the unchanged starter.
+Step 3.4 adds 40 cases for defense/minimum/ceiling damage, combat trigger and refresh, fractional regeneration/expiry/caps, fast and moving-player crossings, tangencies/near misses, reversal/expiry segments, birth-time overlap, consumed return hits, independent simultaneous hits, lethal ordering, and post-death state freezing. Browser integration now verifies pursuit, firing, reversal, hit registration, and health loss through real Phaser updates.
+
+## Playable Engine Adapter
+
+[encounter.ts](app/src/game/phaser/encounter.ts) owns the Phaser game, scene, keyboard sampling, camera, and drawing. [App.tsx](app/src/App.tsx) owns the temporary launch/close entry, focusable canvas host, and minimal health/time/status display, styled through [App.module.css](app/src/App.module.css). React receives scalar HUD updates at most every 100 milliseconds during play, not projectile positions per frame. Phaser's update lifecycle is the only driver of the existing fixed-step simulation.
+
+Game creation is deferred by one cancellable microtask so React Strict Mode's discarded mount never boots a second game. Unmount synchronously disables adapter input, removes adapter listeners and its canvas, and requests Phaser's supported asynchronous destruction on the next engine frame. A read-only `inspectEncounter(host)` returns detached diagnostic snapshots for browser checks; it cannot mutate live simulation state.
+
+The camera remains north-up and centered exactly on the player, including at arena edges, without world bounds. World scale is 32 CSS pixels/tile at zoom 1. O/P change zoom by 0.125 per press within 0.75-1.5; held repeats do not repeat zoom changes. Resize changes visible world extent, never world speed or timing. Ground, bodies, and yellow shards use separate Phaser graphics depths, with circle fills matching configured collision radii.
+
+This temporary entry launches active play directly; it is not the final Start/countdown flow. R retry, Escape pause, countdown, results, retained zoom across retry, and records remain later steps. Blur, host focus loss, or a hidden document clear held keys and gate simulation until explicit Resume; resume discards its first frame delta instead of catching up hidden time. Gameplay key cancellation is scoped to focused active play, leaving unrelated keys and browser modifier shortcuts untouched. No touch input is installed.
+
+Manual check: open http://127.0.0.1:5174/, select **Launch encounter**, move with WASD, and use O/P to change zoom. Stay still to observe pursuit, yellow outbound/returning shards, and health loss. Switch focus away and return: play stays paused until **Resume**. Use **Close encounter**, then launch again for a fresh temporary encounter; R retry is not implemented yet. Narrow screens retain the same world scale and show a keyboard requirement, not touch controls.
+
+Eight Chromium checks cover repeated mounts/one canvas/one effective keyboard handler, movement speed and arena-edge camera centering, zoom limits/repeats, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. Desktop (1440x1000) and narrow (390x844) screenshots plus canvas-pixel checks verify readable nonblank ground/player/shards, visible desktop enemy, and no horizontal overflow or header/canvas overlap. Screenshots are attached to test results under ignored `app/test-results/`.
 
 ## Prerequisites
 
@@ -111,7 +127,7 @@ Updated and validated on 2026-10-24:
 | Node type definitions                         | 24.19.2; intentionally aligned to Node 24 rather than latest major 26 |
 | Vite / React plugin                           | 8.3.5 / 6.1.2                                                         |
 | Oxlint                                        | 1.89.0                                                                |
-| Phaser                                        | 4.2.1; installed, not integrated yet                                  |
+| Phaser                                        | 4.2.1; integrated runtime, input, camera, and drawing                  |
 | @flatten-js/core                              | 1.6.14; typed, framework-independent collision geometry               |
 | Vitest / jsdom                                | 5.0.5 / 30.1.3                                                        |
 | React Testing Library / jest-dom / user-event | 16.3.3 / 7.0.1 / 14.6.8                                               |
@@ -119,7 +135,7 @@ Updated and validated on 2026-10-24:
 
 TypeScript was upgraded through npm; other compatible packages were refreshed and were already current within their supported ranges. A clean `npm ci`, lint, and the TypeScript/production build pass with this toolchain. The original bootstrap record below is historical, not the current runtime requirement.
 
-The project's Chromium smoke test now verifies the starter heading, a normal mouse click updating its counter, all starter images, and absence of uncaught page errors. This supersedes step 2.1's limited editor-browser automation check; no application component was changed to accommodate automation.
+The Chromium suite now verifies the playable encounter rather than the retired starter counter. The temporary launch/close lifecycle check includes uncaught-page-error assertions; render checks inspect actual canvas pixels and save screenshots.
 
 ## Local Development
 
@@ -149,7 +165,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (143 Vitest tests and one Chromium smoke test).
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (143 Vitest tests and eight Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.69 MB minified / 453 kB gzip); no warning limit was raised.
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -197,7 +213,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 4.1.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 4.2.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.

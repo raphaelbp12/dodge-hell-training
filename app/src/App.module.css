@@ -1,0 +1,154 @@
+:global(*) {
+  box-sizing: border-box;
+  letter-spacing: 0;
+}
+:global(:root) {
+  color-scheme: light;
+  color: #152c26;
+  background: #e9efeb;
+  font:
+    16px/1.45 "Trebuchet MS",
+    sans-serif;
+}
+:global(body) {
+  margin: 0;
+}
+:global(#root) {
+  width: 100%;
+  max-width: none;
+  min-height: 100svh;
+  border: 0;
+  text-align: left;
+}
+:global(button) {
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid #386353;
+  border-radius: 4px;
+  padding: 9px 16px;
+  background: #f8fbf8;
+  color: #183f31;
+  cursor: pointer;
+}
+:global(button:hover) {
+  background: #d4e9df;
+}
+:global(button:focus-visible) {
+  outline: 3px solid #299774;
+  outline-offset: 3px;
+}
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 28px;
+  border-bottom: 1px solid #c4d5cc;
+}
+.header h1 {
+  font:
+    600 24px/1.2 "Trebuchet MS",
+    sans-serif;
+  margin: 3px 0 0;
+  letter-spacing: 0;
+  color: #152c26;
+}
+.eyebrow {
+  font-size: 12px;
+  color: #4a6b5c;
+}
+.telemetry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  min-height: 58px;
+  padding: 10px 28px;
+  font-family: Consolas, monospace;
+  font-size: 14px;
+}
+.telemetry output {
+  min-width: 80px;
+}
+.telemetry button {
+  padding: 4px 14px;
+}
+.health {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+}
+.health meter {
+  width: 104px;
+  height: 16px;
+  accent-color: #26885d;
+}
+.arena {
+  width: 100%;
+  height: calc(100svh - 146px);
+  min-height: 320px;
+  overflow: hidden;
+  background: #101b1b;
+  outline-offset: -3px;
+}
+.arena:focus-visible {
+  outline: 2px solid #55d6a0;
+}
+.arena canvas {
+  display: block;
+}
+.keyboardNotice {
+  display: none;
+}
+.idle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 480px;
+  flex: 1;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 31px, #29423a 31px 32px),
+    repeating-linear-gradient(90deg, #1c302a 0 31px, #29423a 31px 32px);
+}
+.crystal {
+  width: 64px;
+  height: 64px;
+  background: #86ded9;
+  border: 10px solid #ea7969;
+  transform: rotate(45deg);
+}
+@media (max-width: 600px) {
+  .header {
+    padding: 14px 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .header h1 {
+    font-size: 22px;
+  }
+  .header button {
+    padding: 8px 12px;
+  }
+  .telemetry {
+    padding: 10px 16px;
+    gap: 10px 18px;
+  }
+  .keyboardNotice {
+    display: block;
+    margin: 0;
+    padding: 8px 16px;
+    background: #d6e5dd;
+    color: #36594b;
+    font-size: 13px;
+  }
+  .arena {
+    height: 65svh;
+    min-height: 320px;
+  }
+}
