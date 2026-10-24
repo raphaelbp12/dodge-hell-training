@@ -5,15 +5,68 @@ import {
   type EncounterView,
 } from "./game/phaser/encounter";
 import { PALADIN_STATS } from "./game/config/stats";
-import { ENCOUNTER_CONFIG } from "./game/config/encounter";
+import { ENCOUNTER_CONFIG, RULES_VERSION } from "./game/config/encounter";
+import {
+  AttemptHistory,
+  retainedBestSeconds,
+  type HistorySnapshot,
+} from "./storage/attempts";
 import styles from "./App.module.css";
+
+function History({ snapshot }: { snapshot: HistorySnapshot }) {
+  const best = retainedBestSeconds(snapshot.records, RULES_VERSION);
+  return (
+    <section className={styles.history} aria-label="Attempt history">
+      <p>
+        Retained personal best{" "}
+        <strong aria-label="Retained personal best">
+          {best === null ? "None" : `${best.toFixed(2)} s`}
+        </strong>
+      </p>
+      <small>
+        Current rules / latest {ENCOUNTER_CONFIG.session.historyLimit} completed
+        attempts
+      </small>
+      <details open>
+        <summary>Recent attempts ({snapshot.records.length})</summary>
+        {snapshot.records.length ? (
+          <ol aria-label="Recent attempts">
+            {snapshot.records.map((record) => (
+              <li
+                key={record.id}
+                aria-label={`Completed attempt: ${record.elapsedSeconds.toFixed(2)} seconds, ${record.hitsTaken} hits`}
+              >
+                <span>{record.elapsedSeconds.toFixed(2)} s</span>
+                <span>{record.hitsTaken} hits</span>
+                <span title={record.rulesVersion}>
+                  {record.rulesVersion === RULES_VERSION
+                    ? "Current rules"
+                    : "Other rules"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No completed attempts</p>
+        )}
+      </details>
+      {snapshot.warning && <p role="status">{snapshot.warning}</p>}
+    </section>
+  );
+}
 
 function Encounter({
   zoomPreference,
   onHome,
+  history,
+  historySnapshot,
+  onHistoryChange,
 }: {
   zoomPreference: RefObject<number>;
   onHome: () => void;
+  history: AttemptHistory;
+  historySnapshot: HistorySnapshot;
+  onHistoryChange: (snapshot: HistorySnapshot) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
@@ -32,6 +85,8 @@ function Encounter({
   }, [view.result]);
   useEffect(() => {
     let active = true;
+    const runtimeId = crypto.randomUUID();
+    const recordedAttempts = new Set<number>();
     const handle = createEncounter(
       host.current!,
       (nextView) => {
@@ -39,7 +94,17 @@ function Encounter({
         zoomPreference.current = nextView.zoom;
         setView(nextView);
       },
-      { initialZoom: zoomPreference.current },
+      {
+        initialZoom: zoomPreference.current,
+        onResult: (result) => {
+          if (!active || recordedAttempts.has(result.attemptId)) return;
+          recordedAttempts.add(result.attemptId);
+          const { attemptId, ...metrics } = result;
+          onHistoryChange(
+            history.save({ id: `${runtimeId}:${attemptId}`, ...metrics }),
+          );
+        },
+      },
     );
     runtime.current = handle;
     return () => {
@@ -47,7 +112,7 @@ function Encounter({
       runtime.current = null;
       handle.destroy();
     };
-  }, [zoomPreference]);
+  }, [zoomPreference, history, onHistoryChange]);
   return (
     <>
       <div className={styles.telemetry} aria-label="Session HUD">
@@ -139,6 +204,7 @@ function Encounter({
                 Home
               </button>
             </div>
+            <History snapshot={historySnapshot} />
           </section>
         )}
       </div>
@@ -147,6 +213,12 @@ function Encounter({
 }
 
 export default function App() {
+  const [history] = useState(
+    () => new AttemptHistory(() => window.localStorage),
+  );
+  const [historySnapshot, setHistorySnapshot] = useState(() =>
+    history.snapshot(),
+  );
   const [launched, setLaunched] = useState(false);
   const startButton = useRef<HTMLButtonElement>(null);
   const zoomPreference = useRef<number>(ENCOUNTER_CONFIG.camera.defaultZoom);
@@ -167,6 +239,9 @@ export default function App() {
         <Encounter
           zoomPreference={zoomPreference}
           onHome={() => setLaunched(false)}
+          history={history}
+          historySnapshot={historySnapshot}
+          onHistoryChange={setHistorySnapshot}
         />
       ) : (
         <div className={styles.home}>
@@ -198,6 +273,7 @@ export default function App() {
             <span>{PALADIN_STATS.speed} SPD</span>
             <span>{PALADIN_STATS.defense} DEF</span>
           </section>
+          <History snapshot={historySnapshot} />
           <section
             className={styles.changelog}
             aria-labelledby="changelog-title"
@@ -209,6 +285,10 @@ export default function App() {
                 Crystal Worm Child Head encounter with returning shard bursts.
               </li>
               <li>Pause, immediate retry, and attempt results.</li>
+              <li>
+                Local attempt history and retained personal best by rules
+                version.
+              </li>
             </ul>
           </section>
           <footer className={styles.footer}>

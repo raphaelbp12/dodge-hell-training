@@ -38,6 +38,14 @@ async function launch(page: Page) {
     .toBeGreaterThan(0);
 }
 
+async function savedAttempts(page: Page) {
+  return page.evaluate(async () => {
+    const modulePath = "/src/storage/attempts.ts";
+    const { HISTORY_STORAGE_KEY } = await import(/* @vite-ignore */ modulePath);
+    return JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) ?? "null");
+  });
+}
+
 async function retrySnapshot(
   page: Page,
   source: "key" | "button" = "key",
@@ -233,6 +241,7 @@ for (const width of [1440, 390]) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
     await launch(page);
+    await page.keyboard.press("p");
     const canvas = await page.locator("canvas").elementHandle();
     const originalBox = await page
       .getByRole("region", { name: "Encounter", exact: true })
@@ -244,8 +253,24 @@ for (const width of [1440, 390]) {
       .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
       .toBe("ended");
     const ended = await inspect(page);
+    const saved = await savedAttempts(page);
+    expect(saved.schemaVersion).toBe(1);
+    expect(saved.records).toHaveLength(1);
+    expect(saved.records[0]).toEqual({
+      id: expect.any(String),
+      rulesVersion: ended.rulesVersion,
+      outcome: "death",
+      elapsedSeconds: ended.elapsedSeconds,
+      hitsTaken: ended.hitsTaken,
+    });
     const results = page.getByRole("region", { name: "Attempt complete" });
     await expect(results).toBeVisible();
+    await expect(results.getByLabel("Retained personal best")).toHaveText(
+      `${ended.elapsedSeconds.toFixed(2)} s`,
+    );
+    await expect(
+      results.getByRole("listitem", { name: /completed attempt/i }),
+    ).toHaveCount(1);
     await expect(results.getByRole("heading")).toBeFocused();
     await expect(results).toContainText(`${ended.elapsedSeconds.toFixed(2)} s`);
     await expect(results.locator("dd").nth(1)).toHaveText(
@@ -323,8 +348,21 @@ for (const width of [1440, 390]) {
       ),
     ).toBe(true);
     await expect(results).toHaveCount(0);
+    expect(await savedAttempts(page)).toEqual(saved);
     await page.getByRole("button", { name: "Home", exact: true }).click();
     await expect(page.locator("canvas")).toHaveCount(0);
+    await page.reload();
+    expect(await savedAttempts(page)).toEqual(saved);
+    await expect(page.getByLabel("Retained personal best")).toHaveText(
+      `${ended.elapsedSeconds.toFixed(2)} s`,
+    );
+    await expect(
+      page.getByRole("listitem", { name: /completed attempt/i }),
+    ).toHaveCount(1);
+    await page.screenshot({
+      path: testInfo.outputPath(`history-${width}.png`),
+      fullPage: true,
+    });
     await expect(
       page.getByRole("button", { name: "Start", exact: true }),
     ).toBeFocused();
@@ -332,6 +370,102 @@ for (const width of [1440, 390]) {
     await expect
       .poll(async () => (await inspect(page))?.sessionPhase)
       .toBe("countdown");
+  });
+}
+
+test("loaded history compares only compatible retained records", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const storagePath = "/src/storage/attempts.ts";
+    const configPath = "/src/game/config/encounter.ts";
+    const { HISTORY_STORAGE_KEY, HISTORY_SCHEMA_VERSION } = await import(
+      /* @vite-ignore */ storagePath
+    );
+    const { RULES_VERSION } = await import(/* @vite-ignore */ configPath);
+    localStorage.setItem(
+      HISTORY_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: HISTORY_SCHEMA_VERSION,
+        records: [
+          {
+            id: "other",
+            rulesVersion: "other-rules",
+            outcome: "death",
+            elapsedSeconds: 999,
+            hitsTaken: 1,
+          },
+          {
+            id: "current",
+            rulesVersion: RULES_VERSION,
+            outcome: "death",
+            elapsedSeconds: 20,
+            hitsTaken: 7,
+          },
+        ],
+      }),
+    );
+  });
+  await page.reload();
+  await expect(page.getByLabel("Retained personal best")).toHaveText("20.00 s");
+  await expect(page.getByText("Other rules", { exact: true })).toBeVisible();
+  await expect(page.getByText("999.00 s", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await expect
+    .poll(async () => (await inspect(page))?.sessionPhase)
+    .toBe("countdown");
+  await retrySnapshot(page);
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  expect((await savedAttempts(page)).records).toHaveLength(2);
+});
+
+for (const failure of ["corrupt", "blocked", "quota"] as const) {
+  test(`${failure} storage still allows death, Retry, and Home`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(90_000);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript((failure) => {
+      if (failure === "corrupt")
+        localStorage.setItem("dodge-hell-training.attempts", "{");
+      if (failure === "blocked")
+        Object.defineProperty(window, "localStorage", {
+          get() {
+            throw new Error("SecurityError");
+          },
+        });
+      if (failure === "quota")
+        Storage.prototype.setItem = () => {
+          throw new Error("QuotaExceededError");
+        };
+    }, failure);
+    await launch(page);
+    await expect
+      .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
+      .toBe("ended");
+    await expect(
+      page.getByText(/Results are kept for this visit only/),
+    ).toBeVisible();
+    const results = page.getByRole("region", { name: "Attempt complete" });
+    await page.screenshot({
+      path: testInfo.outputPath(`storage-${failure}.png`),
+      fullPage: true,
+    });
+    await results.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect
+      .poll(async () => (await inspect(page)).sessionPhase)
+      .toBe("playing");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Start", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      page.getByRole("listitem", { name: /completed attempt/i }),
+    ).toHaveCount(1);
+    expect(errors).toEqual([]);
   });
 }
 

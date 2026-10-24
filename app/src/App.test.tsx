@@ -5,6 +5,11 @@ import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import type { EncounterView } from "./game/phaser/encounter";
 import { RULES_VERSION } from "./game/config/encounter";
+import type { AttemptResult } from "./game/session/session";
+import {
+  HISTORY_STORAGE_KEY,
+  HISTORY_SCHEMA_VERSION,
+} from "./storage/attempts";
 import styles from "./test/probe.module.css";
 
 const adapter = vi.hoisted(() => ({
@@ -12,6 +17,7 @@ const adapter = vi.hoisted(() => ({
   created: 0,
   destroyed: 0,
   publish: null as null | ((view: EncounterView) => void),
+  onResult: null as null | ((result: AttemptResult) => void),
   resume: vi.fn(),
   retry: vi.fn(),
 }));
@@ -20,8 +26,10 @@ vi.mock("./game/phaser/encounter", () => ({
   createEncounter: (
     host: HTMLElement,
     publish: (view: EncounterView) => void,
+    options: { onResult?: (result: AttemptResult) => void },
   ) => {
     adapter.publish = publish;
+    adapter.onResult = options.onResult ?? null;
     adapter.created++;
     adapter.active++;
     const canvas = document.createElement("canvas");
@@ -39,6 +47,8 @@ vi.mock("./game/phaser/encounter", () => ({
 }));
 
 beforeEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
   adapter.active = 0;
   adapter.created = 0;
   adapter.destroyed = 0;
@@ -93,7 +103,9 @@ test("Home includes description, accurate changelog, and delegated links", () =>
   expect(
     screen.getByRole("link", { name: "Realm of the Mad God" }),
   ).toHaveAttribute("href", "https://www.realmofthemadgod.com/");
-  expect(screen.queryByText(/personal best/i)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
+    "None",
+  );
 });
 
 test("HUD reads snapshots and results Retry keeps the runtime while Home cleans up", async () => {
@@ -204,6 +216,139 @@ test("Home from results discards the view and ignores a disposed runtime publica
     screen.getByRole("status", { name: "Session status" }),
   ).toHaveTextContent("Starting");
 });
+
+const completedResult: AttemptResult = {
+  attemptId: 1,
+  rulesVersion: RULES_VERSION,
+  elapsedSeconds: 12.25,
+  hitsTaken: 7,
+  outcome: "death",
+};
+
+test("completed attempts save once despite duplicate callbacks, survive remount, and exclude aborted retries", async () => {
+  const user = userEvent.setup();
+  const mounted = render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+  act(() => {
+    adapter.publish!({
+      ...runningView,
+      status: "ended",
+      healthHp: 0,
+      result: completedResult,
+    });
+    adapter.onResult!(completedResult);
+    adapter.onResult!({ ...completedResult });
+  });
+  expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
+    "12.25 s",
+  );
+  expect(
+    screen.getAllByRole("listitem", { name: /completed attempt/i }),
+  ).toHaveLength(1);
+  expect(
+    JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)!).records,
+  ).toHaveLength(1);
+  await user.click(
+    screen
+      .getByRole("region", { name: "Attempt complete" })
+      .querySelector<HTMLButtonElement>("button")!,
+  );
+  const staleResultCallback = adapter.onResult!;
+  mounted.unmount();
+  act(() => staleResultCallback({ ...completedResult, attemptId: 2 }));
+  render(<App />);
+  expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
+    "12.25 s",
+  );
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  act(() => {
+    adapter.publish!({
+      ...runningView,
+      status: "ended",
+      healthHp: 0,
+      result: completedResult,
+    });
+    adapter.onResult!(completedResult);
+  });
+  expect(
+    JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY)!).records,
+  ).toHaveLength(2);
+});
+
+test("personal best excludes incompatible rules while recent attempts identify them", () => {
+  localStorage.setItem(
+    HISTORY_STORAGE_KEY,
+    JSON.stringify({
+      schemaVersion: HISTORY_SCHEMA_VERSION,
+      records: [
+        {
+          id: "older-rules",
+          rulesVersion: "other-rules",
+          elapsedSeconds: 999,
+          hitsTaken: 1,
+          outcome: "death",
+        },
+        {
+          id: "same-rules",
+          rulesVersion: RULES_VERSION,
+          elapsedSeconds: 20,
+          hitsTaken: 9,
+          outcome: "death",
+        },
+      ],
+    }),
+  );
+  render(<App />);
+  expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
+    "20.00 s",
+  );
+  expect(screen.getByText("Other rules")).toBeVisible();
+  expect(screen.getByText("999.00 s")).toBeVisible();
+});
+
+test.each(["corrupt", "blocked", "quota"])(
+  "%s storage leaves Start, results Retry and Home usable",
+  async (failure) => {
+    if (failure === "corrupt") localStorage.setItem(HISTORY_STORAGE_KEY, "{");
+    if (failure === "blocked")
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    if (failure === "quota")
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("quota");
+      });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    act(() => {
+      adapter.publish!({
+        ...runningView,
+        status: "ended",
+        healthHp: 0,
+        result: completedResult,
+      });
+      adapter.onResult!(completedResult);
+    });
+    expect(
+      screen.getByText(/Results are kept for this visit only/),
+    ).toBeVisible();
+    const results = screen.getByRole("region", { name: "Attempt complete" });
+    await user.click(within(results).getByRole("button", { name: "Retry" }));
+    expect(adapter.retry).toHaveBeenCalledOnce();
+    await user.click(within(results).getByRole("button", { name: "Home" }));
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
+    expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
+      "12.25 s",
+    );
+  },
+);
 
 test("loads scoped CSS Module styles", () => {
   render(<span className={styles.probe}>CSS Module probe</span>);

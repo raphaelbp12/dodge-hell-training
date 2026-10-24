@@ -4,9 +4,9 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 5.1 is complete: Home provides Start, an encounter description, the fixed Paladin stats, changelog, and reference links. The compact session HUD shows health, active survival time, hits, VIT/SPD/DEF, and lifecycle controls. Death shows survival duration and hits with immediate Retry and Home. R retries, Escape toggles pause, and focus loss requires explicit Resume. Records/comparisons and GitHub Pages deployment remain later steps.
+Step 5.2 is complete: Home and results display local recent attempts and the retained personal best for the current rules version. Completed deaths save once; unfinished retries/Home do not create records. Storage failures leave practice usable with visit-only history and a warning. The existing Start/countdown, compact health/stat HUD, pause, immediate Retry, and zoom remain unchanged. Encounter tuning/acceptance and GitHub Pages deployment remain later steps.
 
-Current local preview: http://127.0.0.1:5174/.
+Current local preview: http://127.0.0.1:5175/. The older server on 5174 returned an empty cached App transform during step 5.2; a fresh server was started without stopping the existing servers.
 
 ## Domain Data
 
@@ -26,7 +26,7 @@ The [mechanics contract](docs/mechanics.md) is the source of approved values and
 
 `validateEncounterConfig` checks finite values, positive sizes/counts/timings, reversal strictly within lifetime, spawn collision extents, ordered zoom limits, and pursuit slower than the Paladin. Rule functions reject negative/nonfinite inputs. This is local validation for the typed preset, not a tuning UI or generic schema system.
 
-Comparison-breaking changes to the preset, formulas, or encounter tuning require an explicit `RULES_VERSION` bump and corresponding contract/test updates. Future persistence must compare this version before sharing personal bests; viewing zoom alone does not split comparisons. No comparison/history implementation is introduced here.
+Comparison-breaking changes to the preset, formulas, or encounter tuning require an explicit `RULES_VERSION` bump and corresponding contract/test updates. History compares only records with the same rules version; viewing zoom alone does not split comparisons.
 
 Run the configuration Node suite from `app/` with `npm.cmd run test -- --project node src/game/config/config.test.ts` (46 cases). Formula helpers do not mutate entities; the simulation's health rules apply damage, combat refresh, fractional regeneration, and health caps. Session transitions are owned by the separate controller below.
 
@@ -76,9 +76,9 @@ The camera remains north-up and centered exactly on the player, including at are
 
 The practice interface uses the approved session flow below. Blur, host focus loss, or a hidden document clear held keys and gate both countdown and gameplay until explicit Resume. Resume/retry discard the first frame delta instead of catching up inactive time. Held movement is suppressed until release or a fresh press. R/Escape are edge-triggered; a weak event-identity set prevents Phaser's same-frame keyboard queue from replaying already handled events. Gameplay key cancellation leaves unrelated keys and browser modifier shortcuts untouched. No touch input is installed.
 
-Manual check: open http://127.0.0.1:5174/, review Home, and select **Start** (or press Enter while it is focused). Observe the three-second countdown, then move with WASD and change zoom with O/P. Press R during countdown, a burst, pause, or after death: the attempt resets immediately without another countdown and retains zoom. Hold R to confirm it does not continually restart. Escape pauses/resumes active play; switching focus away leaves play paused until **Resume** or an explicit keyboard action. Let the player die and compare results with the HUD, then use **Retry** or **Home**. Home discards an unfinished attempt, removes the canvas, and focuses Start. Starting again counts down and retains visit-long zoom. Narrow screens show a keyboard requirement, not touch controls.
+Manual check: open http://127.0.0.1:5175/, review Home, and select **Start** (or press Enter while it is focused). Observe the three-second countdown, then move with WASD and change zoom with O/P. Press R during countdown, a burst, pause, or after death: the attempt resets immediately without another countdown and retains zoom. Hold R to confirm it does not continually restart. Escape pauses/resumes active play; switching focus away leaves play paused until **Resume** or an explicit keyboard action. Let the player die and compare results with the HUD, then use **Retry** or **Home**. Home discards an unfinished attempt, removes the canvas, and focuses Start. Starting again counts down and retains visit-long zoom. Narrow screens show a keyboard requirement, not touch controls.
 
-Thirteen Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. Desktop (1440x1000) and narrow (390x844) Home/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry across countdown/play/death. Screenshots are saved under ignored `app/test-results/`.
+Seventeen Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. They also verify real death records, refresh persistence, retry/abort deduplication, compatible bests, and corrupt/blocked/quota storage fallback. Desktop (1440x1000) and narrow (390x844) Home/history/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry. Screenshots are saved under ignored `app/test-results/`.
 
 ## Practice Interface
 
@@ -86,13 +86,27 @@ Home includes only implemented capabilities in its dated changelog. Under the us
 
 HUD values come from the approved preset and bounded adapter snapshots. Positive HP rounds upward for display; the health meter retains the unrounded value. The timer has `aria-live="off"`; only lifecycle status changes are announced. Resume is disabled outside pause. Results read the controller's frozen result, show survival seconds to two decimals and hits taken, and focus their heading. Keyboard traversal reaches Retry/Home, and Home restores focus to Start. HUD control space is retained during results to prevent arena shifts. No independent React clock or result scoring is added.
 
-The six React tests cover Home content/links, Start, Strict Mode cleanup, HUD values/rounding, pause/disabled Resume, results Retry/Home, focus restoration, discarded-runtime publications, and CSS Modules. Browser accessibility checks use semantic role/name locators, native keyboard activation, focus and disabled-state assertions, quiet timer output, and layout checks. A screen-reader audit and automated axe audit were not performed. Personal best and recent-attempt displays belong to step 5.2; this interface neither persists attempts nor claims comparisons exist.
+The eleven React tests cover Home content/links, Start, Strict Mode cleanup, HUD values/rounding, pause/disabled Resume, results Retry/Home, focus restoration, discarded-runtime publications, CSS Modules, persistence/deduplication/remount identity, compatible bests, and storage failures. Browser accessibility checks use semantic role/name locators, native keyboard activation, focus and disabled-state assertions, quiet timer output, and layout checks. Retry/Home precede expandable history in the result panel's tab order. A screen-reader audit and automated axe audit were not performed.
+
+## Local Attempt Records
+
+[attempts.ts](app/src/storage/attempts.ts) owns the injected storage boundary; it imports no Phaser, React, or browser globals. App supplies a guarded getter for `window.localStorage`. The key is `dodge-hell-training.attempts`; the JSON envelope is `{ schemaVersion: 1, records: [...] }`. Each death record contains a unique `id`, `rulesVersion`, finite nonnegative `elapsedSeconds`, safe-integer nonnegative `hitsTaken`, and `outcome: "death"`. Runtime shape validation precedes all use. No type assertion substitutes for parsing/validation.
+
+The session's synchronous `onResult` callback is wired at the application boundary, not from HUD renders. A random per-runtime namespace plus controller attempt ID prevents collisions after Home/Start or refresh. A per-runtime delivery guard, disposed-effect guard, and stored-ID deduplication prevent repeated callbacks/retries from recording twice. Aborted attempts have no death callback. Simulation, controller, and engine files need no persistence changes.
+
+Records are newest-first, deduplicated, copied/frozen, and bounded to the configured latest 100 completed attempts across all rules versions. The displayed retained best is the longest time among retained records matching the current rules; incompatible records remain visible as **Other rules** and are excluded from that best. There is no separately durable all-time best: removing an old best through retention can lower the retained best. Zoom is not a scoring field or compatibility key.
+
+Unavailable storage, blocked reads, invalid JSON, unknown schema versions, or malformed records switch this visit to in-memory history with a visible warning. Unreadable stored data is preserved, not overwritten or migrated. Quota/write failures also retain current/later results in memory and stop repeated failed writes. No refresh-persistence guarantee is made in fallback mode. Storage is browser-profile/origin-specific (different localhost ports have separate histories); there is no cross-tab merge, cloud sync, export, settings UI, or backend.
+
+The 25 Node adapter tests use an injected storage fake and cover serialization/reload, deduplication, retention, compatibility, corrupt/unknown/malformed data, blocked getters/reads, quota failures, and immutable copies. Run from `app/` with `npm.cmd run test -- --project node src/storage/attempts.test.ts`. The focused browser command is `npm.cmd run test:e2e -- --grep "death results|loaded history|storage still"`.
+
+Manual persistence check: at the current preview origin, complete one attempt, note the history count/best, immediately Retry, then Home and reload. The completed record should remain once; aborting the new attempt should not increase the count. Start must remain usable. Automated Chromium checks verify this real-death/reload flow and storage failures. The shared integrated browser loaded the new Home but mouse/keyboard automation timed out during an additional interactive check; that interactive refresh check is not claimed as passed.
 
 ## Session Lifecycle
 
 [session.ts](app/src/game/session/session.ts) owns the pure `home -> countdown -> playing -> paused/ended` flow. It consumes only supplied active seconds; there are no timers, browser imports, or asynchronous result queues. Start and retry share initialization through `createSimulation()`. Start uses the configured three-second countdown without advancing any gameplay; retry uses zero countdown and replaces all simulation state, including combat, shard hit flags, burst/cooldown, positions, counters, and accumulator. Phaser remains the only runtime driver and does not recreate the game on retry.
 
-Death produces one frozen `AttemptResult` with attempt identity, rules version, survival duration, and hits. `advance()` returns that result only on the lethal transition; the adapter offers a synchronous optional `onResult` handoff for later persistence. Home/retry aborts do not produce completed results or records. Retry clears the prior result and never reuses the old simulation object. Zoom is a viewing preference retained across retry and Home/Start during the app visit, not part of simulation reset. The React results view consumes this result; history storage is not implemented yet.
+Death produces one frozen `AttemptResult` with attempt identity, rules version, survival duration, and hits. `advance()` returns that result only on the lethal transition; the adapter's synchronous optional `onResult` handoff now feeds the application's history adapter. Home/retry aborts do not produce completed results or records. Retry clears the prior result and never reuses the old simulation object. Zoom is a viewing preference retained across retry and Home/Start during the app visit, not part of simulation reset. React consumes the bounded snapshots and persisted-history summary without another simulation clock.
 
 Run the 16 focused Node lifecycle cases from `app/`:
 
@@ -185,7 +199,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (163 Vitest tests and thirteen Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 454 kB gzip); no warning limit was raised.
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (193 Vitest tests and seventeen Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -233,7 +247,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 5.2, only when requested.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 6.1, only when requested.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.
