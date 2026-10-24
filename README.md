@@ -6,7 +6,9 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 Step 6.1 is complete: technical validation passed, and the user accepted the current implementation on 2026-10-24. Adjustments are deferred until after the full plan, as requested. No tuning changed; rules version remains `crystal-worm-child-head-paladin-v1`, with known trainer-fidelity limitations retained.
 
-Step 7.1's CI/Pages configuration and local production-path checks are implemented and passing. The step remains blocked on owner-side Pages setup, an authorized push, an actual successful Actions deployment, and a live smoke check. No live deployment is claimed.
+Step 7.1 is complete and user-approved on 2026-10-24. All six Actions jobs and the Pages deployment passed for `5db1674`. Step 7.2 is complete under delegated technical release acceptance: live repeated-practice checks passed, and the shipped gameplay baseline remains the implementation previously accepted in step 6.1. Play at https://raphaelbp12.github.io/dodge-hell-training/. This does not claim a fresh human playtest, exact ROTMG fidelity, Firefox/WebKit certification, or touch support.
+
+The live gameplay verified during this handoff was `5db1674`, with JS/CSS SHA-256 hashes matching the local production build. Step 7.2's test/handoff updates and unused-starter cleanup do not change that gameplay. Subsequent pushes and deployments need their own Actions evidence; the recorded release checks do not claim a newer deployment.
 
 Home and results display local recent attempts and the retained personal best for the current rules version. Completed deaths save once; unfinished retries/Home do not create records. Storage failures leave practice usable with visit-only history and a warning. Start/countdown, the health/stat HUD, pause, immediate Retry, and zoom remain unchanged.
 
@@ -84,7 +86,21 @@ Manual check: open http://127.0.0.1:5176/dodge-hell-training/, review Home, and 
 
 Eighteen development-server Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. They also verify real death records, refresh persistence, retry/abort deduplication, compatible bests, corrupt/blocked/quota storage fallback, and 60 seconds of sustained play followed by 25 retries. Desktop (1440x1000) and narrow (390x844) Home/history/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry. Screenshots are saved under ignored `app/test-results/`.
 
-A nineteenth Chromium check uses built production output, without importing dev-only diagnostic modules. It verifies the Pages pathname, prefixed hashed JS/CSS with successful responses and correct content types, Start/countdown/play, R retry, Home cleanup, and no page errors. Its production screenshot is retained alongside the other artifacts.
+Two production Chromium checks use built output without importing dev-only diagnostic modules. At 1440x1000 and 390x844 they verify the Pages pathname/assets, countdown and initial cooldown, rendered shards and health loss, two actual deaths, result metrics, button Retry plus repeated R, Home cleanup/abort, and valid deduplicated records/bests surviving refresh. Desktop additionally checks WASD through rendered camera-relative motion and O/P through rendered player size; both check pause/resume, readable layout, nonblank canvas pixels, and static same-origin requests only. The same tests can target the live site explicitly, as documented below. Screenshots and JSON evidence remain ignored under `app/test-results/`.
+
+## Controls
+
+| Input | Action |
+| ----- | ------ |
+| WASD | Move north/west/south/east; diagonals normalized |
+| R | Immediately reset the attempt without countdown; ignore held repeats |
+| O / P | Zoom out / in; viewing preference persists during this app visit |
+| Escape | Pause/resume active play |
+| Resume | Explicitly resume after focus loss or pause |
+| Retry | Start again immediately, including from results |
+| Home | Discard an unfinished attempt and return to Home |
+
+Start has a three-second countdown. Changing focus pauses play and clears held input. Keyboard input is required even at narrow widths; no touch controls are implemented.
 
 ## Practice Interface
 
@@ -106,7 +122,7 @@ Unavailable storage, blocked reads, invalid JSON, unknown schema versions, or ma
 
 The 25 Node adapter tests use an injected storage fake and cover serialization/reload, deduplication, retention, compatibility, corrupt/unknown/malformed data, blocked getters/reads, quota failures, and immutable copies. Run from `app/` with `npm.cmd run test -- --project node src/storage/attempts.test.ts`. The focused browser command is `npm.cmd run test:e2e -- --grep "death results|loaded history|storage still"`.
 
-Manual persistence check: at the current preview origin, complete one attempt, note the history count/best, immediately Retry, then Home and reload. The completed record should remain once; aborting the new attempt should not increase the count. Start must remain usable. Automated Chromium checks verify this real-death/reload flow and storage failures. The shared integrated browser loaded the new Home but mouse/keyboard automation timed out during an additional interactive check; that interactive refresh check is not claimed as passed.
+Manual persistence check: at the live URL or current preview origin, complete one attempt, note the history count/best, immediately Retry, then Home and reload. The completed record should remain once; aborting the new attempt should not increase the count. Start must remain usable. Automated Chromium checks now verify two real-death/reload flows on Pages as well as the existing local storage-failure coverage. An earlier additional shared-browser interaction timed out; it is not counted as a human playtest or release evidence.
 
 ## Session Lifecycle
 
@@ -132,7 +148,7 @@ Open http://127.0.0.1:5176/dodge-hell-training/ with a keyboard and review:
 2. Watch the clockwise pattern, four-shot bursts, cooldown, and returning shards; assess collision fairness.
 3. Take hits and assess damage and regeneration, then let the attempt end and inspect results/history.
 4. Use R/Retry repeatedly, Escape/Resume, and Home/Start; confirm a predictable reset and comfortable practice loop.
-5. For future tuning, note desired changes without altering the accepted baseline. The user accepted the current implementation for now on 2026-10-24 and deferred adjustments until after the full plan. Step 6.1 is complete; deployment is not started.
+5. For future tuning, note desired changes without altering the accepted baseline. The user accepted the current implementation for now on 2026-10-24 and deferred adjustments until after the full plan. Step 6.1 is complete; steps 7.1/7.2 subsequently supplied deployment and technical release evidence. Future adjustments still require approval and comparison-breaking changes require a rules-version bump.
 
 ## Prerequisites
 
@@ -220,7 +236,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (194 Vitest tests and nineteen Chromium checks; the full browser run used one worker to match CI). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed for step 7.2 on 2026-10-24: 194 Vitest cases and twenty local Chromium cases; the browser run used `--workers=1 --output=test-results/local-release` and took about 4.9 minutes. Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -232,7 +248,28 @@ npx.cmd playwright install chromium
 
 On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwright's [browser system dependencies](https://playwright.dev/docs/browsers#install-system-dependencies). Browser binaries are cached outside the repository. `npm ci` alone does not install them.
 
-Build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server on port 4173 and production preview on 4174, both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. Keep both ports free: `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Tests never navigate to external websites; failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
+With `PLAYWRIGHT_LIVE_URL` unset, build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server on port 4173 and production preview on 4174, both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. Keep both ports free: `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Default runs never navigate to external websites; hosted verification is an explicit opt-in below. Failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
+
+## Hosted Release Verification
+
+From `app/`, after installing dependencies and Chromium, run only the two production-safe tests against Pages:
+
+```powershell
+$env:PLAYWRIGHT_LIVE_URL = 'https://raphaelbp12.github.io/dodge-hell-training/'
+try {
+	npm.cmd run test:e2e -- --project live-chromium --workers=1 --output=test-results/live-release
+} finally {
+	Remove-Item Env:PLAYWRIGHT_LIVE_URL
+}
+```
+
+Hosted mode starts no localhost servers, needs no local build, and excludes every source-diagnostic test. Each case uses a fresh isolated browser context; real death records are created only in that context, never in the user's browser profile. Keep the environment variable unset for the normal local/CI suite. Separate output subdirectories preserve local and live evidence when running both.
+
+Step 7.2's actual hosted run passed both cases in about one minute at https://raphaelbp12.github.io/dodge-hell-training/. Four real completed attempts across two isolated contexts were saved, compared with the results UI, retained across refresh, and not duplicated by aborted retries. Live requests contained only same-origin static GETs, with no API, XHR/fetch/WebSocket, application token, or server secret required. Gameplay JS/CSS SHA-256 hashes matched the rebuilt local output exactly. Saved Home/arena/results/history screenshots and per-width JSON reports are under ignored `app/test-results/`; desktop arena and narrow Home/arena/results were visually reviewed alongside pixel/layout assertions.
+
+Acceptance outcome: the user had already explicitly accepted this unchanged gameplay baseline in step 6.1 and approved deployment in step 7.1. When presented the completed release checks and Chromium-only scope, the user delegated the release decision for later review. The agent accepted the technical handoff under that delegation; no fresh user playtest is claimed. The vertical slice is shipped at the live URL under this limited release baseline, not certified for every browser or exact ROTMG behavior.
+
+Remaining limitations: only desktop Chromium was exercised, including keyboard-driven narrow layout; Firefox, WebKit/Safari, physical mobile input, screen readers, and an axe audit were not tested. History is origin/profile-specific and bests cover only the latest 100 compatible retained deaths. Known provisional pursuit/hitboxes/camera/cadence/range interpretation and health-integration differences remain in the mechanics contract. Future tuning lives in the named `ENCOUNTER_CONFIG`, `STAT_RULES`, and Paladin data listed above; approval and versioned comparisons still apply. The Phaser bundle warning is unchanged. No backend, account system, custom deployment secret, or new gameplay feature was added.
 
 To serve the production build locally, run:
 
@@ -244,22 +281,22 @@ Use the URL printed by the preview command. Preview also defaults to port 4173, 
 
 ## GitHub Pages Setup
 
-The target repository is [raphaelbp12/dodge-hell-training](https://github.com/raphaelbp12/dodge-hell-training), confirmed from the Git remote and public repository API on 2026-10-24. Its default branch is `main`; public metadata reports `has_pages: false`, and the unauthenticated Pages endpoint returns 404. The expected project-site URL after deployment is https://raphaelbp12.github.io/dodge-hell-training/. This is a target, not a verified live deployment. No custom domain is configured by this work.
+The repository is [raphaelbp12/dodge-hell-training](https://github.com/raphaelbp12/dodge-hell-training), with default branch `main`. The verified live project-site URL is https://raphaelbp12.github.io/dodge-hell-training/. [Actions run 40117403684](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40117403684) succeeded for `5db1674`, including all six jobs and deployment `7302230739` at `2026-10-24T17:49:16Z`. Initial metadata reported Pages disabled before setup; the unauthenticated Pages metadata endpoint later still returned 404 despite successful publication and live HTTP 200, so that endpoint alone must not be used to diagnose site availability. No custom domain or remote settings change was made by the assistant.
 
-[The workflow](.github/workflows/pages.yml) validates pull requests and every push to `main` on Ubuntu 24.04. It selects Node 24.22.1 from `.node-version`, pins npm 12.2.1, caches npm data against `app/package-lock.json`, runs `npm ci` from `app/`, and installs Chromium/system dependencies with `npx playwright install --with-deps chromium`. Lint, typecheck, unit/component tests, build, and all nineteen browser checks gate publication. Browser artifacts are retained for seven days, including on failures when the run is not cancelled.
+[The workflow](.github/workflows/pages.yml) validates pull requests and every push to `main` on Ubuntu 24.04. It selects Node 24.22.1 from `.node-version`, pins npm 12.2.1, caches npm data against `app/package-lock.json`, runs `npm ci` from `app/`, and installs Chromium/system dependencies with `npx playwright install --with-deps chromium`. Lint, typecheck, unit/component tests, build, and the default local browser suite gate publication. The published run used the previous nineteen-case suite; the step 7.2 harness expands it to twenty. Hosted mode is opt-in, not a network dependency added to CI. Browser artifacts are retained for seven days, including on failures when the run is not cancelled.
 
 The Actions graph shows six separate jobs: **Lint**, **Typecheck**, **Unit Tests**, **Build**, **Browser Tests**, and **Deploy Pages**. The first three use a matrix with fail-fast disabled so each reports its own result; they run in parallel with Build. Build shares a one-day `production-build` artifact containing only `app/dist`. Browser Tests downloads it before running the full suite, and Deploy Pages downloads that same build only after every check and browser test passes. No rebuild occurs between browser verification and publication. Each job has an isolated runner and its own dependency installation; npm caching reduces repeated download cost, rather than sharing `node_modules`.
 
 Pull requests never upload a Pages artifact or deploy. Only successful `main` pushes upload `app/dist` through the official Pages artifact action. A dependent deployment job uses the official configure/deploy actions and `github-pages` environment. Validation has only `contents: read`; only deployment has `pages: write` and `id-token: write`. Checkout does not persist credentials. Per-ref concurrency serializes runs without cancelling an in-flight deployment. Pages auto-enablement is explicitly disabled. No backend, custom token, application secret, or repository-settings change is needed or performed by the local implementation.
 
-Owner steps still required:
+Configuration for future setup or troubleshooting:
 
 1. In [repository Pages settings](https://github.com/raphaelbp12/dodge-hell-training/settings/pages), select **Build and deployment -> Source -> GitHub Actions**, not a publishing branch.
 2. Ensure Actions permits the official `actions/*` actions and the `github-pages` environment permits deployment from `main`; satisfy any required environment reviews.
-3. Separately authorize committing/pushing these changes to `main`, or do so yourself. No commit or push was performed during step 7.1. The main-push workflow must complete successfully; a passing PR check alone is not deployment evidence.
-4. Record the successful Actions run/commit and deployment `page_url`, then open the actual URL and smoke-test Home, loaded assets, Start/play, and Retry. Only that evidence can complete step 7.1. The broader release verification in step 7.2 remains unstarted.
+3. Commit/push always requires separate authorization. Initial setup and the split-job workflow were published as `8dff4d0` and `5db1674` after explicit authorization. A main-push workflow must complete successfully; a passing PR check alone is not deployment evidence.
+4. For each release, record the successful run/commit and emitted deployment URL. The step 7.1 live smoke and step 7.2 controls/combat/persistence/responsive checks have passed for this published gameplay baseline. Future changes still need their own validation and separately authorized commit/push.
 
-Local workflow validation passed with checksum-verified actionlint 1.7.12. Actual Linux Actions execution, repository/environment policy compatibility, Pages publication, and the live URL remain unverified until the owner steps above are completed.
+Local workflow validation passed with checksum-verified actionlint 1.7.12. The six-job Ubuntu 24.04 workflow and Pages publication are verified. Step 7.2's expanded live checks used isolated Chromium at 1440x1000 and 390x844 without modifying the user's existing browser storage. Its delegated technical acceptance is recorded above; no cross-browser certification is claimed. Check subsequent workflow runs separately rather than treating this handoff's deployment evidence as evidence for a newer commit.
 
 ## Bootstrap Record
 
@@ -287,9 +324,8 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Step 7.1 has passing local implementation; live deployment acceptance remains blocked. Step 7.2 is not started.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Steps 7.1 and 7.2 are complete; release evidence and delegated acceptance limitations are recorded explicitly.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
-- [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.
 
 Implement one step at a time with `/implement-step <step-id>`. Completing a step does not automatically authorize later steps, a commit, or a push.

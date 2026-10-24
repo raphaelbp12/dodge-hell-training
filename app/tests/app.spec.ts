@@ -41,11 +41,42 @@ async function launch(page: Page) {
 }
 
 async function savedAttempts(page: Page) {
-  return page.evaluate(async () => {
-    const modulePath = new URL("src/storage/attempts.ts", document.baseURI)
-      .href;
-    const { HISTORY_STORAGE_KEY } = await import(/* @vite-ignore */ modulePath);
-    return JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) ?? "null");
+  return page.evaluate(() =>
+    JSON.parse(localStorage.getItem("dodge-hell-training.attempts") ?? "null"),
+  );
+}
+
+async function renderedPixels(page: Page) {
+  return page.locator("canvas").evaluate((canvas) => {
+    if (!(canvas instanceof HTMLCanvasElement))
+      throw new Error("Expected encounter canvas");
+    const copy = document.createElement("canvas");
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    const context = copy.getContext("2d")!;
+    context.drawImage(canvas, 0, 0);
+    const data = context.getImageData(0, 0, copy.width, copy.height).data;
+    const counts = { player: 0, enemy: 0, shards: 0, ground: 0 };
+    let enemyX = 0;
+    let enemyY = 0;
+    for (let offset = 0; offset < data.length; offset += 4) {
+      const red = data[offset]!;
+      const green = data[offset + 1]!;
+      const blue = data[offset + 2]!;
+      if (red > 225 && green > 235 && blue > 225) counts.player++;
+      if (red > 200 && green > 70 && green < 160 && blue < 150) {
+        counts.enemy++;
+        enemyX += (offset / 4) % copy.width;
+        enemyY += Math.floor(offset / 4 / copy.width);
+      }
+      if (red > 230 && green > 180 && blue < 150) counts.shards++;
+      if (red === 28 && green === 48 && blue === 42) counts.ground++;
+    }
+    return {
+      ...counts,
+      enemyX: counts.enemy ? enemyX / counts.enemy : null,
+      enemyY: counts.enemy ? enemyY / counts.enemy : null,
+    };
   });
 }
 
@@ -83,44 +114,270 @@ async function retrySnapshot(
   }, source);
 }
 
-test("production assets and practice loop work under the Pages project path", async ({
-  page,
-}, testInfo) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  const response = await page.goto("./");
-  expect(response?.ok()).toBe(true);
-  expect(new URL(page.url()).pathname).toBe("/dodge-hell-training/");
-  const assets = await page
-    .locator('script[src], link[rel="stylesheet"]')
-    .evaluateAll((elements) =>
-      elements.map((element) =>
-        element instanceof HTMLScriptElement
-          ? element.src
-          : (element as HTMLLinkElement).href,
+for (const width of [1440, 390]) {
+  test(`production assets and repeated practice work at ${width}px under the Pages project path`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(160_000);
+    await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+    const errors: string[] = [];
+    const requests: { url: string; method: string; type: string }[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) =>
+      requests.push({
+        url: request.url(),
+        method: request.method(),
+        type: request.resourceType(),
+      }),
+    );
+    const response = await page.goto("./");
+    expect(response?.ok()).toBe(true);
+    expect(new URL(page.url()).pathname).toBe("/dodge-hell-training/");
+    await expect(
+      page.getByRole("heading", { name: "Changelog" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    expect(
+      await page
+        .locator("h1, h2, button, a")
+        .evaluateAll((elements) =>
+          elements.some((element) => element.scrollWidth > element.clientWidth),
+        ),
+    ).toBe(false);
+    await page.screenshot({
+      path: testInfo.outputPath(`release-home-${width}.png`),
+      fullPage: true,
+    });
+    const assets = await page
+      .locator('script[src], link[rel="stylesheet"]')
+      .evaluateAll((elements) =>
+        elements.map((element) =>
+          element instanceof HTMLScriptElement
+            ? element.src
+            : (element as HTMLLinkElement).href,
+        ),
+      );
+    expect(assets.length).toBeGreaterThanOrEqual(2);
+    for (const asset of assets) {
+      expect(new URL(asset).pathname).toMatch(
+        /^\/dodge-hell-training\/assets\//,
+      );
+      const resource = await page.request.get(asset);
+      expect(resource.ok()).toBe(true);
+      expect(resource.headers()["content-type"]).toMatch(/javascript|css/);
+    }
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(page.locator("canvas")).toHaveCount(1);
+    await expect(page.getByLabel("Session status")).toHaveText("Starting");
+    await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
+    await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
+    if (width === 1440) {
+      for (const [key, axis, direction] of [
+        ["w", "enemyY", 1],
+        ["d", "enemyX", -1],
+        ["a", "enemyX", 1],
+        ["s", "enemyY", -1],
+      ] as const) {
+        const before = await renderedPixels(page);
+        expect(before.enemy).toBeGreaterThan(10);
+        await page.keyboard.down(key);
+        try {
+          await expect
+            .poll(async () => {
+              const position = (await renderedPixels(page))[axis];
+              return position === null
+                ? 0
+                : (position - before[axis]!) * direction;
+            })
+            .toBeGreaterThan(8);
+        } finally {
+          await page.keyboard.up(key);
+        }
+      }
+      const beforeZoom = await renderedPixels(page);
+      await page.keyboard.press("p");
+      await expect
+        .poll(async () => (await renderedPixels(page)).player)
+        .toBeGreaterThan(beforeZoom.player);
+      const zoomed = await renderedPixels(page);
+      await page.keyboard.press("o");
+      await expect
+        .poll(async () => (await renderedPixels(page)).player)
+        .toBeLessThan(zoomed.player);
+    } else {
+      await page.keyboard.press("o");
+      await page.keyboard.press("o");
+    }
+    await page.keyboard.press("Escape");
+    await expect(page.getByLabel("Session status")).toHaveText("Paused");
+    const pausedTime = await page.getByLabel("Survival time").textContent();
+    await page.waitForTimeout(200);
+    await expect(page.getByLabel("Survival time")).toHaveText(pausedTime!);
+    await page.getByRole("button", { name: "Resume", exact: true }).click();
+    await expect(page.getByLabel("Session status")).toHaveText("Active");
+    await page.keyboard.press("r");
+    await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
+    await expect(page.getByRole("meter", { name: "Health" })).toHaveAttribute(
+      "value",
+      "775",
+    );
+    await expect
+      .poll(async () =>
+        Number.parseFloat(await page.getByLabel("Survival time").innerText()),
+      )
+      .toBeGreaterThanOrEqual(1);
+    expect((await renderedPixels(page)).shards).toBe(0);
+    expect(
+      Number.parseFloat(await page.getByLabel("Survival time").innerText()),
+    ).toBeLessThan(2);
+    await expect
+      .poll(async () => (await renderedPixels(page)).shards, { timeout: 6000 })
+      .toBeGreaterThan(5);
+    const pixels = await renderedPixels(page);
+    expect(pixels.player).toBeGreaterThan(10);
+    expect(pixels.ground).toBeGreaterThan(1000);
+    const layout = await page.evaluate(() => ({
+      headerBottom: document.querySelector("header")!.getBoundingClientRect()
+        .bottom,
+      arenaTop: document
+        .querySelector('[aria-label="Encounter"]')!
+        .getBoundingClientRect().top,
+      overflow: document.documentElement.scrollWidth > innerWidth,
+    }));
+    expect(layout.headerBottom).toBeLessThanOrEqual(layout.arenaTop);
+    expect(layout.overflow).toBe(false);
+    await page.screenshot({
+      path: testInfo.outputPath(`release-encounter-${width}.png`),
+      fullPage: true,
+    });
+    await expect
+      .poll(
+        async () =>
+          Number(
+            await page
+              .getByRole("meter", { name: "Health" })
+              .getAttribute("value"),
+          ),
+        { timeout: 15000 },
+      )
+      .toBeLessThan(775);
+    const results = page.getByRole("region", { name: "Attempt complete" });
+    const completed = [];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await expect(results).toBeVisible({ timeout: 70000 });
+      await expect(page.getByRole("meter", { name: "Health" })).toHaveAttribute(
+        "value",
+        "0",
+      );
+      const saved = await savedAttempts(page);
+      expect(saved.schemaVersion).toBe(1);
+      expect(saved.records).toHaveLength(attempt);
+      expect(
+        new Set(saved.records.map((record: { id: string }) => record.id)).size,
+      ).toBe(attempt);
+      const record = saved.records[0];
+      expect(record).toEqual({
+        id: expect.any(String),
+        rulesVersion: "crystal-worm-child-head-paladin-v1",
+        outcome: "death",
+        elapsedSeconds: expect.any(Number),
+        hitsTaken: expect.any(Number),
+      });
+      expect(record.elapsedSeconds).toBeGreaterThan(0);
+      expect(record.hitsTaken).toBeGreaterThan(0);
+      await expect(results.locator("dd").nth(0)).toHaveText(
+        `${record.elapsedSeconds.toFixed(2)} s`,
+      );
+      await expect(results.locator("dd").nth(1)).toHaveText(
+        String(record.hitsTaken),
+      );
+      expect(
+        await results.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return (
+            box.left >= 0 &&
+            box.right <= innerWidth &&
+            box.top >= 0 &&
+            box.bottom <= innerHeight &&
+            ![element, ...element.querySelectorAll("h2, dd, button")].some(
+              (child) => child.scrollWidth > child.clientWidth,
+            )
+          );
+        }),
+      ).toBe(true);
+      completed.push(record);
+      if (attempt === 1) {
+        await page.screenshot({
+          path: testInfo.outputPath(`release-results-${width}.png`),
+          fullPage: true,
+        });
+        await results
+          .getByRole("button", { name: "Retry", exact: true })
+          .click();
+        await expect(results).toHaveCount(0);
+        await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
+        for (let retry = 0; retry < 5; retry++) {
+          await page.keyboard.press("r");
+          await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
+          await expect(
+            page.getByRole("meter", { name: "Health" }),
+          ).toHaveAttribute("value", "775");
+          await expect(page.locator("canvas")).toHaveCount(1);
+        }
+        expect(await savedAttempts(page)).toEqual(saved);
+      }
+    }
+    const saved = await savedAttempts(page);
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await expect(page.locator("canvas")).toHaveCount(0);
+    await page.reload();
+    expect(await savedAttempts(page)).toEqual(saved);
+    await expect(
+      page.getByRole("listitem", { name: /completed attempt/i }),
+    ).toHaveCount(2);
+    await expect(page.getByLabel("Retained personal best")).toHaveText(
+      `${Math.max(...completed.map((record) => record.elapsedSeconds)).toFixed(2)} s`,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`release-history-${width}.png`),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(page.getByLabel("Session status")).toHaveText("Starting");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    expect(await savedAttempts(page)).toEqual(saved);
+    expect(
+      requests.every(
+        (request) =>
+          request.method === "GET" &&
+          !["fetch", "xhr", "websocket"].includes(request.type) &&
+          new URL(request.url).origin === new URL(page.url()).origin &&
+          new URL(request.url).pathname.startsWith("/dodge-hell-training/"),
+      ),
+    ).toBe(true);
+    expect(errors).toEqual([]);
+    await writeFile(
+      testInfo.outputPath(`release-verification-${width}.json`),
+      JSON.stringify(
+        {
+          url: page.url(),
+          browser: testInfo.project.name,
+          width,
+          completed,
+          pixels,
+          requests,
+          pageErrors: errors,
+        },
+        null,
+        2,
       ),
     );
-  expect(assets.length).toBeGreaterThanOrEqual(2);
-  for (const asset of assets) {
-    expect(new URL(asset).pathname).toMatch(/^\/dodge-hell-training\/assets\//);
-    const resource = await page.request.get(asset);
-    expect(resource.ok()).toBe(true);
-    expect(resource.headers()["content-type"]).toMatch(/javascript|css/);
-  }
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await expect(page.locator("canvas")).toHaveCount(1);
-  await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
-  await page.keyboard.press("r");
-  await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
-  await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
-  await page.screenshot({
-    path: testInfo.outputPath("production-project-path.png"),
-    fullPage: true,
   });
-  await page.getByRole("button", { name: "Home", exact: true }).click();
-  await expect(page.locator("canvas")).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
+}
 
 test("Start countdown freezes world, focus pause preserves it, and R skips countdown", async ({
   page,
@@ -964,28 +1221,7 @@ for (const viewport of [
       .toBeGreaterThan(0);
     const state = await inspect(page);
     expect(state.viewport.width).toBe(viewport.width);
-    const pixels = await page.locator("canvas").evaluate((canvas) => {
-      if (!(canvas instanceof HTMLCanvasElement))
-        throw new Error("Expected encounter canvas");
-      const copy = document.createElement("canvas");
-      copy.width = canvas.width;
-      copy.height = canvas.height;
-      const context = copy.getContext("2d")!;
-      context.drawImage(canvas, 0, 0);
-      const data = context.getImageData(0, 0, copy.width, copy.height).data;
-      const counts = { player: 0, enemy: 0, shards: 0, ground: 0 };
-      for (let offset = 0; offset < data.length; offset += 4) {
-        const red = data[offset];
-        const green = data[offset + 1];
-        const blue = data[offset + 2];
-        if (red > 225 && green > 235 && blue > 225) counts.player++;
-        if (red > 200 && green > 70 && green < 160 && blue < 150)
-          counts.enemy++;
-        if (red > 230 && green > 180 && blue < 150) counts.shards++;
-        if (red === 28 && green === 48 && blue === 42) counts.ground++;
-      }
-      return counts;
-    });
+    const pixels = await renderedPixels(page);
     expect(pixels.player).toBeGreaterThan(10);
     expect(pixels.shards).toBeGreaterThan(5);
     expect(pixels.ground).toBeGreaterThan(1000);
