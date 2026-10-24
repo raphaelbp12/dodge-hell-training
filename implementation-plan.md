@@ -103,7 +103,7 @@ Acceptance: the document distinguishes facts from assumptions and lists remainin
 
 ### Step 2.1 - Generate And Verify The React App
 
-Status: pending. Dependencies: 1.1.
+Status: complete. Dependencies: 1.1.
 
 **Implementation prompt**
 
@@ -112,6 +112,25 @@ Inspect installed Node/npm and the current Vite Node requirements. Explain any i
 Keep the generated app initially; adjust generated files only for a demonstrated project requirement after generation. Keep the root draft and planning/customization files untouched. Ensure dependencies, output, and local test artifacts are appropriately ignored. Document the actual supported Node version and commands in a root README. Do not initialize another Git repository inside `app/` or commit changes.
 
 Acceptance: `npm run lint` and `npm run build` pass from `app/`. Start the Vite development server on an available port, verify the generated page loads, report its URL, and record commands and generated-tool versions. No game implementation yet.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 1.1 complete and `app/` absent before generation. Node.js 22.20.0 / npm 11.7.0 satisfy create-vite 9.3.1 and Vite 8.3.5 engine requirements (`^20.19.0 || >=22.12.0`), checked through npm metadata and the Vite setup guide.
+- Generated the official React TypeScript starter with `npm --yes create vite@latest app -- --template react-ts --no-interactive`. The extra flags accept npm's package-install confirmation and disable scaffold prompts; no bootstrap files were manually authored or existing files removed.
+- Ran `npm --prefix app install`; retained the generated lockfile. Installation reported zero vulnerabilities. Installed React/React DOM 19.3.1, TypeScript 6.0.3, Vite 8.3.5, React plugin 6.1.2, and Oxlint 1.89.0.
+- `npm --prefix app run lint` and `npm --prefix app run build` passed on the untouched scaffold. Build includes `tsc -b`. The current template uses Oxlint rather than ESLint; retained the generated choice without changing the approved application stack.
+- Started `npm --prefix app run dev -- --host 127.0.0.1 --port 5173`; live local URL: http://127.0.0.1:5173/. The editor browser loaded the starter, verified its counter changes from 0 to 1, and confirmed every starter image loaded. No browser errors were reported by those checks.
+- Added [the root README](README.md) with actual prerequisites, commands, versions, and current scope. Extended the generated app ignore rules for local test artifacts; retained dependency/build ignores. React components and generated app configuration remain unchanged.
+- No game behavior, Phaser, test framework, CI/deployment workflow, commit, push, or later plan step was introduced. The development server is intentionally left available for local inspection.
+
+**Toolchain follow-up - 2026-10-24**
+
+- At the user's request, reviewed current tools and selected Node 24.22.1 LTS rather than the Node 26 Current release. Remaining installation/update choices were delegated to the agent for later review.
+- Installed fnm 1.39.0 as a per-user WinGet portable package, installed/selected Node 24.22.1, and upgraded npm to 12.2.1 only inside the managed Node installation. The original system Node and PowerShell profile were not modified.
+- Upgraded TypeScript to 7.0.2 through npm and refreshed compatible dependencies; retained Node types on 24.x to match the runtime. Lint and TypeScript/production build passed after the upgrade; install/update audits reported zero vulnerabilities.
+- Added the root Node version file and app engine/package-manager metadata. Updated the README with current versions and reproducible Windows setup, keeping the original bootstrap record as history. No additional implementation step was started.
+- Reinstalled with `npm --prefix app ci` after synchronizing lockfile metadata; lint, TypeScript/production build, and installed dependency checks passed. npm 12's PowerShell entry point misparsed forwarded Vite flags in this environment; verified `npm.cmd` forwards them correctly and documented that Windows-specific invocation.
+- Restarted Vite explicitly under managed Node 24.22.1 / npm 12.2.1 at http://127.0.0.1:5173/. The page and every starter image loaded; a DOM click event changed the React counter from 5 to 6. Normal mouse-actionability automation timed out and is not claimed as passing; manual mouse review remains recommended. Version pins, lockfile engines, documentation links, and editor diagnostics were checked. No application components were changed for the update.
 
 ### Step 2.2 - Install Runtime And Testing Tools
 
