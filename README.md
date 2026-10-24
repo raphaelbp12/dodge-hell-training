@@ -4,7 +4,7 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 2.1 is complete: `app/` contains the command-generated React + TypeScript + Vite starter. It still displays the Vite starter screen and counter, not a playable encounter. Game logic, Phaser integration, test tooling, and GitHub Pages deployment belong to later plan steps.
+Step 2.2 is complete: `app/` contains the command-generated React + TypeScript + Vite starter, Phaser dependency, and unit/browser testing tools. It still displays the Vite starter screen and counter, not a playable encounter. Game logic, Phaser integration, and GitHub Pages deployment belong to later plan steps.
 
 ## Prerequisites
 
@@ -53,10 +53,14 @@ Updated and validated on 2026-10-24:
 | Node type definitions | 24.19.2; intentionally aligned to Node 24 rather than latest major 26 |
 | Vite / React plugin | 8.3.5 / 6.1.2 |
 | Oxlint | 1.89.0 |
+| Phaser | 4.2.1; installed, not integrated yet |
+| Vitest / jsdom | 5.0.5 / 30.1.3 |
+| React Testing Library / jest-dom / user-event | 16.3.3 / 7.0.1 / 14.6.8 |
+| Playwright Test / create-playwright | 1.64.1 / 1.17.139 |
 
 TypeScript was upgraded through npm; other compatible packages were refreshed and were already current within their supported ranges. A clean `npm ci`, lint, and the TypeScript/production build pass with this toolchain. The original bootstrap record below is historical, not the current runtime requirement.
 
-The restarted development server rendered the starter and all images, and a DOM click event verified the React counter update. The editor browser's normal mouse-actionability checks timed out, so they are not reported as passing. Manually check the counter with a mouse when reviewing the page; no application code was changed to accommodate the automation.
+The project's Chromium smoke test now verifies the starter heading, a normal mouse click updating its counter, all starter images, and absence of uncaught page errors. This supersedes step 2.1's limited editor-browser automation check; no application component was changed to accommodate automation.
 
 ## Local Development
 
@@ -68,6 +72,8 @@ npm ci
 npm.cmd run dev -- --host 127.0.0.1 --port 5173
 ```
 
+On Windows, stop this project's dev/test servers before running `npm ci`: a loaded Vite native module can otherwise cause an `EPERM` file-lock error. Retry after stopping the server; elevation is not the remedy for that lock.
+
 Open the URL printed by Vite, normally http://127.0.0.1:5173/. If that port is occupied, Vite chooses another available port. The server is local-only with this command. Stop it with Ctrl+C in its terminal.
 
 In Windows PowerShell 5.1, use `npm.cmd` when forwarding flags after `--`: npm 12's PowerShell entry point did not preserve the separator in the checked environment. On other platforms, use `npm` instead of `npm.cmd`.
@@ -77,11 +83,26 @@ In Windows PowerShell 5.1, use `npm.cmd` when forwarding flags after `--`: npm 1
 Run these from `app/`:
 
 ```powershell
+npm run test
+npm run typecheck
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. The build script runs TypeScript project checking (`tsc -b`) followed by the Vite production build, producing ignored output in `app/dist/`.
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (two Vitest tests and one Chromium smoke test).
+
+Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
+
+Install the required browser on each new machine or after a Playwright browser-version upgrade, from `app/`:
+
+```powershell
+npx.cmd playwright install chromium
+```
+
+On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwright's [browser system dependencies](https://playwright.dev/docs/browsers#install-system-dependencies). Browser binaries are cached outside the repository. `npm ci` alone does not install them.
+
+Playwright starts the local Vite CLI from `app/` using the current Node executable at http://127.0.0.1:4173/. Keep that test port free: `reuseExistingServer: false` and Vite's `--strictPort` intentionally reject an occupied port instead of testing an unrelated server. The runner stops its own server afterward. Tests never navigate to external websites; traces on failure live in ignored `app/test-results/`. No CI workflow is introduced in this step.
 
 To serve the production build locally, run:
 
@@ -89,7 +110,7 @@ To serve the production build locally, run:
 npm.cmd run preview -- --host 127.0.0.1
 ```
 
-Use the URL printed by the preview command. Unit/browser test scripts and a standalone typecheck script do not exist yet; step 2.2 will add them. The browser check in step 2.1 was performed through the editor's browser tools, not through a committed test suite.
+Use the URL printed by the preview command. Preview also defaults to port 4173, so stop it before running browser tests.
 
 ## Bootstrap Record
 
@@ -117,7 +138,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 2.2.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 3.1.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.

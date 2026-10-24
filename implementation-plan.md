@@ -134,7 +134,7 @@ Acceptance: `npm run lint` and `npm run build` pass from `app/`. Start the Vite 
 
 ### Step 2.2 - Install Runtime And Testing Tools
 
-Status: pending. Dependencies: 2.1.
+Status: complete. Dependencies: 2.1.
 
 **Implementation prompt**
 
@@ -143,6 +143,18 @@ Install Phaser using npm. Install compatible Vitest, jsdom, React Testing Librar
 Configure `test` as a single-run unit-test command, `test:watch`, `typecheck` using the generated TypeScript project references, and `test:e2e`. Separate pure simulation tests from DOM tests using the simplest supported configuration. Configure Playwright's web server to run from `app/`, use a known test port, and avoid accidentally testing an unrelated existing server. Add one minimal React render test and one browser smoke test for the existing app; do not leave example tests for external websites. Verify CSS Module support without adding a styling framework.
 
 Acceptance: lint, typecheck, unit tests, production build, and the local browser smoke test pass. Document exact commands and any environment prerequisites. Do not introduce game behavior yet.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 2.1 complete and retained the generated starter components, Vite config, and TypeScript project references. Installed Phaser 4.2.1 with `npm.cmd --prefix app install phaser`; no engine integration or gameplay was added.
+- Installed Vitest 5.0.5, jsdom 30.1.3, React Testing Library 16.3.3, jest-dom 7.0.1, user-event 14.6.8, and Playwright Test 1.64.1 using `npm.cmd --prefix app install --save-dev vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event @playwright/test`. Retained the npm lockfile; installs and clean installation reported zero vulnerabilities.
+- Initialized with the official create-playwright 1.17.139 CLI from `app/`: `npm.cmd --yes create playwright@latest -- --browser chromium --no-browsers --no-examples --quiet --lang ts`. Installed Chromium through `npx.cmd playwright install chromium`. Kept only the local Chromium configuration/test and the generated auth-artifact ignore; no external-site examples or CI workflow were added.
+- The initializer's npm subprocess reported the old system Node 22.20.0/npm 11.7.0 after an interactive terminal reset. Re-selected managed Node 24.22.1/npm 12.2.1 before a clean `npm.cmd --prefix app ci` and all acceptance gates. The first clean-install attempt hit a Windows native-module lock; stopping the existing dev server released it, and the retry passed without elevation.
+- Added the starter render/counter test and test-only CSS Module fixture first. The initial `npx.cmd vitest run src/App.test.tsx` failed both tests due to missing DOM configuration. Configured separate Node (`src/**/*.test.ts`) and jsdom (`src/**/*.test.tsx`) projects, jest-dom/cleanup setup, and CSS Module processing; both tests then passed. Global starter CSS is left to the real browser rather than parsed by jsdom.
+- Added one local browser smoke test first; `npm.cmd run test:e2e -- --reporter=line` failed on the missing base URL. Adapted the generated config to start Vite from `app/` using the current Node executable, dedicated port 4173, `--strictPort`, and `reuseExistingServer: false`. The same test then passed with normal mouse interaction, loaded images, and no uncaught page errors; no forced or synthetic click workaround is used.
+- Added single-run `test`, `test:watch`, `typecheck` (`tsc -b`), and `test:e2e` scripts. Extended the existing Node TypeScript project's include list to cover both test configs and browser tests. The existing app project typechecks React tests and their setup; no replacement bootstrap/configuration system was introduced.
+- Acceptance gates passed from `app/` under Node 24.22.1/npm 12.2.1: `npm run test` (two tests), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one Chromium test). Updated [the root README](README.md) with exact commands, browser prerequisites, test conventions, port ownership, and the Windows file-lock remedy.
+- No gameplay, simulation values, UI redesign, CI/deployment workflow, commit, push, or later step was introduced. No gameplay approval or design deviation was needed. Step 3.1 remains pending.
 
 ## Phase 3: Testable Simulation
 
