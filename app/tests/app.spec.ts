@@ -32,24 +32,35 @@ async function inspect(page: Page): Promise<Inspection> {
 
 async function launch(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Launch encounter" }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
     .toBeGreaterThan(0);
 }
 
-async function retrySnapshot(page: Page): Promise<Inspection> {
-  return page.evaluate(async () => {
+async function retrySnapshot(
+  page: Page,
+  source: "key" | "button" = "key",
+): Promise<Inspection> {
+  return page.evaluate(async (source) => {
     const modulePath = "/src/game/phaser/encounter.ts";
     const adapter = await import(/* @vite-ignore */ modulePath);
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        code: "KeyR",
-        keyCode: 82,
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
+    if (source === "button") {
+      const retry = document.querySelector(
+        '[aria-labelledby="result-title"] button',
+      );
+      if (!(retry instanceof HTMLButtonElement))
+        throw new Error("Missing result Retry button");
+      retry.click();
+    } else
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "KeyR",
+          keyCode: 82,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     const snapshot = adapter.inspectEncounter(
       document.querySelector('[aria-label="Encounter"]'),
     );
@@ -57,7 +68,7 @@ async function retrySnapshot(page: Page): Promise<Inspection> {
       new KeyboardEvent("keyup", { code: "KeyR", keyCode: 82, bubbles: true }),
     );
     return snapshot;
-  });
+  }, source);
 }
 
 test("Start countdown freezes world, focus pause preserves it, and R skips countdown", async ({
@@ -66,7 +77,7 @@ test("Start countdown freezes world, focus pause preserves it, and R skips count
   await page.goto("/");
   await page.keyboard.press("r");
   await expect(page.locator("canvas")).toHaveCount(0);
-  await page.getByRole("button", { name: "Launch encounter" }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page))?.sessionPhase)
     .toBe("countdown");
@@ -173,10 +184,10 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
   expect(fromPause.sessionPhase).toBe("playing");
   expect(fromPause.elapsedSeconds).toBe(0);
   expect(fromPause.attemptId).toBe(7);
-  await page.getByRole("button", { name: "Close encounter" }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await page.keyboard.press("r");
   await expect(page.locator("canvas")).toHaveCount(0);
-  await page.getByRole("button", { name: "Launch encounter" }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page))?.sessionPhase)
     .toBe("countdown");
@@ -215,39 +226,114 @@ test("queued control events cannot replay a retry or pause within the same frame
   expect(snapshot.sessionPhase).toBe("paused");
 });
 
-test("death hands off one result, R and Retry immediately reuse the live encounter", async ({
-  page,
-}) => {
-  test.setTimeout(90_000);
-  await launch(page);
-  await expect
-    .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
-    .toBe("ended");
-  const ended = await inspect(page);
-  expect(ended.result).toEqual({
-    attemptId: ended.attemptId,
-    rulesVersion: ended.rulesVersion,
-    outcome: "death",
-    elapsedSeconds: ended.elapsedSeconds,
-    hitsTaken: ended.hitsTaken,
+for (const width of [1440, 390]) {
+  test(`death results, keyboard/button Retry and Home work at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+    await launch(page);
+    const canvas = await page.locator("canvas").elementHandle();
+    const originalBox = await page
+      .getByRole("region", { name: "Encounter", exact: true })
+      .boundingBox();
+    await expect(
+      page.getByRole("button", { name: "Resume", exact: true }),
+    ).toBeDisabled();
+    await expect
+      .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
+      .toBe("ended");
+    const ended = await inspect(page);
+    const results = page.getByRole("region", { name: "Attempt complete" });
+    await expect(results).toBeVisible();
+    await expect(results.getByRole("heading")).toBeFocused();
+    await expect(results).toContainText(`${ended.elapsedSeconds.toFixed(2)} s`);
+    await expect(results.locator("dd").nth(1)).toHaveText(
+      String(ended.hitsTaken),
+    );
+    expect(
+      await page
+        .getByRole("region", { name: "Encounter", exact: true })
+        .boundingBox(),
+    ).toEqual(originalBox);
+    await expect(page.getByLabel("Survival time")).toHaveAttribute(
+      "aria-live",
+      "off",
+    );
+    await expect(page.getByRole("meter", { name: "Health" })).toHaveAttribute(
+      "value",
+      "0",
+    );
+    await expect(
+      results.getByRole("button", { name: "Retry", exact: true }),
+    ).toBeEnabled();
+    await page.keyboard.press("Tab");
+    await expect(
+      results.getByRole("button", { name: "Retry", exact: true }),
+    ).toBeFocused();
+    const resultLayout = await results.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        withinViewport:
+          box.left >= 0 &&
+          box.right <= innerWidth &&
+          box.top >= 0 &&
+          box.bottom <= innerHeight,
+        overflow: element.scrollWidth > element.clientWidth,
+        clippedText: [...element.querySelectorAll("h2, dd, button")].some(
+          (child) => child.scrollWidth > child.clientWidth,
+        ),
+      };
+    });
+    expect(resultLayout).toEqual({
+      withinViewport: true,
+      overflow: false,
+      clippedText: false,
+    });
+    await page.screenshot({
+      path: testInfo.outputPath(`results-${width}.png`),
+      fullPage: true,
+    });
+    expect(ended.result).toEqual({
+      attemptId: ended.attemptId,
+      rulesVersion: ended.rulesVersion,
+      outcome: "death",
+      elapsedSeconds: ended.elapsedSeconds,
+      hitsTaken: ended.hitsTaken,
+    });
+    await page.waitForTimeout(200);
+    expect(await inspect(page)).toEqual(ended);
+    const reset = await retrySnapshot(page, width === 1440 ? "button" : "key");
+    expect(reset.attemptId).toBe(ended.attemptId + 1);
+    expect(reset.sessionPhase).toBe("playing");
+    expect(reset.result).toBeNull();
+    expect(reset.player.healthHp).toBe(775);
+    expect(reset.elapsedSeconds).toBe(0);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect
+      .poll(async () => (await inspect(page)).attemptId)
+      .toBe(reset.attemptId + 1);
+    expect((await inspect(page)).sessionPhase).toBe("playing");
+    await expect(page.locator("canvas")).toHaveCount(1);
+    expect((await inspect(page)).keydownListeners).toBe(1);
+    expect(
+      await canvas!.evaluate(
+        (element) => element === document.querySelector("canvas"),
+      ),
+    ).toBe(true);
+    await expect(results).toHaveCount(0);
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await expect(page.locator("canvas")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Start", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => (await inspect(page))?.sessionPhase)
+      .toBe("countdown");
   });
-  await page.waitForTimeout(200);
-  expect(await inspect(page)).toEqual(ended);
-  const reset = await retrySnapshot(page);
-  expect(reset.attemptId).toBe(ended.attemptId + 1);
-  expect(reset.sessionPhase).toBe("playing");
-  expect(reset.result).toBeNull();
-  expect(reset.player.healthHp).toBe(775);
-  expect(reset.elapsedSeconds).toBe(0);
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect
-    .poll(async () => (await inspect(page)).attemptId)
-    .toBe(reset.attemptId + 1);
-  expect((await inspect(page)).sessionPhase).toBe("playing");
-  await expect(page.locator("canvas")).toHaveCount(1);
-  expect((await inspect(page)).keydownListeners).toBe(1);
-});
+}
 
 test("launches one Phaser canvas and cleans it up across repeated mounts", async ({
   page,
@@ -260,11 +346,11 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
     page.getByRole("heading", { name: "Crystal Worm Child", level: 1 }),
   ).toBeVisible();
   for (let attempt = 0; attempt < 3; attempt++) {
-    await page.getByRole("button", { name: "Launch encounter" }).click();
+    await page.getByRole("button", { name: "Start", exact: true }).click();
     await expect(page.locator("canvas")).toHaveCount(1);
     await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
     expect((await inspect(page)).keydownListeners).toBe(1);
-    await page.getByRole("button", { name: "Close encounter" }).click();
+    await page.getByRole("button", { name: "Home", exact: true }).click();
     await expect(page.locator("canvas")).toHaveCount(0);
   }
   expect(pageErrors).toEqual([]);
@@ -350,7 +436,7 @@ test("focus loss freezes simulation until explicit resume and clears held input"
   expect(resumed.player.positionTiles).toEqual(paused.player.positionTiles);
   expect(resumed.zoom).toBe(paused.zoom);
   expect(resumed.elapsedSeconds - paused.elapsedSeconds).toBeLessThan(0.2);
-  await page.getByRole("button", { name: "Close encounter" }).focus();
+  await page.getByRole("button", { name: "Home", exact: true }).focus();
   await expect(
     page.getByRole("button", { name: "Resume", exact: true }),
   ).toBeVisible();
@@ -449,9 +535,9 @@ test("captures only unmodified gameplay keys while focused and removes capture o
     unrelated: false,
     browserShortcut: false,
   });
-  await page.getByRole("button", { name: "Close encounter" }).focus();
+  await page.getByRole("button", { name: "Home", exact: true }).focus();
   expect((await dispatch()).movement).toBe(false);
-  await page.getByRole("button", { name: "Close encounter" }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   expect((await dispatch()).movement).toBe(false);
 });
 
@@ -500,7 +586,53 @@ for (const viewport of [
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
-    await launch(page);
+    await page.goto("/");
+    await expect(
+      page.getByRole("button", { name: "Start", exact: true }),
+    ).toBeFocused();
+    await expect(
+      page.getByRole("heading", { name: "Changelog" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Enemy reference" }),
+    ).toHaveAttribute(
+      "href",
+      "https://www.realmeye.com/wiki/crystal-worm-child",
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+    expect(
+      await page
+        .locator("h1, h2, button, a")
+        .evaluateAll((elements) =>
+          elements.some((element) => element.scrollWidth > element.clientWidth),
+        ),
+    ).toBe(false);
+    await page.screenshot({
+      path: testInfo.outputPath(`home-${viewport.width}.png`),
+      fullPage: true,
+    });
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(async () => (await inspect(page))?.sessionPhase)
+      .toBe("countdown");
+    const countdownBox = await page
+      .getByRole("region", { name: "Encounter", exact: true })
+      .boundingBox();
+    await expect
+      .poll(async () => (await inspect(page)).elapsedSeconds)
+      .toBeGreaterThan(0);
+    expect(
+      await page
+        .getByRole("region", { name: "Encounter", exact: true })
+        .boundingBox(),
+    ).toEqual(countdownBox);
+    await expect(page.getByLabel("Primary stats")).toContainText("42 VIT");
+    await expect(page.getByLabel("Primary stats")).toContainText("41 SPD");
+    await expect(page.getByLabel("Primary stats")).toContainText("32 DEF");
     await page.keyboard.press("o");
     await page.keyboard.press("o");
     await expect

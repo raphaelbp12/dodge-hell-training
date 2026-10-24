@@ -322,7 +322,7 @@ Acceptance: lifecycle tests and browser checks pass, retries are immediate and r
 
 ### Step 5.1 - Build Home, HUD, And Results
 
-Status: pending. Dependencies: 4.2.
+Status: complete. Dependencies: 4.2.
 
 **Implementation prompt**
 
@@ -333,6 +333,19 @@ Use CSS Modules, semantic buttons, visible keyboard focus, and accessible health
 Write React tests for Start, results, Retry/Home, HUD values, and disabled/paused states that actually exist. Check desktop and narrow-screen screenshots for clipped text, obstructed play area, and layout shifts. Preserve the explicit home description/changelog requirement; do not turn it into an oversized promotional page.
 
 Acceptance: the complete Home -> Session -> Results -> Retry flow works with buttons and the approved keybinds; relevant React/browser tests, accessibility checks available in the toolchain, lint, typecheck, and build pass.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 4.2 complete with recorded lifecycle/controller/browser evidence and a clean worktree. Read the original draft, shared architecture/contract, approved mechanics, and nearby React/adapter/tests. No gameplay tuning, rules-version, package, lockfile, or controller changes were needed.
+- Asked for Home link targets as required. The user delegated the choice for later review: "The user is not available to respond and will review your work later. Work autonomously and make good decisions." Selected the RealmEye Crystal Worm Child article and official Realm of the Mad God website. These are delegated presentation choices, not previously approved numeric mechanics or new fidelity claims.
+- Updated `app/src/App.test.tsx` first. `npm.cmd --prefix app run test -- --project dom src/App.test.tsx` initially failed four interface cases because the temporary entry lacked Start/Home and the requested surfaces; the CSS Module case passed. Implemented the UI, resolved ambiguous status queries with a named lifecycle status, and reran the same focused tests successfully. Typecheck then caught unsupported Testing Library `exact` options; removed them and reran focused tests/typecheck successfully. Final React coverage is six passing cases.
+- Replaced the temporary entry in `app/src/App.tsx` with compact Home content, prominent Start, configured Paladin stats, accurate dated changelog, delegated reference links, and a trainer-fidelity disclosure. Reused geometric artwork and existing CSS Module conventions. No oversized promotional layout, new UI library, touch controls, tuning UI, or speculative features were added.
+- HUD reads bounded adapter publications and configured HP/VIT/SPD/DEF. HP display uses approved upward rounding; meter retains fractional health. Timer output is explicitly non-live, countdown numbers are not live-announced, and a named status announces lifecycle changes only. Resume is disabled outside pause. Semantic buttons, visible focus, and keyboard activation are retained.
+- Results consume the controller's frozen result, displaying survival seconds to two decimals and hits taken with Retry/Home. Results focus their heading; Home unmounts/cleans the runtime and returns focus to Start. Retry uses the existing adapter/controller without rebuilding Phaser. A disposed-effect guard rejects stale publications. No React clock, lifecycle-rule duplication, per-projectile updates, result scoring, history, personal-best comparison, or storage was introduced.
+- Stabilized HUD/control space and arena sizing across countdown/play/results; result-only controls are exposed while hidden HUD controls are inert. Extended browser coverage to actual death/result metrics, result button Retry and ended-state R, keyboard Start, focus/disabled states, cleanup, retained canvas/listener, and Home/Start. Retained all existing gameplay/camera/retry/focus regressions.
+- Focused Chromium command `npm.cmd --prefix app run test:e2e -- --grep "death results|renders readable"` passed all four desktop/narrow workflows. Saved and visually reviewed Home, arena, and results screenshots at 1440x1000 and 390x844. Checks cover canvas pixels, text/viewport overflow, result containment, header separation, and unchanged arena bounds across countdown/play/death. Artifacts remain ignored under `app/test-results/`.
+- Final required gates passed from `app/` under Node 24.22.1/npm 12.2.1: `npm run test` (163 cases across five files, including six React/CSS cases), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (13 Chromium checks, two workers, 59.7 seconds). Existing nonblocking Phaser chunk warning remains (1,699.09 kB minified / 454.47 kB gzip); no warning limits changed. Editor diagnostics were clean. Available accessibility checks passed through roles/names, focus/keyboard activation, disabled states, non-live timer, and layout assertions; no screen-reader or axe audit is claimed.
+- Updated the README with current flow, ownership, delegated links, tests, limits, and manual checks. Reloaded the existing preview successfully at http://127.0.0.1:5174/; preserved the running servers. Manual review: Start, WASD/O/P, Escape/focus pause and Resume, R/Retry before and after death, result metrics, Home focus/cleanup, and narrow-screen readability. No unresolved blocker remains. Step 5.2 stays pending; no persistence, deployment, commit, or push was performed.
 
 ### Step 5.2 - Persist Comparable Attempt History
 

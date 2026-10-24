@@ -33,7 +33,8 @@
 :global(button:hover) {
   background: #d4e9df;
 }
-:global(button:focus-visible) {
+:global(button:focus-visible),
+:global(a:focus-visible) {
   outline: 3px solid #299774;
   outline-offset: 3px;
 }
@@ -41,6 +42,23 @@
   display: flex;
   flex-direction: column;
   min-height: 100svh;
+}
+.session {
+  height: 100svh;
+}
+.session > header,
+.telemetry,
+.keyboardNotice {
+  flex-shrink: 0;
+}
+.hiddenActions {
+  visibility: hidden;
+}
+.telemetry [aria-label="Session status"] {
+  min-width: 72px;
+}
+.telemetry {
+  font-variant-numeric: tabular-nums;
 }
 .header {
   display: flex;
@@ -72,6 +90,162 @@
   font-family: Consolas, monospace;
   font-size: 14px;
 }
+.stats,
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.stats {
+  white-space: nowrap;
+}
+.actions {
+  margin-left: auto;
+}
+:global(button:disabled) {
+  opacity: 0.45;
+  cursor: default;
+  background: #f8fbf8;
+}
+.primary {
+  background: #164d3b;
+  color: #fff;
+  padding: 12px 32px;
+}
+.primary:hover {
+  background: #24674f;
+}
+.encounterLabel {
+  color: #4a6b5c;
+  font-size: 13px;
+}
+.playfield {
+  position: relative;
+  flex: 1;
+  min-height: 320px;
+}
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: #fff;
+  font:
+    600 64px Consolas,
+    monospace;
+}
+.results {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100% - 32px));
+  padding: 28px;
+  background: #f8fbf8;
+  border: 1px solid #648575;
+  border-radius: 4px;
+  box-shadow: 0 12px 48px #0005;
+}
+.results h2 {
+  margin: 8px 0 24px;
+  font-size: 24px;
+}
+.results h2:focus-visible {
+  outline: 2px solid #299774;
+  outline-offset: 4px;
+}
+.results dl {
+  margin: 0 0 24px;
+}
+.results dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #c4d5cc;
+}
+.results dd {
+  margin: 0;
+  font-family: Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.results .actions {
+  margin-left: 0;
+}
+.home {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 32px 28px;
+}
+.intro {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  align-items: center;
+  gap: 32px;
+  padding: 12px 0 36px;
+}
+.intro h2 {
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 8px 0 16px;
+}
+.intro p {
+  max-width: 56ch;
+  margin: 0 0 24px;
+}
+.specimen {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 31px, #29423a 31px 32px),
+    repeating-linear-gradient(90deg, #1c302a 0 31px, #29423a 31px 32px);
+}
+.preset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  align-items: center;
+  padding: 20px 0;
+  border-block: 1px solid #c4d5cc;
+  font-variant-numeric: tabular-nums;
+}
+.preset h2,
+.changelog h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.changelog {
+  padding: 28px 0;
+}
+.changelog time {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #4a6b5c;
+}
+.changelog ul {
+  padding-left: 20px;
+  margin-bottom: 0;
+}
+.footer {
+  border-top: 1px solid #c4d5cc;
+  padding-top: 20px;
+  font-size: 13px;
+}
+.footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+.footer a {
+  color: #164d3b;
+  text-underline-offset: 3px;
+}
+.footer p {
+  color: #4a6b5c;
+}
 .telemetry output {
   min-width: 80px;
 }
@@ -90,8 +264,10 @@
   accent-color: #26885d;
 }
 .arena {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: calc(100svh - 146px);
+  height: 100%;
   min-height: 320px;
   overflow: hidden;
   background: #101b1b;
@@ -105,16 +281,6 @@
 }
 .keyboardNotice {
   display: none;
-}
-.idle {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 480px;
-  flex: 1;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 31px, #29423a 31px 32px),
-    repeating-linear-gradient(90deg, #1c302a 0 31px, #29423a 31px 32px);
 }
 .crystal {
   width: 64px;
@@ -148,7 +314,30 @@
     font-size: 13px;
   }
   .arena {
-    height: 65svh;
+    height: 100%;
     min-height: 320px;
+  }
+  .home {
+    padding: 24px 16px;
+  }
+  .intro {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .intro h2 {
+    font-size: 24px;
+  }
+  .specimen {
+    margin-top: 6px;
+  }
+  .specimen .crystal {
+    width: 32px;
+    height: 32px;
+    border-width: 5px;
+  }
+  .telemetry .actions {
+    width: 100%;
+    margin-left: 0;
   }
 }
