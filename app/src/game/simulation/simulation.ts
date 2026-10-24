@@ -7,6 +7,7 @@ import {
 import type {
   EnemyState,
   PlayerState,
+  ShardState,
   SimulationInput,
   Vector2,
 } from "../models";
@@ -15,6 +16,8 @@ export type SimulationState = {
   rulesVersion: string;
   player: PlayerState;
   enemy: EnemyState;
+  shards: ShardState[];
+  volleysFired: number;
   ticksElapsed: number;
   elapsedSeconds: number;
   accumulatorSeconds: number;
@@ -27,6 +30,13 @@ export type AdvanceResult = Readonly<{
 
 const timeRoundingToleranceSeconds =
   ENCOUNTER_CONFIG.simulation.fixedStepSeconds * Number.EPSILON * 16;
+const fullTurnRadians = 2 * Math.PI;
+const emitterRadiansPerSecond =
+  (ENCOUNTER_CONFIG.emitters.clockwiseDegreesPerSecond * Math.PI) / 180;
+const burstGroupSeconds =
+  (ENCOUNTER_CONFIG.burst.shotsPerEmitter - 1) *
+    ENCOUNTER_CONFIG.burst.shotIntervalSeconds +
+  ENCOUNTER_CONFIG.burst.cooldownAfterLastShotSeconds;
 
 export function createSimulation(): SimulationState {
   return {
@@ -40,6 +50,8 @@ export function createSimulation(): SimulationState {
       positionTiles: { ...ENCOUNTER_CONFIG.enemy.spawnTiles },
       emitterPhaseRadians: ENCOUNTER_CONFIG.emitters.initialPhaseRadians,
     },
+    shards: [],
+    volleysFired: 0,
     ticksElapsed: 0,
     elapsedSeconds: 0,
     accumulatorSeconds: 0,
@@ -105,6 +117,85 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   );
 }
 
+function moveShard(shard: ShardState, elapsedSeconds: number): void {
+  shard.positionTiles = {
+    x: shard.positionTiles.x + shard.velocityTilesPerSecond.x * elapsedSeconds,
+    y: shard.positionTiles.y + shard.velocityTilesPerSecond.y * elapsedSeconds,
+  };
+}
+
+function advanceShard(shard: ShardState, elapsedSeconds: number): boolean {
+  const boundaryToleranceSeconds = shard.lifetimeSeconds * Number.EPSILON * 16;
+  let targetAgeSeconds = Math.min(
+    shard.ageSeconds + elapsedSeconds,
+    shard.lifetimeSeconds,
+  );
+  for (const boundarySeconds of [
+    shard.reversalAgeSeconds,
+    shard.lifetimeSeconds,
+  ]) {
+    if (
+      Math.abs(targetAgeSeconds - boundarySeconds) <= boundaryToleranceSeconds
+    )
+      targetAgeSeconds = boundarySeconds;
+  }
+  if (!shard.hasReversed && targetAgeSeconds >= shard.reversalAgeSeconds) {
+    moveShard(shard, shard.reversalAgeSeconds - shard.ageSeconds);
+    shard.ageSeconds = shard.reversalAgeSeconds;
+    shard.velocityTilesPerSecond = {
+      x: -shard.velocityTilesPerSecond.x,
+      y: -shard.velocityTilesPerSecond.y,
+    };
+    shard.hasReversed = true;
+  }
+  moveShard(shard, targetAgeSeconds - shard.ageSeconds);
+  shard.ageSeconds = targetAgeSeconds;
+  return shard.ageSeconds < shard.lifetimeSeconds;
+}
+
+function updateAttacks(state: SimulationState): void {
+  state.enemy.emitterPhaseRadians =
+    (ENCOUNTER_CONFIG.emitters.initialPhaseRadians +
+      state.elapsedSeconds * emitterRadiansPerSecond) %
+    fullTurnRadians;
+  const { shotsPerEmitter, shotIntervalSeconds, initialCooldownSeconds } =
+    ENCOUNTER_CONFIG.burst;
+  const groupIndex = Math.floor(state.volleysFired / shotsPerEmitter);
+  const shotIndex = state.volleysFired % shotsPerEmitter;
+  const nextShotSeconds =
+    initialCooldownSeconds +
+    groupIndex * burstGroupSeconds +
+    shotIndex * shotIntervalSeconds;
+  const shotToleranceSeconds =
+    Math.max(state.elapsedSeconds, nextShotSeconds) * Number.EPSILON * 16;
+  if (state.elapsedSeconds + shotToleranceSeconds < nextShotSeconds) return;
+
+  const { count, radiusTiles } = ENCOUNTER_CONFIG.emitters;
+  for (let emitter = 0; emitter < count; emitter++) {
+    const angleRadians =
+      state.enemy.emitterPhaseRadians + (emitter * fullTurnRadians) / count;
+    const directionX = Math.cos(angleRadians);
+    const directionY = Math.sin(angleRadians);
+    state.shards.push({
+      id: state.volleysFired * count + emitter + 1,
+      positionTiles: {
+        x: state.enemy.positionTiles.x + directionX * radiusTiles,
+        y: state.enemy.positionTiles.y + directionY * radiusTiles,
+      },
+      velocityTilesPerSecond: {
+        x: directionX * ENCOUNTER_CONFIG.shard.speedTilesPerSecond,
+        y: directionY * ENCOUNTER_CONFIG.shard.speedTilesPerSecond,
+      },
+      ageSeconds: 0,
+      reversalAgeSeconds: ENCOUNTER_CONFIG.shard.reversalAgeSeconds,
+      lifetimeSeconds: ENCOUNTER_CONFIG.shard.lifetimeSeconds,
+      hasReversed: false,
+      hasHitPlayer: false,
+    });
+  }
+  state.volleysFired++;
+}
+
 export function advanceSimulation(
   state: SimulationState,
   elapsedSeconds: number,
@@ -133,9 +224,15 @@ export function advanceSimulation(
         )
       : 0;
 
-  for (let step = 0; step < stepsExecuted; step++) updateMovement(state, input);
+  for (let step = 0; step < stepsExecuted; step++) {
+    updateMovement(state, input);
+    state.shards = state.shards.filter((shard) =>
+      advanceShard(shard, fixedStepSeconds),
+    );
+    state.ticksElapsed++;
+    state.elapsedSeconds = state.ticksElapsed * fixedStepSeconds;
+    updateAttacks(state);
+  }
   state.accumulatorSeconds = remainderSeconds;
-  state.ticksElapsed += stepsExecuted;
-  state.elapsedSeconds = state.ticksElapsed * fixedStepSeconds;
   return { stepsExecuted, discardedSeconds };
 }

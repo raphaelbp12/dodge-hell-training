@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { ENCOUNTER_CONFIG, validateEncounterConfig } from "../config/encounter";
 import { PALADIN_DERIVED_STATS, PALADIN_STATS } from "../config/stats";
-import type { SimulationInput, Vector2 } from "../models";
+import type { ShardState, SimulationInput, Vector2 } from "../models";
 import { advanceSimulation, createSimulation } from "./simulation";
 
 const idle: SimulationInput = {
@@ -323,3 +323,279 @@ test.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     ).toThrow(RangeError);
   },
 );
+
+test("starts with independent empty shards and no shots before initial cooldown ends", () => {
+  const state = createSimulation();
+  expect(state.shards).toEqual([]);
+  expect(state.shards).not.toBe(createSimulation().shards);
+  expect(state.volleysFired).toBe(0);
+  runTicks(state, 119);
+  expect(state.shards).toEqual([]);
+  expect(state.volleysFired).toBe(0);
+  advanceSimulation(state, stepSeconds, idle);
+  expect(state.shards).toHaveLength(4);
+  expect(state.volleysFired).toBe(1);
+  expect(state.shards.every((shard) => shard.ageSeconds === 0)).toBe(true);
+});
+
+test("rotates clockwise from east toward south even during cooldown", () => {
+  const state = createSimulation();
+  runTicks(state, 60);
+  expect(state.enemy.emitterPhaseRadians).toBeCloseTo(Math.PI / 4, 12);
+  expect(Math.cos(state.enemy.emitterPhaseRadians)).toBeGreaterThan(0);
+  expect(Math.sin(state.enemy.emitterPhaseRadians)).toBeGreaterThan(0);
+  runTicks(state, 60);
+  expect(state.shards[0].velocityTilesPerSecond.x).toBeCloseTo(0, 9);
+  expect(state.shards[0].velocityTilesPerSecond.y).toBeCloseTo(8, 9);
+  runTicks(state, 360);
+  expect(state.enemy.emitterPhaseRadians).toBeCloseTo(0, 12);
+});
+
+test.each([0, 1, 2, 3])(
+  "samples emitter %s at quarter-turn offsets from the current enemy",
+  (emitter) => {
+    const state = createSimulation();
+    runTicks(state, 120);
+    const shard = state.shards[emitter];
+    const angle = Math.PI / 2 + (emitter * Math.PI) / 2;
+    expect(shard.positionTiles.x).toBeCloseTo(
+      state.enemy.positionTiles.x + Math.cos(angle) * 0.75,
+      9,
+    );
+    expect(shard.positionTiles.y).toBeCloseTo(
+      state.enemy.positionTiles.y + Math.sin(angle) * 0.75,
+      9,
+    );
+    expect(shard.velocityTilesPerSecond.x).toBeCloseTo(Math.cos(angle) * 8, 9);
+    expect(shard.velocityTilesPerSecond.y).toBeCloseTo(Math.sin(angle) * 8, 9);
+    expect(shard).toEqual({
+      id: emitter + 1,
+      positionTiles: shard.positionTiles,
+      velocityTilesPerSecond: shard.velocityTilesPerSecond,
+      ageSeconds: 0,
+      reversalAgeSeconds: 1.2,
+      lifetimeSeconds: 2.4,
+      hasReversed: false,
+      hasHitPlayer: false,
+    });
+  },
+);
+
+test("fires 16 shards at the four exact shot times, then waits two seconds from the last shot", () => {
+  const state = createSimulation();
+  runTicks(state, 120);
+  for (let volley = 1; volley < 4; volley++) {
+    runTicks(state, 8);
+    expect(state.shards).toHaveLength(volley * 4);
+    advanceSimulation(state, stepSeconds, idle);
+    expect(state.shards).toHaveLength((volley + 1) * 4);
+    expect(state.elapsedSeconds).toBeCloseTo(2 + volley * 0.15, 12);
+    expect(
+      state.shards.slice(-4).every((shard) => shard.ageSeconds === 0),
+    ).toBe(true);
+  }
+  expect(new Set(state.shards.map((shard) => shard.id)).size).toBe(16);
+  runTicks(state, 119);
+  expect(state.volleysFired).toBe(4);
+  advanceSimulation(state, stepSeconds, idle);
+  expect(state.elapsedSeconds).toBe(4.45);
+  expect(state.volleysFired).toBe(5);
+  expect(state.shards.slice(-4).map((shard) => shard.id)).toEqual([
+    17, 18, 19, 20,
+  ]);
+});
+
+test("resamples the moving enemy and rotated direction for successive shots", () => {
+  const state = createSimulation();
+  runTicks(state, 120);
+  const firstVelocity = { ...state.shards[0].velocityTilesPerSecond };
+  const firstEnemy = { ...state.enemy.positionTiles };
+  runTicks(state, 9, east);
+  const shard = state.shards[4];
+  const angle = (2.15 * Math.PI) / 4;
+  expect(state.enemy.positionTiles).not.toEqual(firstEnemy);
+  expect(shard.velocityTilesPerSecond).not.toEqual(firstVelocity);
+  expect(shard.positionTiles.x).toBeCloseTo(
+    state.enemy.positionTiles.x + Math.cos(angle) * 0.75,
+    9,
+  );
+  expect(shard.positionTiles.y).toBeCloseTo(
+    state.enemy.positionTiles.y + Math.sin(angle) * 0.75,
+    9,
+  );
+  expect(shard.velocityTilesPerSecond.x).toBeLessThan(firstVelocity.x);
+});
+
+function makeShard(overrides: Partial<ShardState> = {}): ShardState {
+  return {
+    id: 100,
+    positionTiles: { x: 0, y: 0 },
+    velocityTilesPerSecond: { x: 8, y: 0 },
+    ageSeconds: 0,
+    reversalAgeSeconds: 1.2,
+    lifetimeSeconds: 2.4,
+    hasReversed: false,
+    hasHitPlayer: false,
+    ...overrides,
+  };
+}
+
+test("moves outbound, reverses exactly at its boundary, and never reverses again", () => {
+  const state = createSimulation();
+  const shard = makeShard();
+  state.shards.push(shard);
+  runTicks(state, 71);
+  expect(shard.hasReversed).toBe(false);
+  expect(shard.positionTiles.x).toBeCloseTo((8 * 71) / 60, 9);
+  runTicks(state, 1);
+  expect(shard.ageSeconds).toBeCloseTo(1.2, 12);
+  expect(shard.positionTiles.x).toBeCloseTo(9.6, 9);
+  expect(shard.hasReversed).toBe(true);
+  expect(shard.velocityTilesPerSecond).toEqual({ x: -8, y: -0 });
+  runTicks(state, 30);
+  expect(shard.positionTiles.x).toBeCloseTo(5.6, 9);
+  expect(shard.velocityTilesPerSecond.x).toBe(-8);
+});
+
+test("splits a tick spanning reversal into outbound and return segments", () => {
+  const state = createSimulation();
+  const outboundSeconds = stepSeconds / 4;
+  const shard = makeShard({ ageSeconds: 1.2 - outboundSeconds });
+  state.shards.push(shard);
+  runTicks(state, 1);
+  expect(shard.positionTiles.x).toBeCloseTo(
+    8 * (2 * outboundSeconds - stepSeconds),
+    12,
+  );
+  expect(shard.ageSeconds).toBeCloseTo(1.2 + stepSeconds - outboundSeconds, 12);
+  expect(shard.hasReversed).toBe(true);
+});
+
+test("splits movement at expiry, removes only then, and does not move an expired shard further", () => {
+  const state = createSimulation();
+  const shard = makeShard({
+    ageSeconds: 2.4 - stepSeconds / 4,
+    velocityTilesPerSecond: { x: -8, y: 0 },
+    hasReversed: true,
+  });
+  state.shards.push(shard);
+  runTicks(state, 1);
+  expect(state.shards).not.toContain(shard);
+  expect(shard.ageSeconds).toBe(2.4);
+  expect(shard.positionTiles.x).toBeCloseTo((-8 * stepSeconds) / 4, 12);
+  const finalPosition = { ...shard.positionTiles };
+  runTicks(state, 1);
+  expect(shard.positionTiles).toEqual(finalPosition);
+});
+
+test("handles reversal and expiry within the same tick", () => {
+  const state = createSimulation();
+  const shard = makeShard({
+    reversalAgeSeconds: stepSeconds / 4,
+    lifetimeSeconds: (stepSeconds * 3) / 4,
+  });
+  state.shards.push(shard);
+  runTicks(state, 1);
+  expect(shard.hasReversed).toBe(true);
+  expect(shard.ageSeconds).toBe(shard.lifetimeSeconds);
+  expect(shard.positionTiles.x).toBeCloseTo((-8 * stepSeconds) / 4, 12);
+  expect(state.shards).toEqual([]);
+});
+
+test.each([false, true])(
+  "keeps shards outside the arena and at the player regardless of hit flag %s",
+  (hasHitPlayer) => {
+    const state = createSimulation();
+    const outside = makeShard({
+      positionTiles: { x: 1000, y: 0 },
+      hasHitPlayer,
+    });
+    const overlap = makeShard({
+      id: 101,
+      positionTiles: { ...state.player.positionTiles },
+      hasHitPlayer,
+    });
+    state.shards.push(outside, overlap);
+    runTicks(state, 1);
+    expect(state.shards).toEqual([outside, overlap]);
+    expect(outside.positionTiles.x).toBeGreaterThan(1000);
+    expect(overlap.hasHitPlayer).toBe(hasHitPlayer);
+    expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
+  },
+);
+
+test("returns to its emission point without an origin field or following later enemy movement", () => {
+  const state = createSimulation();
+  runTicks(state, 120);
+  const shard = state.shards[0];
+  const emissionPoint = { ...shard.positionTiles };
+  state.enemy.positionTiles = { x: 12, y: 0 };
+  runTicks(state, 72, east);
+  expect(shard.positionTiles.x).toBeCloseTo(emissionPoint.x, 9);
+  expect(shard.positionTiles.y).toBeCloseTo(emissionPoint.y + 9.6, 9);
+  runTicks(state, 71);
+  expect(state.shards).toContain(shard);
+  runTicks(state, 1);
+  expect(state.shards).not.toContain(shard);
+  expect(shard.positionTiles.x).toBeCloseTo(emissionPoint.x, 9);
+  expect(shard.positionTiles.y).toBeCloseTo(emissionPoint.y, 9);
+  expect(shard.ageSeconds).toBe(2.4);
+  expect(shard).not.toHaveProperty("origin");
+  expect(shard).not.toHaveProperty("originTiles");
+});
+
+test("shot times and shard state agree across render-frame schedules over several groups", () => {
+  const schedules = [
+    Array<number>(600).fill(stepSeconds),
+    Array<number>(1200).fill(stepSeconds / 2),
+    Array<number>(300).fill(stepSeconds * 2),
+    Array<number>(200).fill(stepSeconds * 3),
+    Array.from({ length: 120 }, () => [
+      stepSeconds / 4,
+      stepSeconds * 1.75,
+      stepSeconds / 2,
+      stepSeconds * 2.5,
+    ]).flat(),
+  ];
+  const reference = createSimulation();
+  runTicks(reference, 600);
+  expect(reference.volleysFired).toBe(16);
+  for (const schedule of schedules) {
+    const state = createSimulation();
+    const observedShotTimes = new Map<number, number>();
+    for (const elapsedSeconds of schedule) {
+      advanceSimulation(state, elapsedSeconds, idle);
+      for (const shard of state.shards) {
+        if (!observedShotTimes.has(shard.id))
+          observedShotTimes.set(
+            shard.id,
+            state.elapsedSeconds - shard.ageSeconds,
+          );
+      }
+    }
+    expect(observedShotTimes.size).toBe(64);
+    for (const [id, shotTime] of observedShotTimes) {
+      const volley = Math.floor((id - 1) / 4);
+      expect(shotTime).toBeCloseTo(
+        2 + Math.floor(volley / 4) * 2.45 + (volley % 4) * 0.15,
+        12,
+      );
+    }
+    expect(state).toEqual(reference);
+  }
+});
+
+test("discarded time advances neither rotation nor the attack scheduler", () => {
+  const state = createSimulation();
+  const shard = makeShard();
+  state.shards.push(shard);
+  advanceSimulation(state, 20, idle);
+  expect(state.volleysFired).toBe(0);
+  expect(state.shards).toEqual([shard]);
+  expect(shard.ageSeconds).toBeCloseTo(8 * stepSeconds, 12);
+  expect(shard.positionTiles.x).toBeCloseTo(8 * 8 * stepSeconds, 9);
+  expect(state.enemy.emitterPhaseRadians).toBeCloseTo(
+    (state.elapsedSeconds * Math.PI) / 4,
+    12,
+  );
+});

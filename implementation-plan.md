@@ -210,7 +210,7 @@ Acceptance: focused movement/timing tests and typecheck pass. No renderer, event
 
 ### Step 3.3 - Implement Rotating Bursts And Returning Shards
 
-Status: pending. Dependencies: 3.2.
+Status: complete. Dependencies: 3.2.
 
 **Implementation prompt**
 
@@ -221,6 +221,17 @@ Represent shard position, velocity, age, reversal state if needed, lifetime, and
 Write failing tests for no premature firing, all four emitter offsets, 16 correctly timed shots, rotation between successive shots, cooldown boundaries, one reversal, partial-step reversal, lifetime-only expiry, and independence from later enemy movement. Test symmetric outbound/return movement returns near the emission location without storing that location in the entity.
 
 Acceptance: focused attack/shard tests and typecheck pass; multiple frame schedules preserve shot counts/times for the same simulated duration.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 3.2 complete with recorded validation and a clean worktree. Read the approved encounter/shard contract and existing models/configuration/simulation. No new tuning, gameplay approval, dependency, or rules-version change was needed.
+- Extended `app/src/game/simulation/simulation.test.ts` first with 17 attack/shard cases. The focused command from `app/`, `npm.cmd run test -- --project node src/game/simulation/simulation.test.ts`, passed the prior 38 cases and failed all 17 new cases on absent attack state/rotation. After implementation, the same command passed all 55 cases; strengthened shot-time/discard assertions also passed before the full gates.
+- Extended `SimulationState` in `app/src/game/simulation/simulation.ts` with independent shards and a volley count. The existing fixed-step loop remains the only clock. Derive shot deadlines from group/shot indices rather than accumulating cooldown drift. Four emitters fire at 2.00/2.15/2.30/2.45 seconds, followed by the next group at 4.45 seconds; IDs follow stable volley/emitter spawn order.
+- Continuously derive phase from executed simulation time, including cooldown; positive X east and positive Y south make increasing angles clockwise. All approved shot times align to 60 Hz boundaries. Each tick moves entities and advances existing shards before sampling the enemy's updated position/phase for the due volley; newborn shards start at age zero. No additional scheduler or wall-clock API was introduced.
+- Advance each shard with separate outbound/return segments when reversal is crossed, including exact-boundary reversal and reversal plus expiry within one tick. Clip travel at lifetime, snap only machine-precision boundary differences, reverse velocity once, and remove only at lifetime. Preserve hit flags and shards outside the arena or overlapping the player; no hit processing, origin/target field, homing, or collision despawn was added.
+- Tests cover initial cooldown, all four emitter offsets, exact 16-shot group timing, last-shot-based cooldown, moving/rotating emitter resampling, actual clockwise direction/phase wrap, one reversal, partial-tick boundaries, lifetime-only expiry, symmetric return without stored origin, independence from later enemy movement, and no attack/rotation/shard progress from discarded time. Five render schedules over ten simulated seconds produce identical final state and all 64 expected shard emission times within 1e-12 second.
+- All required gates passed from `app/` under Node 24.22.1 / npm 12.2.1: `npm run test` (103 tests: 46 configuration, 55 simulation, two React/CSS Module), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one existing Chromium smoke test). Formatted only the two touched TypeScript files through temporary npm-exec Prettier; no dependency was added.
+- Updated [the README](README.md#rotating-bursts-and-shards) with scheduler/state semantics, tick sampling order, shard invariants, focused checks, and current scope. Manual visual verification remains unavailable until Phaser integration: the starter UI is unchanged. No blockers or approved deviations remain. Step 3.4 stays pending; no hits/health, renderer, session lifecycle, storage, CI/deployment, commit, or push was introduced.
 
 ### Step 3.4 - Implement Hits, Health, And Survival End
 

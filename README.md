@@ -4,7 +4,7 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 3.2 is complete: `app/` contains the command-generated React + TypeScript + Vite starter, runtime/test dependencies, domain configuration, pure stat formulas, and fixed-step player movement/enemy pursuit. It still displays the Vite starter screen and counter, not a playable encounter. Projectile/health updates, Phaser integration, and GitHub Pages deployment belong to later plan steps.
+Step 3.3 is complete: `app/` contains the command-generated React + TypeScript + Vite starter, runtime/test dependencies, domain configuration, pure stat formulas, and fixed-step movement, pursuit, rotating bursts, and returning shards. It still displays the Vite starter screen and counter, not a playable encounter. Hits/health updates, Phaser integration, and GitHub Pages deployment belong to later plan steps.
 
 ## Domain Data
 
@@ -26,7 +26,7 @@ The [mechanics contract](docs/mechanics.md) is the source of approved values and
 
 Comparison-breaking changes to the preset, formulas, or encounter tuning require an explicit `RULES_VERSION` bump and corresponding contract/test updates. Future persistence must compare this version before sharing personal bests; viewing zoom alone does not split comparisons. No comparison/history implementation is introduced here.
 
-Run the configuration Node suite from `app/` with `npm.cmd run test -- --project node src/game/config/config.test.ts` (46 cases). Applying hits, combat refresh, regeneration time integration/health caps, firing, and session transitions remain later-step work, not behavior implemented by the formula helpers.
+Run the configuration Node suite from `app/` with `npm.cmd run test -- --project node src/game/config/config.test.ts` (46 cases). Applying hits, combat refresh, regeneration time integration/health caps, and session transitions remain later-step work, not behavior implemented by the formula helpers.
 
 ## Fixed-Step Movement
 
@@ -34,15 +34,25 @@ Run the configuration Node suite from `app/` with `npm.cmd run test -- --project
 
 The [mechanics timing policy](docs/mechanics.md#simulation-timing-and-movement-policy) records the delegated decision made during step 3.2. `ENCOUNTER_CONFIG.simulation` sets a 1/60-second fixed step and at most 8 steps per call. Each call returns `stepsExecuted` and `discardedSeconds`, retains a sub-tick remainder, and drops excess whole ticks instead of catching up later. `ticksElapsed` counts executed ticks; `elapsedSeconds` is that count times the fixed step, so discarded time cannot earn survival credit.
 
-Each tick cancels opposite directions and normalizes diagonals, moves the player, then pursues its updated position without overshooting the enemy's stop distance. Positive X is east; positive Y is south. Circle projection accounts for both collision radii and permits wall sliding. There is no body blocking or contact damage. Timed attacks, shard motion, health updates, and session lifecycle are not implemented here.
+Each tick cancels opposite directions and normalizes diagonals, moves the player, then pursues its updated position without overshooting the enemy's stop distance. Positive X is east; positive Y is south. Circle projection accounts for both collision radii and permits wall sliding. There is no body blocking or contact damage. Health updates and session lifecycle are not implemented here.
 
-From `app/`, run the focused 38-case suite:
+From `app/`, run the focused 55-case movement/attack suite:
 
 ```powershell
 npm.cmd run test -- --project node src/game/simulation/simulation.test.ts
 ```
 
 Tests cover initialization, directions/opposite inputs, normalized speed, known tick counts, boundaries, pursuit/stopping, frame schedules, invalid time, and catch-up accounting. Equivalent schedules with the same per-tick input and no dropped time match within 1e-9 tile; the remainder tolerance is 1e-12 second. At low frame rates that exceed the catch-up limit, intentional dropped time means results are not expected to equal an undropped schedule. No new browser keyboard behavior is expected until Phaser integration.
+
+## Rotating Bursts And Shards
+
+The same simulation state now exposes `shards` and `volleysFired` (one volley is four simultaneous emitter shots). There is no second clock. Shot times derive from the volley count and configured initial cooldown, intra-burst interval, and cooldown after the last shot: 2.00, 2.15, 2.30, 2.45 seconds, then the next group starts at 4.45 seconds. Each group creates 16 shards with stable spawn-order IDs.
+
+All approved shot times align with the 60 Hz tick boundaries. Each tick moves the player/enemy, advances existing shards, then samples the enemy's updated position and continuously rotating phase for any due volley. New shards start at age zero at that boundary. Phase zero points east; increasing angles move toward positive Y (south), so rotation is clockwise. Rotation continues during cooldown and derives from executed simulation time, never discarded time.
+
+Shard updates split displacement at reversal and expiry, reversing velocity exactly once at 1.2 seconds and expiring at 2.4 seconds. Only lifetime removes a shard; arena exit, player overlap, and `hasHitPlayer` do not. Shards store no origin or target, and later enemy movement cannot alter their velocity. Hit flags initialize false; collision/damage belongs to step 3.4.
+
+The focused suite includes 17 attack/shard cases covering cooldown and shot boundaries, all emitter offsets, resampling, clockwise rotation, partial-step reversal/expiry, symmetric return, lifetime-only removal, and discarded time. Five frame schedules over ten simulated seconds agree on all 64 emitted shard times within 1e-12 second and on final state. No rendered shards or manual gameplay verification are available until step 4.1.
 
 ## Prerequisites
 
@@ -128,7 +138,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (86 Vitest tests and one Chromium smoke test).
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (103 Vitest tests and one Chromium smoke test).
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -176,7 +186,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 3.3.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 3.4.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.
