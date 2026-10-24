@@ -10,17 +10,17 @@ Step 3.1 is complete: `app/` contains the command-generated React + TypeScript +
 
 The [mechanics contract](docs/mechanics.md) is the source of approved values and fidelity limitations. Configuration uses HP, tiles, seconds, radians, degrees/second, and CSS pixels explicitly in property names; primary DEF/SPD/VIT remain stat points. No browser or rendering framework is required to import these modules.
 
-| Contract/source | Named implementation |
-| --- | --- |
-| Published integer level-20 averages (S2), adopted under delegation | [stats.ts](app/src/game/config/stats.ts): `PALADIN_BASE_STATS` = 675 HP, 10 DEF, 41 SPD, 42 VIT |
-| Relevant passive bonuses (S7/S11/S13/S14) | `PALADIN_EQUIPMENT_BONUSES`: four fixed items, +22 DEF armor and +100 HP ring; no unused mana/attack systems |
-| Equipped preset | `calculateEquippedStats` / `PALADIN_STATS` = 775 HP, 32 DEF, 41 SPD, 42 VIT; base data is not mutated |
-| Source formulas (S3/S9), delegated combat brackets and integer rounding | `STAT_RULES`, `derivePlayerStats`, `calculateDamageHp`, `calculateCombatTriggerHp`, `calculateCombatDurationSeconds`; `PALADIN_DERIVED_STATS` retains fractional rates |
-| Approved arena, spawns, collision circles, pursuit, emitters, bursts | [encounter.ts](app/src/game/config/encounter.ts): `ENCOUNTER_CONFIG.arena/player/enemy/emitters/burst`; cooldown is measured from the last shot |
-| Wiki shard damage/speed; approved provisional range interpretation | `ENCOUNTER_CONFIG.shard`: 160 HP, 8 tiles/second, reversal age 1.2 seconds and independent lifetime 2.4 seconds; lifetime-only expiry and once-per-shard hit policy |
-| Approved viewing/session numbers | `ENCOUNTER_CONFIG.camera/session`: 32 CSS pixels/tile; zoom 1 within 0.75-1.5 in 0.125 steps; Start/retry countdowns 3/0 seconds; 100 retained deaths |
-| Entities, directional input, circular arena and versioned snapshot shapes | [models.ts](app/src/game/models.ts): plain types; shards carry velocity, age, reversal/hit flags, and no stored origin |
-| Comparison identity | `RULES_VERSION` = `crystal-worm-child-head-paladin-v1`, carried in configuration and `SessionSnapshot.rulesVersion` |
+| Contract/source                                                           | Named implementation                                                                                                                                                   |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Published integer level-20 averages (S2), adopted under delegation        | [stats.ts](app/src/game/config/stats.ts): `PALADIN_BASE_STATS` = 675 HP, 10 DEF, 41 SPD, 42 VIT                                                                        |
+| Relevant passive bonuses (S7/S11/S13/S14)                                 | `PALADIN_EQUIPMENT_BONUSES`: four fixed items, +22 DEF armor and +100 HP ring; no unused mana/attack systems                                                           |
+| Equipped preset                                                           | `calculateEquippedStats` / `PALADIN_STATS` = 775 HP, 32 DEF, 41 SPD, 42 VIT; base data is not mutated                                                                  |
+| Source formulas (S3/S9), delegated combat brackets and integer rounding   | `STAT_RULES`, `derivePlayerStats`, `calculateDamageHp`, `calculateCombatTriggerHp`, `calculateCombatDurationSeconds`; `PALADIN_DERIVED_STATS` retains fractional rates |
+| Approved arena, spawns, collision circles, pursuit, emitters, bursts      | [encounter.ts](app/src/game/config/encounter.ts): `ENCOUNTER_CONFIG.arena/player/enemy/emitters/burst`; cooldown is measured from the last shot                        |
+| Wiki shard damage/speed; approved provisional range interpretation        | `ENCOUNTER_CONFIG.shard`: 160 HP, 8 tiles/second, reversal age 1.2 seconds and independent lifetime 2.4 seconds; lifetime-only expiry and once-per-shard hit policy    |
+| Approved viewing/session numbers                                          | `ENCOUNTER_CONFIG.camera/session`: 32 CSS pixels/tile; zoom 1 within 0.75-1.5 in 0.125 steps; Start/retry countdowns 3/0 seconds; 100 retained deaths                  |
+| Entities, directional input, circular arena and versioned snapshot shapes | [models.ts](app/src/game/models.ts): plain types; shards carry velocity, age, reversal/hit flags, and no stored origin                                                 |
+| Comparison identity                                                       | `RULES_VERSION` = `crystal-worm-child-head-paladin-v1`, carried in configuration and `SessionSnapshot.rulesVersion`                                                    |
 
 `validateEncounterConfig` checks finite values, positive sizes/counts/timings, reversal strictly within lifetime, spawn collision extents, ordered zoom limits, and pursuit slower than the Paladin. Rule functions reject negative/nonfinite inputs. This is local validation for the typed preset, not a tuning UI or generic schema system.
 
@@ -66,19 +66,19 @@ Expected versions: `v24.22.1` and `12.2.1`. In each new terminal, initialize fnm
 
 Updated and validated on 2026-10-24:
 
-| Tool | Current version |
-| --- | --- |
-| fnm | 1.39.0 |
-| Node.js / npm | 24.22.1 / 12.2.1 |
-| React / React DOM | 19.3.1 / 19.3.1 |
-| TypeScript | 7.0.2 |
-| Node type definitions | 24.19.2; intentionally aligned to Node 24 rather than latest major 26 |
-| Vite / React plugin | 8.3.5 / 6.1.2 |
-| Oxlint | 1.89.0 |
-| Phaser | 4.2.1; installed, not integrated yet |
-| Vitest / jsdom | 5.0.5 / 30.1.3 |
-| React Testing Library / jest-dom / user-event | 16.3.3 / 7.0.1 / 14.6.8 |
-| Playwright Test / create-playwright | 1.64.1 / 1.17.139 |
+| Tool                                          | Current version                                                       |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| fnm                                           | 1.39.0                                                                |
+| Node.js / npm                                 | 24.22.1 / 12.2.1                                                      |
+| React / React DOM                             | 19.3.1 / 19.3.1                                                       |
+| TypeScript                                    | 7.0.2                                                                 |
+| Node type definitions                         | 24.19.2; intentionally aligned to Node 24 rather than latest major 26 |
+| Vite / React plugin                           | 8.3.5 / 6.1.2                                                         |
+| Oxlint                                        | 1.89.0                                                                |
+| Phaser                                        | 4.2.1; installed, not integrated yet                                  |
+| Vitest / jsdom                                | 5.0.5 / 30.1.3                                                        |
+| React Testing Library / jest-dom / user-event | 16.3.3 / 7.0.1 / 14.6.8                                               |
+| Playwright Test / create-playwright           | 1.64.1 / 1.17.139                                                     |
 
 TypeScript was upgraded through npm; other compatible packages were refreshed and were already current within their supported ranges. A clean `npm ci`, lint, and the TypeScript/production build pass with this toolchain. The original bootstrap record below is historical, not the current runtime requirement.
 
@@ -147,14 +147,14 @@ npm --prefix app run build
 
 `--yes` accepts npm's generator-package installation; `--no-interactive` selects noninteractive scaffolding. Do not rerun the generator over the existing app. No nested Git repository was created.
 
-| Tool | Original bootstrap version |
-| --- | --- |
-| Node.js / npm | 22.20.0 / 11.7.0 |
-| create-vite | 9.3.1 |
-| React / React DOM | 19.3.1 / 19.3.1 |
-| TypeScript | 6.0.3 |
-| Vite / React plugin | 8.3.5 / 6.1.2 |
-| Oxlint | 1.89.0 |
+| Tool                | Original bootstrap version |
+| ------------------- | -------------------------- |
+| Node.js / npm       | 22.20.0 / 11.7.0           |
+| create-vite         | 9.3.1                      |
+| React / React DOM   | 19.3.1 / 19.3.1            |
+| TypeScript          | 6.0.3                      |
+| Vite / React plugin | 8.3.5 / 6.1.2              |
+| Oxlint              | 1.89.0                     |
 
 The lockfile records installed dependency versions. The initial installation reported zero vulnerabilities; that result is specific to the installation date and is not a continuing security guarantee.
 

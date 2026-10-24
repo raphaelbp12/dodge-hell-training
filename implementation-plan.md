@@ -48,15 +48,15 @@ All steps start pending. After completing a step, replace its status with `compl
 
 Create folders only when their step introduces actual code. Names below describe ownership, not a requirement to create empty scaffolding.
 
-| Boundary | Suggested home under app/src | Owns | Must not depend on |
-| --- | --- | --- | --- |
-| Models | game/models | Typed entities, inputs, snapshots, session states | React, Phaser, storage |
-| Configuration/data | game/config | Validated stats, encounter values, units, preset version | React, Phaser, browser APIs |
-| Simulation/rules | game/simulation | Fixed-step movement, pursuit, burst scheduling, shards, damage, regeneration, elapsed time | React, Phaser, DOM, localStorage |
-| Session application layer | game/session | Start, pause, resume, death, retry, result handoff | UI components, drawing details |
-| Engine adapter/drawing | game/phaser | Phaser lifecycle, keyboard sampling, camera, geometry, render order | Persistence internals |
-| Web components | ui | Home, HUD, results, accessible controls | Per-frame entity mutation |
-| Persistence adapter | storage | Versioned local records and safe reads/writes | Phaser |
+| Boundary                  | Suggested home under app/src | Owns                                                                                       | Must not depend on               |
+| ------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------- |
+| Models                    | game/models                  | Typed entities, inputs, snapshots, session states                                          | React, Phaser, storage           |
+| Configuration/data        | game/config                  | Validated stats, encounter values, units, preset version                                   | React, Phaser, browser APIs      |
+| Simulation/rules          | game/simulation              | Fixed-step movement, pursuit, burst scheduling, shards, damage, regeneration, elapsed time | React, Phaser, DOM, localStorage |
+| Session application layer | game/session                 | Start, pause, resume, death, retry, result handoff                                         | UI components, drawing details   |
+| Engine adapter/drawing    | game/phaser                  | Phaser lifecycle, keyboard sampling, camera, geometry, render order                        | Persistence internals            |
+| Web components            | ui                           | Home, HUD, results, accessible controls                                                    | Per-frame entity mutation        |
+| Persistence adapter       | storage                      | Versioned local records and safe reads/writes                                              | Phaser                           |
 
 Use simple modules and functions, adding interfaces only at actual external boundaries. React must not update state for every projectile on every frame. Do not run independent React and Phaser simulation clocks. All gameplay uses tiles and seconds; conversion to pixels belongs to rendering. Prefer library collision utilities where suitable, but isolate them behind pure rules and test high-speed crossings. Phaser automatic projectile destruction must not override lifetime-only expiration.
 
