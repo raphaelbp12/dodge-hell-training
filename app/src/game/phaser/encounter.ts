@@ -1,15 +1,27 @@
 import Phaser from "phaser";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
-import { advanceSimulation, createSimulation } from "../simulation/simulation";
+import { SessionController, type AttemptResult } from "../session/session";
 
 export type EncounterView = {
   healthHp: number;
   elapsedSeconds: number;
   hitsTaken: number;
-  status: "running" | "paused" | "ended";
+  status: "running" | "countdown" | "paused" | "ended";
+  countdownRemainingSeconds: number;
+  zoom: number;
+  result: AttemptResult | null;
 };
 
-export type EncounterHandle = { destroy(): void; resume(): void };
+export type EncounterHandle = {
+  destroy(): void;
+  resume(): void;
+  retry(): void;
+};
+
+type EncounterOptions = {
+  initialZoom?: number;
+  onResult?: (result: AttemptResult) => void;
+};
 
 const presentation = {
   hudIntervalMilliseconds: 100,
@@ -29,7 +41,10 @@ const pixelsPerTile = ENCOUNTER_CONFIG.camera.cssPixelsPerTile;
 const encounters = new WeakMap<HTMLElement, EncounterScene>();
 
 class EncounterScene extends Phaser.Scene {
-  readonly state = createSimulation();
+  private session = new SessionController();
+  private get state() {
+    return this.session.simulation;
+  }
   private ground!: Phaser.GameObjects.Graphics;
   private bodies!: Phaser.GameObjects.Graphics;
   private projectiles!: Phaser.GameObjects.Graphics;
@@ -37,18 +52,27 @@ class EncounterScene extends Phaser.Scene {
     "north" | "south" | "east" | "west",
     Phaser.Input.Keyboard.Key
   >;
-  private zoom = Number(ENCOUNTER_CONFIG.camera.defaultZoom);
-  private paused = false;
+  private zoom: number;
+  private heldControls = new Set<string>();
+  private suppressedMovement = new Set<string>();
+  private processedKeyEvents = new WeakSet<KeyboardEvent>();
   private disposed = false;
   private skipDelta = true;
   private hudRemainingMilliseconds = 0;
   private host: HTMLElement;
   private publish: (view: EncounterView) => void;
+  private onResult: EncounterOptions["onResult"];
 
-  constructor(host: HTMLElement, publish: (view: EncounterView) => void) {
+  constructor(
+    host: HTMLElement,
+    publish: (view: EncounterView) => void,
+    options: EncounterOptions,
+  ) {
     super("Encounter");
     this.host = host;
     this.publish = publish;
+    this.zoom = options.initialZoom ?? ENCOUNTER_CONFIG.camera.defaultZoom;
+    this.onResult = options.onResult;
   }
 
   create(): void {
@@ -63,11 +87,13 @@ class EncounterScene extends Phaser.Scene {
       false,
     ) as typeof this.keys;
     keyboard.on("keydown", this.onKeyDown);
+    keyboard.on("keyup", this.onKeyUp);
     this.host.addEventListener("focusout", this.onFocusOut);
     window.addEventListener("blur", this.pauseForFocus);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.centerCamera, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this);
+    this.session.start();
     this.drawGround();
     this.drawEntities();
     this.centerCamera();
@@ -76,25 +102,68 @@ class EncounterScene extends Phaser.Scene {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    if (this.processedKeyEvents.has(event)) return;
+    this.processedKeyEvents.add(event);
     if (
       this.disposed ||
-      this.paused ||
-      this.state.phase === "ended" ||
-      document.activeElement !== this.host
+      document.hidden ||
+      !this.host.closest("main")?.contains(document.activeElement)
     )
       return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.code === "KeyR" || event.code === "Escape") {
+      if (
+        event.code === "Escape" &&
+        !["playing", "paused"].includes(this.session.phase)
+      )
+        return;
+      event.preventDefault();
+      if (event.repeat || this.heldControls.has(event.code)) return;
+      this.heldControls.add(event.code);
+      if (event.code === "KeyR") this.retry();
+      else if (this.session.phase === "paused") this.resume();
+      else this.pauseForFocus();
+      return;
+    }
+    if (
+      document.activeElement !== this.host ||
+      !["countdown", "playing"].includes(this.session.phase)
+    )
+      return;
     if (!["KeyW", "KeyA", "KeyS", "KeyD", "KeyO", "KeyP"].includes(event.code))
       return;
     event.preventDefault();
     if (event.repeat) return;
+    this.suppressedMovement.delete(event.code);
     const { minZoom, maxZoom, zoomStep } = ENCOUNTER_CONFIG.camera;
     if (event.code === "KeyO")
       this.zoom = Math.max(minZoom, this.zoom - zoomStep);
     if (event.code === "KeyP")
       this.zoom = Math.min(maxZoom, this.zoom + zoomStep);
     this.centerCamera();
+    if (event.code === "KeyO" || event.code === "KeyP") this.publishView();
   };
+
+  private onKeyUp = (event: KeyboardEvent): void => {
+    if (this.processedKeyEvents.has(event)) return;
+    this.processedKeyEvents.add(event);
+    this.heldControls.delete(event.code);
+    this.suppressedMovement.delete(event.code);
+  };
+
+  private clearMovement(): void {
+    for (const [direction, code] of Object.entries({
+      north: "KeyW",
+      south: "KeyS",
+      east: "KeyD",
+      west: "KeyA",
+    })) {
+      if (this.keys[direction as keyof typeof this.keys].isDown)
+        this.suppressedMovement.add(code);
+    }
+    this.input.keyboard?.resetKeys();
+    this.skipDelta = true;
+  }
 
   private onFocusOut = (): void => {
     this.pauseForFocus();
@@ -104,19 +173,27 @@ class EncounterScene extends Phaser.Scene {
   };
   private pauseForFocus = (): void => {
     if (this.disposed || this.state.phase === "ended") return;
-    this.paused = true;
-    this.skipDelta = true;
-    this.input.keyboard?.resetKeys();
+    this.session.pause();
+    this.clearMovement();
     this.publishView();
   };
 
   resume(): void {
     if (this.disposed || document.hidden || this.state.phase === "ended")
       return;
-    this.input.keyboard?.resetKeys();
-    this.skipDelta = true;
-    this.paused = false;
+    this.clearMovement();
+    this.session.resume();
     this.host.focus({ preventScroll: true });
+    this.publishView();
+  }
+
+  retry(): void {
+    if (this.disposed || document.hidden || !this.session.retry()) return;
+    this.clearMovement();
+    this.hudRemainingMilliseconds = 0;
+    this.host.focus({ preventScroll: true });
+    this.drawEntities();
+    this.centerCamera();
     this.publishView();
   }
 
@@ -124,7 +201,8 @@ class EncounterScene extends Phaser.Scene {
     if (
       this.disposed ||
       !this.keys ||
-      this.paused ||
+      this.session.phase === "paused" ||
+      this.session.phase === "ended" ||
       document.hidden ||
       document.activeElement !== this.host
     )
@@ -133,19 +211,27 @@ class EncounterScene extends Phaser.Scene {
       this.skipDelta = false;
       return;
     }
-    advanceSimulation(this.state, delta / presentation.millisecondsPerSecond, {
-      north: this.keys.north.isDown,
-      south: this.keys.south.isDown,
-      east: this.keys.east.isDown,
-      west: this.keys.west.isDown,
-    });
+    const previousPhase = this.session.phase;
+    const result = this.session.advance(
+      delta / presentation.millisecondsPerSecond,
+      {
+        north: this.keys.north.isDown && !this.suppressedMovement.has("KeyW"),
+        south: this.keys.south.isDown && !this.suppressedMovement.has("KeyS"),
+        east: this.keys.east.isDown && !this.suppressedMovement.has("KeyD"),
+        west: this.keys.west.isDown && !this.suppressedMovement.has("KeyA"),
+      },
+    );
     this.drawEntities();
     this.centerCamera();
     this.hudRemainingMilliseconds -= delta;
-    if (this.hudRemainingMilliseconds <= 0) {
+    if (
+      this.hudRemainingMilliseconds <= 0 ||
+      previousPhase !== this.session.phase
+    ) {
       this.hudRemainingMilliseconds = presentation.hudIntervalMilliseconds;
       this.publishView();
     }
+    if (result) this.onResult?.(result);
   }
 
   private publishView(): void {
@@ -155,11 +241,14 @@ class EncounterScene extends Phaser.Scene {
       elapsedSeconds: this.state.elapsedSeconds,
       hitsTaken: this.state.hitsTaken,
       status:
-        this.state.phase === "ended"
-          ? "ended"
-          : this.paused
-            ? "paused"
-            : "running",
+        this.session.phase === "playing"
+          ? "running"
+          : this.session.phase === "home"
+            ? "countdown"
+            : this.session.phase,
+      countdownRemainingSeconds: this.session.countdownRemainingSeconds,
+      zoom: this.zoom,
+      result: this.session.result,
     });
   }
 
@@ -255,7 +344,11 @@ class EncounterScene extends Phaser.Scene {
   inspect() {
     return {
       ...structuredClone(this.state),
-      paused: this.paused,
+      paused: this.session.phase === "paused",
+      sessionPhase: this.session.phase,
+      attemptId: this.session.attemptId,
+      countdownRemainingSeconds: this.session.countdownRemainingSeconds,
+      result: this.session.result ? { ...this.session.result } : null,
       zoom: this.zoom,
       camera: {
         x: this.cameras.main.midPoint.x / pixelsPerTile,
@@ -267,9 +360,12 @@ class EncounterScene extends Phaser.Scene {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
+    this.session.home();
     this.input?.keyboard?.resetKeys();
     this.input?.keyboard?.off("keydown", this.onKeyDown);
+    this.input?.keyboard?.off("keyup", this.onKeyUp);
     if (this.input?.keyboard) this.input.keyboard.enabled = false;
     this.host.removeEventListener("focusout", this.onFocusOut);
     window.removeEventListener("blur", this.pauseForFocus);
@@ -286,13 +382,14 @@ export function inspectEncounter(host: HTMLElement) {
 export function createEncounter(
   host: HTMLElement,
   publish: (view: EncounterView) => void,
+  options: EncounterOptions = {},
 ): EncounterHandle {
   let disposed = false;
   let game: Phaser.Game | undefined;
   let scene: EncounterScene | undefined;
   queueMicrotask(() => {
     if (disposed) return;
-    scene = new EncounterScene(host, publish);
+    scene = new EncounterScene(host, publish, options);
     encounters.set(host, scene);
     game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -315,6 +412,7 @@ export function createEncounter(
   });
   return {
     resume: () => scene?.resume(),
+    retry: () => scene?.retry(),
     destroy: () => {
       if (disposed) return;
       disposed = true;

@@ -3,6 +3,16 @@ import type { SessionSnapshot, Vector2 } from "../src/game/models.ts";
 
 type Inspection = SessionSnapshot & {
   volleysFired: number;
+  ticksElapsed: number;
+  accumulatorSeconds: number;
+  sessionPhase: "home" | "countdown" | "playing" | "paused" | "ended";
+  countdownRemainingSeconds: number;
+  attemptId: number;
+  result: {
+    attemptId: number;
+    elapsedSeconds: number;
+    hitsTaken: number;
+  } | null;
   paused: boolean;
   zoom: number;
   camera: Vector2;
@@ -27,6 +37,217 @@ async function launch(page: Page) {
     .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
     .toBeGreaterThan(0);
 }
+
+async function retrySnapshot(page: Page): Promise<Inspection> {
+  return page.evaluate(async () => {
+    const modulePath = "/src/game/phaser/encounter.ts";
+    const adapter = await import(/* @vite-ignore */ modulePath);
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        code: "KeyR",
+        keyCode: 82,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    const snapshot = adapter.inspectEncounter(
+      document.querySelector('[aria-label="Encounter"]'),
+    );
+    window.dispatchEvent(
+      new KeyboardEvent("keyup", { code: "KeyR", keyCode: 82, bubbles: true }),
+    );
+    return snapshot;
+  });
+}
+
+test("Start countdown freezes world, focus pause preserves it, and R skips countdown", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.keyboard.press("r");
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "Launch encounter" }).click();
+  await expect
+    .poll(async () => (await inspect(page))?.sessionPhase)
+    .toBe("countdown");
+  await page.keyboard.down("d");
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeVisible();
+  const paused = await inspect(page);
+  await page.waitForTimeout(200);
+  expect(await inspect(page)).toEqual(paused);
+  expect(paused.elapsedSeconds).toBe(0);
+  expect(paused.volleysFired).toBe(0);
+  expect(paused.player.positionTiles).toEqual({ x: 0, y: 0 });
+  expect(paused.enemy.positionTiles).toEqual({ x: 0, y: -13 });
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect
+    .poll(async () => (await inspect(page)).sessionPhase)
+    .toBe("countdown");
+  const reset = await retrySnapshot(page);
+  expect(reset.sessionPhase).toBe("playing");
+  expect(reset.countdownRemainingSeconds).toBe(0);
+  expect(reset.elapsedSeconds).toBe(0);
+  expect(reset.attemptId).toBe(2);
+  await expect
+    .poll(async () => (await inspect(page)).elapsedSeconds)
+    .toBeGreaterThan(0);
+  expect((await inspect(page)).player.positionTiles).toEqual({ x: 0, y: 0 });
+  await page.keyboard.up("d");
+});
+
+test("held R restarts once, burst retry fully resets, and Escape resumes without stale input", async ({
+  page,
+}) => {
+  await launch(page);
+  const canvas = await page.locator("canvas").elementHandle();
+  await page.keyboard.press("p");
+  await expect
+    .poll(async () => (await inspect(page)).volleysFired)
+    .toBeGreaterThan(0);
+  await page.keyboard.down("d");
+  await expect
+    .poll(async () => (await inspect(page)).player.positionTiles.x)
+    .toBeGreaterThan(0);
+  const reset = await retrySnapshot(page);
+  expect(reset.player).toEqual({
+    positionTiles: { x: 0, y: 0 },
+    healthHp: 775,
+    combatRemainingSeconds: 0,
+  });
+  expect(reset.enemy).toEqual({
+    positionTiles: { x: 0, y: -13 },
+    emitterPhaseRadians: 0,
+  });
+  expect(reset.shards).toEqual([]);
+  expect(reset.volleysFired).toBe(0);
+  expect(reset.ticksElapsed).toBe(0);
+  expect(reset.accumulatorSeconds).toBe(0);
+  expect(reset.hitsTaken).toBe(0);
+  expect(reset.result).toBeNull();
+  expect(reset.zoom).toBe(1.125);
+  await page.waitForTimeout(150);
+  expect((await inspect(page)).player.positionTiles).toEqual({ x: 0, y: 0 });
+  await page.keyboard.up("d");
+  await page.keyboard.down("r");
+  await expect.poll(async () => (await inspect(page)).attemptId).toBe(3);
+  await page.keyboard.down("r");
+  await page.keyboard.down("r");
+  expect((await inspect(page)).attemptId).toBe(3);
+  await page.keyboard.up("r");
+  for (let attempt = 4; attempt <= 6; attempt++) {
+    await page.keyboard.press("r");
+    await expect
+      .poll(async () => (await inspect(page)).attemptId)
+      .toBe(attempt);
+    expect((await inspect(page)).keydownListeners).toBe(1);
+    expect(
+      await canvas!.evaluate(
+        (element) => element === document.querySelector("canvas"),
+      ),
+    ).toBe(true);
+  }
+  await page.keyboard.down("d");
+  await expect
+    .poll(async () => (await inspect(page)).player.positionTiles.x)
+    .toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect
+    .poll(async () => (await inspect(page)).sessionPhase)
+    .toBe("paused");
+  const paused = await inspect(page);
+  await page.waitForTimeout(200);
+  expect(await inspect(page)).toEqual(paused);
+  await page.keyboard.press("Escape");
+  await expect
+    .poll(async () => (await inspect(page)).elapsedSeconds)
+    .toBeGreaterThan(paused.elapsedSeconds);
+  expect((await inspect(page)).player.positionTiles).toEqual(
+    paused.player.positionTiles,
+  );
+  await page.keyboard.up("d");
+  await page.keyboard.press("Escape");
+  const fromPause = await retrySnapshot(page);
+  expect(fromPause.sessionPhase).toBe("playing");
+  expect(fromPause.elapsedSeconds).toBe(0);
+  expect(fromPause.attemptId).toBe(7);
+  await page.getByRole("button", { name: "Close encounter" }).click();
+  await page.keyboard.press("r");
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "Launch encounter" }).click();
+  await expect
+    .poll(async () => (await inspect(page))?.sessionPhase)
+    .toBe("countdown");
+  expect((await inspect(page)).zoom).toBe(1.125);
+  expect((await inspect(page)).result).toBeNull();
+});
+
+test("queued control events cannot replay a retry or pause within the same frame", async ({
+  page,
+}) => {
+  await launch(page);
+  const snapshot = await page.evaluate(async () => {
+    const modulePath = "/src/game/phaser/encounter.ts";
+    const adapter = await import(/* @vite-ignore */ modulePath);
+    for (const [code, keyCode] of [
+      ["KeyR", 82],
+      ["Escape", 27],
+    ] as const) {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code,
+          keyCode,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      window.dispatchEvent(
+        new KeyboardEvent("keyup", { code, keyCode, bubbles: true }),
+      );
+    }
+    return adapter.inspectEncounter(
+      document.querySelector('[aria-label="Encounter"]'),
+    );
+  });
+  expect(snapshot.attemptId).toBe(2);
+  expect(snapshot.sessionPhase).toBe("paused");
+});
+
+test("death hands off one result, R and Retry immediately reuse the live encounter", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await launch(page);
+  await expect
+    .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
+    .toBe("ended");
+  const ended = await inspect(page);
+  expect(ended.result).toEqual({
+    attemptId: ended.attemptId,
+    rulesVersion: ended.rulesVersion,
+    outcome: "death",
+    elapsedSeconds: ended.elapsedSeconds,
+    hitsTaken: ended.hitsTaken,
+  });
+  await page.waitForTimeout(200);
+  expect(await inspect(page)).toEqual(ended);
+  const reset = await retrySnapshot(page);
+  expect(reset.attemptId).toBe(ended.attemptId + 1);
+  expect(reset.sessionPhase).toBe("playing");
+  expect(reset.result).toBeNull();
+  expect(reset.player.healthHp).toBe(775);
+  expect(reset.elapsedSeconds).toBe(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect
+    .poll(async () => (await inspect(page)).attemptId)
+    .toBe(reset.attemptId + 1);
+  expect((await inspect(page)).sessionPhase).toBe("playing");
+  await expect(page.locator("canvas")).toHaveCount(1);
+  expect((await inspect(page)).keydownListeners).toBe(1);
+});
 
 test("launches one Phaser canvas and cleans it up across repeated mounts", async ({
   page,
@@ -288,7 +509,8 @@ for (const viewport of [
     const state = await inspect(page);
     expect(state.viewport.width).toBe(viewport.width);
     const pixels = await page.locator("canvas").evaluate((canvas) => {
-      if (!(canvas instanceof HTMLCanvasElement)) throw new Error("Expected encounter canvas");
+      if (!(canvas instanceof HTMLCanvasElement))
+        throw new Error("Expected encounter canvas");
       const copy = document.createElement("canvas");
       copy.width = canvas.width;
       copy.height = canvas.height;

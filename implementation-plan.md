@@ -294,7 +294,7 @@ Acceptance: a temporary minimal React entry can launch the encounter; WASD, purs
 
 ### Step 4.2 - Implement Session Lifecycle, Pause, And Retry
 
-Status: pending. Dependencies: 4.1.
+Status: complete. Dependencies: 4.1.
 
 **Implementation prompt**
 
@@ -305,6 +305,18 @@ Implement focus-loss behavior and resume input clearing from the contract; hidde
 Write failing controller tests and browser checks for repeated R presses, held R, retry during a burst, retry after death, pause/resume, focus loss, and stale input. Verify several consecutive retries leave one canvas and one effective input handler.
 
 Acceptance: lifecycle tests and browser checks pass, retries are immediate and repeatable, and no timer/projectile state leaks between attempts.
+
+**Execution record - 2026-10-24**
+
+- Confirmed step 4.1 complete with recorded acceptance evidence and a clean worktree. Read the shared contract, original draft, approved camera/session policy, and nearby simulation/adapter/host/tests. Used the already approved Start/retry countdowns (3/0 seconds), Escape/focus policy, full reset/abort rules, and visit-long zoom retention without tuning, dependency, or rules-version changes.
+- Added `app/src/game/session/session.test.ts` first. The initial command used the repository root rather than the app package; corrected to `npm.cmd --prefix app run test -- --project node src/game/session/session.test.ts`, which failed on the missing controller as expected. Implemented the pure `SessionController` in neighboring `session.ts`; all 16 focused Node cases passed. Coverage includes ignored home actions, frozen/precise countdown boundaries, no countdown time credited to survival, pause/resume for countdown/play, fresh initialization from countdown/playing/paused/ended, old-object isolation, one frozen death result, abort discard, invalid durations, and operation without browser globals.
+- Start/retry use one initialization path and existing `createSimulation()`. Retry replaces all encounter state, including health/combat, positions, shards/hit flags, emitter phase, initial cooldown, counters, executed ticks, and fractional accumulator. The controller advances only supplied active seconds and returns a completed result exactly once on death. It owns no timers, browser APIs, storage, or asynchronous callbacks; an old simulation/result cannot mutate or complete the new attempt. Home/retry before death produce no record.
+- Phaser remains the sole driver and retains its scene/game/canvas on retry. Added edge-triggered R from countdown/playing/paused/ended and ignored home, held repeats, and modified shortcuts. Escape toggles active play/pause; focus loss also pauses countdown, preserving remaining countdown time until explicit Resume. Resume/retry reset sampled input and skip the first delta; held movement is suppressed until release/fresh press, so no hidden time or stale movement leaks. The adapter supports a synchronous optional death-result callback for later persistence; no persistence is introduced here.
+- The temporary React host shows countdown and minimal Resume/Retry actions, not the step 5.1 Home/results interface. Zoom remains outside simulation and is retained through retry and temporary close/relaunch for the app visit. Existing Strict Mode lifecycle coverage still passes; no per-frame React entity updates, second clock, or game rebuild on retry was introduced.
+- Added a failing Chromium countdown test before integration, then passed the initial three lifecycle browser checks. Full-suite validation exposed resource contention with eight simultaneous Chromium/Phaser workers (GPU stalls/timeouts); the suite passed at two workers. Bounded local workers to two while preserving the existing one-worker CI setting, without weakening timing/gameplay assertions.
+- A subsequent full run caught an intermittent extra retry. Inspected Phaser's keyboard manager/plugin: the same queued event objects can be processed again when more input arrives before the next frame. Added a deterministic same-frame R/Escape browser regression, observed expected attempt 2 versus actual 4, then fixed adapter dispatch with a weak event-identity set for keydown/keyup. The regression, held-R workflow, and real death/retry checks passed after the correction.
+- Final gates passed under the pinned toolchain: `npm run test` (159 cases), `npm run typecheck`, `npm run lint`, `npm run build`, and unmodified `npm run test:e2e` (12 Chromium checks with two local workers). Browser checks cover repeated/held R, complete reset during a burst, retry after actual death, Retry button, pause/resume, countdown focus loss, stale movement, same-frame queue replay, retained zoom, and consecutive retries with one unchanged canvas/one effective keydown handler. Retained movement/camera/render tests and desktop/narrow screenshot/pixel/layout checks also pass. The existing nonblocking Phaser large-chunk warning remains (about 1.70 MB minified / 454 kB gzip).
+- Updated the README with lifecycle ownership, controls, reset/result handoff, validation counts, worker rationale, and local manual checks. No unapproved design choices or blockers remain. Step 5.1 and later remain pending; no final Home/results design, history storage, deployment, commit, or push was added.
 
 ## Phase 5: Practice Interface And Records
 

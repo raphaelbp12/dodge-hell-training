@@ -1,29 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   createEncounter,
   type EncounterHandle,
   type EncounterView,
 } from "./game/phaser/encounter";
 import { PALADIN_STATS } from "./game/config/stats";
+import { ENCOUNTER_CONFIG } from "./game/config/encounter";
 import styles from "./App.module.css";
 
-function Encounter() {
+function Encounter({ zoomPreference }: { zoomPreference: RefObject<number> }) {
   const host = useRef<HTMLDivElement>(null);
   const runtime = useRef<EncounterHandle | null>(null);
   const [view, setView] = useState<EncounterView>({
     healthHp: PALADIN_STATS.healthHp,
     elapsedSeconds: 0,
     hitsTaken: 0,
-    status: "running",
+    status: "countdown",
+    countdownRemainingSeconds: ENCOUNTER_CONFIG.session.startCountdownSeconds,
+    zoom: zoomPreference.current,
+    result: null,
   });
   useEffect(() => {
-    const handle = createEncounter(host.current!, setView);
+    const handle = createEncounter(
+      host.current!,
+      (nextView) => {
+        zoomPreference.current = nextView.zoom;
+        setView(nextView);
+      },
+      { initialZoom: zoomPreference.current },
+    );
     runtime.current = handle;
     return () => {
       runtime.current = null;
       handle.destroy();
     };
-  }, []);
+  }, [zoomPreference]);
   return (
     <>
       <div className={styles.telemetry}>
@@ -45,11 +56,18 @@ function Encounter() {
             ? "Defeated"
             : view.status === "paused"
               ? "Paused"
-              : "Active"}
+              : view.status === "countdown"
+                ? `Starting in ${Math.ceil(view.countdownRemainingSeconds)}`
+                : "Active"}
         </span>
         {view.status === "paused" && (
           <button type="button" onClick={() => runtime.current?.resume()}>
             Resume
+          </button>
+        )}
+        {(view.status === "paused" || view.status === "ended") && (
+          <button type="button" onClick={() => runtime.current?.retry()}>
+            Retry
           </button>
         )}
       </div>
@@ -66,6 +84,7 @@ function Encounter() {
 
 export default function App() {
   const [launched, setLaunched] = useState(false);
+  const zoomPreference = useRef<number>(ENCOUNTER_CONFIG.camera.defaultZoom);
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
@@ -79,7 +98,7 @@ export default function App() {
       </header>
       <p className={styles.keyboardNotice}>Desktop keyboard required</p>
       {launched ? (
-        <Encounter />
+        <Encounter zoomPreference={zoomPreference} />
       ) : (
         <div className={styles.idle} aria-hidden="true">
           <div className={styles.crystal} />

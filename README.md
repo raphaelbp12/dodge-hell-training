@@ -4,7 +4,7 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 4.1 is complete: the temporary React entry launches a playable Phaser encounter with WASD movement, pursuit, rotating bursts, returning shards, hits, health loss, player-centered camera, and O/P zoom. Focus loss pauses play until Resume. Full session/countdown/retry controls, the final practice interface, records, and GitHub Pages deployment remain later steps.
+Step 4.2 is complete: the temporary React entry launches a playable Phaser encounter with a three-second countdown, WASD movement, pursuit, rotating bursts, returning shards, hits, health loss, player-centered camera, and O/P zoom. R retries immediately; Escape toggles pause, and focus loss requires explicit Resume. The final practice interface, records, and GitHub Pages deployment remain later steps.
 
 Current local preview: http://127.0.0.1:5174/.
 
@@ -28,7 +28,7 @@ The [mechanics contract](docs/mechanics.md) is the source of approved values and
 
 Comparison-breaking changes to the preset, formulas, or encounter tuning require an explicit `RULES_VERSION` bump and corresponding contract/test updates. Future persistence must compare this version before sharing personal bests; viewing zoom alone does not split comparisons. No comparison/history implementation is introduced here.
 
-Run the configuration Node suite from `app/` with `npm.cmd run test -- --project node src/game/config/config.test.ts` (46 cases). Formula helpers do not mutate entities; the simulation's health rules apply damage, combat refresh, fractional regeneration, and health caps. Session transitions beyond death remain later-step work.
+Run the configuration Node suite from `app/` with `npm.cmd run test -- --project node src/game/config/config.test.ts` (46 cases). Formula helpers do not mutate entities; the simulation's health rules apply damage, combat refresh, fractional regeneration, and health caps. Session transitions are owned by the separate controller below.
 
 ## Fixed-Step Movement
 
@@ -36,7 +36,7 @@ Run the configuration Node suite from `app/` with `npm.cmd run test -- --project
 
 The [mechanics timing policy](docs/mechanics.md#simulation-timing-and-movement-policy) records the delegated decision made during step 3.2. `ENCOUNTER_CONFIG.simulation` sets a 1/60-second fixed step and at most 8 steps per call. Each call returns `stepsExecuted` and `discardedSeconds`, retains a sub-tick remainder, and drops excess whole ticks instead of catching up later. `ticksElapsed` counts executed ticks; `elapsedSeconds` is that count times the fixed step, so discarded time cannot earn survival credit.
 
-Each tick cancels opposite directions and normalizes diagonals, moves the player, then pursues its updated position without overshooting the enemy's stop distance. Positive X is east; positive Y is south. Circle projection accounts for both collision radii and permits wall sliding. There is no body blocking or contact damage. Session start/pause/retry controls are not implemented here.
+Each tick cancels opposite directions and normalizes diagonals, moves the player, then pursues its updated position without overshooting the enemy's stop distance. Positive X is east; positive Y is south. Circle projection accounts for both collision radii and permits wall sliding. There is no body blocking or contact damage. Session start/pause/retry controls belong to the controller, not this simulation module.
 
 From `app/`, run the focused 95-case simulation/health suites (79 simulation cases and 16 pure health cases):
 
@@ -62,7 +62,7 @@ The simulation uses `@flatten-js/core` segment-distance geometry behind a pure c
 
 [health.ts](app/src/game/simulation/health.ts) applies the approved preset rules through `applyPlayerHit` and `regeneratePlayer`. A first hit marks that shard, increments `hitsTaken`, applies 128 HP damage, and refreshes combat to 5.32 seconds. Separate shards can each hit without global immunity. Resolve hits in spawn order before regeneration; retain fractional HP, use 6.0547 HP/second in combat and 12.1094 otherwise, split at combat expiry, and cap at 775 HP. Damage rounding/minimum and inclusive combat-trigger boundaries reuse the existing stat rules.
 
-Fresh state has `phase: "playing"` and zero hits. Lethal damage clamps HP to zero and sets `phase: "ended"`; no later hits or regeneration can change the result. Count the lethal tick in survival time, stop the rest of a multi-tick update, clear the accumulator, and report unexecuted supplied time as discarded. Later advancement calls execute zero ticks and leave the entire ended state unchanged. The session controller, UI, and persistence remain separate later steps.
+Fresh state has `phase: "playing"` and zero hits. Lethal damage clamps HP to zero and sets `phase: "ended"`; no later hits or regeneration can change the result. Count the lethal tick in survival time, stop the rest of a multi-tick update, clear the accumulator, and report unexecuted supplied time as discarded. Later advancement calls execute zero ticks and leave the entire ended state unchanged. The controller handles session transitions separately; final UI and persistence remain later steps.
 
 Step 3.4 adds 40 cases for defense/minimum/ceiling damage, combat trigger and refresh, fractional regeneration/expiry/caps, fast and moving-player crossings, tangencies/near misses, reversal/expiry segments, birth-time overlap, consumed return hits, independent simultaneous hits, lethal ordering, and post-death state freezing. Browser integration now verifies pursuit, firing, reversal, hit registration, and health loss through real Phaser updates.
 
@@ -74,11 +74,23 @@ Game creation is deferred by one cancellable microtask so React Strict Mode's di
 
 The camera remains north-up and centered exactly on the player, including at arena edges, without world bounds. World scale is 32 CSS pixels/tile at zoom 1. O/P change zoom by 0.125 per press within 0.75-1.5; held repeats do not repeat zoom changes. Resize changes visible world extent, never world speed or timing. Ground, bodies, and yellow shards use separate Phaser graphics depths, with circle fills matching configured collision radii.
 
-This temporary entry launches active play directly; it is not the final Start/countdown flow. R retry, Escape pause, countdown, results, retained zoom across retry, and records remain later steps. Blur, host focus loss, or a hidden document clear held keys and gate simulation until explicit Resume; resume discards its first frame delta instead of catching up hidden time. Gameplay key cancellation is scoped to focused active play, leaving unrelated keys and browser modifier shortcuts untouched. No touch input is installed.
+The temporary entry now uses the approved session flow below, not the final Home/results interface. Blur, host focus loss, or a hidden document clear held keys and gate both countdown and gameplay until explicit Resume. Resume/retry discard the first frame delta instead of catching up inactive time. Held movement is suppressed until release or a fresh press. R/Escape are edge-triggered; a weak event-identity set prevents Phaser's same-frame keyboard queue from replaying already handled events. Gameplay key cancellation leaves unrelated keys and browser modifier shortcuts untouched. No touch input is installed.
 
-Manual check: open http://127.0.0.1:5174/, select **Launch encounter**, move with WASD, and use O/P to change zoom. Stay still to observe pursuit, yellow outbound/returning shards, and health loss. Switch focus away and return: play stays paused until **Resume**. Use **Close encounter**, then launch again for a fresh temporary encounter; R retry is not implemented yet. Narrow screens retain the same world scale and show a keyboard requirement, not touch controls.
+Manual check: open http://127.0.0.1:5174/, select **Launch encounter**, and observe the three-second countdown before movement/pursuit/firing. Move with WASD and change zoom with O/P. Press R during countdown, a burst, pause, or after death: the attempt resets immediately without another countdown and retains zoom. Hold R to confirm it does not continually restart. Escape pauses/resumes active play; switching focus away leaves play paused until **Resume** or an explicit keyboard action. **Retry** is also available while paused/ended. **Close encounter** discards an unfinished attempt; launching again counts down and retains the current visit's zoom. Narrow screens show a keyboard requirement, not touch controls.
 
-Eight Chromium checks cover repeated mounts/one canvas/one effective keyboard handler, movement speed and arena-edge camera centering, zoom limits/repeats, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. Desktop (1440x1000) and narrow (390x844) screenshots plus canvas-pixel checks verify readable nonblank ground/player/shards, visible desktop enemy, and no horizontal overflow or header/canvas overlap. Screenshots are attached to test results under ignored `app/test-results/`.
+Twelve Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. Desktop (1440x1000) and narrow (390x844) screenshots plus canvas-pixel checks verify readable nonblank ground/player/shards, visible desktop enemy, and no horizontal overflow or header/canvas overlap. Screenshots are attached to test results under ignored `app/test-results/`.
+
+## Session Lifecycle
+
+[session.ts](app/src/game/session/session.ts) owns the pure `home -> countdown -> playing -> paused/ended` flow. It consumes only supplied active seconds; there are no timers, browser imports, or asynchronous result queues. Start and retry share initialization through `createSimulation()`. Start uses the configured three-second countdown without advancing any gameplay; retry uses zero countdown and replaces all simulation state, including combat, shard hit flags, burst/cooldown, positions, counters, and accumulator. Phaser remains the only runtime driver and does not recreate the game on retry.
+
+Death produces one frozen `AttemptResult` with attempt identity, rules version, survival duration, and hits. `advance()` returns that result only on the lethal transition; the adapter offers a synchronous optional `onResult` handoff for later persistence. Home/retry aborts do not produce completed results or records. Retry clears the prior result and never reuses the old simulation object. Zoom is a viewing preference retained across retry and temporary close/relaunch during the app visit, not part of simulation reset. No history storage or final results screen is added here.
+
+Run the 16 focused Node lifecycle cases from `app/`:
+
+```powershell
+npm.cmd run test -- --project node src/game/session/session.test.ts
+```
 
 ## Prerequisites
 
@@ -165,7 +177,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (143 Vitest tests and eight Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.69 MB minified / 453 kB gzip); no warning limit was raised.
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (159 Vitest tests and twelve Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 454 kB gzip); no warning limit was raised.
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -177,7 +189,7 @@ npx.cmd playwright install chromium
 
 On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwright's [browser system dependencies](https://playwright.dev/docs/browsers#install-system-dependencies). Browser binaries are cached outside the repository. `npm ci` alone does not install them.
 
-Playwright starts the local Vite CLI from `app/` using the current Node executable at http://127.0.0.1:4173/. Keep that test port free: `reuseExistingServer: false` and Vite's `--strictPort` intentionally reject an occupied port instead of testing an unrelated server. The runner stops its own server afterward. Tests never navigate to external websites; traces on failure live in ignored `app/test-results/`. No CI workflow is introduced in this step.
+Playwright starts the local Vite CLI from `app/` using the current Node executable at http://127.0.0.1:4173/. Keep that test port free: `reuseExistingServer: false` and Vite's `--strictPort` intentionally reject an occupied port instead of testing an unrelated server. Local runs use two Chromium workers after eight simultaneous Phaser instances caused GPU stalls/timeouts; CI retains one worker. The runner stops its own server afterward. Tests never navigate to external websites; traces on failure live in ignored `app/test-results/`. No CI workflow is introduced in this step.
 
 To serve the production build locally, run:
 
@@ -213,7 +225,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 4.2.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 5.1.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.
