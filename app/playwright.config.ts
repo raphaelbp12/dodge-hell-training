@@ -1,8 +1,15 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+import viteConfig from "./vite.config.ts";
 
 const testPort = 4173;
-const baseURL = `http://127.0.0.1:${testPort}`;
+const previewPort = 4174;
+const baseURL = new URL(viteConfig.base ?? "/", `http://127.0.0.1:${testPort}`)
+  .href;
+const previewURL = new URL(
+  viteConfig.base ?? "/",
+  `http://127.0.0.1:${previewPort}`,
+).href;
 
 export default defineConfig({
   testDir: "./tests",
@@ -19,13 +26,27 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      grepInvert: /production assets/,
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "production-chromium",
+      grep: /production assets/,
+      use: { ...devices["Desktop Chrome"], baseURL: previewURL },
+    },
   ],
-  webServer: {
-    command: `"${process.execPath}" node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${testPort} --strictPort`,
-    cwd: fileURLToPath(new URL(".", import.meta.url)),
-    url: baseURL,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: `"${process.execPath}" node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${testPort} --strictPort`,
+      cwd: fileURLToPath(new URL(".", import.meta.url)),
+      url: baseURL,
+      reuseExistingServer: false,
+    },
+    {
+      command: `"${process.execPath}" node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${previewPort} --strictPort`,
+      cwd: fileURLToPath(new URL(".", import.meta.url)),
+      url: previewURL,
+      reuseExistingServer: false,
+    },
+  ],
 });

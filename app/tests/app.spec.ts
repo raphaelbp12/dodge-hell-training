@@ -23,7 +23,8 @@ type Inspection = SessionSnapshot & {
 
 async function inspect(page: Page): Promise<Inspection> {
   return page.evaluate(async () => {
-    const modulePath = "/src/game/phaser/encounter.ts";
+    const modulePath = new URL("src/game/phaser/encounter.ts", document.baseURI)
+      .href;
     const adapter = await import(/* @vite-ignore */ modulePath);
     return adapter.inspectEncounter(
       document.querySelector('[aria-label="Encounter"]'),
@@ -32,7 +33,7 @@ async function inspect(page: Page): Promise<Inspection> {
 }
 
 async function launch(page: Page) {
-  await page.goto("/");
+  await page.goto("./");
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
@@ -41,7 +42,8 @@ async function launch(page: Page) {
 
 async function savedAttempts(page: Page) {
   return page.evaluate(async () => {
-    const modulePath = "/src/storage/attempts.ts";
+    const modulePath = new URL("src/storage/attempts.ts", document.baseURI)
+      .href;
     const { HISTORY_STORAGE_KEY } = await import(/* @vite-ignore */ modulePath);
     return JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) ?? "null");
   });
@@ -52,7 +54,8 @@ async function retrySnapshot(
   source: "key" | "button" = "key",
 ): Promise<Inspection> {
   return page.evaluate(async (source) => {
-    const modulePath = "/src/game/phaser/encounter.ts";
+    const modulePath = new URL("src/game/phaser/encounter.ts", document.baseURI)
+      .href;
     const adapter = await import(/* @vite-ignore */ modulePath);
     if (source === "button") {
       const retry = document.querySelector(
@@ -80,10 +83,49 @@ async function retrySnapshot(
   }, source);
 }
 
+test("production assets and practice loop work under the Pages project path", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const response = await page.goto("./");
+  expect(response?.ok()).toBe(true);
+  expect(new URL(page.url()).pathname).toBe("/dodge-hell-training/");
+  const assets = await page
+    .locator('script[src], link[rel="stylesheet"]')
+    .evaluateAll((elements) =>
+      elements.map((element) =>
+        element instanceof HTMLScriptElement
+          ? element.src
+          : (element as HTMLLinkElement).href,
+      ),
+    );
+  expect(assets.length).toBeGreaterThanOrEqual(2);
+  for (const asset of assets) {
+    expect(new URL(asset).pathname).toMatch(/^\/dodge-hell-training\/assets\//);
+    const resource = await page.request.get(asset);
+    expect(resource.ok()).toBe(true);
+    expect(resource.headers()["content-type"]).toMatch(/javascript|css/);
+  }
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await expect(page.locator("canvas")).toHaveCount(1);
+  await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
+  await page.keyboard.press("r");
+  await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
+  await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
+  await page.screenshot({
+    path: testInfo.outputPath("production-project-path.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(page.locator("canvas")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test("Start countdown freezes world, focus pause preserves it, and R skips countdown", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.keyboard.press("r");
   await expect(page.locator("canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "Start", exact: true }).click();
@@ -209,7 +251,8 @@ test("queued control events cannot replay a retry or pause within the same frame
 }) => {
   await launch(page);
   const snapshot = await page.evaluate(async () => {
-    const modulePath = "/src/game/phaser/encounter.ts";
+    const modulePath = new URL("src/game/phaser/encounter.ts", document.baseURI)
+      .href;
     const adapter = await import(/* @vite-ignore */ modulePath);
     for (const [code, keyCode] of [
       ["KeyR", 82],
@@ -377,10 +420,12 @@ for (const width of [1440, 390]) {
 test("loaded history compares only compatible retained records", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.evaluate(async () => {
-    const storagePath = "/src/storage/attempts.ts";
-    const configPath = "/src/game/config/encounter.ts";
+    const storagePath = new URL("src/storage/attempts.ts", document.baseURI)
+      .href;
+    const configPath = new URL("src/game/config/encounter.ts", document.baseURI)
+      .href;
     const { HISTORY_STORAGE_KEY, HISTORY_SCHEMA_VERSION } = await import(
       /* @vite-ignore */ storagePath
     );
@@ -620,7 +665,7 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/");
+  await page.goto("./");
   await expect(
     page.getByRole("heading", { name: "Crystal Worm Child", level: 1 }),
   ).toBeVisible();
@@ -865,7 +910,7 @@ for (const viewport of [
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await page.goto("./");
     await expect(
       page.getByRole("button", { name: "Start", exact: true }),
     ).toBeFocused();

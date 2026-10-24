@@ -4,11 +4,13 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 6.1 is complete: technical validation passed, and the user accepted the current implementation on 2026-10-24. Adjustments are deferred until after the full plan, as requested. No tuning changed; rules version remains `crystal-worm-child-head-paladin-v1`, with known trainer-fidelity limitations retained. GitHub Pages deployment has not started.
+Step 6.1 is complete: technical validation passed, and the user accepted the current implementation on 2026-10-24. Adjustments are deferred until after the full plan, as requested. No tuning changed; rules version remains `crystal-worm-child-head-paladin-v1`, with known trainer-fidelity limitations retained.
+
+Step 7.1's CI/Pages configuration and local production-path checks are implemented and passing. The step remains blocked on owner-side Pages setup, an authorized push, an actual successful Actions deployment, and a live smoke check. No live deployment is claimed.
 
 Home and results display local recent attempts and the retained personal best for the current rules version. Completed deaths save once; unfinished retries/Home do not create records. Storage failures leave practice usable with visit-only history and a warning. Start/countdown, the health/stat HUD, pause, immediate Retry, and zoom remain unchanged.
 
-Current local preview: http://127.0.0.1:5175/. The older server on 5174 returned an empty cached App transform during step 5.2; a fresh server was started without stopping the existing servers.
+Current local production preview: http://127.0.0.1:5176/dodge-hell-training/. Existing development servers were preserved; use the `/dodge-hell-training/` prefix on those ports too. Histories are origin-specific and do not transfer between preview ports.
 
 ## Domain Data
 
@@ -78,9 +80,11 @@ The camera remains north-up and centered exactly on the player, including at are
 
 The practice interface uses the approved session flow below. Blur, host focus loss, or a hidden document clear held keys and gate both countdown and gameplay until explicit Resume. Resume/retry discard the first frame delta instead of catching up inactive time. Held movement is suppressed until release or a fresh press. R/Escape are edge-triggered; a weak event-identity set prevents Phaser's same-frame keyboard queue from replaying already handled events. Gameplay key cancellation leaves unrelated keys and browser modifier shortcuts untouched. No touch input is installed.
 
-Manual check: open http://127.0.0.1:5175/, review Home, and select **Start** (or press Enter while it is focused). Observe the three-second countdown, then move with WASD and change zoom with O/P. Press R during countdown, a burst, pause, or after death: the attempt resets immediately without another countdown and retains zoom. Hold R to confirm it does not continually restart. Escape pauses/resumes active play; switching focus away leaves play paused until **Resume** or an explicit keyboard action. Let the player die and compare results with the HUD, then use **Retry** or **Home**. Home discards an unfinished attempt, removes the canvas, and focuses Start. Starting again counts down and retains visit-long zoom. Narrow screens show a keyboard requirement, not touch controls.
+Manual check: open http://127.0.0.1:5176/dodge-hell-training/, review Home, and select **Start** (or press Enter while it is focused). Observe the three-second countdown, then move with WASD and change zoom with O/P. Press R during countdown, a burst, pause, or after death: the attempt resets immediately without another countdown and retains zoom. Hold R to confirm it does not continually restart. Escape pauses/resumes active play; switching focus away leaves play paused until **Resume** or an explicit keyboard action. Let the player die and compare results with the HUD, then use **Retry** or **Home**. Home discards an unfinished attempt, removes the canvas, and focuses Start. Starting again counts down and retains visit-long zoom. Narrow screens show a keyboard requirement, not touch controls.
 
-Eighteen Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. They also verify real death records, refresh persistence, retry/abort deduplication, compatible bests, corrupt/blocked/quota storage fallback, and 60 seconds of sustained play followed by 25 retries. Desktop (1440x1000) and narrow (390x844) Home/history/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry. Screenshots are saved under ignored `app/test-results/`.
+Eighteen development-server Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. They also verify real death records, refresh persistence, retry/abort deduplication, compatible bests, corrupt/blocked/quota storage fallback, and 60 seconds of sustained play followed by 25 retries. Desktop (1440x1000) and narrow (390x844) Home/history/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry. Screenshots are saved under ignored `app/test-results/`.
+
+A nineteenth Chromium check uses built production output, without importing dev-only diagnostic modules. It verifies the Pages pathname, prefixed hashed JS/CSS with successful responses and correct content types, Start/countdown/play, R retry, Home cleanup, and no page errors. Its production screenshot is retained alongside the other artifacts.
 
 ## Practice Interface
 
@@ -122,7 +126,7 @@ Step 6.1's [technical review](docs/mechanics.md#step-61-technical-review) and [e
 
 Under delegated decision-making, validation used five simulated minutes at each of 30/60/120 Hz, 60 seconds of browser play, and 25 consecutive retries. All schedules matched exactly with a 16-shard peak. The final browser run observed 59.98 simulated seconds, no deaths, one canvas/handler, and approximately 16.7/16.7/16.8 ms median/p95/max animation-frame gaps. These are machine-specific observations, not a universal FPS or memory-leak guarantee; separate browser cases cover real deaths and the complete results/history loop. Generated JSON metrics and screenshots remain under ignored `app/test-results/`.
 
-Open http://127.0.0.1:5175/ with a keyboard and review:
+Open http://127.0.0.1:5176/dodge-hell-training/ with a keyboard and review:
 
 1. Start, move with WASD, and compare movement speed, camera scale, and O/P zoom.
 2. Watch the clockwise pattern, four-shot bursts, cooldown, and returning shards; assess collision fairness.
@@ -200,7 +204,7 @@ npm.cmd run dev -- --host 127.0.0.1 --port 5173
 
 On Windows, stop this project's dev/test servers before running `npm ci`: a loaded Vite native module can otherwise cause an `EPERM` file-lock error. Retry after stopping the server; elevation is not the remedy for that lock.
 
-Open the URL printed by Vite, normally http://127.0.0.1:5173/. If that port is occupied, Vite chooses another available port. The server is local-only with this command. Stop it with Ctrl+C in its terminal.
+Open the URL printed by Vite, normally http://127.0.0.1:5173/dodge-hell-training/. If that port is occupied, Vite chooses another available port. The project prefix is configured in `app/vite.config.ts` for both development and production. The server is local-only with this command. Stop it with Ctrl+C in its terminal.
 
 In Windows PowerShell 5.1, use `npm.cmd` when forwarding flags after `--`: npm 12's PowerShell entry point did not preserve the separator in the checked environment. On other platforms, use `npm` instead of `npm.cmd`.
 
@@ -216,7 +220,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (194 Vitest tests and eighteen Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (194 Vitest tests and nineteen Chromium checks; the full browser run used one worker to match CI). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -228,7 +232,7 @@ npx.cmd playwright install chromium
 
 On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwright's [browser system dependencies](https://playwright.dev/docs/browsers#install-system-dependencies). Browser binaries are cached outside the repository. `npm ci` alone does not install them.
 
-Playwright starts the local Vite CLI from `app/` using the current Node executable at http://127.0.0.1:4173/. Keep that test port free: `reuseExistingServer: false` and Vite's `--strictPort` intentionally reject an occupied port instead of testing an unrelated server. Local runs use two Chromium workers after eight simultaneous Phaser instances caused GPU stalls/timeouts; CI retains one worker. The runner stops its own server afterward. Tests never navigate to external websites; traces on failure live in ignored `app/test-results/`. No CI workflow is introduced in this step.
+Build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server on port 4173 and production preview on 4174, both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. Keep both ports free: `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Tests never navigate to external websites; failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
 
 To serve the production build locally, run:
 
@@ -237,6 +241,23 @@ npm.cmd run preview -- --host 127.0.0.1
 ```
 
 Use the URL printed by the preview command. Preview also defaults to port 4173, so stop it before running browser tests.
+
+## GitHub Pages Setup
+
+The target repository is [raphaelbp12/dodge-hell-training](https://github.com/raphaelbp12/dodge-hell-training), confirmed from the Git remote and public repository API on 2026-10-24. Its default branch is `main`; public metadata reports `has_pages: false`, and the unauthenticated Pages endpoint returns 404. The expected project-site URL after deployment is https://raphaelbp12.github.io/dodge-hell-training/. This is a target, not a verified live deployment. No custom domain is configured by this work.
+
+[The workflow](.github/workflows/pages.yml) validates pull requests and every push to `main` on Ubuntu 24.04. It selects Node 24.22.1 from `.node-version`, pins npm 12.2.1, caches npm data against `app/package-lock.json`, runs `npm ci` from `app/`, and installs Chromium/system dependencies with `npx playwright install --with-deps chromium`. Lint, typecheck, unit/component tests, build, and all nineteen browser checks gate publication. Browser artifacts are retained for seven days, including on failures when the run is not cancelled.
+
+Pull requests never upload a Pages artifact or deploy. Only successful `main` pushes upload `app/dist` through the official Pages artifact action. A dependent deployment job uses the official configure/deploy actions and `github-pages` environment. Validation has only `contents: read`; only deployment has `pages: write` and `id-token: write`. Checkout does not persist credentials. Per-ref concurrency serializes runs without cancelling an in-flight deployment. Pages auto-enablement is explicitly disabled. No backend, custom token, application secret, or repository-settings change is needed or performed by the local implementation.
+
+Owner steps still required:
+
+1. In [repository Pages settings](https://github.com/raphaelbp12/dodge-hell-training/settings/pages), select **Build and deployment -> Source -> GitHub Actions**, not a publishing branch.
+2. Ensure Actions permits the official `actions/*` actions and the `github-pages` environment permits deployment from `main`; satisfy any required environment reviews.
+3. Separately authorize committing/pushing these changes to `main`, or do so yourself. No commit or push was performed during step 7.1. The main-push workflow must complete successfully; a passing PR check alone is not deployment evidence.
+4. Record the successful Actions run/commit and deployment `page_url`, then open the actual URL and smoke-test Home, loaded assets, Start/play, and Retry. Only that evidence can complete step 7.1. The broader release verification in step 7.2 remains unstarted.
+
+Local workflow validation passed with checksum-verified actionlint 1.7.12. Actual Linux Actions execution, repository/environment policy compatibility, Pages publication, and the live URL remain unverified until the owner steps above are completed.
 
 ## Bootstrap Record
 
@@ -264,7 +285,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 7.1, only when requested.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Step 7.1 has passing local implementation; live deployment acceptance remains blocked. Step 7.2 is not started.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.
