@@ -590,6 +590,65 @@ test("shot times and shard state agree across render-frame schedules over severa
   }
 });
 
+test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () => {
+  const validationSeconds = 5 * 60;
+  const movementSegmentSeconds = 4;
+  const route: SimulationInput[] = [
+    east,
+    { ...idle, south: true },
+    { ...idle, west: true },
+    { ...idle, north: true },
+  ];
+  const groupPeriodSeconds =
+    (ENCOUNTER_CONFIG.burst.shotsPerEmitter - 1) *
+      ENCOUNTER_CONFIG.burst.shotIntervalSeconds +
+    ENCOUNTER_CONFIG.burst.cooldownAfterLastShotSeconds;
+  const shardBound =
+    ENCOUNTER_CONFIG.emitters.count * ENCOUNTER_CONFIG.burst.shotsPerEmitter;
+  expect(ENCOUNTER_CONFIG.shard.lifetimeSeconds).toBeLessThan(
+    groupPeriodSeconds,
+  );
+  let reference: ReturnType<typeof createSimulation> | undefined;
+  for (const frameRate of [60, 30, 120]) {
+    const state = createSimulation();
+    let peakShards = 0;
+    let maximumAgeSeconds = 0;
+    let discardedSeconds = 0;
+    const observedShardIds = new Set<number>();
+    for (let frame = 0; frame < validationSeconds * frameRate; frame++) {
+      const direction =
+        route[
+          Math.floor(frame / (movementSegmentSeconds * frameRate)) %
+            route.length
+        ]!;
+      discardedSeconds += advanceSimulation(
+        state,
+        1 / frameRate,
+        direction,
+      ).discardedSeconds;
+      peakShards = Math.max(peakShards, state.shards.length);
+      for (const shard of state.shards) {
+        observedShardIds.add(shard.id);
+        maximumAgeSeconds = Math.max(maximumAgeSeconds, shard.ageSeconds);
+      }
+    }
+    expect(state.phase).toBe("playing");
+    expect(state.elapsedSeconds).toBe(validationSeconds);
+    expect(state.ticksElapsed).toBe(validationSeconds / stepSeconds);
+    expect(state.volleysFired).toBe(488);
+    expect(observedShardIds.size).toBe(
+      state.volleysFired * ENCOUNTER_CONFIG.emitters.count,
+    );
+    expect(peakShards).toBe(shardBound);
+    expect(maximumAgeSeconds).toBeLessThan(
+      ENCOUNTER_CONFIG.shard.lifetimeSeconds,
+    );
+    expect(discardedSeconds).toBe(0);
+    if (reference) expect(state).toEqual(reference);
+    else reference = state;
+  }
+});
+
 test("discarded time advances neither rotation nor the attack scheduler", () => {
   const state = createSimulation();
   const shard = makeShard();

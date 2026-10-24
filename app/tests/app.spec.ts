@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 import type { SessionSnapshot, Vector2 } from "../src/game/models.ts";
 
 type Inspection = SessionSnapshot & {
@@ -468,6 +469,150 @@ for (const failure of ["corrupt", "blocked", "quota"] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test("sustained play for 60 seconds and 25 retries retain bounded runtime resources", async ({
+  page,
+}, testInfo) => {
+  const browserSeconds = 60;
+  const retryCount = 25;
+  const millisecondsPerSecond = 1000;
+  const movementSegmentSeconds = 4;
+  const sampleMilliseconds = 250;
+  test.setTimeout((browserSeconds + 30) * millisecondsPerSecond);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await launch(page);
+  const canvas = await page.locator("canvas").elementHandle();
+  const animationFrames = page.evaluate(
+    (durationMilliseconds) =>
+      new Promise<{
+        frameCount: number;
+        medianGapMilliseconds: number;
+        p95GapMilliseconds: number;
+        maximumGapMilliseconds: number;
+      }>((resolve) => {
+        const started = performance.now();
+        let previous = started;
+        const gaps: number[] = [];
+        function measure(now: number) {
+          gaps.push(now - previous);
+          previous = now;
+          if (now - started < durationMilliseconds)
+            requestAnimationFrame(measure);
+          else {
+            gaps.sort((first, second) => first - second);
+            resolve({
+              frameCount: gaps.length,
+              medianGapMilliseconds: gaps[Math.floor(gaps.length / 2)]!,
+              p95GapMilliseconds: gaps[Math.floor(gaps.length * 0.95)]!,
+              maximumGapMilliseconds: gaps[gaps.length - 1]!,
+            });
+          }
+        }
+        requestAnimationFrame(measure);
+      }),
+    browserSeconds * millisecondsPerSecond,
+  );
+  const route = ["d", "s", "a", "w"];
+  const started = Date.now();
+  let heldKey = "";
+  let previous = await inspect(page);
+  let simulatedSeconds = 0;
+  let peakShards = 0;
+  let deaths = 0;
+  let progressSamples = 0;
+  let lastProgress = Date.now();
+  while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
+    let state = await inspect(page);
+    peakShards = Math.max(peakShards, state.shards.length);
+    expect(state.shards.length).toBeLessThanOrEqual(16);
+    expect(
+      state.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
+    ).toBe(true);
+    expect(state.keydownListeners).toBe(1);
+    await expect(page.locator("canvas")).toHaveCount(1);
+    if (
+      state.attemptId === previous.attemptId &&
+      state.ticksElapsed > previous.ticksElapsed
+    ) {
+      simulatedSeconds += state.elapsedSeconds - previous.elapsedSeconds;
+      progressSamples++;
+      lastProgress = Date.now();
+    }
+    expect(Date.now() - lastProgress).toBeLessThan(2 * millisecondsPerSecond);
+    if (state.sessionPhase === "ended") {
+      deaths++;
+      if (heldKey) await page.keyboard.up(heldKey);
+      heldKey = "";
+      state = await retrySnapshot(page);
+      lastProgress = Date.now();
+    }
+    const nextKey =
+      route[
+        Math.floor(
+          (Date.now() - started) /
+            (movementSegmentSeconds * millisecondsPerSecond),
+        ) % route.length
+      ]!;
+    if (heldKey !== nextKey) {
+      if (heldKey) await page.keyboard.up(heldKey);
+      heldKey = nextKey;
+      await page.keyboard.down(heldKey);
+    }
+    previous = state;
+    await page.waitForTimeout(sampleMilliseconds);
+  }
+  if (heldKey) await page.keyboard.up(heldKey);
+  const frames = await animationFrames;
+  expect(frames.frameCount).toBeGreaterThan(0);
+  expect(progressSamples).toBeGreaterThan(0);
+  const beforeRetries = await inspect(page);
+  for (let index = 0; index < retryCount; index++) {
+    const reset = await retrySnapshot(page);
+    expect(reset.attemptId).toBe(beforeRetries.attemptId + index + 1);
+    expect(reset.sessionPhase).toBe("playing");
+    expect(reset.elapsedSeconds).toBe(0);
+    expect(reset.hitsTaken).toBe(0);
+    expect(reset.volleysFired).toBe(0);
+    expect(reset.shards).toEqual([]);
+    expect(reset.player.healthHp).toBe(775);
+    expect(reset.keydownListeners).toBe(1);
+    await expect(page.locator("canvas")).toHaveCount(1);
+    expect(
+      await canvas!.evaluate(
+        (element) => element === document.querySelector("canvas"),
+      ),
+    ).toBe(true);
+  }
+  expect(errors).toEqual([]);
+  const metricsPath = testInfo.outputPath("sustained-validation.json");
+  await writeFile(
+    metricsPath,
+    JSON.stringify(
+      {
+        browserSeconds,
+        simulatedSeconds,
+        deaths,
+        peakShards,
+        progressSamples,
+        retryCount,
+        ...frames,
+      },
+      null,
+      2,
+    ),
+  );
+  await testInfo.attach("sustained-validation", {
+    path: metricsPath,
+    contentType: "application/json",
+  });
+  await page.screenshot({
+    path: testInfo.outputPath("after-25-retries.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(page.locator("canvas")).toHaveCount(0);
+});
 
 test("launches one Phaser canvas and cleans it up across repeated mounts", async ({
   page,

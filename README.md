@@ -4,7 +4,9 @@ A pure-frontend bullet-hell practice game targeting repeated survival training a
 
 ## Current State
 
-Step 5.2 is complete: Home and results display local recent attempts and the retained personal best for the current rules version. Completed deaths save once; unfinished retries/Home do not create records. Storage failures leave practice usable with visit-only history and a warning. The existing Start/countdown, compact health/stat HUD, pause, immediate Retry, and zoom remain unchanged. Encounter tuning/acceptance and GitHub Pages deployment remain later steps.
+Step 6.1 is complete: technical validation passed, and the user accepted the current implementation on 2026-10-24. Adjustments are deferred until after the full plan, as requested. No tuning changed; rules version remains `crystal-worm-child-head-paladin-v1`, with known trainer-fidelity limitations retained. GitHub Pages deployment has not started.
+
+Home and results display local recent attempts and the retained personal best for the current rules version. Completed deaths save once; unfinished retries/Home do not create records. Storage failures leave practice usable with visit-only history and a warning. Start/countdown, the health/stat HUD, pause, immediate Retry, and zoom remain unchanged.
 
 Current local preview: http://127.0.0.1:5175/. The older server on 5174 returned an empty cached App transform during step 5.2; a fresh server was started without stopping the existing servers.
 
@@ -38,7 +40,7 @@ The [mechanics timing policy](docs/mechanics.md#simulation-timing-and-movement-p
 
 Each tick cancels opposite directions and normalizes diagonals, moves the player, then pursues its updated position without overshooting the enemy's stop distance. Positive X is east; positive Y is south. Circle projection accounts for both collision radii and permits wall sliding. There is no body blocking or contact damage. Session start/pause/retry controls belong to the controller, not this simulation module.
 
-From `app/`, run the focused 95-case simulation/health suites (79 simulation cases and 16 pure health cases):
+From `app/`, run the focused 96-case simulation/health suites (80 simulation cases and 16 pure health cases):
 
 ```powershell
 npm.cmd run test -- --project node src/game/simulation
@@ -78,7 +80,7 @@ The practice interface uses the approved session flow below. Blur, host focus lo
 
 Manual check: open http://127.0.0.1:5175/, review Home, and select **Start** (or press Enter while it is focused). Observe the three-second countdown, then move with WASD and change zoom with O/P. Press R during countdown, a burst, pause, or after death: the attempt resets immediately without another countdown and retains zoom. Hold R to confirm it does not continually restart. Escape pauses/resumes active play; switching focus away leaves play paused until **Resume** or an explicit keyboard action. Let the player die and compare results with the HUD, then use **Retry** or **Home**. Home discards an unfinished attempt, removes the canvas, and focuses Start. Starting again counts down and retains visit-long zoom. Narrow screens show a keyboard requirement, not touch controls.
 
-Seventeen Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. They also verify real death records, refresh persistence, retry/abort deduplication, compatible bests, and corrupt/blocked/quota storage fallback. Desktop (1440x1000) and narrow (390x844) Home/history/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry. Screenshots are saved under ignored `app/test-results/`.
+Eighteen Chromium checks cover countdown, immediate/held/repeated R, burst/death/paused retry, same-frame event replay, input clearing, retained zoom, repeated mounts/one canvas/one effective keyboard handler, movement/camera/zoom, focus/visibility safety, scoped key cancellation and cleanup, resize invariance, and real combat. They also verify real death records, refresh persistence, retry/abort deduplication, compatible bests, corrupt/blocked/quota storage fallback, and 60 seconds of sustained play followed by 25 retries. Desktop (1440x1000) and narrow (390x844) Home/history/arena/results screenshots, canvas-pixel checks, and layout assertions verify readable nonblank gameplay, unclipped text, viewport-contained results, and stable arena geometry. Screenshots are saved under ignored `app/test-results/`.
 
 ## Practice Interface
 
@@ -114,7 +116,22 @@ Run the 16 focused Node lifecycle cases from `app/`:
 npm.cmd run test -- --project node src/game/session/session.test.ts
 ```
 
+## Training-Feel Review
+
+Step 6.1's [technical review](docs/mechanics.md#step-61-technical-review) and [execution record](implementation-plan.md#step-61---tune-and-approve-the-encounter) separate verified wiki formulas from trainer choices. Pursuit, camera scale, hitboxes, rotation/cadence, reversal/lifetime interpretation, and exact health integration remain intentional or provisional approximations. No tuning or rules-version change was made, and no current-client fidelity is claimed.
+
+Under delegated decision-making, validation used five simulated minutes at each of 30/60/120 Hz, 60 seconds of browser play, and 25 consecutive retries. All schedules matched exactly with a 16-shard peak. The final browser run observed 59.98 simulated seconds, no deaths, one canvas/handler, and approximately 16.7/16.7/16.8 ms median/p95/max animation-frame gaps. These are machine-specific observations, not a universal FPS or memory-leak guarantee; separate browser cases cover real deaths and the complete results/history loop. Generated JSON metrics and screenshots remain under ignored `app/test-results/`.
+
+Open http://127.0.0.1:5175/ with a keyboard and review:
+
+1. Start, move with WASD, and compare movement speed, camera scale, and O/P zoom.
+2. Watch the clockwise pattern, four-shot bursts, cooldown, and returning shards; assess collision fairness.
+3. Take hits and assess damage and regeneration, then let the attempt end and inspect results/history.
+4. Use R/Retry repeatedly, Escape/Resume, and Home/Start; confirm a predictable reset and comfortable practice loop.
+5. For future tuning, note desired changes without altering the accepted baseline. The user accepted the current implementation for now on 2026-10-24 and deferred adjustments until after the full plan. Step 6.1 is complete; deployment is not started.
+
 ## Prerequisites
+
 
 - Use Node.js 24.22.1 LTS and npm 12.2.1. The root [.node-version](.node-version) selects the exact Node version; app package metadata records npm and supported Node/npm ranges.
 - Node 24 is LTS; Node 26 is still Current as of 2026-10-24. See [Node release status](https://nodejs.org/en/about/previous-releases). The selected runtime satisfies the [Vite requirements](https://vite.dev/guide/) and npm 12's engine requirements.
@@ -199,7 +216,7 @@ npm run build
 npm run test:e2e
 ```
 
-The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (193 Vitest tests and seventeen Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
+The generated lint script uses Oxlint. Typecheck uses the generated TypeScript project references (`tsc -b`), including test/tooling files. The existing Node test project includes DOM types for code evaluated inside browser pages; runtime domain tests still run without browser globals. The build script runs that same check followed by the Vite production build, producing ignored output in `app/dist/`. All five commands passed on 2026-10-24 (194 Vitest tests and eighteen Chromium checks). Build reports a nonblocking large-chunk warning for the initial Phaser bundle (about 1.70 MB minified / 456 kB gzip); no warning limit was raised.
 
 Use `npm run test:watch` during development. Vitest runs `src/**/*.test.ts` in Node without DOM setup; reserve that convention for pure models, configuration, simulation, and adapters. React tests use `src/**/*.test.tsx` in jsdom with jest-dom matchers and automatic cleanup. Only CSS Modules are processed in jsdom; a test-only stylesheet verifies scoped class names and computed styles. Full page styles run in Chromium, not jsdom.
 
@@ -247,7 +264,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 6.1, only when requested.
+- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Next: step 7.1, only when requested.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 - [Generated template notes](app/README.md): upstream starter documentation, retained unchanged.

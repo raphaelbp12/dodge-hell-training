@@ -261,6 +261,27 @@ The decision gate for step 1.1 is resolved. Retain the listed fidelity limitatio
 
 ## Validation And Known Limitations
 
-Documentation-only step: validate local links, required mechanics sections, evidence labels, source dates, conditional range/preset/combat arithmetic, approval checklist, and completed step status. No application code, unit-test harness, or bootstrap should be created for this research. Actual behavior tests remain work for the implementation steps.
+Step 1.1 was documentation-only: validate local links, required mechanics sections, evidence labels, source dates, conditional range/preset/combat arithmetic, approval checklist, and completed step status. That research did not authorize application code, a test harness, or bootstrap. Subsequent implementation and behavior checks are recorded separately in the implementation plan.
 
 Known limitations, not implementation blockers: published stat averages do not establish the DEF roll distribution; the trainer uses the published integers instead. Vital Combat has inconsistent threshold descriptions; the trainer selects its worked-example interpretation. Authentic hitboxes, camera scale, client regeneration tick/rounding details, and shard lifetime are not established; approved or delegated trainer approximations cover them. Encounter tuning and camera/session policies retain earlier user approval. The equipped preset and final arithmetic are delegated decisions for later user review. No source gap is silently represented as current-client verification.
+
+## Step 6.1 Technical Review
+
+Reviewed on 2026-10-24. Technical checks passed; the user subsequently accepted the current implementation as recorded below. When initially asked about acceptance/tuning and test budgets, the user delegated autonomous decisions for later review. The agent selected five simulated minutes at each of 30/60/120 Hz, 60 seconds of browser play, and 25 consecutive retries, leaving all tuning unchanged. That initial delegation alone was not treated as personal playtesting or training-feel acceptance.
+
+| Aspect | Implementation compared with available evidence | Review outcome |
+| ------ | ---------------------------------------------- | -------------- |
+| Player speed | 41 SPD yields approximately 7.061333 tiles/second using recorded S3 formula | Formula matches contract; browser movement/resize/zoom checks pass, not an independent client comparison |
+| Camera | Player-centered, north-up, 32 CSS pixels/tile at zoom 1; 0.75-1.5 zoom | User-approved provisional trainer scale and restricted rotation; S12 does not establish numeric scale |
+| Rotation and cadence | Clockwise 45 degrees/second; four emitters with four shots at 0.15-second intervals; 2-second initial/after-last-shot cooldown | Matches user-defined provisional contract; S1's spiralling prose does not verify direction, angular speed, or exact cadence |
+| Shard return | Speed 8, reversal at 1.2 seconds, lifetime 2.4 seconds, no stored origin/homing | S1 reread confirms 160/8/19.2 and boomerang label; total-path interpretation and exact reversal/lifetime remain provisional |
+| Damage and recovery | 128 HP after 32 DEF; combat trigger 27 HP for 5.32 seconds; regeneration 12.1094/6.0547 HP per second | Matches recorded S3/S9 formulas and delegated brackets, rounding, integration, and ordering; client tick fidelity remains unknown |
+| Encounter scope | Slow pursuit, circular arena, approximate circles, no contact damage, attacks, active seal, or other worm segments | Intentional trainer scope; S1 describes irregular movement after only the head remains |
+
+S1 was readable again and still labels its update Aug 2019. The review does not independently verify the current ROTMG client. No stronger numeric evidence was established for authentic camera scale, hitboxes, rotation/cadence, or range semantics, so no replacement tuning was inferred.
+
+The five-minute schedule test executes 18,000 ticks and 488 volleys (1,952 unique shards) at each schedule with equal final state, no dropped time, and a peak of 16 live shards. The lifetime (2.4 seconds) is shorter than the repeat period (2.45 seconds) of each of the four shot slots on four emitters, bounding live shards to 16. The browser soak samples this bound, lifetime, one canvas/handler, and ongoing simulation progress, then verifies 25 full resets on the same canvas and cleanup on Home.
+
+The final full-suite soak recorded 59.9833 simulated seconds, no deaths, 16 peak shards, and 219 progressing samples during its 60-second budget. Its test-only animation-frame observer measured 3,601 frames, approximately 16.7 ms median/p95 and 16.8 ms maximum gap. These are one-machine headless Chromium observations, not guaranteed FPS or a heap/leak analysis. Separate browser tests cover real deaths, results, persistence/reload, and retry. All 194 unit tests, typecheck, lint, build, and 18 Chromium checks passed. Generated metrics/screenshots stay ignored under `app/test-results/`; the known large Phaser bundle warning remains.
+
+**User acceptance recorded on 2026-10-24:** "let's approve for now what we have. I will make the adjustments later, after our full plan is implemented". Together with the recorded passing technical checks, this completes step 6.1. Current tuning is accepted for now; adjustment notes are deferred until after the full plan. Known trainer approximations remain provisional fidelity choices, not verified current-client behavior, and no independently observed user playtest is claimed. Rules version remains `crystal-worm-child-head-paladin-v1`; future approved comparison-breaking changes require a new version and corresponding tests. This acceptance does not automatically start deployment work.
