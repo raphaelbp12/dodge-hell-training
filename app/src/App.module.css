@@ -120,6 +120,22 @@
   font-size: 13px;
 }
 .headerTools { display: grid; justify-items: end; gap: 4px; }
+.homeControls { margin-left: 12px; }
+.controls {
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100svh - 32px);
+  overflow: auto;
+  padding: 24px;
+  color: #152c26;
+  background: #f8fbf8;
+  border: 1px solid #648575;
+  border-radius: 4px;
+}
+.controls::backdrop { background: #101b1b99; }
+.controls h2 { margin: 0 0 20px; font-size: 22px; }
+.controls dl { display: grid; grid-template-columns: minmax(80px, 108px) minmax(0, 1fr); gap: 12px 16px; font-size: 14px; margin: 0 0 24px; }
+.controls dt { font-weight: 600; }
+.controls dd { margin: 0; }
 .mute { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 .mute input { accent-color: #26885d; width: 16px; height: 16px; margin: 0; }
 .playfield {

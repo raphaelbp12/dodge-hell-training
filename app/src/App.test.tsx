@@ -62,6 +62,21 @@ beforeEach(() => {
   adapter.destroyed = 0;
   adapter.publish = null;
   vi.clearAllMocks();
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function(this: HTMLDialogElement) { this.open = true; } });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function(this: HTMLDialogElement) { this.open = false; } });
+});
+
+test("Home Controls is labeled, lists actual bindings, closes and restores its opener without launching", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const controls = screen.getByRole("button", { name: "Controls" });
+  await user.click(controls);
+  const dialog = screen.getByRole("dialog", { name: "Controls" });
+  for (const binding of ["WASD", "R", "O / P", "Escape", "Mute", "Resume"]) expect(within(dialog).getByText(binding, { exact: true })).toBeVisible();
+  await user.click(within(dialog).getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(controls).toHaveFocus();
+  expect(adapter.created).toBe(0);
 });
 
 test("launches and unmounts one effective runtime under Strict Mode", async () => {

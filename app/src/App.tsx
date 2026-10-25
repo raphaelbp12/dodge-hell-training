@@ -14,6 +14,36 @@ import {
 import styles from "./App.module.css";
 import { ZoomPreference } from "./storage/zoom";
 
+function ControlsDialog({ onClose }: { onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement;
+    const element = dialog.current!;
+    element.showModal();
+    return () => {
+      element.close();
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
+  return <dialog ref={dialog} className={styles.controls} aria-labelledby="controls-title" onCancel={(event) => { event.preventDefault(); onClose(); }} onKeyDown={(event) => {
+    if (event.key === "Tab") { event.preventDefault(); dialog.current?.querySelector<HTMLButtonElement>("button")?.focus(); }
+  }}>
+    <h2 id="controls-title">Controls</h2>
+    <dl>
+      <dt>WASD</dt><dd>Move</dd>
+      <dt>R</dt><dd>Immediate retry</dd>
+      <dt>O / P</dt><dd>Zoom out / in</dd>
+      <dt>Escape</dt><dd>Pause / resume, or close Controls</dd>
+      <dt>Mute</dt><dd>Hit audio checkbox</dd>
+      <dt>Resume</dt><dd>Continue a paused attempt</dd>
+      <dt>Start / Retry / Home</dt><dd>Screen actions</dd>
+      <dt>Tab / Shift+Tab</dt><dd>Move focus</dd>
+      <dt>Enter / Space</dt><dd>Activate a focused control</dd>
+    </dl>
+    <button type="button" autoFocus onClick={onClose}>Close</button>
+  </dialog>;
+}
+
 function History({ snapshot }: { snapshot: HistorySnapshot }) {
   const best = retainedBestSeconds(snapshot.records, RULES_VERSION);
   return (
@@ -236,6 +266,7 @@ export default function App() {
     history.snapshot(),
   );
   const [launched, setLaunched] = useState(false);
+  const [homeControlsOpen, setHomeControlsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const startButton = useRef<HTMLButtonElement>(null);
   const [zoomStorage] = useState(() => new ZoomPreference(() => window.localStorage));
@@ -287,6 +318,7 @@ export default function App() {
               >
                 Start
               </button>
+              <button type="button" className={styles.homeControls} onClick={() => setHomeControlsOpen(true)}>Controls</button>
             </div>
           </section>
           <section className={styles.preset} aria-labelledby="preset-title">
@@ -328,6 +360,7 @@ export default function App() {
               trainer-specific approximations.
             </p>
           </footer>
+          {homeControlsOpen && <ControlsDialog onClose={() => setHomeControlsOpen(false)} />}
         </div>
       )}
     </main>

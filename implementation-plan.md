@@ -395,7 +395,7 @@ Unlock/resume from supported user gestures. Unavailable/blocked/suspended/reject
 
 ### Step 13.1 - Build The Accessible Controls Dialog
 
-Status: pending. Dependencies: 12.4.
+Status: complete. Dependencies: 12.4.
 
 **Implementation prompt**
 
@@ -404,6 +404,12 @@ Add a minimal reusable React dialog with native semantics where suitable, existi
 **Focused checks:** accessible naming, keyboard open/close/Tab/Shift+Tab/focus return, Escape once, repeated opens, unchanged Home/session state, desktop/narrow clipping. Reuse React/browser tests, not another modal harness.
 
 **Acceptance:** Home dialog passes relevant interaction/type/lint/build/browser checks and reflects current controls; no unguarded gameplay entry point.
+
+**Execution and verification - 2026-10-25**
+
+- Step 12.4 remote verified at `8604f032f122ec112757511db78ca9243382e440`. Added one reusable native React dialog within existing App/CSS Modules, Home entry only. Labels/title/Close, native Escape cancel, explicit opener restoration, constrained responsive dimensions and actual WASD/R/O/P/Escape/Mute/Resume/screen actions plus standard Tab/Enter/Space activation; no framework/tutorial/rebinding/touch controls.
+- TDD: Home Controls React test failed absent button, then 15 React cases passed. jsdom stubs only unavailable native dialog methods; production Chromium owns real keyboard evidence. First browser checks exposed native Tab leaving the single-focusable dialog for browser chrome; a narrow Tab/Shift+Tab handler now retains Close, while native modality/cancel remain intact.
+- All five gates passed: 291 unit/component tests, typecheck, lint, build and 22 Chromium cases. Production-safe desktop/narrow tests repeat Escape/button closing, Tab/Shift+Tab, focus return, no canvas/session creation and no clipping. Narrow dialog screenshot reviewed; clear bindings/wrapping and visible close. Existing chunk warning unchanged. No HUD entry or unfinished gameplay/modal input path exposed; 13.2 owns that integration.
 
 ### Step 13.2 - Integrate Controls With Pause And Input Isolation
 

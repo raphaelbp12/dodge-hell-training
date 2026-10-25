@@ -164,6 +164,27 @@ for (const width of [1440, 390]) {
     await page.getByRole("checkbox", { name: "Mute hit audio" }).check();
     await expect(page.getByRole("checkbox", { name: "Mute hit audio" })).toBeChecked();
     await page.getByRole("checkbox", { name: "Mute hit audio" }).uncheck();
+    for (const closeBy of ["Escape", "button"] as const) {
+      const opener = page.getByRole("button", { name: "Controls", exact: true });
+      await opener.click();
+      const dialog = page.getByRole("dialog", { name: "Controls", exact: true });
+      await expect(dialog).toBeVisible();
+      const close = dialog.getByRole("button", { name: "Close", exact: true });
+      await expect(close).toBeFocused();
+      for (const key of ["Tab", "Shift+Tab"]) {
+        await page.keyboard.press(key);
+        await expect(close).toBeFocused();
+      }
+      expect(await dialog.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight && ![...element.querySelectorAll("h2, dt, dd, button")].some((child) => child.scrollWidth > child.clientWidth);
+      })).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`release-controls-${width}.png`), fullPage: true });
+      if (closeBy === "Escape") await page.keyboard.press("Escape"); else await close.click();
+      await expect(dialog).toHaveCount(0);
+      await expect(opener).toBeFocused();
+      await expect(page.locator("canvas")).toHaveCount(0);
+    }
     const assets = await page
       .locator('script[src], link[rel="stylesheet"]')
       .evaluateAll((elements) =>
