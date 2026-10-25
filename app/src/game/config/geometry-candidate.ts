@@ -1,4 +1,8 @@
 import type { Vector2 } from "../models";
+import {
+  convexContactDistance,
+  deriveShardTiming,
+} from "../simulation/geometry.ts";
 
 type CandidateBody = Readonly<{
   sourceWidthPixels: number;
@@ -84,15 +88,17 @@ const bodies = {
 const emitterOffsetTiles =
   (emitterHeadWidthFraction * bodies.head.sourceWidthPixels) /
   sourcePixelsPerTile;
-const maximumShardCenterDistanceTiles = Math.min(
-  ...bodies.shard.verticesTiles.map(
-    (vertex) => Math.sqrt(arenaRadiusTiles ** 2 - vertex.y ** 2) - vertex.x,
-  ),
+const {
+  maximumCenterDistanceTiles: maximumShardCenterDistanceTiles,
+  reversalAgeSeconds,
+  lifetimeSeconds,
+} = deriveShardTiming(
+  bodies.shard.verticesTiles,
+  { x: 1, y: 0 },
+  arenaRadiusTiles,
+  emitterOffsetTiles,
+  shardSpeedTilesPerSecond,
 );
-const reversalAgeSeconds =
-  (maximumShardCenterDistanceTiles - emitterOffsetTiles) /
-  shardSpeedTilesPerSecond;
-const lifetimeSeconds = 2 * reversalAgeSeconds;
 
 export const V2_GEOMETRY_CANDIDATE = {
   approval: "approved",
@@ -116,11 +122,15 @@ export const V2_GEOMETRY_CANDIDATE = {
     shardsPerGroup * Math.ceil(lifetimeSeconds / groupPeriodSeconds),
   pursuit: {
     extraGapTiles: 0,
-    eastSeparationTiles:
-      (bodies.player.sourceWidthPixels + bodies.head.sourceWidthPixels) /
-      (2 * sourcePixelsPerTile),
-    southSeparationTiles:
-      (bodies.player.sourceHeightPixels + bodies.head.sourceHeightPixels) /
-      (2 * sourcePixelsPerTile),
+    eastSeparationTiles: convexContactDistance(
+      bodies.player.verticesTiles,
+      bodies.head.verticesTiles,
+      { x: 1, y: 0 },
+    ),
+    southSeparationTiles: convexContactDistance(
+      bodies.player.verticesTiles,
+      bodies.head.verticesTiles,
+      { x: 0, y: 1 },
+    ),
   },
 } as const;

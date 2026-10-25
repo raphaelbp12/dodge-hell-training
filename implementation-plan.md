@@ -205,7 +205,7 @@ Implement minimal shared vertex transforms and continuous translating-convex ove
 
 ### Step 9.2 - Implement Body-Aware Arena And Pursuit Geometry
 
-Status: pending. Dependencies: 9.1.
+Status: complete. Dependencies: 9.1.
 
 **Implementation prompt**
 
@@ -214,6 +214,16 @@ Extend the same pure geometry slice with transformed-vertex circular containment
 **Focused checks:** interior/edge/outside placements, rotated corner contact, outward rejection/tangential movement, repeated containment, approved spawn, coincident/near pursuit without overshoot/division by zero/jitter, zero emitter offset accepted and negative/nonfinite rejected, exact leading-edge contact across firing phases.
 
 **Acceptance:** shared physical shapes move/stop under approved semantics and fit where required; arena containment never becomes projectile confinement. Helpers remain disconnected from live v1 rules.
+
+**Execution and verification - 2026-10-25**
+
+- Verified step 9.1 complete with its 41-case continuous-geometry record and the actual G01-G04 approvals, including zero extra pursuit gap. Extended the existing pure [geometry adapter](app/src/game/simulation/geometry.ts); no new module, test harness, dependency, physics framework or clock was added. Reused the existing validator, normalized edge axes, projections, numerical roundoff policy and installed `Matrix` transform.
+- Added actual-vertex circular containment and exact direction-dependent center limits, then a radial candidate constraint preserving the existing arena projection/tangential movement semantics. Translated arena centers, rotated corner contact, approved north spawn and upright player/head shapes are supported. Neither center-only fit nor an enclosing circle proves physical fit. The constraint operates only on supplied movement candidates; no shard confinement, wall despawn or contact response was introduced.
+- Added support-plane silhouette contact and pursuit capped by the remaining distance to contact. Tests confirm the approved 1.720912488107/1.941542294274-tile axial and 2.093284691954-tile diagonal separations, bounded travel, no overshoot, stable repeated stopping, coincident/near/overlapping placements and invalid-input rejection. Zero extra gap remains unchanged; there is no push-apart correction, player blocking or contact damage.
+- Added shared exact leading-edge timing and reused it in the disconnected [candidate config](app/src/game/config/geometry-candidate.ts), which also reuses axial contact derivation. Replaced the [review generator](app/scripts/review-geometry.mjs)'s duplicate diagonal-contact math with the shared helper. Direct Node execution/regeneration passed; review JSON comparison retained every other value and vertex exactly, with only a one-unit-in-last-place diagonal rounding difference. Approved emitter/reach/reversal/lifetime/spawn/live-bound values remain unchanged; no nominal timing was restored or rounded to ticks. Documented the [helper and numerical contracts](docs/mechanics.md#step-92-body-aware-arena-and-pursuit-geometry).
+- TDD: six new arena tests failed on missing helpers, then all 47 geometry cases passed after implementation. Twelve subsequent pursuit/timing cases failed on their missing helpers, then all 59 passed. Eighteen new cases cover interior/edge/outside fit, enclosing-circle overconstraint rejected, rotated corner contact, radial/outward/tangential behavior over 240 consecutive moves, repeated containment, approved spawn, pursuit stability and no division by zero, valid zero emitter offset versus negative/nonfinite input, and exact contact/just-beyond failure across firing rotations. Existing independent config assertions also pass: 109 focused geometry/config checks total.
+- Under pinned Node 24.22.1, all 257 unit/component tests across seven files, typecheck, lint and production build passed. Production retains the v1 JS/CSS asset identities and the existing approximately 1.70 MB Phaser chunk warning. Node-only import inspection confirms that only preparatory config, tests and the review generator use these helpers; no React, Phaser, DOM or storage dependency was introduced. Browser/hosted suites and fresh human visual/play acceptance were not rerun or claimed for this disconnected pure-code step; generated figures/layout were not redesigned.
+- Acceptance met with no remaining blocker or design/tuning deviation. Live v1 encounter configuration, simulation, drawing, shard lifecycle, comparison identity, history, dependencies and lockfile remain unchanged. Preserved the unrelated local Vite formatting edit and prior step records. Step 10.1 and later remain pending and unstarted; no commit, push, deployment or coordinated runtime activation was performed.
 
 ## Phase 10: Coordinated Playable V2
 

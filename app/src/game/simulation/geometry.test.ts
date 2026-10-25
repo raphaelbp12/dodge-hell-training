@@ -1,7 +1,16 @@
 import { expect, test } from "vitest";
 import { V2_GEOMETRY_CANDIDATE } from "../config/geometry-candidate";
 import type { Vector2 } from "../models";
-import { sweptConvexOverlap, transformBodyVertices } from "./geometry";
+import {
+  constrainBodyToArena,
+  convexBodyFitsCircle,
+  convexContactDistance,
+  deriveShardTiming,
+  maximumBodyCenterDistance,
+  pursueBody,
+  sweptConvexOverlap,
+  transformBodyVertices,
+} from "./geometry";
 
 const square: readonly Vector2[] = [
   { x: -0.5, y: -0.5 },
@@ -375,4 +384,447 @@ test("runs in Node without browser, storage or engine globals", () => {
   expect(typeof document).toBe("undefined");
   expect(typeof localStorage).toBe("undefined");
   expect(sweptConvexOverlap(square, stationary, square, stationary)).toBe(true);
+});
+
+const arena = { centerTiles: stationary, radiusTiles: 5 };
+
+test("checks actual vertices for circular interior, contact and outside placements", () => {
+  expect(convexBodyFitsCircle(square, arena)).toBe(true);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(square, { x: 4.4, y: 0 }),
+      arena,
+    ),
+  ).toBe(true);
+  expect(4.4 + Math.SQRT1_2).toBeGreaterThan(arena.radiusTiles);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(square, { x: 4.5, y: 0 }),
+      arena,
+    ),
+  ).toBe(false);
+  const reach = maximumBodyCenterDistance(
+    square,
+    { x: 1, y: 0 },
+    arena.radiusTiles,
+  );
+  expect(reach).toBeCloseTo(Math.sqrt(25 - 0.25) - 0.5, 12);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(square, { x: reach, y: 0 }),
+      arena,
+    ),
+  ).toBe(true);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(square, { x: reach + 0.000001, y: 0 }),
+      arena,
+    ),
+  ).toBe(false);
+});
+
+test("derives rotated corner contact from the same physical vertices", () => {
+  const rotated = transformBodyVertices(square, stationary, Math.PI / 4);
+  const reach = maximumBodyCenterDistance(
+    rotated,
+    { x: 3, y: 0 },
+    arena.radiusTiles,
+  );
+  expect(reach).toBeCloseTo(5 - Math.SQRT1_2, 12);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(rotated, { x: reach, y: 0 }),
+      arena,
+    ),
+  ).toBe(true);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(rotated, { x: reach + 0.000001, y: 0 }),
+      arena,
+    ),
+  ).toBe(false);
+});
+
+test("preserves radial candidate direction and interior positions in translated arenas", () => {
+  const translatedArena = { centerTiles: { x: 11, y: -8 }, radiusTiles: 5 };
+  const interior = { x: 12, y: -7 };
+  expect(constrainBodyToArena(square, interior, translatedArena)).toEqual(
+    interior,
+  );
+  expect(
+    constrainBodyToArena(square, translatedArena.centerTiles, translatedArena),
+  ).toEqual(translatedArena.centerTiles);
+  const constrained = constrainBodyToArena(
+    square,
+    { x: 21, y: 2 },
+    translatedArena,
+  );
+  expect(constrained.x - 11).toBeCloseTo(constrained.y + 8, 12);
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(square, constrained),
+      translatedArena,
+    ),
+  ).toBe(true);
+  expect(
+    Math.max(
+      ...transformBodyVertices(square, constrained).map((vertex) =>
+        Math.hypot(vertex.x - 11, vertex.y + 8),
+      ),
+    ),
+  ).toBeCloseTo(5, 12);
+});
+
+test("rejects outward movement while retaining tangential edge movement over repeated constraints", () => {
+  const edge = constrainBodyToArena(square, { x: 10, y: 0 }, arena);
+  expect(
+    constrainBodyToArena(square, { x: edge.x + 0.1, y: 0 }, arena),
+  ).toEqual(edge);
+  let position = edge;
+  for (let tick = 0; tick < 240; tick++) {
+    const tangent = { x: -position.y, y: position.x };
+    const length = Math.hypot(tangent.x, tangent.y);
+    const next = constrainBodyToArena(
+      square,
+      {
+        x: position.x + (tangent.x / length) * 0.05,
+        y: position.y + (tangent.y / length) * 0.05,
+      },
+      arena,
+    );
+    expect(
+      Math.hypot(next.x - position.x, next.y - position.y),
+    ).toBeGreaterThan(0.01);
+    expect(
+      convexBodyFitsCircle(transformBodyVertices(square, next), arena),
+    ).toBe(true);
+    expect(constrainBodyToArena(square, next, arena).x).toBeCloseTo(next.x, 12);
+    expect(constrainBodyToArena(square, next, arena).y).toBeCloseTo(next.y, 12);
+    position = next;
+  }
+});
+
+test("fits the approved north spawn and constrains both approved upright bodies", () => {
+  const candidate = V2_GEOMETRY_CANDIDATE;
+  const approvedArena = {
+    centerTiles: stationary,
+    radiusTiles: candidate.arenaRadiusTiles,
+  };
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(
+        candidate.bodies.head.verticesTiles,
+        candidate.enemySpawnTiles,
+      ),
+      approvedArena,
+    ),
+  ).toBe(true);
+  for (const body of [candidate.bodies.player, candidate.bodies.head]) {
+    for (const direction of [
+      { x: 30, y: 0 },
+      { x: 0, y: -30 },
+      { x: 30, y: 30 },
+    ]) {
+      const position = constrainBodyToArena(
+        body.verticesTiles,
+        direction,
+        approvedArena,
+      );
+      expect(
+        convexBodyFitsCircle(
+          transformBodyVertices(body.verticesTiles, position),
+          approvedArena,
+        ),
+      ).toBe(true);
+    }
+  }
+});
+
+test("rejects invalid circles, directions and bodies in containment and constraints", () => {
+  for (const radiusTiles of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const invalidArena = { ...arena, radiusTiles };
+    expect(() => convexBodyFitsCircle(square, invalidArena)).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      constrainBodyToArena(square, stationary, invalidArena),
+    ).toThrow(RangeError);
+    expect(() =>
+      maximumBodyCenterDistance(square, { x: 1, y: 0 }, radiusTiles),
+    ).toThrow(RangeError);
+  }
+  expect(() => maximumBodyCenterDistance(square, stationary, 5)).toThrow(
+    RangeError,
+  );
+  expect(() =>
+    maximumBodyCenterDistance(square, { x: Number.NaN, y: 0 }, 5),
+  ).toThrow(RangeError);
+  expect(() => maximumBodyCenterDistance(square, { x: 1, y: 0 }, 0.1)).toThrow(
+    RangeError,
+  );
+  expect(() =>
+    constrainBodyToArena(square, { x: Number.NaN, y: 0 }, arena),
+  ).toThrow(RangeError);
+  expect(() =>
+    convexBodyFitsCircle(square, {
+      ...arena,
+      centerTiles: { x: 0, y: Number.NaN },
+    }),
+  ).toThrow(RangeError);
+  for (const vertices of invalidBodies) {
+    expect(() => convexBodyFitsCircle(vertices, arena)).toThrow(RangeError);
+    expect(() => constrainBodyToArena(vertices, stationary, arena)).toThrow(
+      RangeError,
+    );
+  }
+});
+
+test.each([
+  { direction: { x: 1, y: 0 }, expected: 1.7209124881066744 },
+  { direction: { x: -1, y: 0 }, expected: 1.7209124881066744 },
+  { direction: { x: 0, y: 1 }, expected: 1.9415422942741967 },
+  { direction: { x: 0, y: -1 }, expected: 1.9415422942741967 },
+  { direction: { x: 1, y: 1 }, expected: 2.0932846919542065 },
+])(
+  "stops pursuit at shared-silhouette contact for $direction",
+  ({ direction, expected }) => {
+    const { player, head } = V2_GEOMETRY_CANDIDATE.bodies;
+    expect(
+      convexContactDistance(
+        player.verticesTiles,
+        head.verticesTiles,
+        direction,
+      ),
+    ).toBeCloseTo(expected, 12);
+    const length = Math.hypot(direction.x, direction.y);
+    const start = {
+      x: (direction.x / length) * 10,
+      y: (direction.y / length) * 10,
+    };
+    const stopped = pursueBody(
+      head.verticesTiles,
+      start,
+      player.verticesTiles,
+      stationary,
+      100,
+    );
+    expect(Math.hypot(stopped.x, stopped.y)).toBeCloseTo(expected, 12);
+    expect(
+      sweptConvexOverlap(
+        transformBodyVertices(head.verticesTiles, stopped),
+        stationary,
+        player.verticesTiles,
+        stationary,
+      ),
+    ).toBe(true);
+    const separated = {
+      x: stopped.x + (direction.x / length) * 0.000001,
+      y: stopped.y + (direction.y / length) * 0.000001,
+    };
+    expect(
+      sweptConvexOverlap(
+        transformBodyVertices(head.verticesTiles, separated),
+        stationary,
+        player.verticesTiles,
+        stationary,
+      ),
+    ).toBe(false);
+    let position = stopped;
+    for (let tick = 0; tick < 60; tick++) {
+      const next = pursueBody(
+        head.verticesTiles,
+        position,
+        player.verticesTiles,
+        stationary,
+        0.025,
+      );
+      expect(next).toBe(position);
+      position = next;
+    }
+  },
+);
+
+test("limits pursuit travel without pushing already-overlapping or coincident bodies apart", () => {
+  const { player, head } = V2_GEOMETRY_CANDIDATE.bodies;
+  const start = { x: 8, y: 6 };
+  const moved = pursueBody(
+    head.verticesTiles,
+    start,
+    player.verticesTiles,
+    stationary,
+    0.05,
+  );
+  expect(Math.hypot(moved.x - start.x, moved.y - start.y)).toBeCloseTo(
+    0.05,
+    12,
+  );
+  expect(
+    pursueBody(head.verticesTiles, start, player.verticesTiles, stationary, 0),
+  ).toBe(start);
+  for (const overlap of [
+    stationary,
+    { x: Number.EPSILON, y: 0 },
+    { x: 0.5, y: 0 },
+  ]) {
+    expect(
+      pursueBody(
+        head.verticesTiles,
+        overlap,
+        player.verticesTiles,
+        stationary,
+        1,
+      ),
+    ).toBe(overlap);
+  }
+  const target = { x: 3, y: -4 };
+  expect(
+    pursueBody(head.verticesTiles, target, player.verticesTiles, target, 1),
+  ).toBe(target);
+  const near = {
+    x: V2_GEOMETRY_CANDIDATE.pursuit.eastSeparationTiles + 0.001,
+    y: 0,
+  };
+  expect(
+    pursueBody(head.verticesTiles, near, player.verticesTiles, stationary, 1).x,
+  ).toBeCloseTo(V2_GEOMETRY_CANDIDATE.pursuit.eastSeparationTiles, 12);
+});
+
+test("rejects invalid pursuit inputs even at coincident centers", () => {
+  for (const travel of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    expect(() =>
+      pursueBody(square, stationary, square, stationary, travel),
+    ).toThrow(RangeError);
+  }
+  expect(() => convexContactDistance(square, square, stationary)).toThrow(
+    RangeError,
+  );
+  expect(() =>
+    pursueBody(square, { x: Number.NaN, y: 0 }, square, stationary, 1),
+  ).toThrow(RangeError);
+  expect(() =>
+    pursueBody(
+      square,
+      stationary,
+      square,
+      { x: 0, y: Number.POSITIVE_INFINITY },
+      1,
+    ),
+  ).toThrow(RangeError);
+  for (const vertices of invalidBodies) {
+    expect(() =>
+      pursueBody(vertices, stationary, square, stationary, 1),
+    ).toThrow(RangeError);
+    expect(() =>
+      pursueBody(square, stationary, vertices, stationary, 1),
+    ).toThrow(RangeError);
+  }
+});
+
+test.each([0, 0.37, Math.PI / 2, 2.2])(
+  "shares exact leading-edge timing across firing rotation %s",
+  (angle) => {
+    const candidate = V2_GEOMETRY_CANDIDATE;
+    const direction = { x: Math.cos(angle), y: Math.sin(angle) };
+    const vertices = transformBodyVertices(
+      candidate.bodies.shard.verticesTiles,
+      stationary,
+      angle,
+    );
+    const timing = deriveShardTiming(
+      vertices,
+      direction,
+      candidate.arenaRadiusTiles,
+      candidate.emitterOffsetTiles,
+      candidate.shardSpeedTilesPerSecond,
+    );
+    expect(timing.maximumCenterDistanceTiles).toBeCloseTo(
+      candidate.maximumShardCenterDistanceTiles,
+      12,
+    );
+    expect(timing.reversalAgeSeconds).toBeCloseTo(2.2208044714307382, 12);
+    expect(timing.lifetimeSeconds).toBeCloseTo(4.4416089428614765, 12);
+    expect(timing.centerTravelTiles).toBeCloseTo(
+      timing.maximumCenterDistanceTiles - candidate.emitterOffsetTiles,
+      12,
+    );
+    const positionAt = (distance: number) => ({
+      x: direction.x * distance,
+      y: direction.y * distance,
+    });
+    const approvedArena = {
+      centerTiles: stationary,
+      radiusTiles: candidate.arenaRadiusTiles,
+    };
+    expect(
+      convexBodyFitsCircle(
+        transformBodyVertices(
+          vertices,
+          positionAt(candidate.emitterOffsetTiles),
+        ),
+        approvedArena,
+      ),
+    ).toBe(true);
+    expect(
+      convexBodyFitsCircle(
+        transformBodyVertices(
+          vertices,
+          positionAt(timing.maximumCenterDistanceTiles),
+        ),
+        approvedArena,
+      ),
+    ).toBe(true);
+    expect(
+      convexBodyFitsCircle(
+        transformBodyVertices(
+          vertices,
+          positionAt(timing.maximumCenterDistanceTiles + 0.000001),
+        ),
+        approvedArena,
+      ),
+    ).toBe(false);
+    const zeroOffset = deriveShardTiming(
+      vertices,
+      direction,
+      candidate.arenaRadiusTiles,
+      0,
+      candidate.shardSpeedTilesPerSecond,
+    );
+    expect(
+      zeroOffset.reversalAgeSeconds * candidate.shardSpeedTilesPerSecond,
+    ).toBeCloseTo(timing.maximumCenterDistanceTiles, 12);
+  },
+);
+
+test("rejects invalid emission, speed and nonpositive travel in reach derivation", () => {
+  const candidate = V2_GEOMETRY_CANDIDATE;
+  const vertices = candidate.bodies.shard.verticesTiles;
+  const direction = { x: 1, y: 0 };
+  for (const offset of [
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    candidate.maximumShardCenterDistanceTiles,
+    candidate.maximumShardCenterDistanceTiles + 1,
+  ]) {
+    expect(() =>
+      deriveShardTiming(
+        vertices,
+        direction,
+        candidate.arenaRadiusTiles,
+        offset,
+        8,
+      ),
+    ).toThrow(RangeError);
+  }
+  for (const speed of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    expect(() =>
+      deriveShardTiming(
+        vertices,
+        direction,
+        candidate.arenaRadiusTiles,
+        0,
+        speed,
+      ),
+    ).toThrow(RangeError);
+  }
 });

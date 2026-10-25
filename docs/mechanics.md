@@ -466,3 +466,29 @@ For nonzero `s`, intersect `[min(u1,u2), max(u1,u2)]` with the other axes' inter
 - The focused Node suite covers tiny/ordinary/large scales, rotated tangency and just-separation, approved shapes under common rotations, relative motion of both bodies, axial/diagonal/return crossings, mutually disjoint axis-time intervals, enclosing-circle false positives and invalid inputs. Numerical policy does not authorize changes to approved vertices, timing or rules identity.
 
 No live simulation, configuration or drawing imports these helpers yet. Step 10.1 will reuse existing reversal/expiry segments and matching player interpolation, retaining the firing-axis orientation on reversal and the sole Phaser-driven simulation clock. Arena/pursuit helpers remain separate step 9.2 work. This step adds no collision despawn, hit state, rendering, persistence or runtime branch.
+
+### Step 9.2 Body-Aware Arena And Pursuit Geometry
+
+The same pure [geometry adapter](../app/src/game/simulation/geometry.ts) now owns circular containment, radial candidate constraints, silhouette contact/pursuit and exact shard timing. The preparatory [candidate config](../app/src/game/config/geometry-candidate.ts) and [local review generator](../app/scripts/review-geometry.mjs) reuse these derivations instead of maintaining separate timing or pursuit equations. Approved vertices, anchors, dimensions, emitter offset, spawn, reversal/lifetime and zero extra gap are unchanged. Diagonal contact remains numerically equivalent to the approved value (a one-unit-in-last-place rounding difference). No live configuration, simulation, renderer or storage integration is activated.
+
+#### Circular Containment And Movement
+
+`convexBodyFitsCircle` checks every actual world vertex against the arena's center and radius. Since both the polygon and disk are convex, contained vertices establish containment of the whole physical body, including its edges. Enclosing-circle overlap, body-center fit or AABB overlap is not proof of fit. Tangency is contained, with the existing `64 * Number.EPSILON` roundoff budget scaled by world coordinates, arena center and radius; no gameplay padding is added.
+
+`maximumBodyCenterDistance` accepts already-oriented local vertices, a nonzero direction and a positive finite circle radius. The local body must fit when its anchor is at the circle center. Normalize the direction to `n`; with vertex components `p_i = dot(q_i,n)` and `b_i = cross(n,q_i)`, the exact maximum center distance along that ray is:
+
+$$
+D(n) = \min_i\left(\sqrt{R^2-b_i^2}-p_i\right)
+$$
+
+`constrainBodyToArena` preserves the existing radial candidate-projection semantics, not a new wall-response system. For candidate offset `c` from arena center, retain it when `length(c) <= D(c/length(c))`; otherwise place the anchor at distance `D` along the same candidate direction. At zero offset, keep the centered body without dividing by zero. The body orientation stays fixed. This prevents outward clipping while preserving tangential progress; it is neither a circumradius clamp nor a polygon-wall approximation. Repeated constraints retain vertex containment. No body blocking or contact response is introduced.
+
+#### Pursuit And Shared Calibration
+
+`convexContactDistance` uses normalized edge normals from both local bodies, testing both signs. Local center anchors must lie inside their respective silhouettes. For direction `n` from the first body's anchor to the second, it finds the ray exit of their Minkowski contact region from support values `h_first(a) + h_second(-a)` divided by `dot(a,n)` for positive alignment. This produces the approved east/west, north/south and diagonal separations rather than using a single radius or axial maximum.
+
+`pursueBody` takes an explicit maximum travel in tiles, supplied by the caller's existing speed/time rules. It advances toward the target by at most `min(maximumTravel, distance - contactDistance)`. Coincident, already-overlapping and contact-within-roundoff placements stay unchanged: there is no push-apart correction, oscillation, extra stopping gap, contact damage or reciprocal player blocking. Circle constraints remain a separate operation on the proposed position, matching the existing movement sequence. Pursuit speed and the sole simulation clock are unchanged.
+
+`deriveShardTiming` reuses the exact vertex ray limit: `centerTravel = D - emitterOffset`, `reversalAge = centerTravel / speed`, and `lifetime = 2 * reversalAge`. Zero emitter offset is valid; negative/nonfinite offsets, nonpositive/nonfinite speed or radius, invalid geometry, failed centered fit and nonpositive/unrepresentable travel/timing throw `RangeError`. All results use tiles/seconds without rounding to ticks. Approved exact values remain emitter `0.18532903718071878` tile, center reach `17.951764808626624` tiles, reversal `2.2208044714307382` seconds, lifetime `4.4416089428614765` seconds and conservative live bound 88.
+
+These circle operations are available for player/head movement and centered-head calibration only. They do not constrain, despawn or otherwise alter shards in play. Step 10.1 remains responsible for coordinated runtime activation; no projectile trajectory, lifetime or rules identity changes in step 9.2.

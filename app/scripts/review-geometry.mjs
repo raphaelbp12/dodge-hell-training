@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { V2_GEOMETRY_CANDIDATE as candidate } from "../src/game/config/geometry-candidate.ts";
+import { convexContactDistance } from "../src/game/simulation/geometry.ts";
 
 const output = new URL("../test-results/geometry-review/", import.meta.url);
 const decimal = (value) => value.toFixed(6);
@@ -87,31 +88,10 @@ const spawnReview = frame(
 );
 
 const diagonal = { x: Math.SQRT1_2, y: Math.SQRT1_2 };
-const pursuitBodies = [candidate.bodies.player, candidate.bodies.head];
-const axes = pursuitBodies.flatMap((body) =>
-  body.verticesTiles.map((vertex, index, vertices) => {
-    const next = vertices[(index + 1) % vertices.length];
-    return { x: -(next.y - vertex.y), y: next.x - vertex.x };
-  }),
-);
-const diagonalSeparationTiles = Math.min(
-  ...axes.map((axis) => {
-    const projectedDirection = Math.abs(
-      axis.x * diagonal.x + axis.y * diagonal.y,
-    );
-    if (projectedDirection < Number.EPSILON) return Infinity;
-    const support = pursuitBodies.reduce(
-      (sum, body) =>
-        sum +
-        Math.max(
-          ...body.verticesTiles.map(
-            (vertex) => vertex.x * axis.x + vertex.y * axis.y,
-          ),
-        ),
-      0,
-    );
-    return support / projectedDirection;
-  }),
+const diagonalSeparationTiles = convexContactDistance(
+  candidate.bodies.player.verticesTiles,
+  candidate.bodies.head.verticesTiles,
+  diagonal,
 );
 const summary = {
   approval: candidate.approval,
