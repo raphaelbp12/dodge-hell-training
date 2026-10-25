@@ -4,7 +4,15 @@ Status: complete under delegated decision-making on 2026-10-24; ready for user r
 
 Initial encounter/preset rules version: `crystal-worm-child-head-paladin-v1`.
 
-Current implementation: `crystal-worm-child-head-paladin-v2`. See [Implemented V2 Handoff](#implemented-v2-handoff) for active behavior, presentation policies and acceptance limits. Earlier sections preserve dated v1/preparatory evidence; their not-yet-activated wording describes those earlier steps, not today's runtime.
+Current implementation: `crystal-worm-child-head-paladin-v3`. The user explicitly approved promoting **Load selected values** to normal defaults on 2026-10-25. See [Selected V3 Defaults](#selected-v3-defaults) for that override and [Implemented V2 Handoff](#implemented-v2-handoff) for unchanged behavior, presentation policies and acceptance limits. Earlier sections preserve dated historical evidence.
+
+## Selected V3 Defaults
+
+**User-defined, 2026-10-25:** the previously saved screenshot values are now the normal, scoring-eligible configuration. Player/head dimensions are 1.25x1.25 tiles, with matching enabled by default; six emitters, offset 0.35 tiles, phase zero, clockwise rotation 45 degrees/s; eleven shots per emitter at 0.19-second intervals, 3-second cooldown after the last shot and 2-second initial cooldown. Projectiles retain their pointed hexagon at 1.45x0.65 tiles, deal 160 HP before defense, move at 8 tiles/s, reverse once at 1.5 seconds and expire at 3 seconds. This supersedes prior debug-only restrictions for these specific defaults, not other debug options.
+
+These are selected trainer values, not externally verified ROTMG dimensions or timings. Historical v2 screenshot geometry and its geometry-derived reversal/lifetime remain recorded below but no longer supply active body dimensions or projectile timings. The existing 60 Hz scheduler fires each scheduled shot on its first eligible fixed tick; 0.19 seconds is not an integral tick count. No sub-tick clock or changed collision policy was introduced. Pursuit speed, spawn, arena, Paladin stats, once-per-shard hits and lifetime-only expiration are unchanged.
+
+Normal attempts use `crystal-worm-child-head-paladin-v3`; previous rules versions remain in history but do not contribute to the v3 best. Loading already-default values is scoring eligible. God mode, center chasing, disabled size matching or numeric deviations still taint the current attempt until a fresh default Start/Retry. Reset restores the selected v3 defaults rather than the historical v2 preset. No release/publication verification is implied by this local change.
 
 Research/access date: 2026-10-24.
 

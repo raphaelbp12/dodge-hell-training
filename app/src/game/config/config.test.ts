@@ -8,12 +8,14 @@ import {
   validateDebugSettings,
   SELECTED_DEBUG_VALUES,
   loadSelectedDebugValues,
+  isDefaultDebugSettings,
 } from "./debug";
 import type { SessionSnapshot } from "../models";
 import {
   ENCOUNTER_CONFIG,
   RULES_VERSION,
   validateEncounterConfig,
+  scaleBody,
 } from "./encounter";
 import {
   PALADIN_BASE_STATS,
@@ -27,7 +29,22 @@ import {
   derivePlayerStats,
 } from "./stats";
 
-test("loads all screenshot-selected values without changing omitted settings or the scored preset", () => {
+test("selected values are the normal scoring-eligible defaults", () => {
+  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
+  expect(DEFAULT_DEBUG_SETTINGS).toMatchObject(SELECTED_DEBUG_VALUES);
+  expect(DEFAULT_DEBUG_SETTINGS.matchPlayerToHead).toBe(true);
+  expect(
+    isDefaultDebugSettings(loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS)),
+  ).toBe(true);
+  const selected = debugEncounterConfig(
+    loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
+  );
+  expect({ ...selected, rulesVersion: RULES_VERSION }).toEqual(
+    ENCOUNTER_CONFIG,
+  );
+});
+
+test("loads all screenshot-selected values without changing omitted settings", () => {
   expect(SELECTED_DEBUG_VALUES).toEqual({
     enemyWidth: 1.25,
     enemyHeight: 1.25,
@@ -63,11 +80,11 @@ test("loads all screenshot-selected values without changing omitted settings or 
   expect(previous.enemyWidth).toBe(DEFAULT_DEBUG_SETTINGS.enemyWidth);
   expect(() => validateDebugSettings(selected)).not.toThrow();
   expect(debugEncounterConfig(selected).emitters.count).toBe(6);
-  expect(ENCOUNTER_CONFIG.emitters.count).toBe(4);
-  expect(DEFAULT_DEBUG_SETTINGS.cooldownSeconds).toBe(1);
+  expect(ENCOUNTER_CONFIG.emitters.count).toBe(6);
+  expect(DEFAULT_DEBUG_SETTINGS.cooldownSeconds).toBe(3);
 });
 
-test("the selected preset matches the player body to the head, without resizing normal v2", () => {
+test("the selected preset matches the player body to the head and follows live size edits", () => {
   const selected = loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS);
   for (const settings of [
     selected,
@@ -274,7 +291,7 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("encodes approved tuning and independent reversal/lifetime values with explicit units", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v2");
+  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION);
   expect(ENCOUNTER_CONFIG.arena).toEqual({
     centerTiles: { x: 0, y: 0 },
@@ -282,34 +299,46 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   });
   expect(ENCOUNTER_CONFIG.player).toEqual({
     spawnTiles: { x: 0, y: 0 },
-    verticesTiles: V2_GEOMETRY_CANDIDATE.bodies.player.verticesTiles,
+    verticesTiles: scaleBody(
+      V2_GEOMETRY_CANDIDATE.bodies.player.verticesTiles,
+      1.25,
+      1.25,
+    ),
   });
   expect(ENCOUNTER_CONFIG.enemy).toEqual({
     spawnTiles: { x: 0, y: -16.2 },
-    verticesTiles: V2_GEOMETRY_CANDIDATE.bodies.head.verticesTiles,
+    verticesTiles: scaleBody(
+      V2_GEOMETRY_CANDIDATE.bodies.head.verticesTiles,
+      1.25,
+      1.25,
+    ),
     speedTilesPerSecond: 1.5,
     contactDamageHp: 0,
     blocksPlayer: false,
   });
   expect(ENCOUNTER_CONFIG.emitters).toEqual({
-    count: 4,
-    radiusTiles: V2_GEOMETRY_CANDIDATE.emitterOffsetTiles,
+    count: 6,
+    radiusTiles: 0.35,
     initialPhaseRadians: 0,
     clockwiseDegreesPerSecond: 45,
     rotateDuringCooldown: true,
   });
   expect(ENCOUNTER_CONFIG.burst).toEqual({
     shotsPerEmitter: 11,
-    shotIntervalSeconds: 0.15,
-    cooldownAfterLastShotSeconds: 1,
+    shotIntervalSeconds: 0.19,
+    cooldownAfterLastShotSeconds: 3,
     initialCooldownSeconds: 2,
   });
   expect(ENCOUNTER_CONFIG.shard).toEqual({
     damageHp: 160,
     speedTilesPerSecond: 8,
-    verticesTiles: V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles,
-    reversalAgeSeconds: V2_GEOMETRY_CANDIDATE.reversalAgeSeconds,
-    lifetimeSeconds: V2_GEOMETRY_CANDIDATE.lifetimeSeconds,
+    verticesTiles: scaleBody(
+      V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles,
+      1.45,
+      0.65,
+    ),
+    reversalAgeSeconds: 1.5,
+    lifetimeSeconds: 3,
     expiration: "lifetime-only",
     hitPolicy: "once-per-shard",
   });
@@ -563,7 +592,7 @@ test("v2 geometry candidate derives exact leading-vertex reversal and rejects ju
   );
 });
 
-test("v2 geometry fits the approved spawn and supplies playable v2", () => {
+test("historical v2 geometry still fits the approved spawn independently of selected v3 tuning", () => {
   const candidate = V2_GEOMETRY_CANDIDATE;
   expect(candidate.enemySpawnTiles).toEqual({ x: 0, y: -16.2 });
   for (const vertex of candidate.bodies.head.verticesTiles) {
@@ -587,9 +616,7 @@ test("v2 geometry fits the approved spawn and supplies playable v2", () => {
   );
   expect(candidate.bodies.player.orientation).toBe("upright");
   expect(candidate.bodies.head.orientation).toBe("upright");
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v2");
+  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
   expect(ENCOUNTER_CONFIG.burst.shotsPerEmitter).toBe(11);
-  expect(ENCOUNTER_CONFIG.shard.reversalAgeSeconds).toBe(
-    candidate.reversalAgeSeconds,
-  );
+  expect(ENCOUNTER_CONFIG.shard.reversalAgeSeconds).toBe(1.5);
 });

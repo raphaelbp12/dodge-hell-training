@@ -1,4 +1,9 @@
-import { ENCOUNTER_CONFIG, type EncounterConfig } from "./encounter";
+import {
+  ENCOUNTER_CONFIG,
+  SELECTED_ENCOUNTER_VALUES,
+  scaleBody,
+  type EncounterConfig,
+} from "./encounter";
 import type { Vector2 } from "../models";
 
 export const DEBUG_RULES_VERSION = "crystal-worm-child-head-debug";
@@ -206,24 +211,10 @@ export const DEBUG_PARAMETERS = [
 ] as const;
 
 export type DebugParameterKey = (typeof DEBUG_PARAMETERS)[number]["key"];
-export const SELECTED_DEBUG_VALUES = Object.freeze({
-  enemyWidth: 1.25,
-  enemyHeight: 1.25,
-  emitterCount: 6,
-  emitterRadiusTiles: 0.35,
-  initialPhaseDegrees: 0,
-  rotationDegreesPerSecond: 45,
-  shotsPerEmitter: 11,
-  shotIntervalSeconds: 0.19,
-  cooldownSeconds: 3,
-  initialCooldownSeconds: 2,
-  projectileDamageHp: 160,
-  projectileSpeedTilesPerSecond: 8,
-  reversalSeconds: 1.5,
-  lifetimeSeconds: 3,
-  projectileWidth: 1.45,
-  projectileHeight: 0.65,
-} satisfies Partial<Record<DebugParameterKey, number>>);
+export const SELECTED_DEBUG_VALUES =
+  SELECTED_ENCOUNTER_VALUES satisfies Partial<
+    Record<DebugParameterKey, number>
+  >;
 
 export type DebugSettings = Readonly<
   Record<DebugParameterKey, number> & {
@@ -241,14 +232,14 @@ export const DEFAULT_DEBUG_SETTINGS: DebugSettings = Object.freeze({
   ),
   godMode: false,
   chaseArenaCenter: false,
-  matchPlayerToHead: false,
+  matchPlayerToHead: true,
 }) as DebugSettings;
 
 export function isDefaultDebugSettings(settings: DebugSettings): boolean {
   return (
     !settings.godMode &&
     !settings.chaseArenaCenter &&
-    !settings.matchPlayerToHead &&
+    settings.matchPlayerToHead === DEFAULT_DEBUG_SETTINGS.matchPlayerToHead &&
     DEBUG_PARAMETERS.every(
       (parameter) => settings[parameter.key] === parameter.defaultValue,
     )
@@ -299,19 +290,6 @@ export function updateDebugParameter(
     next.reversalSeconds = next.lifetimeSeconds / 2;
   validateDebugSettings(next);
   return next;
-}
-
-function scaleBody(
-  vertices: readonly Vector2[],
-  width: number,
-  height: number,
-): readonly Vector2[] {
-  const scaleX = width / extent(vertices, "x");
-  const scaleY = height / extent(vertices, "y");
-  return vertices.map((vertex) => ({
-    x: vertex.x * scaleX,
-    y: vertex.y * scaleY,
-  }));
 }
 
 export function debugEncounterConfig(settings: DebugSettings): EncounterConfig {

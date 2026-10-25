@@ -90,6 +90,6 @@ test("approved camera limits do not change rules identity or world scale", () =>
     zoomStep: 0.125,
   });
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(
-    "crystal-worm-child-head-paladin-v2",
+    "crystal-worm-child-head-paladin-v3",
   );
 });

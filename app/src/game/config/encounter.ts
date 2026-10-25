@@ -57,7 +57,46 @@ export type EncounterConfig = Readonly<{
   }>;
 }>;
 
-export const RULES_VERSION = "crystal-worm-child-head-paladin-v2";
+export const RULES_VERSION = "crystal-worm-child-head-paladin-v3";
+
+export const SELECTED_ENCOUNTER_VALUES = Object.freeze({
+  enemyWidth: 1.25,
+  enemyHeight: 1.25,
+  emitterCount: 6,
+  emitterRadiusTiles: 0.35,
+  initialPhaseDegrees: 0,
+  rotationDegreesPerSecond: 45,
+  shotsPerEmitter: 11,
+  shotIntervalSeconds: 0.19,
+  cooldownSeconds: 3,
+  initialCooldownSeconds: 2,
+  projectileDamageHp: 160,
+  projectileSpeedTilesPerSecond: 8,
+  reversalSeconds: 1.5,
+  lifetimeSeconds: 3,
+  projectileWidth: 1.45,
+  projectileHeight: 0.65,
+});
+
+export function scaleBody(
+  vertices: readonly Vector2[],
+  width: number,
+  height: number,
+): readonly Vector2[] {
+  const sourceWidth =
+    Math.max(...vertices.map((vertex) => vertex.x)) -
+    Math.min(...vertices.map((vertex) => vertex.x));
+  const sourceHeight =
+    Math.max(...vertices.map((vertex) => vertex.y)) -
+    Math.min(...vertices.map((vertex) => vertex.y));
+  if (sourceWidth === width && sourceHeight === height) return vertices;
+  return vertices.map((vertex) => ({
+    x: (vertex.x / sourceWidth) * width,
+    y: (vertex.y / sourceHeight) * height,
+  }));
+}
+
+const selected = SELECTED_ENCOUNTER_VALUES;
 
 export const ENCOUNTER_CONFIG = {
   rulesVersion: RULES_VERSION,
@@ -68,34 +107,46 @@ export const ENCOUNTER_CONFIG = {
   },
   player: {
     spawnTiles: { x: 0, y: 0 },
-    verticesTiles: geometry.bodies.player.verticesTiles,
+    verticesTiles: scaleBody(
+      geometry.bodies.player.verticesTiles,
+      selected.enemyWidth,
+      selected.enemyHeight,
+    ),
   },
   enemy: {
     spawnTiles: geometry.enemySpawnTiles,
-    verticesTiles: geometry.bodies.head.verticesTiles,
+    verticesTiles: scaleBody(
+      geometry.bodies.head.verticesTiles,
+      selected.enemyWidth,
+      selected.enemyHeight,
+    ),
     speedTilesPerSecond: 1.5,
     contactDamageHp: 0,
     blocksPlayer: false,
   },
   emitters: {
-    count: 4,
-    radiusTiles: geometry.emitterOffsetTiles,
-    initialPhaseRadians: 0,
-    clockwiseDegreesPerSecond: 45,
+    count: selected.emitterCount,
+    radiusTiles: selected.emitterRadiusTiles,
+    initialPhaseRadians: (selected.initialPhaseDegrees * Math.PI) / 180,
+    clockwiseDegreesPerSecond: selected.rotationDegreesPerSecond,
     rotateDuringCooldown: true,
   },
   burst: {
-    shotsPerEmitter: 11,
-    shotIntervalSeconds: 0.15,
-    cooldownAfterLastShotSeconds: 1,
-    initialCooldownSeconds: 2,
+    shotsPerEmitter: selected.shotsPerEmitter,
+    shotIntervalSeconds: selected.shotIntervalSeconds,
+    cooldownAfterLastShotSeconds: selected.cooldownSeconds,
+    initialCooldownSeconds: selected.initialCooldownSeconds,
   },
   shard: {
-    damageHp: 160,
-    speedTilesPerSecond: 8,
-    verticesTiles: geometry.bodies.shard.verticesTiles,
-    reversalAgeSeconds: geometry.reversalAgeSeconds,
-    lifetimeSeconds: geometry.lifetimeSeconds,
+    damageHp: selected.projectileDamageHp,
+    speedTilesPerSecond: selected.projectileSpeedTilesPerSecond,
+    verticesTiles: scaleBody(
+      geometry.bodies.shard.verticesTiles,
+      selected.projectileWidth,
+      selected.projectileHeight,
+    ),
+    reversalAgeSeconds: selected.reversalSeconds,
+    lifetimeSeconds: selected.lifetimeSeconds,
     expiration: "lifetime-only",
     hitPolicy: "once-per-shard",
   },

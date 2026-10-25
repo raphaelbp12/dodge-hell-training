@@ -175,6 +175,41 @@ async function retrySnapshot(
   }, source);
 }
 
+test("selected values are the scored defaults without opening Debug", async ({
+  page,
+}) => {
+  await launch(page);
+  const state = await inspect(page);
+  expect(state.rulesVersion).toBe("crystal-worm-child-head-paladin-v3");
+  expect(state.debugSettings).toMatchObject({
+    enemyWidth: 1.25,
+    enemyHeight: 1.25,
+    emitterCount: 6,
+    emitterRadiusTiles: 0.35,
+    initialPhaseDegrees: 0,
+    rotationDegreesPerSecond: 45,
+    shotsPerEmitter: 11,
+    shotIntervalSeconds: 0.19,
+    cooldownSeconds: 3,
+    initialCooldownSeconds: 2,
+    projectileDamageHp: 160,
+    projectileSpeedTilesPerSecond: 8,
+    reversalSeconds: 1.5,
+    lifetimeSeconds: 3,
+    projectileWidth: 1.45,
+    projectileHeight: 0.65,
+    godMode: false,
+    chaseArenaCenter: false,
+    matchPlayerToHead: true,
+  });
+  await page.getByRole("button", { name: "Debug", exact: true }).click();
+  await page.getByRole("button", { name: "Load selected values" }).click();
+  expect((await inspect(page)).rulesVersion).toBe(
+    "crystal-worm-child-head-paladin-v3",
+  );
+  await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
+});
+
 for (const width of [1440, 390]) {
   test(`live enemy debug sliders, god mode and safe Retry work at ${width}px`, async ({
     page,
@@ -333,7 +368,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Reset defaults" }).click();
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     expect((await inspect(page)).rulesVersion).toBe(
-      "crystal-worm-child-head-paladin-v2",
+      "crystal-worm-child-head-paladin-v3",
     );
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page
@@ -668,7 +703,7 @@ for (const width of [1440, 390]) {
       const record = saved.records[0];
       expect(record).toEqual({
         id: expect.any(String),
-        rulesVersion: "crystal-worm-child-head-paladin-v2",
+        rulesVersion: "crystal-worm-child-head-paladin-v3",
         outcome: "death",
         elapsedSeconds: expect.any(Number),
         hitsTaken: expect.any(Number),
@@ -1236,7 +1271,7 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
     expect(state.audio.activeVoices).toBeLessThanOrEqual(4);
     expect(state.audio.requests).toBe(state.hitsTaken);
     expect(state.shards.length).toBeLessThanOrEqual(
-      4 * 11 * Math.ceil(4.4416089428614765 / 2.5),
+      6 * 11 * Math.ceil(3 / 4.9),
     );
     expect(
       state.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
@@ -1383,7 +1418,7 @@ test("WASD uses world speed and camera stays centered at the arena edge through 
   await page.keyboard.down("d");
   await expect
     .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeCloseTo(18.400762384786905, 5);
+    .toBeCloseTo(Math.sqrt(19.2 ** 2 - 0.375 ** 2) - 0.625, 5);
   await page.keyboard.up("d");
   const edge = await inspect(page);
   expect(edge.camera.x).toBeCloseTo(edge.player.positionTiles.x, 6);
@@ -1847,7 +1882,14 @@ for (const viewport of [
       .toBeGreaterThan(0);
     const state = await inspect(page);
     expect(state.viewport.width).toBe(viewport.width);
-    const pixels = await renderedPixels(page);
+    let pixels = await renderedPixels(page);
+    if (viewport.width > 600)
+      await expect
+        .poll(async () => {
+          pixels = await renderedPixels(page);
+          return pixels.enemy;
+        })
+        .toBeGreaterThan(10);
     expect(pixels.player).toBeGreaterThan(10);
     expect(pixels.shards).toBeGreaterThan(5);
     expect(pixels.ground).toBeGreaterThan(1000);

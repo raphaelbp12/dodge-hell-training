@@ -188,14 +188,14 @@ test("arena-center chase reaches the exact center and ignores the player silhoue
   expect(state.enemy.positionTiles).toEqual(ENCOUNTER_CONFIG.arena.centerTiles);
 });
 
-test("activates the approved v2 preset and eleven-volley first group atomically", () => {
+test("activates the selected v3 preset and eleven-volley first group atomically", () => {
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(
-    "crystal-worm-child-head-paladin-v2",
+    "crystal-worm-child-head-paladin-v3",
   );
   expect(ENCOUNTER_CONFIG.arena.radiusTiles).toBe(19.2);
   expect(ENCOUNTER_CONFIG.enemy.spawnTiles).toEqual({ x: 0, y: -16.2 });
   const state = createSimulation();
-  for (let tick = 0; tick < 210; tick++) {
+  for (let tick = 0; tick < 234; tick++) {
     state.player.healthHp = PALADIN_STATS.healthHp;
     advanceSimulation(state, stepSeconds, idle);
   }
@@ -543,7 +543,7 @@ test("starts with independent empty shards and no shots before initial cooldown 
   expect(state.shards).toEqual([]);
   expect(state.volleysFired).toBe(0);
   advanceSimulation(state, stepSeconds, idle);
-  expect(state.shards).toHaveLength(4);
+  expect(state.shards).toHaveLength(6);
   expect(state.volleysFired).toBe(1);
   expect(state.shards.every((shard) => shard.ageSeconds === 0)).toBe(true);
 });
@@ -561,13 +561,13 @@ test("rotates clockwise from east toward south even during cooldown", () => {
   expect(state.enemy.emitterPhaseRadians).toBeCloseTo(0, 12);
 });
 
-test.each([0, 1, 2, 3])(
-  "samples emitter %s at quarter-turn offsets from the current enemy",
+test.each([0, 1, 2, 3, 4, 5])(
+  "samples emitter %s at sixth-turn offsets from the current enemy",
   (emitter) => {
     const state = createSimulation();
     runTicks(state, 120);
     const shard = state.shards[emitter];
-    const angle = Math.PI / 2 + (emitter * Math.PI) / 2;
+    const angle = Math.PI / 2 + (emitter * Math.PI) / 3;
     expect(shard.positionTiles.x).toBeCloseTo(
       state.enemy.positionTiles.x +
         Math.cos(angle) * ENCOUNTER_CONFIG.emitters.radiusTiles,
@@ -594,38 +594,42 @@ test.each([0, 1, 2, 3])(
   },
 );
 
-test("fires 44 shards at eleven exact shot times, then waits one second from the last shot", () => {
+test("fires 66 shards on the first fixed tick at each scheduled shot, then waits three seconds", () => {
   const state = createSimulation();
+  setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
   runTicks(state, 120);
   for (let volley = 1; volley < 11; volley++) {
-    runTicks(state, 8);
-    expect(state.shards).toHaveLength(volley * 4);
+    const shotTime = 2 + volley * 0.19;
+    const beforeTick = Math.ceil(shotTime / stepSeconds - 1e-9) - 1;
+    runTicks(state, beforeTick - state.ticksElapsed);
+    expect(state.shards).toHaveLength(volley * 6);
     advanceSimulation(state, stepSeconds, idle);
-    expect(state.shards).toHaveLength((volley + 1) * 4);
-    expect(state.elapsedSeconds).toBeCloseTo(2 + volley * 0.15, 12);
-    expect(
-      state.shards.slice(-4).every((shard) => shard.ageSeconds === 0),
-    ).toBe(true);
+    expect(state.shards).toHaveLength((volley + 1) * 6);
+    for (const shard of state.shards.slice(-6))
+      expect(state.elapsedSeconds - shard.ageSeconds).toBeCloseTo(
+        (beforeTick + 1) * stepSeconds,
+        12,
+      );
   }
-  expect(new Set(state.shards.map((shard) => shard.id)).size).toBe(44);
-  runTicks(state, 59);
+  expect(new Set(state.shards.map((shard) => shard.id)).size).toBe(66);
+  runTicks(state, 179);
   expect(state.volleysFired).toBe(11);
   advanceSimulation(state, stepSeconds, idle);
-  expect(state.elapsedSeconds).toBe(4.5);
+  expect(state.elapsedSeconds).toBeCloseTo(6.9, 12);
   expect(state.volleysFired).toBe(12);
-  expect(state.shards.slice(-4).map((shard) => shard.id)).toEqual([
-    45, 46, 47, 48,
+  expect(state.shards.slice(-6).map((shard) => shard.id)).toEqual([
+    67, 68, 69, 70, 71, 72,
   ]);
 });
 
-test("resamples the moving enemy and rotated direction for successive shots", () => {
+test("resamples the moving enemy and rotated direction for later shots", () => {
   const state = createSimulation();
   runTicks(state, 120);
   const firstVelocity = { ...state.shards[0].velocityTilesPerSecond };
   const firstEnemy = { ...state.enemy.positionTiles };
-  runTicks(state, 9, east);
-  const shard = state.shards[4];
-  const angle = (2.15 * Math.PI) / 4;
+  runTicks(state, 57, east);
+  const shard = state.shards[30];
+  const angle = (2.95 * Math.PI) / 4;
   expect(state.enemy.positionTiles).not.toEqual(firstEnemy);
   expect(shard.velocityTilesPerSecond).not.toEqual(firstVelocity);
   expect(shard.positionTiles.x).toBeCloseTo(
@@ -688,7 +692,7 @@ test("one advance collects accepted hits from later fixed ticks without a persis
     makeShard({ id: 1 }),
     makeShard({
       id: 2,
-      positionTiles: { x: -2.5, y: 0 },
+      positionTiles: { x: -(horizontalContactTiles + 0.9), y: 0 },
       velocityTilesPerSecond: { x: 20, y: 0 },
     }),
   );
@@ -831,7 +835,7 @@ test("shot times and shard state agree across render-frame schedules over severa
   ];
   const reference = createSimulation();
   runTicks(reference, 600, east);
-  expect(reference.volleysFired).toBe(37);
+  expect(reference.volleysFired).toBe(22);
   for (const schedule of schedules) {
     const state = createSimulation();
     const observedShotTimes = new Map<number, number>();
@@ -845,11 +849,13 @@ test("shot times and shard state agree across render-frame schedules over severa
           );
       }
     }
-    expect(observedShotTimes.size).toBe(148);
+    expect(observedShotTimes.size).toBe(132);
     for (const [id, shotTime] of observedShotTimes) {
-      const volley = Math.floor((id - 1) / 4);
+      const volley = Math.floor((id - 1) / 6);
+      const scheduledTime =
+        2 + Math.floor(volley / 11) * 4.9 + (volley % 11) * 0.19;
       expect(shotTime).toBeCloseTo(
-        2 + Math.floor(volley / 11) * 2.5 + (volley % 11) * 0.15,
+        Math.ceil(scheduledTime / stepSeconds - 1e-9) * stepSeconds,
         12,
       );
     }
@@ -902,7 +908,7 @@ test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () 
     expect(state.phase).toBe("playing");
     expect(state.elapsedSeconds).toBe(validationSeconds);
     expect(state.ticksElapsed).toBe(validationSeconds / stepSeconds);
-    expect(state.volleysFired).toBe(1313);
+    expect(state.volleysFired).toBe(671);
     expect(observedShardIds.size).toBe(
       state.volleysFired * ENCOUNTER_CONFIG.emitters.count,
     );
@@ -1195,12 +1201,12 @@ test("checks newborn overlap at the exact firing boundary", () => {
   state.player.positionTiles = { x: 0, y: 0.75 };
   runTicks(state, 1);
   expect(state.elapsedSeconds).toBe(2);
-  expect(state.shards).toHaveLength(4);
+  expect(state.shards).toHaveLength(6);
   expect(state.shards[0].ageSeconds).toBe(0);
   expect(state.shards[0].hasHitPlayer).toBe(true);
-  expect(state.hitsTaken).toBe(4);
+  expect(state.hitsTaken).toBe(6);
   expect(state.player.healthHp).toBeCloseTo(
-    775 - 4 * 128 + 6.0547 * stepSeconds,
+    775 - 6 * 128 + 6.0547 * stepSeconds,
     10,
   );
 });
@@ -1217,7 +1223,7 @@ test("a lethal boundary-spawn hit prevents later newborn hits and regeneration",
   expect(state.player.healthHp).toBe(0);
   expect(state.hitsTaken).toBe(1);
   expect(state.shards.filter((shard) => shard.hasHitPlayer)).toHaveLength(1);
-  expect(state.shards).toHaveLength(4);
+  expect(state.shards).toHaveLength(6);
 });
 
 test("does not sweep a newborn shard against player movement before its firing time", () => {
@@ -1232,7 +1238,7 @@ test("does not sweep a newborn shard against player movement before its firing t
   expect(state.player.positionTiles.x).toBeGreaterThan(
     horizontalContactTiles + ENCOUNTER_CONFIG.emitters.radiusTiles + 0.025,
   );
-  expect(state.shards).toHaveLength(4);
+  expect(state.shards).toHaveLength(6);
   expect(state.shards.every((shard) => shard.ageSeconds === 0)).toBe(true);
   expect(state.hitsTaken).toBe(0);
   expect(state.player.healthHp).toBe(775);

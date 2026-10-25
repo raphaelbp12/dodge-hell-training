@@ -80,6 +80,21 @@ test("retains the latest configured 100 deaths across all rules and derives best
   expect(retainedBestSeconds(records, "unknown-rules")).toBeNull();
 });
 
+test("retains v2 scores without comparing them to selected v3 defaults", () => {
+  const legacy = record("v2-best", 999, "crystal-worm-child-head-paladin-v2");
+  const boundary = storage(encoded([legacy]));
+  const history = new AttemptHistory(() => boundary);
+  expect(history.snapshot().records).toEqual([legacy]);
+  expect(
+    retainedBestSeconds(history.snapshot().records, RULES_VERSION),
+  ).toBeNull();
+  history.save(record("v3-best", 12));
+  expect(retainedBestSeconds(history.snapshot().records, RULES_VERSION)).toBe(
+    12,
+  );
+  expect(history.snapshot().records).toContainEqual(legacy);
+});
+
 test("bounds oversized loaded history, removes duplicate IDs, and preserves newer-first order", () => {
   const entries = Array.from({ length: 102 }, (_, index) =>
     record(`id-${index}`, index),
