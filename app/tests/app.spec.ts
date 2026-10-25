@@ -74,6 +74,10 @@ async function renderedPixels(page: Page) {
     }
     return {
       ...counts,
+      survivalSeconds: Number.parseFloat(
+        document.querySelector('[aria-label="Survival time"]')?.textContent ??
+          "NaN",
+      ),
       enemyX: counts.enemy ? enemyX / counts.enemy : null,
       enemyY: counts.enemy ? enemyY / counts.enemy : null,
     };
@@ -176,6 +180,11 @@ for (const width of [1440, 390]) {
     await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
     await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
     if (width === 1440) {
+      await page.keyboard.press("o");
+      await page.keyboard.press("o");
+      await expect
+        .poll(async () => (await renderedPixels(page)).enemy)
+        .toBeGreaterThan(10);
       for (const [key, axis, direction] of [
         ["w", "enemyY", 1],
         ["d", "enemyX", -1],
@@ -226,14 +235,18 @@ for (const width of [1440, 390]) {
       "775",
     );
     await expect
-      .poll(async () =>
-        Number.parseFloat(await page.getByLabel("Survival time").innerText()),
+      .poll(
+        async () => {
+          const snapshot = await renderedPixels(page);
+          return (
+            snapshot.survivalSeconds >= 1 &&
+            snapshot.survivalSeconds < 2 &&
+            snapshot.shards === 0
+          );
+        },
+        { intervals: [50] },
       )
-      .toBeGreaterThanOrEqual(1);
-    expect((await renderedPixels(page)).shards).toBe(0);
-    expect(
-      Number.parseFloat(await page.getByLabel("Survival time").innerText()),
-    ).toBeLessThan(2);
+      .toBe(true);
     await expect
       .poll(async () => (await renderedPixels(page)).shards, { timeout: 6000 })
       .toBeGreaterThan(5);
@@ -282,7 +295,7 @@ for (const width of [1440, 390]) {
       const record = saved.records[0];
       expect(record).toEqual({
         id: expect.any(String),
-        rulesVersion: "crystal-worm-child-head-paladin-v1",
+        rulesVersion: "crystal-worm-child-head-paladin-v2",
         outcome: "death",
         elapsedSeconds: expect.any(Number),
         hitsTaken: expect.any(Number),
@@ -400,7 +413,7 @@ test("Start countdown freezes world, focus pause preserves it, and R skips count
   expect(paused.elapsedSeconds).toBe(0);
   expect(paused.volleysFired).toBe(0);
   expect(paused.player.positionTiles).toEqual({ x: 0, y: 0 });
-  expect(paused.enemy.positionTiles).toEqual({ x: 0, y: -13 });
+  expect(paused.enemy.positionTiles).toEqual({ x: 0, y: -16.2 });
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page)).sessionPhase)
@@ -437,7 +450,7 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     combatRemainingSeconds: 0,
   });
   expect(reset.enemy).toEqual({
-    positionTiles: { x: 0, y: -13 },
+    positionTiles: { x: 0, y: -16.2 },
     emitterPhaseRadians: 0,
   });
   expect(reset.shards).toEqual([]);
@@ -827,7 +840,9 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
   while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
     let state = await inspect(page);
     peakShards = Math.max(peakShards, state.shards.length);
-    expect(state.shards.length).toBeLessThanOrEqual(16);
+    expect(state.shards.length).toBeLessThanOrEqual(
+      4 * 11 * Math.ceil(4.4416089428614765 / 2.5),
+    );
     expect(
       state.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
     ).toBe(true);
@@ -971,7 +986,7 @@ test("WASD uses world speed and camera stays centered at the arena edge through 
   await page.keyboard.down("d");
   await expect
     .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeCloseTo(15.75, 5);
+    .toBeCloseTo(18.400762384786905, 5);
   await page.keyboard.up("d");
   const edge = await inspect(page);
   expect(edge.camera.x).toBeCloseTo(edge.player.positionTiles.x, 6);

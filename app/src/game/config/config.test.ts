@@ -156,43 +156,42 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("encodes approved tuning and independent reversal/lifetime values with explicit units", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v1");
+  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v2");
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION);
   expect(ENCOUNTER_CONFIG.arena).toEqual({
     centerTiles: { x: 0, y: 0 },
-    radiusTiles: 16,
+    radiusTiles: 19.2,
   });
   expect(ENCOUNTER_CONFIG.player).toEqual({
     spawnTiles: { x: 0, y: 0 },
-    colliderRadiusTiles: 0.25,
+    verticesTiles: V2_GEOMETRY_CANDIDATE.bodies.player.verticesTiles,
   });
   expect(ENCOUNTER_CONFIG.enemy).toEqual({
-    spawnTiles: { x: 0, y: -13 },
-    colliderRadiusTiles: 0.6,
+    spawnTiles: { x: 0, y: -16.2 },
+    verticesTiles: V2_GEOMETRY_CANDIDATE.bodies.head.verticesTiles,
     speedTilesPerSecond: 1.5,
-    stopDistanceTiles: 1,
     contactDamageHp: 0,
     blocksPlayer: false,
   });
   expect(ENCOUNTER_CONFIG.emitters).toEqual({
     count: 4,
-    radiusTiles: 0.75,
+    radiusTiles: V2_GEOMETRY_CANDIDATE.emitterOffsetTiles,
     initialPhaseRadians: 0,
     clockwiseDegreesPerSecond: 45,
     rotateDuringCooldown: true,
   });
   expect(ENCOUNTER_CONFIG.burst).toEqual({
-    shotsPerEmitter: 4,
+    shotsPerEmitter: 11,
     shotIntervalSeconds: 0.15,
-    cooldownAfterLastShotSeconds: 2,
+    cooldownAfterLastShotSeconds: 1,
     initialCooldownSeconds: 2,
   });
   expect(ENCOUNTER_CONFIG.shard).toEqual({
     damageHp: 160,
     speedTilesPerSecond: 8,
-    colliderRadiusTiles: 0.15,
-    reversalAgeSeconds: 1.2,
-    lifetimeSeconds: 2.4,
+    verticesTiles: V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles,
+    reversalAgeSeconds: V2_GEOMETRY_CANDIDATE.reversalAgeSeconds,
+    lifetimeSeconds: V2_GEOMETRY_CANDIDATE.lifetimeSeconds,
     expiration: "lifetime-only",
     hitPolicy: "once-per-shard",
   });
@@ -223,17 +222,21 @@ test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
   },
 );
 
-test.each([0, -1, 2.4, 2.5, Number.NaN, Number.POSITIVE_INFINITY])(
-  "rejects reversal outside the lifetime: %s",
-  (reversalAgeSeconds) => {
-    expect(() =>
-      validateEncounterConfig({
-        ...ENCOUNTER_CONFIG,
-        shard: { ...ENCOUNTER_CONFIG.shard, reversalAgeSeconds },
-      }),
-    ).toThrow(RangeError);
-  },
-);
+test.each([
+  0,
+  -1,
+  ENCOUNTER_CONFIG.shard.lifetimeSeconds,
+  5,
+  Number.NaN,
+  Number.POSITIVE_INFINITY,
+])("rejects reversal outside the lifetime: %s", (reversalAgeSeconds) => {
+  expect(() =>
+    validateEncounterConfig({
+      ...ENCOUNTER_CONFIG,
+      shard: { ...ENCOUNTER_CONFIG.shard, reversalAgeSeconds },
+    }),
+  ).toThrow(RangeError);
+});
 
 test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursuit speed", () => {
   const invalidConfigs = [
@@ -244,11 +247,11 @@ test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursu
     },
     {
       ...ENCOUNTER_CONFIG,
-      player: { ...ENCOUNTER_CONFIG.player, colliderRadiusTiles: -1 },
+      player: { ...ENCOUNTER_CONFIG.player, verticesTiles: [] },
     },
     {
       ...ENCOUNTER_CONFIG,
-      player: { ...ENCOUNTER_CONFIG.player, spawnTiles: { x: 16, y: 0 } },
+      player: { ...ENCOUNTER_CONFIG.player, spawnTiles: { x: 19.2, y: 0 } },
     },
     {
       ...ENCOUNTER_CONFIG,
@@ -256,7 +259,7 @@ test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursu
     },
     {
       ...ENCOUNTER_CONFIG,
-      enemy: { ...ENCOUNTER_CONFIG.enemy, spawnTiles: { x: 16, y: 0 } },
+      enemy: { ...ENCOUNTER_CONFIG.enemy, spawnTiles: { x: 19.2, y: 0 } },
     },
     {
       ...ENCOUNTER_CONFIG,
@@ -321,6 +324,7 @@ test("imports in Node and carries the comparison version in plain session snapsh
     shards: [
       {
         id: 0,
+        orientationRadians: 0,
         positionTiles: { x: 0, y: 0 },
         velocityTilesPerSecond: { x: 8, y: 0 },
         ageSeconds: 0,
@@ -441,7 +445,7 @@ test("v2 geometry candidate derives exact leading-vertex reversal and rejects ju
   );
 });
 
-test("v2 geometry candidate fits the approved spawn and derives axial pursuit contact without changing playable v1", () => {
+test("v2 geometry fits the approved spawn and supplies playable v2", () => {
   const candidate = V2_GEOMETRY_CANDIDATE;
   expect(candidate.enemySpawnTiles).toEqual({ x: 0, y: -16.2 });
   for (const vertex of candidate.bodies.head.verticesTiles) {
@@ -465,7 +469,9 @@ test("v2 geometry candidate fits the approved spawn and derives axial pursuit co
   );
   expect(candidate.bodies.player.orientation).toBe("upright");
   expect(candidate.bodies.head.orientation).toBe("upright");
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v1");
-  expect(ENCOUNTER_CONFIG.burst.shotsPerEmitter).toBe(4);
-  expect(ENCOUNTER_CONFIG.shard.reversalAgeSeconds).toBe(1.2);
+  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v2");
+  expect(ENCOUNTER_CONFIG.burst.shotsPerEmitter).toBe(11);
+  expect(ENCOUNTER_CONFIG.shard.reversalAgeSeconds).toBe(
+    candidate.reversalAgeSeconds,
+  );
 });

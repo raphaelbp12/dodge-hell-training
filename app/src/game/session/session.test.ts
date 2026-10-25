@@ -24,6 +24,7 @@ function kill(session: SessionController) {
   session.simulation.player.healthHp = 1;
   session.simulation.shards.push({
     id: 100,
+    orientationRadians: 0,
     positionTiles: { ...session.simulation.player.positionTiles },
     velocityTilesPerSecond: { x: 0, y: 0 },
     ageSeconds: 0,

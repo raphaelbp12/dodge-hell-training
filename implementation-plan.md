@@ -2,6 +2,8 @@
 
 ## Purpose And Execution
 
+**Batch authorization - 2026-10-25:** The user explicitly requested all remaining steps in order, tests and a separate commit/push between steps, with no further confirmation prompts. For this batch this overrides the single-step invocation/publication restrictions below. Use conservative presentation choices and record them as delegated technical decisions, not human visual/audible acceptance. Never treat a failed gate as complete or invent deployment evidence. Preserve unrelated local edits. Each completed step still requires its own checks, execution record, commit and verified push before the next step begins.
+
 Deliver a pure-frontend ROTMG-inspired training game: repeatedly survive against the Crystal Worm Child Head, inspect results, and retry immediately.
 
 This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 8.1`. Read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
@@ -229,7 +231,7 @@ Extend the same pure geometry slice with transformed-vertex circular containment
 
 ### Step 10.1 - Activate The Revised Encounter Atomically
 
-Status: pending. Dependencies: 9.2.
+Status: complete. Dependencies: 9.2.
 
 **Implementation prompt**
 
@@ -240,6 +242,14 @@ Reuse simulation entry points, `updateAttacks`, reversal/expiry segment splittin
 **Focused checks:** eleven shots per phase/44 per group; initial/last/next-group boundaries; moving-head origins/rotation; fractional reversal/expiry inside ticks; swept outward/return hits, independent once-only shards/lethal stop; lifetime-only expiry outside arena; schedule equivalence; spawn/edge constraints and final live bound. Browser checks prove nonblank polygons, matching outlines and repeated-practice lifecycle at desktop/narrow sizes.
 
 **Acceptance:** all five app gates pass; v2 activates as one coherent preset without hidden circle hits, a second clock or weakened resource/lifetime assertions. Record exact geometry/timing/bounds; later visual acceptance remains pending.
+
+**Execution and verification - 2026-10-25**
+
+- Activated approved shared octagons/hexagon, actual-vertex arena/pursuit, relative swept polygon hits and drawing atomically as `crystal-worm-child-head-paladin-v2`. Shards retain firing-axis orientation on reversal; existing fractional reversal/expiry segmentation, once-only hit state, stable lethal ordering and one Phaser clock remain. A conservative relative swept-AABB rejection avoids unnecessary SAT work; it never accepts collisions or confines shards.
+- Arena radius 19.2 tiles, north head center -16.2 tiles, emitter offset 0.18532903718071878 tile; speed 8 tiles/s, reversal 2.2208044714307382 s, lifetime 4.4416089428614765 s. Four emitters times eleven shots, 0.15 s apart, 1 s after last shot, two-second initial cooldown. Conservative live bound `44 * ceil(lifetime / 2.5) = 88`. No timing was rounded to ticks or nominal screenshot values.
+- Focused activation test failed v1 identity then passed. Updated obsolete v1 radius/spawn/cadence fixtures without weakening once-only, lifetime, schedule or resource tests. Five-minute schedules at 30/60/120 Hz agree, 1313 volleys, resource bound 88. Browser fixtures now wait for the near-edge head to be visible and use an atomic time/pixel cooldown observation with 50 ms sampling, repairing the previously observed poll/readback race without weakening the two-second rule.
+- Final pinned-toolchain gates: 258 unit/component tests, typecheck, lint, production build and all 20 Chromium browser cases passed. Desktop/narrow screenshots and pixels are generated, actual deaths and persistence exercised, 60-second play plus 25 retries retain one canvas/listener set. Existing large Phaser chunk warning remains nonblocking. Earlier failing browser runs exposed obsolete v1 assertions and the cooldown observation race; neither was treated as a pass.
+- No zoom/audio/modal behavior, tuning, migration, artwork distribution, fresh human geometry approval or hosted verification claimed. Step 10.2 owns comparison/technical visual acceptance. Batch publication is explicitly authorized above; unrelated Vite formatting remains excluded.
 
 ### Step 10.2 - Verify Geometry And Comparison Isolation
 

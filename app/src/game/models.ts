@@ -40,6 +40,7 @@ export type EnemyState = {
 
 export type ShardState = {
   id: number;
+  orientationRadians: number;
   positionTiles: Vector2;
   velocityTilesPerSecond: Vector2;
   ageSeconds: number;
@@ -50,11 +51,7 @@ export type ShardState = {
 };
 
 export type SessionPhase =
-  | "home"
-  | "countdown"
-  | "playing"
-  | "paused"
-  | "ended";
+  "home" | "countdown" | "playing" | "paused" | "ended";
 
 export type SessionSnapshot = Readonly<{
   rulesVersion: string;

@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
+import { transformBodyVertices } from "../simulation/geometry";
+import type { Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
 
 export type EncounterView = {
@@ -294,50 +296,44 @@ class EncounterScene extends Phaser.Scene {
 
   private drawEntities(): void {
     const { player, enemy, shards } = this.state;
-    const playerRadius =
-      ENCOUNTER_CONFIG.player.colliderRadiusTiles * pixelsPerTile;
-    const enemyRadius =
-      ENCOUNTER_CONFIG.enemy.colliderRadiusTiles * pixelsPerTile;
     this.bodies.clear();
-    this.bodies
-      .fillStyle(presentation.enemy)
-      .fillCircle(
-        enemy.positionTiles.x * pixelsPerTile,
-        enemy.positionTiles.y * pixelsPerTile,
-        enemyRadius,
+    const draw = (
+      graphics: Phaser.GameObjects.Graphics,
+      vertices: readonly Vector2[],
+      position: Vector2,
+      color: number,
+      orientation = 0,
+    ) => {
+      const points = transformBodyVertices(vertices, position, orientation).map(
+        (vertex) =>
+          new Phaser.Math.Vector2(
+            vertex.x * pixelsPerTile,
+            vertex.y * pixelsPerTile,
+          ),
       );
-    this.bodies
-      .fillStyle(presentation.enemyCore)
-      .fillCircle(
-        enemy.positionTiles.x * pixelsPerTile,
-        enemy.positionTiles.y * pixelsPerTile,
-        enemyRadius / 2,
-      );
-    this.bodies
-      .fillStyle(presentation.player)
-      .fillCircle(
-        player.positionTiles.x * pixelsPerTile,
-        player.positionTiles.y * pixelsPerTile,
-        playerRadius,
-      );
-    this.bodies
-      .lineStyle(2, presentation.playerOutline)
-      .strokeCircle(
-        player.positionTiles.x * pixelsPerTile,
-        player.positionTiles.y * pixelsPerTile,
-        playerRadius,
-      );
+      graphics.fillStyle(color).fillPoints(points, true);
+    };
+    draw(
+      this.bodies,
+      ENCOUNTER_CONFIG.enemy.verticesTiles,
+      enemy.positionTiles,
+      presentation.enemy,
+    );
+    draw(
+      this.bodies,
+      ENCOUNTER_CONFIG.player.verticesTiles,
+      player.positionTiles,
+      presentation.player,
+    );
     this.projectiles.clear();
     for (const shard of shards) {
-      this.projectiles
-        .fillStyle(
-          shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
-        )
-        .fillCircle(
-          shard.positionTiles.x * pixelsPerTile,
-          shard.positionTiles.y * pixelsPerTile,
-          ENCOUNTER_CONFIG.shard.colliderRadiusTiles * pixelsPerTile,
-        );
+      draw(
+        this.projectiles,
+        ENCOUNTER_CONFIG.shard.verticesTiles,
+        shard.positionTiles,
+        shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
+        shard.orientationRadians,
+      );
     }
   }
 

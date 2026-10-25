@@ -1,5 +1,10 @@
 import type { CircularArena, Vector2 } from "../models";
 import { assertNonnegative, PALADIN_DERIVED_STATS } from "./stats";
+import { V2_GEOMETRY_CANDIDATE as geometry } from "./geometry-candidate";
+import {
+  convexBodyFitsCircle,
+  transformBodyVertices,
+} from "../simulation/geometry";
 
 export type EncounterConfig = Readonly<{
   rulesVersion: string;
@@ -8,12 +13,11 @@ export type EncounterConfig = Readonly<{
     maxStepsPerUpdate: number;
   }>;
   arena: CircularArena;
-  player: Readonly<{ spawnTiles: Vector2; colliderRadiusTiles: number }>;
+  player: Readonly<{ spawnTiles: Vector2; verticesTiles: readonly Vector2[] }>;
   enemy: Readonly<{
     spawnTiles: Vector2;
-    colliderRadiusTiles: number;
+    verticesTiles: readonly Vector2[];
     speedTilesPerSecond: number;
-    stopDistanceTiles: number;
     contactDamageHp: 0;
     blocksPlayer: false;
   }>;
@@ -33,7 +37,7 @@ export type EncounterConfig = Readonly<{
   shard: Readonly<{
     damageHp: number;
     speedTilesPerSecond: number;
-    colliderRadiusTiles: number;
+    verticesTiles: readonly Vector2[];
     reversalAgeSeconds: number;
     lifetimeSeconds: number;
     expiration: "lifetime-only";
@@ -53,40 +57,45 @@ export type EncounterConfig = Readonly<{
   }>;
 }>;
 
-export const RULES_VERSION = "crystal-worm-child-head-paladin-v1";
+export const RULES_VERSION = "crystal-worm-child-head-paladin-v2";
 
 export const ENCOUNTER_CONFIG = {
   rulesVersion: RULES_VERSION,
   simulation: { fixedStepSeconds: 1 / 60, maxStepsPerUpdate: 8 },
-  arena: { centerTiles: { x: 0, y: 0 }, radiusTiles: 16 },
-  player: { spawnTiles: { x: 0, y: 0 }, colliderRadiusTiles: 0.25 },
+  arena: {
+    centerTiles: { x: 0, y: 0 },
+    radiusTiles: geometry.arenaRadiusTiles,
+  },
+  player: {
+    spawnTiles: { x: 0, y: 0 },
+    verticesTiles: geometry.bodies.player.verticesTiles,
+  },
   enemy: {
-    spawnTiles: { x: 0, y: -13 },
-    colliderRadiusTiles: 0.6,
+    spawnTiles: geometry.enemySpawnTiles,
+    verticesTiles: geometry.bodies.head.verticesTiles,
     speedTilesPerSecond: 1.5,
-    stopDistanceTiles: 1,
     contactDamageHp: 0,
     blocksPlayer: false,
   },
   emitters: {
     count: 4,
-    radiusTiles: 0.75,
+    radiusTiles: geometry.emitterOffsetTiles,
     initialPhaseRadians: 0,
     clockwiseDegreesPerSecond: 45,
     rotateDuringCooldown: true,
   },
   burst: {
-    shotsPerEmitter: 4,
+    shotsPerEmitter: 11,
     shotIntervalSeconds: 0.15,
-    cooldownAfterLastShotSeconds: 2,
+    cooldownAfterLastShotSeconds: 1,
     initialCooldownSeconds: 2,
   },
   shard: {
     damageHp: 160,
     speedTilesPerSecond: 8,
-    colliderRadiusTiles: 0.15,
-    reversalAgeSeconds: 1.2,
-    lifetimeSeconds: 2.4,
+    verticesTiles: geometry.bodies.shard.verticesTiles,
+    reversalAgeSeconds: geometry.reversalAgeSeconds,
+    lifetimeSeconds: geometry.lifetimeSeconds,
     expiration: "lifetime-only",
     hitPolicy: "once-per-shard",
   },
@@ -122,12 +131,8 @@ export function validateEncounterConfig(config: EncounterConfig): void {
     fixedStepSeconds: config.simulation.fixedStepSeconds,
     maxStepsPerUpdate: config.simulation.maxStepsPerUpdate,
     arenaRadiusTiles: config.arena.radiusTiles,
-    playerColliderRadiusTiles: config.player.colliderRadiusTiles,
-    enemyColliderRadiusTiles: config.enemy.colliderRadiusTiles,
     enemySpeedTilesPerSecond: config.enemy.speedTilesPerSecond,
-    enemyStopDistanceTiles: config.enemy.stopDistanceTiles,
     emitterCount: config.emitters.count,
-    emitterRadiusTiles: config.emitters.radiusTiles,
     clockwiseDegreesPerSecond: config.emitters.clockwiseDegreesPerSecond,
     shotsPerEmitter: config.burst.shotsPerEmitter,
     shotIntervalSeconds: config.burst.shotIntervalSeconds,
@@ -135,7 +140,6 @@ export function validateEncounterConfig(config: EncounterConfig): void {
     initialCooldownSeconds: config.burst.initialCooldownSeconds,
     shardDamageHp: config.shard.damageHp,
     shardSpeedTilesPerSecond: config.shard.speedTilesPerSecond,
-    shardColliderRadiusTiles: config.shard.colliderRadiusTiles,
     reversalAgeSeconds: config.shard.reversalAgeSeconds,
     lifetimeSeconds: config.shard.lifetimeSeconds,
     cssPixelsPerTile: config.camera.cssPixelsPerTile,
@@ -147,6 +151,8 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   };
   for (const [name, value] of Object.entries(positiveValues))
     assertPositive(value, name);
+  assertNonnegative(config.emitters.radiusTiles, "emitterRadiusTiles");
+  transformBodyVertices(config.shard.verticesTiles, { x: 0, y: 0 });
   for (const count of [
     config.simulation.maxStepsPerUpdate,
     config.emitters.count,
@@ -185,11 +191,12 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   validatePoint(config.arena.centerTiles);
   for (const entity of [config.player, config.enemy]) {
     validatePoint(entity.spawnTiles);
-    const distanceTiles = Math.hypot(
-      entity.spawnTiles.x - config.arena.centerTiles.x,
-      entity.spawnTiles.y - config.arena.centerTiles.y,
-    );
-    if (distanceTiles + entity.colliderRadiusTiles > config.arena.radiusTiles) {
+    if (
+      !convexBodyFitsCircle(
+        transformBodyVertices(entity.verticesTiles, entity.spawnTiles),
+        config.arena,
+      )
+    ) {
       throw new RangeError(
         "Entity collision extent must spawn inside the arena",
       );

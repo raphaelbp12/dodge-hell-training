@@ -1,4 +1,9 @@
-import { Point, Segment } from "@flatten-js/core";
+import {
+  constrainBodyToArena,
+  pursueBody,
+  sweptConvexOverlap,
+  transformBodyVertices,
+} from "./geometry";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import {
   assertNonnegative,
@@ -35,6 +40,17 @@ export type AdvanceResult = Readonly<{
 const timeRoundingToleranceSeconds =
   ENCOUNTER_CONFIG.simulation.fixedStepSeconds * Number.EPSILON * 16;
 const fullTurnRadians = 2 * Math.PI;
+const combinedBoundingRadiusTiles =
+  Math.max(
+    ...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) =>
+      Math.hypot(vertex.x, vertex.y),
+    ),
+  ) +
+  Math.max(
+    ...ENCOUNTER_CONFIG.shard.verticesTiles.map((vertex) =>
+      Math.hypot(vertex.x, vertex.y),
+    ),
+  );
 const emitterRadiansPerSecond =
   (ENCOUNTER_CONFIG.emitters.clockwiseDegreesPerSecond * Math.PI) / 180;
 const burstGroupSeconds =
@@ -66,19 +82,13 @@ export function createSimulation(): SimulationState {
 
 function constrainToArena(
   positionTiles: Vector2,
-  colliderRadiusTiles: number,
+  verticesTiles: readonly Vector2[],
 ): Vector2 {
-  const { centerTiles, radiusTiles } = ENCOUNTER_CONFIG.arena;
-  const offsetX = positionTiles.x - centerTiles.x;
-  const offsetY = positionTiles.y - centerTiles.y;
-  const distanceTiles = Math.hypot(offsetX, offsetY);
-  const centerLimitTiles = radiusTiles - colliderRadiusTiles;
-  if (distanceTiles <= centerLimitTiles) return positionTiles;
-  const scale = centerLimitTiles / distanceTiles;
-  return {
-    x: centerTiles.x + offsetX * scale,
-    y: centerTiles.y + offsetY * scale,
-  };
+  return constrainBodyToArena(
+    verticesTiles,
+    positionTiles,
+    ENCOUNTER_CONFIG.arena,
+  );
 }
 
 function updateMovement(state: SimulationState, input: SimulationInput): void {
@@ -97,47 +107,63 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
         state.player.positionTiles.y +
         (directionY / directionLength) * playerTravelTiles,
     },
-    ENCOUNTER_CONFIG.player.colliderRadiusTiles,
+    ENCOUNTER_CONFIG.player.verticesTiles,
   );
 
-  const targetX = state.player.positionTiles.x - state.enemy.positionTiles.x;
-  const targetY = state.player.positionTiles.y - state.enemy.positionTiles.y;
-  const distanceTiles = Math.hypot(targetX, targetY);
-  const { stopDistanceTiles, speedTilesPerSecond, colliderRadiusTiles } =
-    ENCOUNTER_CONFIG.enemy;
-  if (distanceTiles <= stopDistanceTiles) return;
-  const enemyTravelTiles = Math.min(
-    speedTilesPerSecond * stepSeconds,
-    distanceTiles - stopDistanceTiles,
-  );
   state.enemy.positionTiles = constrainToArena(
-    {
-      x:
-        state.enemy.positionTiles.x +
-        (targetX / distanceTiles) * enemyTravelTiles,
-      y:
-        state.enemy.positionTiles.y +
-        (targetY / distanceTiles) * enemyTravelTiles,
-    },
-    colliderRadiusTiles,
+    pursueBody(
+      ENCOUNTER_CONFIG.enemy.verticesTiles,
+      state.enemy.positionTiles,
+      ENCOUNTER_CONFIG.player.verticesTiles,
+      state.player.positionTiles,
+      ENCOUNTER_CONFIG.enemy.speedTilesPerSecond * stepSeconds,
+    ),
+    ENCOUNTER_CONFIG.enemy.verticesTiles,
   );
 }
 
-function sweptCirclesOverlap(
+function shardOverlapsPlayer(
   shardStart: Vector2,
   shardEnd: Vector2,
   playerStart: Vector2,
   playerEnd: Vector2,
+  orientationRadians: number,
 ): boolean {
-  const relativePath = new Segment(
-    new Point(shardStart.x - playerStart.x, shardStart.y - playerStart.y),
-    new Point(shardEnd.x - playerEnd.x, shardEnd.y - playerEnd.y),
-  );
-  const [distanceTiles] = relativePath.distanceTo(new Point(0, 0));
-  return (
-    distanceTiles <=
-    ENCOUNTER_CONFIG.player.colliderRadiusTiles +
-      ENCOUNTER_CONFIG.shard.colliderRadiusTiles
+  const relativeStart = {
+    x: shardStart.x - playerStart.x,
+    y: shardStart.y - playerStart.y,
+  };
+  const relativeEnd = {
+    x: shardEnd.x - playerEnd.x,
+    y: shardEnd.y - playerEnd.y,
+  };
+  const bound =
+    combinedBoundingRadiusTiles +
+    Number.EPSILON *
+      64 *
+      Math.max(
+        1,
+        Math.abs(shardStart.x),
+        Math.abs(shardStart.y),
+        Math.abs(playerStart.x),
+        Math.abs(playerStart.y),
+      );
+  if (
+    Math.min(relativeStart.x, relativeEnd.x) > bound ||
+    Math.max(relativeStart.x, relativeEnd.x) < -bound ||
+    Math.min(relativeStart.y, relativeEnd.y) > bound ||
+    Math.max(relativeStart.y, relativeEnd.y) < -bound
+  )
+    return false;
+  return sweptConvexOverlap(
+    transformBodyVertices(
+      ENCOUNTER_CONFIG.shard.verticesTiles,
+      shardStart,
+      orientationRadians,
+    ),
+    { x: shardEnd.x - shardStart.x, y: shardEnd.y - shardStart.y },
+    transformBodyVertices(ENCOUNTER_CONFIG.player.verticesTiles, playerStart),
+    { x: playerEnd.x - playerStart.x, y: playerEnd.y - playerStart.y },
   );
 }
 
@@ -165,7 +191,13 @@ function moveShard(
   };
   return (
     !shard.hasHitPlayer &&
-    sweptCirclesOverlap(shardStart, shard.positionTiles, playerStart, playerEnd)
+    shardOverlapsPlayer(
+      shardStart,
+      shard.positionTiles,
+      playerStart,
+      playerEnd,
+      shard.orientationRadians,
+    )
   );
 }
 
@@ -255,6 +287,7 @@ function updateAttacks(state: SimulationState): void {
     const directionY = Math.sin(angleRadians);
     state.shards.push({
       id: state.volleysFired * count + emitter + 1,
+      orientationRadians: angleRadians,
       positionTiles: {
         x: state.enemy.positionTiles.x + directionX * radiusTiles,
         y: state.enemy.positionTiles.y + directionY * radiusTiles,
@@ -325,11 +358,12 @@ export function advanceSimulation(
       updateAttacks(state);
       for (const shard of state.shards.slice(existingCount)) {
         if (
-          sweptCirclesOverlap(
+          shardOverlapsPlayer(
             shard.positionTiles,
             shard.positionTiles,
             state.player.positionTiles,
             state.player.positionTiles,
+            shard.orientationRadians,
           )
         )
           registerShardHit(state, shard);
