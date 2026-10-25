@@ -343,6 +343,31 @@ On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwrig
 
 With `PLAYWRIGHT_LIVE_URL` unset, build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server on port 4173 and production preview on 4174, both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. Keep both ports free: `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Default runs never navigate to external websites; hosted verification is an explicit opt-in below. Failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
 
+### Slow-Renderer Regression
+
+The browser failures in [Actions run 40217781529](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40217781529) were reproduced locally before fixing their test paths. Sixfold Chromium CPU throttling reproduced resume-time bounds failing; twelvefold throttling reproduced the five-second startup checks remaining at zero. Setting `CI=true` alone did not reproduce these failures on the local Windows machine. The original log and before-fix traces are retained locally under ignored `app/test-results/ci-40217781529-*` paths, not shipped as application assets.
+
+`PLAYWRIGHT_CPU_THROTTLE_RATE` is an opt-in Chromium test setting, not gameplay configuration. It must be a finite number at least 1 and is unset in normal runs and CI. From `app/`, after building, run the same failure paths with no retries:
+
+```powershell
+$previousCI = $env:CI
+$previousThrottle = $env:PLAYWRIGHT_CPU_THROTTLE_RATE
+try {
+	$env:CI = 'true'
+	$env:PLAYWRIGHT_CPU_THROTTLE_RATE = '6'
+	npm.cmd run test:e2e -- --grep 'live enemy debug.*1440px|death results.*1440px|focus loss freezes|Controls isolates|real hit feedback.*1440px|production assets.*1440px' --retries=0 --output=test-results/slow-renderer
+	$env:PLAYWRIGHT_CPU_THROTTLE_RATE = '12'
+	npm.cmd run test:e2e -- --grep 'real hit feedback.*1440px|production assets.*1440px' --retries=0 --output=test-results/slow-startup
+} finally {
+	$env:CI = $previousCI
+	$env:PLAYWRIGHT_CPU_THROTTLE_RATE = $previousThrottle
+}
+```
+
+The tests now advance normal browser animation frames through countdown and exact pause/Retry/feedback sampling points. They use `clock.runFor`, not frame-skipping `fastForward`: Phaser's frame smoother clamps large gaps during its startup cooldown, so one skipped-frame callback does not represent the requested game time. Controlled-time polls do not idle in wall time between advances. Gameplay code, normal timing values and assertion deadlines are unchanged. Each feedback viewport/zoom combination has an isolated context and the same 30-second limit; the suite now contains 33 browser cases. The debug-close check explicitly pauses before Resume rather than racing a layout-driven frame. Other runtime/soak checks continue in real time after countdown.
+
+Local verification on 2026-10-25 passed 323 unit/component tests, typecheck, lint, build and all 33 browser cases with `CI=true` and retries disabled. All ten originally failing/flaky paths passed together at sixfold CPU throttling with no retries. The desktop production case and all three desktop feedback zoom cases also passed twelvefold throttling in separate focused runs. These are local Windows results; no replacement Actions run or deployment has been verified. The test fix and these reproduction notes are not yet committed or pushed.
+
 ## Hosted Release Verification
 
 The command below now exercises current v2 production-safe Controls, pause, persisted rendered zoom, bar/numbers/lethal feedback, mute and real versioned death records. Current v2 run/deployment identity and outcome are recorded in step 14.3 of the active plan. The dated step 7.2 hosted outcomes/acceptance below are historical v1 only.

@@ -2,6 +2,19 @@ import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 import type { SessionSnapshot, Vector2 } from "../src/game/models.ts";
 
+const controlledFrameMilliseconds = 250;
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.install();
+  const throttle = process.env.PLAYWRIGHT_CPU_THROTTLE_RATE;
+  if (!throttle) return;
+  const rate = Number(throttle);
+  if (!Number.isFinite(rate) || rate < 1)
+    throw new Error("PLAYWRIGHT_CPU_THROTTLE_RATE must be a number >= 1");
+  const session = await page.context().newCDPSession(page);
+  await session.send("Emulation.setCPUThrottlingRate", { rate });
+});
+
 type Inspection = SessionSnapshot & {
   debugSettings: Record<string, number | boolean>;
   volleysFired: number;
@@ -47,9 +60,26 @@ async function inspect(page: Page): Promise<Inspection> {
   });
 }
 
-async function launch(page: Page) {
+async function finishCountdown(page: Page, resumeClock = true) {
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
+  const status = page.getByLabel("Session status");
+  for (
+    let step = 0;
+    step < 40 &&
+    (await page.getByLabel("Survival time").textContent()) === "0.0 s";
+    step++
+  )
+    await page.clock.runFor(100);
+  await page.clock.runFor(100);
+  await expect(status).toHaveText("Active");
+  await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
+  if (resumeClock) await page.clock.resume();
+}
+
+async function launch(page: Page, resumeClock = true) {
   await page.goto("./");
   await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, resumeClock);
   await expect
     .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
     .toBeGreaterThan(0);
@@ -155,6 +185,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
     await page.getByRole("checkbox", { name: "Chase arena center" }).check();
     await page.getByRole("button", { name: "Start", exact: true }).click();
+    await finishCountdown(page);
     await expect
       .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
       .toBeGreaterThan(0);
@@ -304,18 +335,25 @@ for (const width of [1440, 390]) {
     expect((await inspect(page)).rulesVersion).toBe(
       "crystal-worm-child-head-paladin-v2",
     );
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page
       .getByRole("button", { name: "Close debug", exact: true })
       .click();
     await expect(
       page.getByRole("button", { name: "Debug", exact: true }),
     ).toBeFocused();
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await expect(
+      page.getByRole("button", { name: "Resume", exact: true }),
+    ).toBeEnabled();
     await page.keyboard.down("w");
+    await page.getByRole("button", { name: "Resume", exact: true }).click();
     await page.getByRole("region", { name: "Encounter", exact: true }).click();
     const refocused = await inspect(page);
-    await expect
-      .poll(async () => (await inspect(page)).elapsedSeconds)
-      .toBeGreaterThan(refocused.elapsedSeconds + 0.25);
+    await page.clock.runFor(300);
+    expect((await inspect(page)).elapsedSeconds).toBeGreaterThan(
+      refocused.elapsedSeconds + 0.25,
+    );
     expect((await inspect(page)).player.positionTiles).toEqual(
       refocused.player.positionTiles,
     );
@@ -440,7 +478,7 @@ for (const width of [1440, 390]) {
     await expect(page.locator("canvas")).toHaveCount(1);
     await expect(page.getByLabel("Session status")).toHaveText("Starting");
     await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
-    await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
+    await finishCountdown(page, false);
     const beforeControls = await renderedPixels(page);
     await page.getByRole("button", { name: "Controls", exact: true }).click();
     await expect(page.getByLabel("Session status")).toHaveText("Paused");
@@ -461,7 +499,13 @@ for (const width of [1440, 390]) {
       await page.keyboard.press("o");
       await page.keyboard.press("o");
       await expect
-        .poll(async () => (await renderedPixels(page)).enemy)
+        .poll(
+          async () => {
+            await page.clock.runFor(controlledFrameMilliseconds);
+            return (await renderedPixels(page)).enemy;
+          },
+          { intervals: [0] },
+        )
         .toBeGreaterThan(10);
       for (const [key, axis, direction] of [
         ["w", "enemyY", 1],
@@ -474,12 +518,16 @@ for (const width of [1440, 390]) {
         await page.keyboard.down(key);
         try {
           await expect
-            .poll(async () => {
-              const position = (await renderedPixels(page))[axis];
-              return position === null
-                ? 0
-                : (position - before[axis]!) * direction;
-            })
+            .poll(
+              async () => {
+                await page.clock.runFor(controlledFrameMilliseconds);
+                const position = (await renderedPixels(page))[axis];
+                return position === null
+                  ? 0
+                  : (position - before[axis]!) * direction;
+              },
+              { intervals: [0] },
+            )
             .toBeGreaterThan(8);
         } finally {
           await page.keyboard.up(key);
@@ -488,12 +536,24 @@ for (const width of [1440, 390]) {
       const beforeZoom = await renderedPixels(page);
       await page.keyboard.press("p");
       await expect
-        .poll(async () => (await renderedPixels(page)).player)
+        .poll(
+          async () => {
+            await page.clock.runFor(controlledFrameMilliseconds);
+            return (await renderedPixels(page)).player;
+          },
+          { intervals: [0] },
+        )
         .toBeGreaterThan(beforeZoom.player);
       const zoomed = await renderedPixels(page);
       await page.keyboard.press("o");
       await expect
-        .poll(async () => (await renderedPixels(page)).player)
+        .poll(
+          async () => {
+            await page.clock.runFor(controlledFrameMilliseconds);
+            return (await renderedPixels(page)).player;
+          },
+          { intervals: [0] },
+        )
         .toBeLessThan(zoomed.player);
     } else {
       await page.keyboard.press("o");
@@ -502,7 +562,7 @@ for (const width of [1440, 390]) {
     await page.keyboard.press("Escape");
     await expect(page.getByLabel("Session status")).toHaveText("Paused");
     const pausedTime = await page.getByLabel("Survival time").textContent();
-    await page.waitForTimeout(200);
+    await page.clock.runFor(200);
     await expect(page.getByLabel("Survival time")).toHaveText(pausedTime!);
     await page.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(page.getByLabel("Session status")).toHaveText("Active");
@@ -515,6 +575,7 @@ for (const width of [1440, 390]) {
     await expect
       .poll(
         async () => {
+          await page.clock.runFor(controlledFrameMilliseconds);
           const snapshot = await renderedPixels(page);
           return (
             snapshot.survivalSeconds >= 1 &&
@@ -522,11 +583,17 @@ for (const width of [1440, 390]) {
             snapshot.shards === 0
           );
         },
-        { intervals: [50] },
+        { intervals: [0] },
       )
       .toBe(true);
     await expect
-      .poll(async () => (await renderedPixels(page)).shards, { timeout: 6000 })
+      .poll(
+        async () => {
+          await page.clock.runFor(controlledFrameMilliseconds);
+          return (await renderedPixels(page)).shards;
+        },
+        { timeout: 6000, intervals: [0] },
+      )
       .toBeGreaterThan(5);
     const pixels = await renderedPixels(page);
     expect(pixels.player).toBeGreaterThan(10);
@@ -548,13 +615,15 @@ for (const width of [1440, 390]) {
     });
     await expect
       .poll(
-        async () =>
-          Number(
+        async () => {
+          await page.clock.runFor(controlledFrameMilliseconds);
+          return Number(
             await page
               .getByRole("meter", { name: "Health" })
               .getAttribute("value"),
-          ),
-        { timeout: 15000 },
+          );
+        },
+        { timeout: 15000, intervals: [0] },
       )
       .toBeLessThan(775);
     await expect
@@ -572,7 +641,15 @@ for (const width of [1440, 390]) {
     const results = page.getByRole("region", { name: "Attempt complete" });
     const completed = [];
     for (let attempt = 1; attempt <= 2; attempt++) {
-      await expect(results).toBeVisible({ timeout: 70000 });
+      await expect
+        .poll(
+          async () => {
+            await page.clock.runFor(controlledFrameMilliseconds);
+            return results.isVisible();
+          },
+          { timeout: 70000, intervals: [0] },
+        )
+        .toBe(true);
       await expect(
         results.getByRole("group", { name: "Final hit amounts" }),
       ).toContainText("-128");
@@ -660,7 +737,7 @@ for (const width of [1440, 390]) {
     });
     await page.getByRole("button", { name: "Start", exact: true }).click();
     await expect(page.getByLabel("Session status")).toHaveText("Starting");
-    await expect(page.getByLabel("Session status")).toHaveText("Active");
+    await finishCountdown(page, false);
     const restoredPixels = await renderedPixels(page);
     expect(Math.abs(restoredPixels.player - pixels.player)).toBeLessThan(
       pixels.player * 0.1 + 4,
@@ -1339,16 +1416,16 @@ test("focus loss freezes simulation until explicit resume and clears held input"
   await expect(
     page.getByRole("button", { name: "Resume", exact: true }),
   ).toBeVisible();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   const paused = await inspect(page);
   await page.keyboard.up("d");
   await page.keyboard.press("p");
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await inspect(page)).toEqual(paused);
   await page.getByRole("button", { name: "Resume", exact: true }).click();
-  await expect
-    .poll(async () => (await inspect(page)).elapsedSeconds)
-    .toBeGreaterThan(paused.elapsedSeconds);
+  await page.clock.runFor(100);
   const resumed = await inspect(page);
+  expect(resumed.elapsedSeconds).toBeGreaterThan(paused.elapsedSeconds);
   expect(resumed.player.positionTiles).toEqual(paused.player.positionTiles);
   expect(resumed.zoom).toBe(paused.zoom);
   expect(resumed.elapsedSeconds - paused.elapsedSeconds).toBeLessThan(0.2);
@@ -1373,7 +1450,7 @@ test("focus loss freezes simulation until explicit resume and clears held input"
     page.getByRole("button", { name: "Resume", exact: true }),
   ).toBeVisible();
   const hidden = await inspect(page);
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   await page.evaluate(() => {
     Object.defineProperty(document, "hidden", {
       configurable: true,
@@ -1384,9 +1461,10 @@ test("focus loss freezes simulation until explicit resume and clears held input"
   expect((await inspect(page)).elapsedSeconds).toBe(hidden.elapsedSeconds);
   expect((await inspect(page)).paused).toBe(true);
   await page.getByRole("button", { name: "Resume", exact: true }).click();
-  await expect
-    .poll(async () => (await inspect(page)).elapsedSeconds)
-    .toBeGreaterThan(hidden.elapsedSeconds);
+  await page.clock.runFor(100);
+  expect((await inspect(page)).elapsedSeconds).toBeGreaterThan(
+    hidden.elapsedSeconds,
+  );
 });
 
 test("real Phaser ticks pursue, fire, reverse, register hits and reduce health", async ({
@@ -1506,10 +1584,11 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
     const opener = page.getByRole("button", { name: "Controls", exact: true });
     await opener.click();
     await expect(page.getByRole("dialog", { name: "Controls" })).toBeVisible();
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     const frozen = await inspect(page);
     for (const key of ["a", "s", "d", "r", "o", "p"])
       await page.keyboard.press(key);
-    await page.waitForTimeout(250);
+    await page.clock.runFor(250);
     const unchanged = (state: Inspection) => ({
       player: state.player,
       enemy: state.enemy,
@@ -1524,11 +1603,11 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(opener).toBeFocused();
     await expect(page.getByLabel("Paused overlay")).toBeVisible();
-    await page.waitForTimeout(200);
+    await page.clock.runFor(200);
     expect((await inspect(page)).sessionPhase).toBe("paused");
     expect(unchanged(await inspect(page))).toEqual(unchanged(frozen));
     await page.getByRole("button", { name: "Resume", exact: true }).click();
-    await page.waitForTimeout(200);
+    await page.clock.runFor(200);
     const resumed = await inspect(page);
     expect(resumed.player.positionTiles).toEqual(frozen.player.positionTiles);
     expect(resumed.attemptId).toBe(frozen.attemptId);
@@ -1627,12 +1706,12 @@ test("resize preserves zoom, movement speed, camera center and the simulation at
 });
 
 for (const width of [1440, 390]) {
-  test(`real hit feedback stays readable at all zoom levels at ${width}px`, async ({
-    page,
-  }, testInfo) => {
-    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
-    await launch(page);
-    for (const zoom of [0.25, 1, 3]) {
+  for (const zoom of [0.25, 1, 3]) {
+    test(`real hit feedback stays readable at ${zoom}x zoom at ${width}px`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+      await launch(page, false);
       const current = (await inspect(page)).zoom;
       for (
         let press = 0;
@@ -1642,10 +1721,13 @@ for (const width of [1440, 390]) {
         await page.keyboard.press(zoom < current ? "o" : "p");
       await retrySnapshot(page);
       await expect
-        .poll(async () => (await inspect(page)).hitNumbers.length, {
-          timeout: 10000,
-          intervals: [50],
-        })
+        .poll(
+          async () => {
+            await page.clock.runFor(controlledFrameMilliseconds);
+            return (await inspect(page)).hitNumbers.length;
+          },
+          { timeout: 10000, intervals: [0] },
+        )
         .toBeGreaterThan(0);
       await page.keyboard.press("Escape");
       const state = await inspect(page);
@@ -1668,8 +1750,8 @@ for (const width of [1440, 390]) {
         })
         .toBeGreaterThan(5);
       await page.getByRole("button", { name: "Resume", exact: true }).click();
-    }
-  });
+    });
+  }
 }
 
 for (const viewport of [
