@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
-import type { Vector2 } from "../models";
+import type { AcceptedHit, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
 
 export type EncounterView = {
@@ -13,6 +13,7 @@ export type EncounterView = {
   countdownRemainingSeconds: number;
   zoom: number;
   result: AttemptResult | null;
+  finalHitAmounts?: readonly number[];
 };
 
 export type EncounterHandle = {
@@ -40,6 +41,18 @@ const presentation = {
   enemyCore: 0x86ded9,
   shard: 0xffdf69,
   spentShard: 0xc9a948,
+  hitNumbers: {
+    lifetimeSeconds: 0.9,
+    riseCssPixels: 28,
+    gapCssPixels: 12,
+    laneWidthCssPixels: 54,
+    lanes: 7,
+    fontSizeCssPixels: 18,
+    maxVisible: 16,
+    color: "#ff8fa3",
+    stroke: "#101b1b",
+    strokeCssPixels: 3,
+  },
   healthBar: {
     widthCssPixels: 48,
     heightCssPixels: 6,
@@ -62,6 +75,8 @@ class EncounterScene extends Phaser.Scene {
   private bodies!: Phaser.GameObjects.Graphics;
   private projectiles!: Phaser.GameObjects.Graphics;
   private healthBar!: Phaser.GameObjects.Graphics;
+  private hitNumbers: { hit: AcceptedHit; ageSeconds: number; text: Phaser.GameObjects.Text }[] = [];
+  private finalHitAmounts: number[] = [];
   private keys!: Record<
     "north" | "south" | "east" | "west",
     Phaser.Input.Keyboard.Key
@@ -211,6 +226,8 @@ class EncounterScene extends Phaser.Scene {
 
   retry(): void {
     if (this.disposed || document.hidden || !this.session.retry()) return;
+    this.clearHitNumbers();
+    this.finalHitAmounts = [];
     this.clearMovement();
     this.hudRemainingMilliseconds = 0;
     this.host.focus({ preventScroll: true });
@@ -234,6 +251,8 @@ class EncounterScene extends Phaser.Scene {
       return;
     }
     const previousPhase = this.session.phase;
+    const previousSeconds = this.state.elapsedSeconds;
+    const currentHits: AcceptedHit[] = [];
     const result = this.session.advance(
       delta / presentation.millisecondsPerSecond,
       {
@@ -242,7 +261,16 @@ class EncounterScene extends Phaser.Scene {
         east: this.keys.east.isDown && !this.suppressedMovement.has("KeyD"),
         west: this.keys.west.isDown && !this.suppressedMovement.has("KeyA"),
       },
+      (hit) => { currentHits.push(hit); this.addHitNumber(hit); },
     );
+    if (result) this.finalHitAmounts = currentHits.map((hit) => hit.damageHp);
+    const activeSeconds = this.state.elapsedSeconds - previousSeconds;
+    this.hitNumbers = this.hitNumbers.filter((number) => {
+      number.ageSeconds += activeSeconds;
+      if (number.ageSeconds < presentation.hitNumbers.lifetimeSeconds) return true;
+      number.text.destroy();
+      return false;
+    });
     this.drawEntities();
     this.centerCamera();
     this.hudRemainingMilliseconds -= delta;
@@ -271,6 +299,7 @@ class EncounterScene extends Phaser.Scene {
       countdownRemainingSeconds: this.session.countdownRemainingSeconds,
       zoom: this.zoom,
       result: this.session.result,
+      finalHitAmounts: this.finalHitAmounts,
     });
   }
 
@@ -312,6 +341,21 @@ class EncounterScene extends Phaser.Scene {
     this.ground
       .lineStyle(3, presentation.boundary)
       .strokeCircle(centerX, centerY, radius);
+  }
+
+  private addHitNumber(hit: AcceptedHit): void {
+    const policy = presentation.hitNumbers;
+    while (this.hitNumbers.length >= policy.maxVisible) this.hitNumbers.shift()!.text.destroy();
+    const text = this.add.text(0, 0, `-${hit.damageHp}`, {
+      fontFamily: "Consolas, monospace", fontSize: `${policy.fontSizeCssPixels}px`,
+      color: policy.color, stroke: policy.stroke, strokeThickness: policy.strokeCssPixels,
+    }).setOrigin(0.5, 1).setDepth(4);
+    this.hitNumbers.push({ hit, ageSeconds: 0, text });
+  }
+
+  private clearHitNumbers(): void {
+    for (const number of this.hitNumbers) number.text.destroy();
+    this.hitNumbers = [];
   }
 
   private drawEntities(): void {
@@ -366,6 +410,14 @@ class EncounterScene extends Phaser.Scene {
       .fillStyle(bar.border).fillRect(left - border, top - border, width + border * 2, height + border * 2)
       .fillStyle(bar.empty).fillRect(left, top, width, height)
       .fillStyle(bar.fill).fillRect(left, top, width * player.healthHp / PALADIN_STATS.healthHp, height);
+    const policy = presentation.hitNumbers;
+    for (const number of this.hitNumbers) {
+      const lane = number.hit.shardId % policy.lanes - (policy.lanes - 1) / 2;
+      number.text.setScale(1 / this.zoom).setPosition(
+        number.hit.positionTiles.x * pixelsPerTile + lane * policy.laneWidthCssPixels / this.zoom,
+        (number.hit.positionTiles.y - bottom) * pixelsPerTile - (policy.gapCssPixels + policy.riseCssPixels * number.ageSeconds / policy.lifetimeSeconds) / this.zoom,
+      );
+    }
   }
 
   inspect() {
@@ -383,12 +435,14 @@ class EncounterScene extends Phaser.Scene {
       },
       viewport: { width: this.scale.width, height: this.scale.height },
       keydownListeners: this.input.keyboard?.listenerCount("keydown"),
+      hitNumbers: this.hitNumbers.map((number) => ({ shardId: number.hit.shardId, damageHp: number.hit.damageHp, ageSeconds: number.ageSeconds, text: number.text.text })),
     };
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.clearHitNumbers();
     this.session.home();
     this.input?.keyboard?.resetKeys();
     this.input?.keyboard?.off("keydown", this.onKeyDown);

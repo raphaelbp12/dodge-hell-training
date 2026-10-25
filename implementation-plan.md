@@ -352,7 +352,7 @@ Extend existing Phaser drawing with a below-player bar from authoritative HP/max
 
 ### Step 12.3 - Render Individual Floating Hit Amounts
 
-Status: pending. Dependencies: 12.2.
+Status: complete. Dependencies: 12.2.
 
 **Implementation prompt**
 
@@ -361,6 +361,14 @@ Consume accepted-hit output in the runtime for one post-defense number per hit, 
 **Focused checks:** exact amounts, independent numbers, no regeneration/spent-return false events, resource bound/cleanup, visible lethal feedback, pause and no stale Retry/Home effects; unchanged health/time/records.
 
 **Acceptance:** approved numbers are observable once including at death without delaying results; all five gates and desktop/narrow review pass. Audio is not implemented yet.
+
+**Execution and verification - 2026-10-25**
+
+- Step 12.2 remote verified at `48ed6ca19440a2e3e6e93d1eb14b66943a8ed101`. Runtime consumes each accepted-hit callback, creates an individual Phaser text and ages it only by actual advanced simulation seconds. Paused/ended state freezes effects; Retry/Home destroys all owned texts. No HUD/HP-delta inference, gameplay change, second clock or persistent event log.
+- Delegated presentation: 18 px Consolas text, pink `#ff8fa3`/3 px dark stroke, 0.9 active-second life, 28 CSS px rise, 12 px gap above physical body, seven 54 px lanes based on shard identity, cap 16 active text objects (oldest evicted if saturated). Text dimensions/offsets stay screen-sized at all camera scales. Accepted-hit data is never truncated or merged.
+- Explicit lethal treatment: immediate results are unchanged and never delayed. Only final-advance amounts pass through the existing result view into an individually rendered accessible Final hit amounts group, remaining visible until Retry/Home; no extra timer. This prevents the results panel from hiding the only lethal feedback. These are delegated technical presentation choices, not a fresh human visual approval.
+- TDD: final-results React test failed missing group, then all 13 React cases passed. Real Phaser test verifies exact -128 text, individual hit data, frozen paused age and empty Retry state; its first historical-hit sampling assertion was repaired to observe a live effect, not cumulative history. Production-safe desktop/narrow pixels prove floating text and final groups during real damage/death. Reviewed narrow active feedback and desktop lethal results captures; amounts are readable and separated.
+- All five gates passed: 286 unit/component tests, typecheck, lint, build and 20 Chromium cases. Sustained run asserts <=16 effects as well as <=88 shards, one canvas/listener and 25 reset cleanups. Existing chunk warning unchanged. No audio or hosted verification yet.
 
 ### Step 12.4 - Add Quiet Hit Audio And Mute
 

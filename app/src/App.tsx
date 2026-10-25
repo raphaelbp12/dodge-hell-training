@@ -190,6 +190,9 @@ function Encounter({
             <h2 id="result-title" ref={resultHeading} tabIndex={-1}>
               Attempt complete
             </h2>
+            {!!view.finalHitAmounts?.length && <div role="group" aria-label="Final hit amounts" className={styles.finalHits}>
+              {view.finalHitAmounts.map((amount, index) => <span key={index}>-{amount}</span>)}
+            </div>}
             <dl>
               <div>
                 <dt>Survival time</dt>

@@ -248,6 +248,14 @@ const completedResult: AttemptResult = {
   outcome: "death",
 };
 
+test("lethal feedback remains individually observable in immediate results", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  act(() => adapter.publish!({ ...runningView, status: "ended", healthHp: 0, result: completedResult, finalHitAmounts: [128, 128] }));
+  expect(within(screen.getByRole("group", { name: "Final hit amounts" })).getAllByText("-128")).toHaveLength(2);
+});
+
 test("completed attempts save once despite duplicate callbacks, survive remount, and exclude aborted retries", async () => {
   const user = userEvent.setup();
   const mounted = render(

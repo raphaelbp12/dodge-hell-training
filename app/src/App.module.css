@@ -157,6 +157,14 @@
   outline: 2px solid #299774;
   outline-offset: 4px;
 }
+.finalHits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: #b3314b;
+  margin: -8px 0 16px;
+  font: 600 18px Consolas, monospace;
+}
 .results dl {
   margin: 0 0 24px;
 }

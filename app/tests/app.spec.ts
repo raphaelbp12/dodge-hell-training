@@ -19,6 +19,7 @@ type Inspection = SessionSnapshot & {
   camera: Vector2;
   viewport: { width: number; height: number };
   keydownListeners: number;
+  hitNumbers: { shardId: number; damageHp: number; ageSeconds: number; text: string }[];
 };
 
 async function inspect(page: Page): Promise<Inspection> {
@@ -56,7 +57,7 @@ async function renderedPixels(page: Page) {
     const context = copy.getContext("2d")!;
     context.drawImage(canvas, 0, 0);
     const data = context.getImageData(0, 0, copy.width, copy.height).data;
-    const counts = { player: 0, enemy: 0, shards: 0, ground: 0, healthBar: 0, missingHealth: 0 };
+    const counts = { player: 0, enemy: 0, shards: 0, ground: 0, healthBar: 0, missingHealth: 0, hitText: 0 };
     let enemyX = 0;
     let enemyY = 0;
     for (let offset = 0; offset < data.length; offset += 4) {
@@ -73,6 +74,7 @@ async function renderedPixels(page: Page) {
       if (red === 28 && green === 48 && blue === 42) counts.ground++;
       if (red === 85 && green === 214 && blue === 160) counts.healthBar++;
       if (red === 89 && green === 46 && blue === 57) counts.missingHealth++;
+      if (red > 245 && green > 130 && green < 150 && blue > 150 && blue < 180) counts.hitText++;
     }
     return {
       ...counts,
@@ -282,10 +284,13 @@ for (const width of [1440, 390]) {
       )
       .toBeLessThan(775);
     await expect.poll(async () => (await renderedPixels(page)).missingHealth).toBeGreaterThan(5);
+    await expect.poll(async () => (await renderedPixels(page)).hitText, { intervals: [50] }).toBeGreaterThan(5);
+    await page.screenshot({ path: testInfo.outputPath(`release-feedback-${width}.png`), fullPage: true });
     const results = page.getByRole("region", { name: "Attempt complete" });
     const completed = [];
     for (let attempt = 1; attempt <= 2; attempt++) {
       await expect(results).toBeVisible({ timeout: 70000 });
+      await expect(results.getByRole("group", { name: "Final hit amounts" })).toContainText("-128");
       await expect(page.getByRole("meter", { name: "Health" })).toHaveAttribute(
         "value",
         "0",
@@ -852,6 +857,7 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
   while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
     let state = await inspect(page);
     peakShards = Math.max(peakShards, state.shards.length);
+    expect(state.hitNumbers.length).toBeLessThanOrEqual(16);
     expect(state.shards.length).toBeLessThanOrEqual(
       4 * 11 * Math.ceil(4.4416089428614765 / 2.5),
     );
@@ -1102,14 +1108,22 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
     )
     .toBe(true);
   await expect
-    .poll(async () => (await inspect(page)).hitsTaken, { timeout: 4000 })
+    .poll(async () => (await inspect(page)).hitNumbers.length, { timeout: 4000, intervals: [50] })
     .toBeGreaterThan(0);
   const hit = await inspect(page);
+  expect(hit.hitsTaken).toBeGreaterThan(0);
   expect(hit.player.healthHp).toBeLessThan(775);
+  expect(hit.hitNumbers.length).toBeGreaterThan(0);
+  expect(hit.hitNumbers.every((number) => number.damageHp === 128 && number.text === "-128")).toBe(true);
   expect(hit.shards.some((shard) => shard.hasHitPlayer)).toBe(true);
   expect(
     hit.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
   ).toBe(true);
+  await page.keyboard.press("Escape");
+  const frozen = (await inspect(page)).hitNumbers;
+  await page.waitForTimeout(250);
+  expect((await inspect(page)).hitNumbers).toEqual(frozen);
+  expect((await retrySnapshot(page)).hitNumbers).toEqual([]);
 });
 
 test("captures only unmodified gameplay keys while focused and removes capture on close", async ({
