@@ -269,14 +269,14 @@ Known limitations, not implementation blockers: published stat averages do not e
 
 Reviewed on 2026-10-24. Technical checks passed; the user subsequently accepted the current implementation as recorded below. When initially asked about acceptance/tuning and test budgets, the user delegated autonomous decisions for later review. The agent selected five simulated minutes at each of 30/60/120 Hz, 60 seconds of browser play, and 25 consecutive retries, leaving all tuning unchanged. That initial delegation alone was not treated as personal playtesting or training-feel acceptance.
 
-| Aspect | Implementation compared with available evidence | Review outcome |
-| ------ | ---------------------------------------------- | -------------- |
-| Player speed | 41 SPD yields approximately 7.061333 tiles/second using recorded S3 formula | Formula matches contract; browser movement/resize/zoom checks pass, not an independent client comparison |
-| Camera | Player-centered, north-up, 32 CSS pixels/tile at zoom 1; 0.75-1.5 zoom | User-approved provisional trainer scale and restricted rotation; S12 does not establish numeric scale |
-| Rotation and cadence | Clockwise 45 degrees/second; four emitters with four shots at 0.15-second intervals; 2-second initial/after-last-shot cooldown | Matches user-defined provisional contract; S1's spiralling prose does not verify direction, angular speed, or exact cadence |
-| Shard return | Speed 8, reversal at 1.2 seconds, lifetime 2.4 seconds, no stored origin/homing | S1 reread confirms 160/8/19.2 and boomerang label; total-path interpretation and exact reversal/lifetime remain provisional |
-| Damage and recovery | 128 HP after 32 DEF; combat trigger 27 HP for 5.32 seconds; regeneration 12.1094/6.0547 HP per second | Matches recorded S3/S9 formulas and delegated brackets, rounding, integration, and ordering; client tick fidelity remains unknown |
-| Encounter scope | Slow pursuit, circular arena, approximate circles, no contact damage, attacks, active seal, or other worm segments | Intentional trainer scope; S1 describes irregular movement after only the head remains |
+| Aspect               | Implementation compared with available evidence                                                                                | Review outcome                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Player speed         | 41 SPD yields approximately 7.061333 tiles/second using recorded S3 formula                                                    | Formula matches contract; browser movement/resize/zoom checks pass, not an independent client comparison                          |
+| Camera               | Player-centered, north-up, 32 CSS pixels/tile at zoom 1; 0.75-1.5 zoom                                                         | User-approved provisional trainer scale and restricted rotation; S12 does not establish numeric scale                             |
+| Rotation and cadence | Clockwise 45 degrees/second; four emitters with four shots at 0.15-second intervals; 2-second initial/after-last-shot cooldown | Matches user-defined provisional contract; S1's spiralling prose does not verify direction, angular speed, or exact cadence       |
+| Shard return         | Speed 8, reversal at 1.2 seconds, lifetime 2.4 seconds, no stored origin/homing                                                | S1 reread confirms 160/8/19.2 and boomerang label; total-path interpretation and exact reversal/lifetime remain provisional       |
+| Damage and recovery  | 128 HP after 32 DEF; combat trigger 27 HP for 5.32 seconds; regeneration 12.1094/6.0547 HP per second                          | Matches recorded S3/S9 formulas and delegated brackets, rounding, integration, and ordering; client tick fidelity remains unknown |
+| Encounter scope      | Slow pursuit, circular arena, approximate circles, no contact damage, attacks, active seal, or other worm segments             | Intentional trainer scope; S1 describes irregular movement after only the head remains                                            |
 
 S1 was readable again and still labels its update Aug 2019. The review does not independently verify the current ROTMG client. No stronger numeric evidence was established for authentic camera scale, hitboxes, rotation/cadence, or range semantics, so no replacement tuning was inferred.
 
@@ -285,3 +285,162 @@ The five-minute schedule test executes 18,000 ticks and 488 volleys (1,952 uniqu
 The final full-suite soak recorded 59.9833 simulated seconds, no deaths, 16 peak shards, and 219 progressing samples during its 60-second budget. Its test-only animation-frame observer measured 3,601 frames, approximately 16.7 ms median/p95 and 16.8 ms maximum gap. These are one-machine headless Chromium observations, not guaranteed FPS or a heap/leak analysis. Separate browser tests cover real deaths, results, persistence/reload, and retry. All 194 unit tests, typecheck, lint, build, and 18 Chromium checks passed. Generated metrics/screenshots stay ignored under `app/test-results/`; the known large Phaser bundle warning remains.
 
 **User acceptance recorded on 2026-10-24:** "let's approve for now what we have. I will make the adjustments later, after our full plan is implemented". Together with the recorded passing technical checks, this completes step 6.1. Current tuning is accepted for now; adjustment notes are deferred until after the full plan. Known trainer approximations remain provisional fidelity choices, not verified current-client behavior, and no independently observed user playtest is claimed. Rules version remains `crystal-worm-child-head-paladin-v1`; future approved comparison-breaking changes require a new version and corresponding tests. This acceptance does not automatically start deployment work.
+
+## Approved V2 Contract - Step 8.1
+
+Recorded 2026-10-25. This additive section defines the approved follow-up target, not implemented gameplay. It supersedes conflicting v1 tuning above only when the coordinated encounter is activated in step 10.1. Until then, the runtime remains `crystal-worm-child-head-paladin-v1`; all preceding source history, approvals and release evidence remain historical v1 records.
+
+Authority: [the fixes decision record](fixes-plan.md#4-one-batch-decision-table) supplies Q01-Q20; [the follow-up answers](fixes-plan.md#77-follow-up-decisions-recorded---2026-10-25) supply R01-R05; [the selected calibration](fixes-plan.md#78-selected-leading-edge-calibration) supplies nominal measurements and their uncertainty. The [active implementation plan](../implementation-plan.md#phase-8-revised-contract-and-geometry-approval) owns execution status and remaining review gates. These are user-defined provisional trainer decisions, not new independent verification of ROTMG or permission to implement later steps.
+
+### Decision Coverage And Provenance
+
+| Approval  | Binding v2 decision and remaining precision                                                                                                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q01       | Player, head and shard reference identities are confirmed; the head remains partly occluded.                                                                                                                                                                                         |
+| Q02       | Derive approximate proportions from colored body measurements, not crop windows or forced equal sizes.                                                                                                                                                                               |
+| Q03       | Use original simple art/code-generated shapes, not copied sprites. Source screenshot/crops remain local-only, ignored reference material outside runtime assets.                                                                                                                     |
+| Q04       | Four emitters, eleven shots each: forty-four shards per group.                                                                                                                                                                                                                       |
+| Q05       | Wait one second after the eleventh shot before the next group's first shot.                                                                                                                                                                                                          |
+| Q06       | Keep 0.15-second shot spacing, clockwise 45 degrees/second rotation and two-second initial firing cooldown. Rotation continues during cooldown; phases remain 90 degrees apart.                                                                                                      |
+| Q07 / R02 | Near-center offset is 10% of calibrated head width. Zero is a valid configuration input, not the selected offset; negative/nonfinite values are invalid.                                                                                                                             |
+| Q08 / R01 | Treat the selected lower-left outer shard as maximum reach for this calibration: 19.2 tiles from head simulation center to the body's farthest leading edge, including emitter offset. This is not center travel or total path. Speed remains 8 tiles/second, not 19.2 tiles/second. |
+| Q09       | At reversal the shard body only touches the 19.2-tile arena circle with a stationary head at arena center. Off-axis vertices count; a bounding circle is not proof of exact contact.                                                                                                 |
+| Q10 / R03 | Player starts at center; enemy starts north with a three-tile center-to-wall margin, subject to actual polygon fit. Derive pursuit stopping separation from silhouettes; an extra nonzero gap is not approved.                                                                       |
+| Q11       | Use one original convex physical silhouette with 3-8 ordered vertices per body, shared by rendering and collision with the same anchor, dimensions and transform. No hidden small-circle final hit test.                                                                             |
+| Q12 / R04 | Persist O/P zoom independently of history: minimum 0.25, maximum 3.0, default 1, step 0.125. Preserve 32 CSS pixels/tile at zoom 1 independently of source-image scale and device pixel ratio.                                                                                       |
+| Q13       | Always-visible Phaser health bar below the character, using authoritative HP/max HP; retain the React HUD.                                                                                                                                                                           |
+| Q14       | Display the post-defense amount separately for each accepted hit, not a health-delta estimate that mixes hits, regeneration and lethal clamping. Existing damage arithmetic is unchanged.                                                                                            |
+| Q15       | Separate floating hit numbers/cues with bounded mixing; lethal feedback is visible without delaying results. Effect duration, placement and numeric limits still need review.                                                                                                        |
+| Q16 / R05 | Quiet original synthesized hit cue with visible user-controlled mute. Numeric gain/voice cap require audible review; persisted mute is optional, not a mandatory saved preference.                                                                                                   |
+| Q17       | Controls access on both Home and gameplay HUD; no new custom shortcut or rebinding.                                                                                                                                                                                                  |
+| Q18       | Accessible Controls dialog; after session closure require explicit Resume and show centered Paused text. Escape closes the dialog once without also toggling play; no background input or inactive-time catch-up.                                                                    |
+| Q19       | Activate comparison-breaking changes together as `crystal-worm-child-head-paladin-v2`. Retain v1 records, labeled incompatible and excluded from v2 bests; do not delete or relabel them.                                                                                            |
+| Q20       | Tuning is approved provisionally for this trainer. Disclose calibration assumptions, head uncertainty and remaining fidelity limits; do not claim exact client behavior.                                                                                                             |
+
+### Cadence, Range And Geometry
+
+Eleven emission offsets per emitter are `k * 0.15` seconds for integer `k` from 0 through 10. The group span is `(11 - 1) * 0.15 = 1.5` seconds; the last-shot cooldown makes the first-to-first period `1.5 + 1 = 2.5` seconds, with no overlapping groups. Four emitters yield `4 * 11 = 44` shards/group and a steady average `44 / 2.5 = 17.6` shards/second. The initial two-second cooldown begins with active gameplay, not during the unchanged Start countdown. Sample the moving head position and rotating direction for each shot.
+
+R01 replaces v1's provisional total-path interpretation with head-center-to-leading-edge maximum reach. R01/Q09 set arena radius to 19.2 tiles and diameter to 38.4 tiles. This is a centered-head calibration condition, not a change to the near-edge play spawn or a rule that confines shards emitted by a pursuing head. Previously emitted shards ignore later head movement.
+
+Use original shared convex silhouettes and fixed orientation within each motion segment. The shard is centrally symmetric, with its long axis aligned to its original firing direction; reversal does not rotate its occupied body and there is no within-tick spin. Borders must not create a materially larger apparent physical body than the collider. Shadows, bars and hit feedback are explicitly nonphysical decorations. Continuous relative-motion collision must use the existing reversal/expiry segmentation, not endpoint-only overlap; circles/AABBs may reject candidates but never establish final hits. Exact vertices/anchors and their visual acceptance belong to step 8.2; continuous collision and body-aware movement belong to steps 9.1/9.2, disconnected from gameplay until 10.1.
+
+The nominal scale is `435.118 / 19.2 = 22.662396` source pixels/tile, from the selected farthest pixel-center distance. Source image: local-only root `image.png`, 857x700, SHA-256 `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`. This identifies the reference; it is not a public asset or a recovered exact client hitbox. Measurements exclude the player's weapon/bar; pixel footprint, masks, anchor choice, head occlusion and unknown head motion limit precision.
+
+| Nominal measurement or derivation       | Value, not a frozen runtime constant                                 |
+| --------------------------------------- | -------------------------------------------------------------------- |
+| Player width x height                   | 36x33 source pixels; 1.588535 x 1.456157 tiles                       |
+| Visible head width x height             | 42x55 source pixels; 1.853290 x 2.426928 tiles; occluded contour     |
+| Shard long x short dimensions           | 56.576x34.660 source pixels; 2.496470 x 1.529406 tiles               |
+| Emitter offset                          | 10% of head width; nominally 0.185329 tile                           |
+| Maximum head-to-shard centroid          | 409.973 source pixels; nominally 18.090453 tiles                     |
+| Observed radial extension past centroid | 1.109547 tiles; not an assumed half-length                           |
+| Center travel from emitter              | 17.905124 tiles                                                      |
+| Reversal / lifetime                     | 2.238140 / 4.476281 seconds at 8 tiles/second                        |
+| North enemy center                      | `(0, -16.2)` tiles from `-(19.2 - 3)`, subject to actual polygon fit |
+| Conservative live-shard bound           | Nominally 88; recompute from exact lifetime                          |
+
+Step 8.2 must derive exact timing from the approved polygon rather than retaining the asymmetric reference glyph's centroid timing. With unit firing direction `n`, transformed local shard vertices `q_i`, emitter offset `e` in tiles, radius `R = 19.2` tiles and speed `v = 8` tiles/second:
+
+$$
+p_i=q_i\cdot n,\qquad b_i^2=\|q_i\|^2-p_i^2,\qquad
+C_{max}=\min_i\left(\sqrt{R^2-b_i^2}-p_i\right)
+$$
+
+$$
+t_{reverse}=\frac{C_{max}-e}{v},\qquad
+T=2t_{reverse},\qquad
+\max_i\|C_{max}n+q_i\|=R
+$$
+
+Here `C_max` is head-to-shard-center distance, not travel from the emitter. Validate finite geometry, fit at emission, nonnegative square-root arguments and positive travel `C_max > e`. Do not change radius/proportions or round timing to simulation ticks to preserve nominal values. The conservative bound is `44 * ceil(T / 2.5)` live shards, nominally 88; it is not a required observed peak. Actual spawn fit, silhouette-derived direction-dependent pursuit separation and any explicitly proposed extra gap require step 8.2 review. The old one-tile center stopping distance is not silently retained for larger bodies.
+
+### Presentation, Persistence And Session Boundaries
+
+Zoom restoration must validate finite values against the approved range/step policy, read safely, write only on actual changes and retain visit-local fallback for blocked/corrupt/quota-failed storage. Preference storage must not modify or depend on attempt-history validation. Retry/Home preserve zoom; zoom and resize never change world geometry, timing or comparisons.
+
+Accepted-hit output belongs to the pure simulation/session boundary and remains ephemeral, not a persistent event history. Phaser consumes each eligible hit once, including independent same-tick hits and lethal hits; spent returns and post-death overlap produce no feedback. Reuse existing health arithmetic and stable hit order. React must not track each projectile/effect per frame. Clear effects/audio on retry/Home and dispose owned resources. Unlock audio from a user gesture; blocked/unsupported audio, mute and voice limiting cannot change damage/time or queue stale cues. Lethal feedback must not defer results.
+
+React owns the accessible labeled Controls dialog with keyboard focus containment/restoration and actual WASD/R/O/P/Escape bindings plus existing UI actions. Opening during play/countdown freezes the relevant session state; movement, retry and zoom cannot act behind it. Closing by Escape must not also toggle the underlying session. Preserve focus-loss safety, require explicit Resume after a session dialog closes, and never advance paused/hidden time. No custom shortcut, touch controls or rebinding is added.
+
+### Preserved Rules And Review Ownership
+
+Keep the fixed 775 HP / 32 DEF / 41 SPD / 42 VIT Paladin and existing damage/regeneration/combat ordering, 1.5 tiles/second pursuit, normalized movement, sole fixed-step clock and catch-up/discard policy. Keep one velocity reversal, lifetime-only expiration, per-shard `hasHitPlayer`, no stored firing origin/homing, and no global invulnerability. Arena constraints apply to player/head bodies, never projectile lifespan. Preserve immediate retry, abort-without-record, death-record-once, latest-100 retention and version-compatible bests. No storage schema migration is required without an actual field change. No backend, accounts, attacks, seal activation, body contact damage/blocking, shrinking arena or tuning UI is authorized.
+
+| Owning step        | Remaining review or implementation gate                                                                                                                                                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8.2                | Approve actual original vertices, anchors/orientations, aspect/dimension tolerances and common-scale collision overlay; derive exact emitter/timing, live bound, spawn fit and pursuit separation. Any extra gap needs approval. No such outputs are invented by step 8.1. |
+| 9.1 / 9.2          | Test pure continuous collision, tangency/numerical tolerance and body-aware arena/pursuit helpers without activating them. Numerical tolerance is not gameplay tuning.                                                                                                     |
+| 10.1 / 10.2        | Activate the coordinated v2 preset and obtain actual geometry/pattern acceptance and v1/v2 comparison isolation. Preparatory geometry must not ship as changed v1 physics.                                                                                                 |
+| 11.1 / 11.2        | Implement defensive independent zoom preference storage and verify actual reload-safe rendered restoration.                                                                                                                                                                |
+| 12.1               | Implement ephemeral accepted-hit output without duplicating health rules or adding an event bus.                                                                                                                                                                           |
+| 12.2 / 12.3        | Review unspecified health-bar placement/style and hit-number placement/duration, then validate full/partial/zero health, simultaneous/lethal hits and cleanup.                                                                                                             |
+| 12.4               | Audibly review numeric gain, voice cap and cue tuning; implement visible mute and nonfatal audio lifecycle. Mute persistence remains optional.                                                                                                                             |
+| 13.1 / 13.2        | Implement accessible Home/HUD Controls and verify focus, Escape isolation, centered Paused state and explicit Resume.                                                                                                                                                      |
+| 14.1 / 14.2 / 14.3 | Full repeated-practice regression, local acceptance and separately authorized publication followed by actual hosted verification. Documentation approval is not deployment evidence.                                                                                       |
+
+No missing polygon or presentation value blocks this reconciliation step: the owning steps must obtain the necessary review before completion. Settled Q/R choices are not reopened. This section neither implements the target nor records fresh human geometry/audio acceptance, client verification, commit, push or deployment.
+
+### Step 8.2 Geometry Candidate - Approved
+
+Proposed and **user-approved on 2026-10-25; not activated**. In response to the combined G01-G04 review request, the user replied "approved". This explicitly approves the exact shapes, anchors/orientations, review tolerances and derived values below, including zero extra pursuit gap. It is design approval, not an independently observed playtest or verification of ROTMG client fidelity. The pure [candidate configuration](../app/src/game/config/geometry-candidate.ts) owns the shared typed vertices; only the existing config tests and [review generator](../app/scripts/review-geometry.mjs) import it. The playable configuration, renderer and simulation still use v1. No reference screenshot or crop is installed as artwork.
+
+Run `node app/scripts/review-geometry.mjs` from the repository root under the pinned Node version to regenerate the ignored local review page `app/test-results/geometry-review/index.html` and exact `values.json`. The page includes a common-scale body/collision overlay, centered-head reach construction, min/default/max zoom views and actual north-spawn fit. PNG review captures are also local-only. Generated images/pages are not committed or runtime assets; a fresh clone can regenerate the page from the original vertices without the reference screenshot.
+
+#### Approved Silhouettes And Anchors
+
+All coordinates use X east and Y south. Each local origin `(0, 0)` is the physical body's bounding-box center and simulation position, **not feet/ground contact**, a weapon anchor or an independently offset visual center. For the partly occluded head this is an explicitly approved reconstruction, not the measured colored-pixel centroid. Player/head remain upright with zero rotation. The shard's local positive X axis follows its initial firing direction; velocity reversal does not rotate it. All three candidates are convex and centrally symmetric, with consistent clockwise screen-space vertex ordering and nonzero area.
+
+Normalized coordinates below multiply X by full body width in tiles and Y by full body height in tiles. The full dimensions come from the common scale `435.118 / 19.2` source pixels/tile, not independent per-body resizing:
+
+| Body   | Normalized ordered vertices                                                      | Source dimensions        |
+| ------ | -------------------------------------------------------------------------------- | ------------------------ |
+| Player | `(-.3,-.5),(.3,-.5),(.5,-.3),(.5,.3),(.3,.5),(-.3,.5),(-.5,.3),(-.5,-.3)`        | 36 x 33 pixels           |
+| Head   | Same original beveled octagon as player, scaled only by measured head dimensions | 42 x 55 pixels; occluded |
+| Shard  | `(.5,0),(.25,.5),(-.25,.5),(-.5,0),(-.25,-.5),(.25,-.5)`                         | 56.576 x 34.660 pixels   |
+
+The octagons cut each corner by 20% of the corresponding full dimension; the shard uses tips at half-length and shoulders at quarter-length. These shape choices are approved original trainer geometry, not copied sprite contours or recovered client hitboxes. The physical fill and dashed collision-review outline use the same `verticesTiles` and parent transform. Review-only anchor marks/strokes and later health/effect decorations are nonphysical; they do not add collider padding.
+
+| Body   | Approved dimension tolerance, source pixels | Resulting allowed aspect interval, width/height | Basis and limitation                                                                                                   |
+| ------ | ------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Player | Width +/-2, height +/-2                     | 0.971429-1.225806                               | Broad 36x33 versus strict 35x32, with weapon-exclusion uncertainty                                                     |
+| Head   | Width +/-2, height +/-7                     | 0.645161-0.916667                               | Broad 42x55 versus strict 42x48; occlusion leaves center/contour uncertain                                             |
+| Shard  | Long dimension +/-1, short dimension +/-1   | 1.558497-1.710517                               | Broad measurements 56.576x34.660 and 55.975x35.146 differ by less than one pixel; highlight-only masks omit body color |
+
+These are approved review tolerances, not numerical collision epsilon, randomized dimensions, invisible padding or authority to retune approved geometry without review. The actual candidate uses the nominal dimensions exactly. Each interval is `(width - widthTolerance)/(height + heightTolerance)` through `(width + widthTolerance)/(height - heightTolerance)`.
+
+#### Candidate-Derived Calibration
+
+Applying the already-approved leading-edge equation to the G01-G04-approved vertices gives the following finalized v2 geometry outputs. They do not change R01-R05 and do not activate the v2 encounter before step 10.1:
+
+| Quantity                                        | Candidate value                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------- |
+| Emitter offset                                  | 0.185329037181 tile, 10% of head width                            |
+| Maximum head-to-shard-center distance           | 17.951764808627 tiles                                             |
+| Center travel from emitter                      | 17.766435771446 tiles                                             |
+| Reversal age at 8 tiles/second                  | 2.220804471431 seconds                                            |
+| Lifetime                                        | 4.441608942861 seconds, twice reversal age                        |
+| Conservative live bound                         | `44 * ceil(4.441608942861 / 2.5) = 88`                            |
+| Play spawn                                      | Player `(0,0)`, head `(0,-16.2)` tiles                            |
+| Farthest spawned head vertex                    | 17.422337611417 tiles from arena center, inside radius 19.2       |
+| Pursuit center separation on east/west axis     | 1.720912488107 tiles before any extra gap                         |
+| Pursuit center separation on north/south axis   | 1.941542294274 tiles before any extra gap                         |
+| Pursuit center separation on 45-degree diagonal | 2.093284691954 tiles before any extra gap                         |
+| Approved extra pursuit gap                      | 0 tiles; silhouette contact only, with no blocking/contact damage |
+
+For this pointed hexagon the limiting vertex is the forward tip `(1.248235191373,0)` tiles, so `C_max = 19.2 - 1.248235191373`. All other vertices lie inside the circle at reversal. Rotating the shard and its radial center together preserves contact across firing phases; translating just `0.000001` tile farther breaches the circle. That displacement is a test probe, not a gameplay tolerance. No timing is rounded to simulation ticks. The screenshot-centroid estimate of 2.238140/4.476281 seconds is intentionally not retained: doing so would let this candidate's tip overshoot the approved reach.
+
+Pursuit must use direction-dependent contact of the shared silhouettes, not a single axial maximum or the old one-tile center distance. For these centered, symmetric player/head polygons, let `h_body(a)` be the maximum vertex dot product with an edge normal `a`. For unit center direction `n`, the ray exits their Minkowski contact region at `min((h_player(a) + h_head(-a)) / dot(a,n))` over edge normals of both polygons with `dot(a,n) > 0`. The values above apply that construction with the approved zero extra gap. This records the intended separation derivation, not the step 9.2 movement implementation; coincident centers, no overshoot and absence of body blocking remain unchanged requirements.
+
+#### Approval Questions
+
+G01-G04 were presented together with the local review page and are now approved by the user's response "approved" on 2026-10-25. The questions are retained as approval scope/evidence; settled Q/R decisions are not reopened.
+
+| ID  | Requested approval                                                                                                                                                          | Status              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| G01 | Accept the original player/head beveled octagons and symmetric pointed shard hexagon, at the exact shared-scale dimensions/vertices above?                                  | Approved 2026-10-25 |
+| G02 | Accept body-center simulation/drawing anchors, upright player/head and fixed initial-firing-axis shard orientation, including the explicitly uncertain head reconstruction? | Approved 2026-10-25 |
+| G03 | Accept the proposed source-pixel dimension/aspect review tolerances, without treating them as collider padding or automatic retuning permission?                            | Approved 2026-10-25 |
+| G04 | Accept the exact candidate-derived offset/reversal/lifetime/live bound, fitted north spawn and silhouette-derived pursuit separation with **zero extra gap**?               | Approved 2026-10-25 |
+
+The actual user response, not technical checks or delegated acceptance, resolves this approval gate. The reviewed vertices and derived numeric values are unchanged. Step 8.2 is complete with focused verification recorded in the active plan. Preparatory data stays disconnected; steps 9-14 remain unstarted and require separate requests. No runtime activation, commit, push or deployment is authorized by this approval.

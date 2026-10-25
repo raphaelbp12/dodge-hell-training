@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { V2_GEOMETRY_CANDIDATE } from "./geometry-candidate";
 import type { SessionSnapshot } from "../models";
 import {
   ENCOUNTER_CONFIG,
@@ -333,4 +334,138 @@ test("imports in Node and carries the comparison version in plain session snapsh
   expect(snapshot.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion);
   expect(snapshot.shards[0]).not.toHaveProperty("origin");
   expect(snapshot.shards[0].hasHitPlayer).toBe(false);
+});
+
+test("v2 geometry candidate keeps finite ordered convex bodies at the measured common scale", () => {
+  const candidate = V2_GEOMETRY_CANDIDATE;
+  expect(candidate.approval).toBe("approved");
+  expect(candidate.sourcePixelsPerTile).toBeCloseTo(435.118 / 19.2, 12);
+  for (const body of Object.values(candidate.bodies)) {
+    const vertices = body.verticesTiles;
+    expect(vertices.length).toBeGreaterThanOrEqual(3);
+    expect(vertices.length).toBeLessThanOrEqual(8);
+    const turns = vertices.map((vertex, index) => {
+      expect(Number.isFinite(vertex.x) && Number.isFinite(vertex.y)).toBe(true);
+      const next = vertices[(index + 1) % vertices.length];
+      const after = vertices[(index + 2) % vertices.length];
+      return (
+        (next.x - vertex.x) * (after.y - next.y) -
+        (next.y - vertex.y) * (after.x - next.x)
+      );
+    });
+    expect(turns.every((turn) => turn > 0)).toBe(true);
+    const twiceArea = vertices.reduce((area, vertex, index) => {
+      const next = vertices[(index + 1) % vertices.length];
+      return area + vertex.x * next.y - next.x * vertex.y;
+    }, 0);
+    expect(twiceArea).toBeGreaterThan(0);
+    const width =
+      Math.max(...vertices.map((vertex) => vertex.x)) -
+      Math.min(...vertices.map((vertex) => vertex.x));
+    const height =
+      Math.max(...vertices.map((vertex) => vertex.y)) -
+      Math.min(...vertices.map((vertex) => vertex.y));
+    expect(width * candidate.sourcePixelsPerTile).toBeCloseTo(
+      body.sourceWidthPixels,
+      10,
+    );
+    expect(height * candidate.sourcePixelsPerTile).toBeCloseTo(
+      body.sourceHeightPixels,
+      10,
+    );
+    expect(width / height).toBeCloseTo(
+      body.sourceWidthPixels / body.sourceHeightPixels,
+      10,
+    );
+    expect(body.anchor).toBe("body-center");
+    expect(body.dimensionToleranceSourcePixels.width).toBeGreaterThan(0);
+    expect(body.dimensionToleranceSourcePixels.height).toBeGreaterThan(0);
+  }
+});
+
+test("v2 geometry candidate shard is centrally symmetric and keeps its firing-axis orientation on reversal", () => {
+  const shard = V2_GEOMETRY_CANDIDATE.bodies.shard;
+  expect(shard.orientation).toBe("initial-firing-axis");
+  expect(shard.verticesTiles.length % 2).toBe(0);
+  shard.verticesTiles.forEach((vertex, index, vertices) => {
+    const opposite = vertices[(index + vertices.length / 2) % vertices.length];
+    expect(vertex.x + opposite.x).toBeCloseTo(0, 12);
+    expect(vertex.y + opposite.y).toBeCloseTo(0, 12);
+  });
+});
+
+test("v2 geometry candidate derives exact leading-vertex reversal and rejects just-beyond reach across firing phases", () => {
+  const candidate = V2_GEOMETRY_CANDIDATE;
+  const {
+    emitterOffsetTiles,
+    maximumShardCenterDistanceTiles,
+    reversalAgeSeconds,
+    lifetimeSeconds,
+  } = candidate;
+  expect(emitterOffsetTiles).toBeCloseTo(
+    (candidate.bodies.head.sourceWidthPixels / candidate.sourcePixelsPerTile) *
+      0.1,
+    12,
+  );
+  expect(reversalAgeSeconds).toBeGreaterThan(0);
+  expect(lifetimeSeconds).toBeCloseTo(2 * reversalAgeSeconds, 12);
+  expect(reversalAgeSeconds).toBeLessThan(lifetimeSeconds);
+  expect(
+    emitterOffsetTiles +
+      reversalAgeSeconds * candidate.shardSpeedTilesPerSecond,
+  ).toBeCloseTo(maximumShardCenterDistanceTiles, 12);
+  for (const phase of [0, Math.PI / 7, Math.PI / 2, Math.PI, Math.PI * 1.75]) {
+    const farthest = (distance: number) =>
+      Math.max(
+        ...candidate.bodies.shard.verticesTiles.map((vertex) => {
+          const localX = distance + vertex.x;
+          return Math.hypot(
+            localX * Math.cos(phase) - vertex.y * Math.sin(phase),
+            localX * Math.sin(phase) + vertex.y * Math.cos(phase),
+          );
+        }),
+      );
+    expect(farthest(emitterOffsetTiles)).toBeLessThan(
+      candidate.arenaRadiusTiles,
+    );
+    expect(farthest(maximumShardCenterDistanceTiles)).toBeCloseTo(
+      candidate.arenaRadiusTiles,
+      11,
+    );
+    expect(
+      farthest(maximumShardCenterDistanceTiles + 0.000001),
+    ).toBeGreaterThan(candidate.arenaRadiusTiles);
+  }
+  expect(candidate.conservativeLiveShardBound).toBe(
+    44 * Math.ceil(lifetimeSeconds / 2.5),
+  );
+});
+
+test("v2 geometry candidate fits the approved spawn and derives axial pursuit contact without changing playable v1", () => {
+  const candidate = V2_GEOMETRY_CANDIDATE;
+  expect(candidate.enemySpawnTiles).toEqual({ x: 0, y: -16.2 });
+  for (const vertex of candidate.bodies.head.verticesTiles) {
+    expect(
+      Math.hypot(vertex.x, vertex.y + candidate.enemySpawnTiles.y),
+    ).toBeLessThan(candidate.arenaRadiusTiles);
+  }
+  for (const vertex of candidate.bodies.player.verticesTiles) {
+    expect(Math.hypot(vertex.x, vertex.y)).toBeLessThan(
+      candidate.arenaRadiusTiles,
+    );
+  }
+  expect(candidate.pursuit.extraGapTiles).toBe(0);
+  expect(candidate.pursuit.eastSeparationTiles).toBeCloseTo(
+    (36 + 42) / (2 * candidate.sourcePixelsPerTile),
+    12,
+  );
+  expect(candidate.pursuit.southSeparationTiles).toBeCloseTo(
+    (33 + 55) / (2 * candidate.sourcePixelsPerTile),
+    12,
+  );
+  expect(candidate.bodies.player.orientation).toBe("upright");
+  expect(candidate.bodies.head.orientation).toBe("upright");
+  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v1");
+  expect(ENCOUNTER_CONFIG.burst.shotsPerEmitter).toBe(4);
+  expect(ENCOUNTER_CONFIG.shard.reversalAgeSeconds).toBe(1.2);
 });

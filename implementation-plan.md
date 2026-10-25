@@ -88,7 +88,7 @@ Every step prompt inherits these instructions:
 
 ## Follow-Up Execution Contract - Phases 8-14
 
-The architecture, shared prompt contract and project instructions still apply. Execute only the requested numbered step and stop afterward. All new steps below are **pending**; this planning task is not an implementation execution record.
+The architecture, shared prompt contract and project instructions still apply. Execute only the requested numbered step and stop afterward. Steps were initially planned as pending; each step's status and execution record below now report its actual progress.
 
 ### Approved Scope And Review Gates
 
@@ -130,7 +130,7 @@ Preparatory geometry remains disconnected from the playable preset until step 10
 
 ### Step 8.1 - Record The Approved V2 Contract
 
-Status: pending. Dependencies: 7.2.
+Status: complete. Dependencies: 7.2.
 
 **Implementation prompt**
 
@@ -140,9 +140,18 @@ Reconcile the latest fixes decisions into an additive v2 section in [the mechani
 
 **Acceptance:** authority and remaining review ownership are clear, no settled choice is reopened, and document checks pass. Exact polygon-derived numbers remain explicitly assigned to step 8.2, not a blocker to this contract-reconciliation step.
 
+**Execution record - 2026-10-25**
+
+- Verified the final [archived step 7.2 release record](docs/implementation-plan-v1.md#step-72---verify-release-and-finish-the-handoff): complete under delegated technical release acceptance, with prior successful deployment and live/local checks. Preserved its earlier blocked attempt and subsequent resolution; no fresh deployment verification was needed or claimed.
+- Appended [the approved v2 contract](docs/mechanics.md#approved-v2-contract---step-81) without rewriting v1 mechanics/source/approval text. Covered Q01-Q20 and R01-R05, cadence/range units, shared polygon/emitter/spawn policy, nominal calibration, comparison isolation, UI/session/persistence decisions and preserved invariants. Explicitly separated user approvals from uncertain image measurements, geometry-derived outputs and unspecified presentation values.
+- Assigned exact vertices/anchors, tolerances, edge-contact timing, spawn fit, live bound and pursuit separation to step 8.2; implementation/acceptance and presentation/audio reviews remain with their numbered owning steps. No settled question was reopened, geometry/audio value invented or additional approval assumed. No deviation or remaining blocker for step 8.1.
+- Focused Node assertions passed: all 25 approval IDs; group span 1.5 seconds, period 2.5 seconds, 44 shards/group and 17.6 shards/second; nominal dimensions, offset, reversal/lifetime, 19.2/38.4-tile radius/diameter, north spawn and conditional 88-shard bound; 13 local file links/anchors across mechanics/active plan; original screenshot SHA-256 `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`; exact pre-edit v1 mechanics prefix and archive/decision-record/original-draft preservation; hashes of every tracked app file unchanged. Scoped Git whitespace checks passed.
+- Documentation-only checks replace artificial behavior tests here. Application unit/type/lint/build/browser suites were not rerun; no runtime, dependency, storage, rules activation, commit, push or deployment changed. Preserved pre-existing mechanics table formatting and the unrelated local Vite formatting edit. Step 8.2 and all later steps remain pending and unstarted.
+- Manual review: read the appended v2 section and its approval/review tables alongside the linked decision record; confirm that exact polygon outputs belong to 8.2 and runtime activation to 10.1. No new application behavior is expected from this step.
+
 ### Step 8.2 - Define And Approve Shared Geometry
 
-Status: pending. Dependencies: 8.1.
+Status: complete. Dependencies: 8.1.
 
 **Implementation prompt**
 
@@ -153,6 +162,23 @@ Derive the 10%-head-width emission offset, exact reversal/lifetime from farthest
 **Focused checks:** finite ordered convex vertices, nonzero area, 3-8 sides, shard central symmetry, documented dimension/aspect tolerances reflecting source uncertainty, shared transforms, exact edge contact/just-beyond failure, spawn fit, positive reversal within lifetime. Use existing Node tests and common-scale visual review.
 
 **Acceptance:** exact geometry and derived values have actual approval evidence; data/math/comparison checks pass; runtime remains v1. Missing approval is recorded as a blocker, not assumed acceptance.
+
+**Candidate preparation and approval blocker - 2026-10-25**
+
+- Verified step 8.1 complete and read its approved v2 contract and Q/R decision provenance. Added a disconnected, Node-only [typed geometry candidate](app/src/game/config/geometry-candidate.ts), reusing `Vector2`, and four tests in the existing config suite. Proposed upright beveled player/head octagons, a centrally symmetric firing-axis shard hexagon, body-center anchors, source-informed dimension/aspect review tolerances and zero extra pursuit gap. None of these new geometry choices is recorded as user-approved.
+- Added [a reproducible review generator](app/scripts/review-geometry.mjs). Run `node app/scripts/review-geometry.mjs` from the root to create ignored `app/test-results/geometry-review/index.html` and `values.json`. Review figures use identical candidate vertices/transforms for the physical fill/collision overlay, and show common-scale proportions, centered-head edge contact, min/default/max zoom and actual near-edge spawn. No reference artwork or generated review image is committed or bundled.
+- Recorded exact vertices, uncertainty, tolerances, derivation and [approval questions G01-G04](docs/mechanics.md#approval-questions). Conditional candidate outputs: emitter 0.185329037181 tile, center reach 17.951764808627 tiles, reversal 2.220804471431 seconds, lifetime 4.441608942861 seconds, conservative live bound 88, north spawn `(0,-16.2)` fitting within radius 19.2. Axial pursuit contact is 1.720912488107/1.941542294274 tiles and diagonal contact 2.093284691954 tiles, with proposed zero extra gap; the direction-dependent movement helper remains step 9.2 work.
+- TDD: focused config test first failed because the candidate module was absent, then passed all four new cases after the smallest data implementation. Checks cover finite ordered convex nonzero-area 3-8-vertex bodies, exact common-scale dimensions/aspects, shard central symmetry, fixed orientation policy, exact contact and just-beyond failure across firing phases, spawn fit, positive reversal/lifetime, dynamic live bound and unchanged v1 values. Under pinned Node 24.22.1, all 198 unit/component tests across six files, typecheck, lint and production build passed. The existing large Phaser bundle warning remains unchanged.
+- Isolated Chromium review checks at 1440x1000 and 390x1000 passed: four nonblank figures, body/overlay vertex equality, colored-body pixels, no clipping/overflow or page errors. Visual inspection found comparison/zoom-row overlaps missed by the first clipping check; a focused pairwise-overlap assertion reproduced them, then passed at both widths after a layout-only repair. Screenshots remain ignored in the review artifact directory. This is automated/agent visual review, not user geometry acceptance or a fresh full gameplay end-to-end run.
+- Documentation checks passed against generated numeric/aspect values and local links; the original image SHA-256 remains `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`. No live v1 config, simulation, renderer, history, dependency, lockfile, gameplay rules identity, commit, push or deployment changed. Preserved the pre-existing local Vite formatting and step 8.1 documentation work.
+- **Blocker:** actual user approval of G01-G04 is required before finalizing these v2 geometry entries or completing step 8.2. Review the generated local page and answer the four questions together in the mechanics document or conversation. No approval is inferred from technical checks; steps 9-14 remain pending and unstarted.
+
+**User approval and completion - 2026-10-25**
+
+- In response to the combined G01-G04 review request, the user replied "approved". Recorded actual approval of the exact original silhouettes, body-center anchors/orientations, dimension/aspect review tolerances and derived offset/timing/live-bound/spawn/pursuit values with zero extra gap in [the finalized mechanics entries](docs/mechanics.md#step-82-geometry-candidate---approved). This resolves the historical handoff blocker above; no approval is inferred from test success or delegated acceptance.
+- Updated candidate approval/provenance metadata and the existing config assertion, plus generated-review labels. Preserved all reviewed vertices and physical values exactly, verified by deep comparison of regenerated data against the pre-approval review artifact. Source-informed uncertainty remains documented; approval is not client-fidelity certification or a newly observed playtest.
+- Approval-state TDD check failed as expected (`proposed` versus required `approved`), then all four focused geometry cases passed after the metadata change. All 50 config tests, typecheck and lint passed on this follow-up; approved-artifact and documentation assertions passed. The prior candidate-preparation record retains the full 198-test/build and desktop/narrow visual evidence; those broader gameplay gates were not rerun or misrepresented as fresh here.
+- Acceptance: exact geometry/derived values have explicit user approval and passing data/math/common-scale review evidence. Step 8.2 is complete with no remaining blocker or deviation. Runtime configuration, simulation, renderer, comparison identity and history remain v1; geometry is still disconnected until the coordinated step 10.1 activation. Step 9.1 and all later steps remain pending and unstarted. No commit, push or deployment was performed.
 
 ## Phase 9: Pure Geometry Rules
 
