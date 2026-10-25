@@ -289,7 +289,7 @@ test("personal best excludes incompatible rules while recent attempts identify t
       records: [
         {
           id: "older-rules",
-          rulesVersion: "other-rules",
+          rulesVersion: "crystal-worm-child-head-paladin-v1",
           elapsedSeconds: 999,
           hitsTaken: 1,
           outcome: "death",

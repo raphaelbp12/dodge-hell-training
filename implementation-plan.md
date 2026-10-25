@@ -253,7 +253,7 @@ Reuse simulation entry points, `updateAttacks`, reversal/expiry segment splittin
 
 ### Step 10.2 - Verify Geometry And Comparison Isolation
 
-Status: pending. Dependencies: 10.1.
+Status: complete. Dependencies: 10.1.
 
 **Implementation prompt**
 
@@ -264,6 +264,13 @@ Review actual desktop/narrow practice and shared outlines at currently available
 **Focused checks:** mixed-version best/history, corrupt/future-record handling, one canvas/driver, resets/cleanup, geometry pixels/overlays, actual hits and resource bounds. Run relevant gates, all five if runtime changes.
 
 **Acceptance:** comparison/practice checks and actual geometry/pattern approval are recorded; no v1 death-time/pixel-radius target or new deployment is claimed.
+
+**Execution and verification - 2026-10-25**
+
+- Step 10.1 published and remote verified at `6422656be044548372d6f52b109707cff8777322`. Existing exact-version history comparison already isolates v2; no runtime/storage/schema change was needed. Replaced generic incompatible fixtures with actual v1 identities; browser assertions prove v1 metrics/version survive R/abort unchanged, remain labeled Other rules and are excluded from the v2 best. Existing real-death production tests, result-once tests and corrupt/future-storage preservation continue to apply unchanged.
+- Extended existing desktop/narrow pixel workflows with current 0.75/1/1.5 min/default/max zoom screenshots, then restore default. All three focused history/responsive browser cases passed. Reviewed generated min/max and active-pattern captures at 1440x1000 and 390x844: original shared polygons, nonblank play, no HUD overlap; head/shards can be offscreen at tighter views by design. Controlled centered-head leading-edge contact is proved by the shared geometry/config tests, not inferred from a chasing-head screenshot.
+- 258 unit/component tests, typecheck, lint and production build passed. Unchanged runtime's immediately preceding full 20-case browser gate includes real v2 deaths, 60-second play, 25 retries, one canvas/listener and conservative shard bound 88. No claims of a new sustained run or hosted verification for this evidence-only step.
+- Geometry/pattern accepted technically under the explicit no-further-confirmation batch delegation, building on actual G01-G04 shape approvals. No fresh human play/visual approval, fidelity claim or tuning is invented. Broader zoom and health/Controls presentation remain later steps. Preserved unrelated Vite edit and local reference art.
 
 ## Phase 11: Persisted Camera Zoom
 

@@ -707,7 +707,7 @@ test("loaded history compares only compatible retained records", async ({
         records: [
           {
             id: "other",
-            rulesVersion: "other-rules",
+            rulesVersion: "crystal-worm-child-head-paladin-v1",
             outcome: "death",
             elapsedSeconds: 999,
             hitsTaken: 1,
@@ -734,6 +734,9 @@ test("loaded history compares only compatible retained records", async ({
   await retrySnapshot(page);
   await page.getByRole("button", { name: "Home", exact: true }).click();
   expect((await savedAttempts(page)).records).toHaveLength(2);
+  expect((await savedAttempts(page)).records[0]).toEqual({
+    id: "other", rulesVersion: "crystal-worm-child-head-paladin-v1", outcome: "death", elapsedSeconds: 999, hitsTaken: 1,
+  });
 });
 
 for (const failure of ["corrupt", "blocked", "quota"] as const) {
@@ -1218,6 +1221,19 @@ for (const viewport of [
     const countdownBox = await page
       .getByRole("region", { name: "Encounter", exact: true })
       .boundingBox();
+    const camera = await page.evaluate(async () => {
+      const path = new URL("src/game/config/encounter.ts", document.baseURI).href;
+      return (await import(/* @vite-ignore */ path)).ENCOUNTER_CONFIG.camera;
+    });
+    for (const target of [camera.minZoom, camera.defaultZoom, camera.maxZoom, camera.defaultZoom]) {
+      const current = (await inspect(page)).zoom;
+      for (let step = 0; step < Math.round(Math.abs(target - current) / camera.zoomStep); step++) {
+        await page.keyboard.press(target < current ? "o" : "p");
+      }
+      await expect.poll(async () => (await inspect(page)).zoom).toBe(target);
+      await expect.poll(async () => (await renderedPixels(page)).player).toBeGreaterThan(10);
+      await page.screenshot({ path: testInfo.outputPath(`geometry-${viewport.width}-${target}.png`), fullPage: true });
+    }
     await expect
       .poll(async () => (await inspect(page)).elapsedSeconds)
       .toBeGreaterThan(0);
