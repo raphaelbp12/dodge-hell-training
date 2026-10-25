@@ -20,6 +20,8 @@ const adapter = vi.hoisted(() => ({
   onResult: null as null | ((result: AttemptResult) => void),
   resume: vi.fn(),
   retry: vi.fn(),
+  setMuted: vi.fn(),
+  initialMuted: false,
   initialZoom: undefined as number | undefined,
   onZoomChange: undefined as undefined | ((zoom: number) => void),
 }));
@@ -28,9 +30,10 @@ vi.mock("./game/phaser/encounter", () => ({
   createEncounter: (
     host: HTMLElement,
     publish: (view: EncounterView) => void,
-    options: { initialZoom?: number; onZoomChange?: (zoom: number) => void; onResult?: (result: AttemptResult) => void },
+    options: { initialMuted?: boolean; initialZoom?: number; onZoomChange?: (zoom: number) => void; onResult?: (result: AttemptResult) => void },
   ) => {
     adapter.initialZoom = options.initialZoom;
+    adapter.initialMuted = options.initialMuted ?? false;
     adapter.onZoomChange = options.onZoomChange;
     adapter.publish = publish;
     adapter.onResult = options.onResult ?? null;
@@ -41,6 +44,7 @@ vi.mock("./game/phaser/encounter", () => ({
     return {
       resume: adapter.resume,
       retry: adapter.retry,
+      setMuted: adapter.setMuted,
       destroy: () => {
         adapter.active--;
         adapter.destroyed++;
@@ -129,6 +133,22 @@ test("Home includes description, accurate changelog, and delegated links", () =>
   expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
     "None",
   );
+});
+
+test("visible mute is visit-local, survives Home and updates audio without recreating play", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  const mute = screen.getByRole("checkbox", { name: "Mute hit audio" });
+  expect(mute).not.toBeChecked();
+  await user.click(mute);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.initialMuted).toBe(true);
+  await user.click(mute);
+  expect(adapter.setMuted).toHaveBeenLastCalledWith(false);
+  expect(adapter.created).toBe(1);
+  await user.click(screen.getByRole("button", { name: "Home" }));
+  expect(mute).not.toBeChecked();
+  expect(localStorage.getItem("dodge-hell-training.mute")).toBeNull();
 });
 
 test("HUD reads snapshots and results Retry keeps the runtime while Home cleans up", async () => {

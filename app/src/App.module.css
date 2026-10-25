@@ -119,6 +119,9 @@
   color: #4a6b5c;
   font-size: 13px;
 }
+.headerTools { display: grid; justify-items: end; gap: 4px; }
+.mute { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.mute input { accent-color: #26885d; width: 16px; height: 16px; margin: 0; }
 .playfield {
   position: relative;
   flex: 1;

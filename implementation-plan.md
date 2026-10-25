@@ -372,7 +372,7 @@ Consume accepted-hit output in the runtime for one post-defense number per hit, 
 
 ### Step 12.4 - Add Quiet Hit Audio And Mute
 
-Status: pending. Dependencies: 12.3.
+Status: complete. Dependencies: 12.3.
 
 **Implementation prompt**
 
@@ -383,6 +383,13 @@ Unlock/resume from supported user gestures. Unavailable/blocked/suspended/reject
 **Focused checks:** cue request per accepted event, simultaneous voice cap, lethal cue, mute/unmute, gesture unlock, unavailable/rejected audio, pause policy, no stale Resume/Retry/Home playback and repeated-session cleanup. Automation does not replace audible approval.
 
 **Acceptance:** numerical audio policy/audible approval and all five gates pass; mute/fallback work without changing gameplay, history or result timing.
+
+**Execution and verification - 2026-10-25**
+
+- Step 12.3 remote verified at `a75ca16c3a835fa11e8f060d1915f0aa66907954`. Added a small synthesis boundary borrowing Phaser's WebAudio context, not another audio context/engine, dependency, soundtrack or copied sound. The same individual accepted-hit callback requests cue and number. Original sine sweep 440 -> 220 Hz, peak gain 0.018, 5 ms attack, 55 ms total, at most four concurrent voices; saturated/muted/suspended requests are dropped, never queued. Numeric choices accepted technically under batch delegation; automation is not fresh human audible/comfort approval.
+- Visible accessible Mute checkbox on Home and play is visit-local across Home/Start; no persistence policy/key added. Live updates do not recreate the scene. Supported create/keyboard/pointer/Resume/retry gestures attempt unlock; unavailable/closed/throwing contexts and rejected resume remain nonfatal. Pause stops voices, retry resets requests/voices, disposal disconnects owned nodes/listeners while Phaser owns context disposal. Ended-state focus changes do not stop the lethal cue, which can finish during immediate results without delaying them.
+- TDD: synthesis suite failed missing module, then its cap/envelope/release/mute/suspension/no-catchup/rejected/unavailable/closed/disposal cases passed. React mute test failed missing checkbox then all 17 focused audio/React cases passed. Real Chromium verifies hit requests match accepted hit count, actual cue scheduling, muted play then unmute, unavailable AudioContext real damage/death/results/retry and no stale voices. Sustained test now checks <=4 voices alongside <=16 effects and <=88 shards. Production-safe tests exercise checkbox and visit-local reload default.
+- All five gates passed: 290 unit/component cases across nine files, typecheck, lint, build and 22 Chromium cases. No gameplay/history/version/timing change or human listening/cross-browser/hosted claim. Nonblocking Phaser chunk warning remains.
 
 ## Phase 13: Controls And Paused-Session Safety
 

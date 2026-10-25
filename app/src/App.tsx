@@ -59,6 +59,7 @@ function History({ snapshot }: { snapshot: HistorySnapshot }) {
 function Encounter({
   zoomPreference,
   zoomStorage,
+  muted,
   onHome,
   history,
   historySnapshot,
@@ -66,6 +67,7 @@ function Encounter({
 }: {
   zoomPreference: RefObject<number>;
   zoomStorage: ZoomPreference;
+  muted: boolean;
   onHome: () => void;
   history: AttemptHistory;
   historySnapshot: HistorySnapshot;
@@ -74,6 +76,7 @@ function Encounter({
   const host = useRef<HTMLDivElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const runtime = useRef<EncounterHandle | null>(null);
+  const initialMuted = useRef(muted);
   const [view, setView] = useState<EncounterView>({
     healthHp: PALADIN_STATS.healthHp,
     elapsedSeconds: 0,
@@ -99,6 +102,7 @@ function Encounter({
       },
       {
         initialZoom: zoomPreference.current,
+        initialMuted: initialMuted.current,
         onZoomChange: (zoom) => {
           if (!active) return;
           zoomPreference.current = zoom;
@@ -121,6 +125,7 @@ function Encounter({
       handle.destroy();
     };
   }, [zoomPreference, zoomStorage, history, onHistoryChange]);
+  useEffect(() => { runtime.current?.setMuted(muted); }, [muted]);
   return (
     <>
       <div className={styles.telemetry} aria-label="Session HUD">
@@ -231,6 +236,7 @@ export default function App() {
     history.snapshot(),
   );
   const [launched, setLaunched] = useState(false);
+  const [muted, setMuted] = useState(false);
   const startButton = useRef<HTMLButtonElement>(null);
   const [zoomStorage] = useState(() => new ZoomPreference(() => window.localStorage));
   const zoomPreference = useRef<number>(zoomStorage.get());
@@ -244,13 +250,17 @@ export default function App() {
           <span className={styles.eyebrow}>Dodge Hell Training</span>
           <h1>Crystal Worm Child</h1>
         </div>
-        <span className={styles.encounterLabel}>Head / Survival</span>
+        <div className={styles.headerTools}>
+          <span className={styles.encounterLabel}>Head / Survival</span>
+          <label className={styles.mute}><input type="checkbox" aria-label="Mute hit audio" checked={muted} onChange={(event) => setMuted(event.target.checked)} />Mute</label>
+        </div>
       </header>
       <p className={styles.keyboardNotice}>Desktop keyboard required</p>
       {launched ? (
         <Encounter
           zoomPreference={zoomPreference}
           zoomStorage={zoomStorage}
+          muted={muted}
           onHome={() => setLaunched(false)}
           history={history}
           historySnapshot={historySnapshot}

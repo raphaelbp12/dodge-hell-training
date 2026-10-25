@@ -4,6 +4,7 @@ import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
 import type { AcceptedHit, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
+import { HitAudio } from "./hit-audio";
 
 export type EncounterView = {
   healthHp: number;
@@ -20,10 +21,12 @@ export type EncounterHandle = {
   destroy(): void;
   resume(): void;
   retry(): void;
+  setMuted(muted: boolean): void;
 };
 
 type EncounterOptions = {
   initialZoom?: number;
+  initialMuted?: boolean;
   onZoomChange?: (zoom: number) => void;
   onResult?: (result: AttemptResult) => void;
 };
@@ -77,6 +80,8 @@ class EncounterScene extends Phaser.Scene {
   private healthBar!: Phaser.GameObjects.Graphics;
   private hitNumbers: { hit: AcceptedHit; ageSeconds: number; text: Phaser.GameObjects.Text }[] = [];
   private finalHitAmounts: number[] = [];
+  private hitAudio = new HitAudio(() => this.sound instanceof Phaser.Sound.WebAudioSoundManager ? this.sound.context : null);
+  private unlockAudio = (): void => this.hitAudio.unlock();
   private keys!: Record<
     "north" | "south" | "east" | "west",
     Phaser.Input.Keyboard.Key
@@ -104,6 +109,7 @@ class EncounterScene extends Phaser.Scene {
     this.zoom = options.initialZoom ?? ENCOUNTER_CONFIG.camera.defaultZoom;
     this.onResult = options.onResult;
     this.onZoomChange = options.onZoomChange;
+    this.hitAudio.setMuted(options.initialMuted ?? false);
   }
 
   create(): void {
@@ -121,6 +127,7 @@ class EncounterScene extends Phaser.Scene {
     keyboard.on("keydown", this.onKeyDown);
     keyboard.on("keyup", this.onKeyUp);
     this.host.addEventListener("focusout", this.onFocusOut);
+    this.host.addEventListener("pointerdown", this.unlockAudio);
     window.addEventListener("blur", this.pauseForFocus);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.centerCamera, this);
@@ -130,6 +137,7 @@ class EncounterScene extends Phaser.Scene {
     this.drawEntities();
     this.centerCamera();
     this.host.focus({ preventScroll: true });
+    this.hitAudio.unlock();
     this.publishView();
   }
 
@@ -143,6 +151,7 @@ class EncounterScene extends Phaser.Scene {
     )
       return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    this.hitAudio.unlock();
     if (event.code === "KeyR" || event.code === "Escape") {
       if (
         event.code === "Escape" &&
@@ -211,6 +220,7 @@ class EncounterScene extends Phaser.Scene {
   private pauseForFocus = (): void => {
     if (this.disposed || this.state.phase === "ended") return;
     this.session.pause();
+    this.hitAudio.stop();
     this.clearMovement();
     this.publishView();
   };
@@ -219,6 +229,7 @@ class EncounterScene extends Phaser.Scene {
     if (this.disposed || document.hidden || this.state.phase === "ended")
       return;
     this.clearMovement();
+    this.hitAudio.unlock();
     this.session.resume();
     this.host.focus({ preventScroll: true });
     this.publishView();
@@ -227,6 +238,8 @@ class EncounterScene extends Phaser.Scene {
   retry(): void {
     if (this.disposed || document.hidden || !this.session.retry()) return;
     this.clearHitNumbers();
+    this.hitAudio.reset();
+    this.hitAudio.unlock();
     this.finalHitAmounts = [];
     this.clearMovement();
     this.hudRemainingMilliseconds = 0;
@@ -234,6 +247,11 @@ class EncounterScene extends Phaser.Scene {
     this.drawEntities();
     this.centerCamera();
     this.publishView();
+  }
+
+  setMuted(muted: boolean): void {
+    this.hitAudio.setMuted(muted);
+    if (!muted) this.hitAudio.unlock();
   }
 
   update(_time: number, delta: number): void {
@@ -261,7 +279,7 @@ class EncounterScene extends Phaser.Scene {
         east: this.keys.east.isDown && !this.suppressedMovement.has("KeyD"),
         west: this.keys.west.isDown && !this.suppressedMovement.has("KeyA"),
       },
-      (hit) => { currentHits.push(hit); this.addHitNumber(hit); },
+      (hit) => { currentHits.push(hit); this.addHitNumber(hit); this.hitAudio.play(); },
     );
     if (result) this.finalHitAmounts = currentHits.map((hit) => hit.damageHp);
     const activeSeconds = this.state.elapsedSeconds - previousSeconds;
@@ -436,6 +454,7 @@ class EncounterScene extends Phaser.Scene {
       viewport: { width: this.scale.width, height: this.scale.height },
       keydownListeners: this.input.keyboard?.listenerCount("keydown"),
       hitNumbers: this.hitNumbers.map((number) => ({ shardId: number.hit.shardId, damageHp: number.hit.damageHp, ageSeconds: number.ageSeconds, text: number.text.text })),
+      audio: this.hitAudio.inspect(),
     };
   }
 
@@ -443,12 +462,14 @@ class EncounterScene extends Phaser.Scene {
     if (this.disposed) return;
     this.disposed = true;
     this.clearHitNumbers();
+    this.hitAudio.dispose();
     this.session.home();
     this.input?.keyboard?.resetKeys();
     this.input?.keyboard?.off("keydown", this.onKeyDown);
     this.input?.keyboard?.off("keyup", this.onKeyUp);
     if (this.input?.keyboard) this.input.keyboard.enabled = false;
     this.host.removeEventListener("focusout", this.onFocusOut);
+    this.host.removeEventListener("pointerdown", this.unlockAudio);
     window.removeEventListener("blur", this.pauseForFocus);
     document.removeEventListener("visibilitychange", this.onVisibility);
     this.scale?.off(Phaser.Scale.Events.RESIZE, this.centerCamera, this);
@@ -494,6 +515,7 @@ export function createEncounter(
   return {
     resume: () => scene?.resume(),
     retry: () => scene?.retry(),
+    setMuted: (muted) => scene?.setMuted(muted),
     destroy: () => {
       if (disposed) return;
       disposed = true;

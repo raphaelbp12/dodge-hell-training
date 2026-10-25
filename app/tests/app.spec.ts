@@ -20,6 +20,7 @@ type Inspection = SessionSnapshot & {
   viewport: { width: number; height: number };
   keydownListeners: number;
   hitNumbers: { shardId: number; damageHp: number; ageSeconds: number; text: string }[];
+  audio: { muted: boolean; requests: number; played: number; activeVoices: number };
 };
 
 async function inspect(page: Page): Promise<Inspection> {
@@ -160,6 +161,9 @@ for (const width of [1440, 390]) {
       path: testInfo.outputPath(`release-home-${width}.png`),
       fullPage: true,
     });
+    await page.getByRole("checkbox", { name: "Mute hit audio" }).check();
+    await expect(page.getByRole("checkbox", { name: "Mute hit audio" })).toBeChecked();
+    await page.getByRole("checkbox", { name: "Mute hit audio" }).uncheck();
     const assets = await page
       .locator('script[src], link[rel="stylesheet"]')
       .evaluateAll((elements) =>
@@ -360,6 +364,7 @@ for (const width of [1440, 390]) {
     await expect(page.locator("canvas")).toHaveCount(0);
     await page.reload();
     expect(await savedAttempts(page)).toEqual(saved);
+    await expect(page.getByRole("checkbox", { name: "Mute hit audio" })).not.toBeChecked();
     await expect(
       page.getByRole("listitem", { name: /completed attempt/i }),
     ).toHaveCount(2);
@@ -858,6 +863,8 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
     let state = await inspect(page);
     peakShards = Math.max(peakShards, state.shards.length);
     expect(state.hitNumbers.length).toBeLessThanOrEqual(16);
+    expect(state.audio.activeVoices).toBeLessThanOrEqual(4);
+    expect(state.audio.requests).toBe(state.hitsTaken);
     expect(state.shards.length).toBeLessThanOrEqual(
       4 * 11 * Math.ceil(4.4416089428614765 / 2.5),
     );
@@ -1112,6 +1119,8 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
     .toBeGreaterThan(0);
   const hit = await inspect(page);
   expect(hit.hitsTaken).toBeGreaterThan(0);
+  expect(hit.audio.requests).toBe(hit.hitsTaken);
+  expect(hit.audio.played).toBeGreaterThan(0);
   expect(hit.player.healthHp).toBeLessThan(775);
   expect(hit.hitNumbers.length).toBeGreaterThan(0);
   expect(hit.hitNumbers.every((number) => number.damageHp === 128 && number.text === "-128")).toBe(true);
@@ -1125,6 +1134,36 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
   expect((await inspect(page)).hitNumbers).toEqual(frozen);
   expect((await retrySnapshot(page)).hitNumbers).toEqual([]);
 });
+
+for (const mode of ["muted", "unavailable"] as const) {
+  test(`${mode} audio never blocks hits, results or retry`, async ({ page }) => {
+    if (mode === "unavailable") await page.addInitScript(() => {
+      Object.defineProperty(window, "AudioContext", { value: undefined });
+      Object.defineProperty(window, "webkitAudioContext", { value: undefined });
+    });
+    await launch(page);
+    if (mode === "muted") {
+      await page.getByRole("checkbox", { name: "Mute hit audio" }).check();
+      await page.getByRole("button", { name: "Resume", exact: true }).click();
+    }
+    await expect.poll(async () => (await inspect(page)).hitNumbers.length, { timeout: 10000, intervals: [50] }).toBeGreaterThan(0);
+    const silent = await inspect(page);
+    expect(silent.audio.requests).toBe(silent.hitsTaken);
+    expect(silent.audio.played).toBe(0);
+    if (mode === "muted") {
+      await page.getByRole("checkbox", { name: "Mute hit audio" }).uncheck();
+      await page.getByRole("button", { name: "Resume", exact: true }).click();
+      await expect.poll(async () => (await inspect(page)).audio.played, { timeout: 10000 }).toBeGreaterThan(0);
+    }
+    await expect(page.getByRole("region", { name: "Attempt complete" })).toBeVisible({ timeout: 15000 });
+    const ended = await inspect(page);
+    expect(ended.audio.requests).toBe(ended.hitsTaken);
+    expect(ended.audio.activeVoices).toBeLessThanOrEqual(4);
+    const reset = await retrySnapshot(page);
+    expect(reset.audio).toMatchObject({ requests: 0, played: 0, activeVoices: 0 });
+    expect(reset.hitNumbers).toEqual([]);
+  });
+}
 
 test("captures only unmodified gameplay keys while focused and removes capture on close", async ({
   page,
