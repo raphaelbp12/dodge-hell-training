@@ -333,7 +333,7 @@ Extend existing simulation/session advancement with narrow accepted-hit output u
 
 ### Step 12.2 - Draw The Always-Visible Health Bar
 
-Status: pending. Dependencies: 12.1.
+Status: complete. Dependencies: 12.1.
 
 **Implementation prompt**
 
@@ -342,6 +342,13 @@ Extend existing Phaser drawing with a below-player bar from authoritative HP/max
 **Focused checks:** full/partial/zero health, min/default/max zoom, resize/anchor/draw order, Retry/Home/results cleanup, unchanged physical body and HUD agreement. Reuse pixel/screenshots rather than canvas-existence assertions.
 
 **Acceptance:** presentation values/review and all five app gates pass; no gameplay/version change.
+
+**Execution and verification - 2026-10-25**
+
+- Step 12.1 remote verified at `9d4f7b03cdb188cc59e93683ca864a2c0eedb9fe`. Added one reusable Phaser Graphics below the physical player outline, above projectiles. Draws authoritative HP/max HP, retaining HUD; no independent HP state, collider change, entity React overlay or clock.
+- Delegated presentation policy: 48x6 CSS-pixel track, 1 px dark border, 6 px screen-space gap from transformed player bottom, green `#55d6a0` fill and muted red `#592e39` missing health. Inverse camera scaling keeps these dimensions readable at 0.25-3 zoom; O/P redraws immediately. These are original trainer presentation choices, not ROTMG fidelity claims.
+- TDD: browser extreme-zoom bar assertion failed at zero pixels, then desktop/narrow min/default/max cases passed. Production-safe actual-death flows verify full/partial/zero bar pixels against HUD, including empty track at death and restored-scale play. Reviewed min-zoom narrow and max-zoom desktop captures: bar remains separated below the body and nonblank; countdown overlay remains existing UI until pause/Controls work.
+- All five gates passed: 285 unit/component cases, typecheck, lint, build, 20 Chromium cases including sustained/25 retries/cleanup. Existing chunk warning unchanged. Technical visual acceptance delegated by batch; no fresh human approval, tuning, audio or hosted claim.
 
 ### Step 12.3 - Render Individual Floating Hit Amounts
 

@@ -56,7 +56,7 @@ async function renderedPixels(page: Page) {
     const context = copy.getContext("2d")!;
     context.drawImage(canvas, 0, 0);
     const data = context.getImageData(0, 0, copy.width, copy.height).data;
-    const counts = { player: 0, enemy: 0, shards: 0, ground: 0 };
+    const counts = { player: 0, enemy: 0, shards: 0, ground: 0, healthBar: 0, missingHealth: 0 };
     let enemyX = 0;
     let enemyY = 0;
     for (let offset = 0; offset < data.length; offset += 4) {
@@ -71,6 +71,8 @@ async function renderedPixels(page: Page) {
       }
       if (red > 230 && green > 180 && blue < 150) counts.shards++;
       if (red === 28 && green === 48 && blue === 42) counts.ground++;
+      if (red === 85 && green === 214 && blue === 160) counts.healthBar++;
+      if (red === 89 && green === 46 && blue === 57) counts.missingHealth++;
     }
     return {
       ...counts,
@@ -252,6 +254,7 @@ for (const width of [1440, 390]) {
       .toBeGreaterThan(5);
     const pixels = await renderedPixels(page);
     expect(pixels.player).toBeGreaterThan(10);
+    expect(pixels.healthBar).toBeGreaterThan(150);
     expect(pixels.ground).toBeGreaterThan(1000);
     const layout = await page.evaluate(() => ({
       headerBottom: document.querySelector("header")!.getBoundingClientRect()
@@ -278,6 +281,7 @@ for (const width of [1440, 390]) {
         { timeout: 15000 },
       )
       .toBeLessThan(775);
+    await expect.poll(async () => (await renderedPixels(page)).missingHealth).toBeGreaterThan(5);
     const results = page.getByRole("region", { name: "Attempt complete" });
     const completed = [];
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -286,6 +290,8 @@ for (const width of [1440, 390]) {
         "value",
         "0",
       );
+      expect((await renderedPixels(page)).healthBar).toBe(0);
+      expect((await renderedPixels(page)).missingHealth).toBeGreaterThan(150);
       const saved = await savedAttempts(page);
       expect(saved.schemaVersion).toBe(1);
       expect(saved.records).toHaveLength(attempt);
@@ -1235,6 +1241,7 @@ for (const viewport of [
       }
       await expect.poll(async () => (await inspect(page)).zoom).toBe(target);
       await expect.poll(async () => (await renderedPixels(page)).player).toBeGreaterThan(10);
+      await expect.poll(async () => (await renderedPixels(page)).healthBar).toBeGreaterThan(150);
       await page.screenshot({ path: testInfo.outputPath(`geometry-${viewport.width}-${target}.png`), fullPage: true });
     }
     await expect

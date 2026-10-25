@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
+import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
 import type { Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
@@ -39,6 +40,15 @@ const presentation = {
   enemyCore: 0x86ded9,
   shard: 0xffdf69,
   spentShard: 0xc9a948,
+  healthBar: {
+    widthCssPixels: 48,
+    heightCssPixels: 6,
+    gapCssPixels: 6,
+    borderCssPixels: 1,
+    fill: 0x55d6a0,
+    empty: 0x592e39,
+    border: 0x101b1b,
+  },
 } as const;
 const pixelsPerTile = ENCOUNTER_CONFIG.camera.cssPixelsPerTile;
 const encounters = new WeakMap<HTMLElement, EncounterScene>();
@@ -51,6 +61,7 @@ class EncounterScene extends Phaser.Scene {
   private ground!: Phaser.GameObjects.Graphics;
   private bodies!: Phaser.GameObjects.Graphics;
   private projectiles!: Phaser.GameObjects.Graphics;
+  private healthBar!: Phaser.GameObjects.Graphics;
   private keys!: Record<
     "north" | "south" | "east" | "west",
     Phaser.Input.Keyboard.Key
@@ -85,6 +96,7 @@ class EncounterScene extends Phaser.Scene {
     this.ground = this.add.graphics().setDepth(0);
     this.bodies = this.add.graphics().setDepth(1);
     this.projectiles = this.add.graphics().setDepth(2);
+    this.healthBar = this.add.graphics().setDepth(3);
     const keyboard = this.input.keyboard!;
     this.keys = keyboard.addKeys(
       { north: "W", south: "S", east: "D", west: "A" },
@@ -146,7 +158,10 @@ class EncounterScene extends Phaser.Scene {
       this.zoom = Math.max(minZoom, this.zoom - zoomStep);
     if (event.code === "KeyP")
       this.zoom = Math.min(maxZoom, this.zoom + zoomStep);
-    if (this.zoom !== previousZoom) this.onZoomChange?.(this.zoom);
+    if (this.zoom !== previousZoom) {
+      this.onZoomChange?.(this.zoom);
+      this.drawEntities();
+    }
     this.centerCamera();
     if (event.code === "KeyO" || event.code === "KeyP") this.publishView();
   };
@@ -340,6 +355,17 @@ class EncounterScene extends Phaser.Scene {
         shard.orientationRadians,
       );
     }
+    const bar = presentation.healthBar;
+    const width = bar.widthCssPixels / this.zoom;
+    const height = bar.heightCssPixels / this.zoom;
+    const border = bar.borderCssPixels / this.zoom;
+    const bottom = Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.y));
+    const left = player.positionTiles.x * pixelsPerTile - width / 2;
+    const top = (player.positionTiles.y + bottom) * pixelsPerTile + bar.gapCssPixels / this.zoom;
+    this.healthBar.clear()
+      .fillStyle(bar.border).fillRect(left - border, top - border, width + border * 2, height + border * 2)
+      .fillStyle(bar.empty).fillRect(left, top, width, height)
+      .fillStyle(bar.fill).fillRect(left, top, width * player.healthHp / PALADIN_STATS.healthHp, height);
   }
 
   inspect() {
