@@ -2,7 +2,16 @@ import { expect, test } from "vitest";
 import { ENCOUNTER_CONFIG, validateEncounterConfig } from "../config/encounter";
 import { PALADIN_DERIVED_STATS, PALADIN_STATS } from "../config/stats";
 import type { ShardState, SimulationInput, Vector2 } from "../models";
-import { advanceSimulation, createSimulation } from "./simulation.ts";
+import {
+  advanceSimulation,
+  createSimulation,
+  setDebugSettings,
+} from "./simulation.ts";
+import {
+  DEFAULT_DEBUG_SETTINGS,
+  updateDebugParameter,
+  loadSelectedDebugValues,
+} from "../config/debug";
 import {
   convexBodyFitsCircle,
   maximumBodyCenterDistance,
@@ -23,6 +32,161 @@ const horizontalContactTiles =
 const verticalContactTiles =
   Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.y)) +
   Math.max(...ENCOUNTER_CONFIG.shard.verticesTiles.map((vertex) => vertex.y));
+
+test("matched player size controls shard collision instead of the old larger preset body", () => {
+  const state = createSimulation();
+  setDebugSettings(state, {
+    ...loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
+    enemySpeedTilesPerSecond: 0,
+    initialCooldownSeconds: 5,
+  });
+  state.shards.push({
+    id: 999,
+    positionTiles: { x: 1.45, y: 0 },
+    velocityTilesPerSecond: { x: 0, y: 0 },
+    orientationRadians: 0,
+    ageSeconds: 0,
+    reversalAgeSeconds: 1.5,
+    lifetimeSeconds: 3,
+    hasReversed: false,
+    hasHitPlayer: false,
+  });
+  expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toEqual([]);
+  expect(state.hitsTaken).toBe(0);
+});
+
+test("matched player size controls movement and immediate live-resize wall containment", () => {
+  const state = createSimulation();
+  const selected = {
+    ...loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
+    godMode: true,
+  };
+  setDebugSettings(state, selected);
+  state.player.positionTiles = { x: 18.5, y: 0 };
+  advanceSimulation(state, stepSeconds, east);
+  expect(state.player.positionTiles.x).toBeGreaterThan(18.5);
+  setDebugSettings(state, { ...selected, enemyWidth: 5, enemyHeight: 5 });
+  expect(
+    convexBodyFitsCircle(
+      transformBodyVertices(
+        state.config.player.verticesTiles,
+        state.player.positionTiles,
+      ),
+      state.config.arena,
+    ),
+  ).toBe(true);
+});
+
+test("live debug settings suppress accepted hits, stop pursuit and target the arena center", () => {
+  const state = createSimulation();
+  setDebugSettings(state, {
+    ...DEFAULT_DEBUG_SETTINGS,
+    godMode: true,
+    enemySpeedTilesPerSecond: 0,
+  });
+  const enemyStart = { ...state.enemy.positionTiles };
+  state.shards.push({
+    id: 1,
+    positionTiles: { x: 0, y: 0 },
+    velocityTilesPerSecond: { x: 0, y: 0 },
+    orientationRadians: 0,
+    ageSeconds: 0,
+    reversalAgeSeconds: 1,
+    lifetimeSeconds: 2,
+    hasReversed: false,
+    hasHitPlayer: false,
+  });
+  expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toEqual([]);
+  expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
+  expect(state.hitsTaken).toBe(0);
+  expect(state.shards[0].hasHitPlayer).toBe(false);
+  expect(state.enemy.positionTiles).toEqual(enemyStart);
+  state.player.positionTiles = { x: 10, y: 0 };
+  setDebugSettings(state, {
+    ...DEFAULT_DEBUG_SETTINGS,
+    godMode: true,
+    chaseArenaCenter: true,
+  });
+  runTicks(state, 60);
+  expect(state.enemy.positionTiles.x).toBeCloseTo(0, 12);
+  expect(state.enemy.positionTiles.y).toBeGreaterThan(enemyStart.y);
+  expect(state.rulesVersion).not.toBe(ENCOUNTER_CONFIG.rulesVersion);
+});
+
+test("live projectile edits preserve IDs and once-only reversal, and lifetime reductions expire existing shards", () => {
+  const state = createSimulation();
+  let settings = {
+    ...DEFAULT_DEBUG_SETTINGS,
+    godMode: true,
+    initialCooldownSeconds: 0,
+    enemySpeedTilesPerSecond: 0,
+  };
+  setDebugSettings(state, settings);
+  runTicks(state, 2);
+  const first = state.shards[0];
+  const firstId = first.id;
+  settings = {
+    ...settings,
+    emitterCount: 3,
+    projectileSpeedTilesPerSecond: 12,
+    reversalSeconds: 0.05,
+  };
+  setDebugSettings(state, settings);
+  runTicks(state, 12);
+  expect(
+    Math.hypot(first.velocityTilesPerSecond.x, first.velocityTilesPerSecond.y),
+  ).toBeCloseTo(12);
+  expect(first.hasReversed).toBe(true);
+  const returnedVelocity = { ...first.velocityTilesPerSecond };
+  settings = { ...settings, reversalSeconds: 2 };
+  setDebugSettings(state, settings);
+  runTicks(state, 1);
+  expect(first.velocityTilesPerSecond).toEqual(returnedVelocity);
+  expect(first.id).toBe(firstId);
+  expect(new Set(state.shards.map((shard) => shard.id)).size).toBe(
+    state.shards.length,
+  );
+  const shortened = updateDebugParameter(settings, "lifetimeSeconds", 0.1);
+  setDebugSettings(state, shortened);
+  expect(state.shards.some((shard) => shard.id === firstId)).toBe(false);
+  expect(
+    state.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
+  ).toBe(true);
+});
+
+test("live burst edits re-anchor scheduling without a catch-up avalanche and rotation can stop", () => {
+  const state = createSimulation();
+  setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
+  runTicks(state, 600);
+  const count = state.volleysFired;
+  const phase = state.enemy.emitterPhaseRadians;
+  setDebugSettings(state, {
+    ...DEFAULT_DEBUG_SETTINGS,
+    godMode: true,
+    shotsPerEmitter: 1,
+    shotIntervalSeconds: 0.05,
+    cooldownSeconds: 0.05,
+    rotationDegreesPerSecond: 0,
+  });
+  runTicks(state, 1);
+  expect(state.volleysFired).toBe(count);
+  expect(state.enemy.emitterPhaseRadians).toBe(phase);
+  runTicks(state, 5);
+  expect(state.volleysFired - count).toBe(2);
+});
+
+test("arena-center chase reaches the exact center and ignores the player silhouette", () => {
+  const state = createSimulation();
+  state.player.positionTiles = { x: 10, y: 0 };
+  setDebugSettings(state, {
+    ...DEFAULT_DEBUG_SETTINGS,
+    godMode: true,
+    chaseArenaCenter: true,
+    enemySpeedTilesPerSecond: 12,
+  });
+  runTicks(state, 180);
+  expect(state.enemy.positionTiles).toEqual(ENCOUNTER_CONFIG.arena.centerTiles);
+});
 
 test("activates the approved v2 preset and eleven-volley first group atomically", () => {
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(

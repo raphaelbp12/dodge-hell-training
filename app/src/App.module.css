@@ -54,6 +54,99 @@
 .hiddenActions {
   visibility: hidden;
 }
+.debugLayout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.mainContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.debugPanel {
+  flex: 0 0 320px;
+  width: 320px;
+  max-height: calc(100svh - 110px);
+  overflow: auto;
+  padding: 16px;
+  background: #f8fbf8;
+  border-left: 1px solid #c4d5cc;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.debugHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.debugHeading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.debugPanel button {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.debugLoad {
+  width: 100%;
+  margin-bottom: 16px;
+}
+.debugToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.debugPanel input {
+  accent-color: #26885d;
+}
+.debugPanel fieldset {
+  border: 0;
+  border-top: 1px solid #c4d5cc;
+  padding: 12px 0 4px;
+  margin: 20px 0 0;
+  min-width: 0;
+}
+.debugPanel legend {
+  font-weight: 600;
+  padding-right: 8px;
+}
+.debugParameter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  margin-bottom: 14px;
+}
+.debugParameter output {
+  color: #4a6b5c;
+  font-family: Consolas, monospace;
+}
+.debugParameter input {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+}
+.debugBadge {
+  color: #993c27;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .debugLayout {
+    flex-direction: column;
+  }
+  .debugPanel {
+    order: -1;
+    flex: none;
+    width: 100%;
+    max-height: 38svh;
+    border-left: 0;
+    border-bottom: 1px solid #c4d5cc;
+  }
+}
 .telemetry [aria-label="Session status"] {
   min-width: 72px;
 }

@@ -3,6 +3,7 @@ import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { createSimulation } from "../simulation/simulation";
 import type { SimulationInput } from "../models";
 import { SessionController } from "./session";
+import { DEFAULT_DEBUG_SETTINGS, DEBUG_RULES_VERSION } from "../config/debug";
 
 const idle: SimulationInput = {
   north: false,
@@ -68,6 +69,26 @@ function kill(session: SessionController) {
   });
   return session.advance(tick, idle);
 }
+
+test("debug eligibility stays tainted until retry and result-screen settings apply to the next attempt", () => {
+  const session = running();
+  session.setDebugSettings({
+    ...DEFAULT_DEBUG_SETTINGS,
+    chaseArenaCenter: true,
+  });
+  session.setDebugSettings(DEFAULT_DEBUG_SETTINGS);
+  expect(session.simulation.rulesVersion).toBe(DEBUG_RULES_VERSION);
+  const result = kill(session);
+  expect(result?.rulesVersion).toBe(DEBUG_RULES_VERSION);
+  session.setDebugSettings({ ...DEFAULT_DEBUG_SETTINGS, godMode: true });
+  expect(session.result).toBe(result);
+  expect(session.simulation.debugSettings.godMode).toBe(false);
+  session.retry();
+  expect(session.simulation.debugSettings.godMode).toBe(true);
+  session.setDebugSettings(DEFAULT_DEBUG_SETTINGS);
+  session.retry();
+  expect(session.simulation.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion);
+});
 
 test("home ignores retry, pause and elapsed time until Start", () => {
   const session = new SessionController();

@@ -1,10 +1,15 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import type { EncounterView } from "./game/phaser/encounter";
 import { RULES_VERSION } from "./game/config/encounter";
+import {
+  DEBUG_PARAMETERS,
+  DEBUG_RULES_VERSION,
+  SELECTED_DEBUG_VALUES,
+} from "./game/config/debug";
 import type { AttemptResult } from "./game/session/session";
 import {
   HISTORY_STORAGE_KEY,
@@ -22,6 +27,7 @@ const adapter = vi.hoisted(() => ({
   retry: vi.fn(),
   setMuted: vi.fn(),
   setControlsOpen: vi.fn(),
+  setDebugSettings: vi.fn(),
   initialMuted: false,
   initialZoom: undefined as number | undefined,
   onZoomChange: undefined as undefined | ((zoom: number) => void),
@@ -52,6 +58,7 @@ vi.mock("./game/phaser/encounter", () => ({
       retry: adapter.retry,
       setMuted: adapter.setMuted,
       setControlsOpen: adapter.setControlsOpen,
+      setDebugSettings: adapter.setDebugSettings,
       destroy: () => {
         adapter.active--;
         adapter.destroyed++;
@@ -81,6 +88,83 @@ beforeEach(() => {
       this.open = false;
     },
   });
+});
+
+test("debug panel exposes every parameter and sends live flags/sliders without recreating the runtime", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Debug" }));
+  for (const parameter of DEBUG_PARAMETERS)
+    expect(screen.getByRole("slider", { name: parameter.label })).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  await user.click(screen.getByRole("checkbox", { name: "God mode" }));
+  await user.click(
+    screen.getByRole("checkbox", { name: "Chase arena center" }),
+  );
+  fireEvent.change(screen.getByRole("slider", { name: "Projectile speed" }), {
+    target: { value: "12" },
+  });
+  expect(adapter.setDebugSettings).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      godMode: true,
+      chaseArenaCenter: true,
+      projectileSpeedTilesPerSecond: 12,
+    }),
+  );
+  expect(adapter.created).toBe(1);
+  await user.click(
+    screen.getByRole("button", { name: "Load selected values" }),
+  );
+  expect(
+    screen.getByRole("checkbox", { name: "Match player to head" }),
+  ).toBeChecked();
+  for (const [key, value] of Object.entries(SELECTED_DEBUG_VALUES)) {
+    const parameter = DEBUG_PARAMETERS.find(
+      (parameter) => parameter.key === key,
+    )!;
+    expect(screen.getByRole("slider", { name: parameter.label })).toHaveValue(
+      String(value),
+    );
+  }
+  expect(adapter.setDebugSettings).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      ...SELECTED_DEBUG_VALUES,
+      godMode: true,
+      chaseArenaCenter: true,
+      matchPlayerToHead: true,
+    }),
+  );
+  expect(adapter.created).toBe(1);
+  await user.click(
+    screen.getByRole("checkbox", { name: "Match player to head" }),
+  );
+  expect(adapter.setDebugSettings).toHaveBeenLastCalledWith(
+    expect.objectContaining({ matchPlayerToHead: false }),
+  );
+  await user.click(screen.getByRole("button", { name: "Reset defaults" }));
+  expect(adapter.setDebugSettings).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      godMode: false,
+      chaseArenaCenter: false,
+      projectileSpeedTilesPerSecond: 8,
+    }),
+  );
+});
+
+test("debug deaths never write normal attempt history", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  act(() =>
+    adapter.onResult!({
+      attemptId: 1,
+      rulesVersion: DEBUG_RULES_VERSION,
+      elapsedSeconds: 10,
+      hitsTaken: 7,
+      outcome: "death",
+    }),
+  );
+  expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
 });
 
 test("Home Controls is labeled, lists actual bindings, closes and restores its opener without launching", async () => {

@@ -10,22 +10,42 @@ The preset is `crystal-worm-child-head-paladin-v2`: shared polygon bodies/collis
 
 Site: https://raphaelbp12.github.io/dodge-hell-training/. **V2 live-verified on 2026-10-25** at runtime commit `e12f3fe4742cb9d02374f07563192dcc5a727b72`: [Actions run 40193885409](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40193885409), all six jobs successful, Pages deployment `7313260767` and both hosted Chromium checks passed. All four emitted files match the tested local build byte-for-byte. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage. Fresh local preview: http://127.0.0.1:5177/dodge-hell-training/.
 
+## Debug Tools
+
+The header's Debug button opens a live, non-modal enemy panel on Home or during play. This is a locally implemented follow-up to the release above, explicitly requested on 2026-10-25; that earlier hosted verification does not claim this addition is deployed.
+
+All 19 sliders use [typed debug metadata](app/src/game/config/debug.ts): chase speed; spawn X/Y; head width/height; emitter count, offset, phase and rotation speed; shots per burst, shot interval, burst cooldown and initial cooldown; projectile damage, speed, reversal age, lifetime and width/height. Positive rotation is clockwise, negative is counterclockwise and zero stops rotation. Fixed collision/expiration policies are not tuning parameters.
+
+God mode suppresses accepted hits, damage, combat triggers, hit counts, new numbers and hit audio. It does not heal old damage. Chase arena center moves the head to the exact arena center instead of following/stopping at the player. The world keeps running while debug controls have focus; gameplay keys are isolated there. Existing blur/Controls pause safety remains.
+
+Changes apply live: spawn coordinates immediately reposition the head inside the arena; dimensions change shared drawing/collision; speed/timing affect existing projectiles as well as new ones. Already-reversed shards never reverse twice. Shorter lifetimes expire older shards immediately. Burst timing changes start a fresh schedule at the current time, never replay missed volleys. Reversal and lifetime sliders keep reversal strictly before expiration. Initial cooldown only governs the initial wait/new attempts; changing it during play re-anchors the next shot rather than replaying the initial burst.
+
+Settings survive Retry/Home for this visit, but are not stored. Reset defaults restores the preset. Any adjusted attempt remains labeled `Debug attempt / not saved` even after reset; start a fresh Retry/Start with defaults for normal v2 scoring. Debug deaths never enter history or personal bests. The unchanged preset is still v2; debug attempts use `crystal-worm-child-head-debug`.
+
+**Load selected values** restores the user's latest 2026-10-25 screenshot as an unranked debug preset, without promoting it to scored defaults. Head width/height 1.25/1.25 tiles; six emitters, 0.35-tile offset, phase 0 degrees, rotation 45 degrees/s; eleven shots at 0.19-second intervals, 3-second cooldown, 2-second initial cooldown; projectile 160 HP, 8 tiles/s, reversal 1.5 s, lifetime 3 s, width/height 1.45/0.65 tiles. It also enables **Match player to head**, as requested, so the player is 1.25x1.25 tiles and follows subsequent head width/height edits. Both bodies retain their existing silhouettes, scaled to the same dimensions; drawing, collision, pursuit, wall containment and health-bar/hit-text placement use the active player body. Chase speed, spawn coordinates, god mode and chase target are outside the screenshot and remain at their current settings. Disable the size-link checkbox to restore only the player's original size; Reset defaults restores the entire original v2 preset. Choosing this conservative debug-only scope was delegated while the user was unavailable; it is not explicit approval to replace the scored preset.
+
+Slider limits are implementation-selected exploration bounds, not ROTMG claims: head speed 0-12 tiles/s, 1-8 emitters, 1-24 shots, minimum shot/cooldown 0.05 s, projectile speed 0-32 tiles/s and lifetime at most 12 s. The requested debug size link does not tune player stats or the arena, add a second clock/backend/copied artwork, or migrate the preset.
+
+Initial local debug-tool verification on 2026-10-25 passed 319 unit/component tests, typecheck, lint, build and all 29 Chromium cases. New desktop/narrow tests exercise all sliders, live progress, real overlapping god-mode shots, disabling god mode for a real unsaved death, reset/Retry eligibility and held-key/focus safety; nonblank canvas and screenshots were checked at both widths. The saved screenshot-preset follow-up passed all five gates again with 320 unit/component tests and 29 Chromium cases, including independent runtime assertions for all 16 selected values and reviewed load-action screenshots. Existing large Phaser chunk warning remains nonblocking. This follow-up has not been committed, pushed or live-verified.
+
+The latest values and matched-player follow-up passed 323 unit/component tests, typecheck, lint, build and all 29 Chromium cases with one browser worker. Both desktop and narrow captures show equal player/head dimensions, with canvas-pixel assertions for their sizes and the health-bar gap; simulation tests cover the resized collider and immediate wall containment. The initial two-worker browser run passed 28 cases but timed out finding Start in the existing movement case; that case passed unchanged in isolation before the complete one-worker rerun. The timeout was not reproduced or attributed to a confirmed cause. These changes remain local and uncommitted.
+
 ## V2 Contract
 
 [The mechanics contract](docs/mechanics.md#implemented-v2-handoff) records provenance and fidelity limits. [Canonical geometry](app/src/game/config/geometry-candidate.ts), [encounter config](app/src/game/config/encounter.ts) and [pure geometry](app/src/game/simulation/geometry.ts) own the implementation.
 
-| Quantity | Implemented Value |
-| --- | --- |
-| Paladin | 775 HP, 32 DEF, 41 SPD, 42 VIT; unchanged fixed equipment/stat formulas |
-| Arena/spawn | Radius 19.2 tiles; player `(0,0)`, head `(0,-16.2)` |
-| Physical shapes | Upright player/head octagons, pointed symmetric shard hexagon; shared drawing/collision vertices and transforms |
-| Emission | Four emitters, eleven shots each, 0.15 s spacing, 1 s after last shot, initial 2 s cooldown, clockwise 45 degrees/s |
-| Offset/speed/damage | 0.18532903718071878 tile (10% head width), 8 tiles/s, incoming 160 HP, accepted post-defense 128 HP |
-| Reversal/lifetime | 2.2208044714307382 / 4.4416089428614765 seconds; exact polygon leading-edge calibration, not rounded to ticks |
-| Reach/bound | 19.2 tiles from a stationary centered head to leading body edge; 44 shards/group, period 2.5 s, conservative live bound 88 |
-| Camera | 32 CSS pixels/tile at zoom 1; zoom 0.25-3, default 1, step 0.125 |
-| Clock | One Phaser driver; pure simulation at 1/60 s, max eight ticks/advance, no inactive-time catch-up |
-| History | Latest 100 completed deaths, exact-version best; v1 retained as Other rules and excluded from v2 bests |
+| Quantity            | Implemented Value                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Paladin             | 775 HP, 32 DEF, 41 SPD, 42 VIT; unchanged fixed equipment/stat formulas                                                    |
+| Arena/spawn         | Radius 19.2 tiles; player `(0,0)`, head `(0,-16.2)`                                                                        |
+| Physical shapes     | Upright player/head octagons, pointed symmetric shard hexagon; shared drawing/collision vertices and transforms            |
+| Emission            | Four emitters, eleven shots each, 0.15 s spacing, 1 s after last shot, initial 2 s cooldown, clockwise 45 degrees/s        |
+| Offset/speed/damage | 0.18532903718071878 tile (10% head width), 8 tiles/s, incoming 160 HP, accepted post-defense 128 HP                        |
+| Reversal/lifetime   | 2.2208044714307382 / 4.4416089428614765 seconds; exact polygon leading-edge calibration, not rounded to ticks              |
+| Reach/bound         | 19.2 tiles from a stationary centered head to leading body edge; 44 shards/group, period 2.5 s, conservative live bound 88 |
+| Camera              | 32 CSS pixels/tile at zoom 1; zoom 0.25-3, default 1, step 0.125                                                           |
+| Clock               | One Phaser driver; pure simulation at 1/60 s, max eight ticks/advance, no inactive-time catch-up                           |
+| History             | Latest 100 completed deaths, exact-version best; v1 retained as Other rules and excluded from v2 bests                     |
 
 Pursuit stops at direction-dependent silhouette contact with zero extra gap. Actual vertices constrain player/head to the circle; broad-phase rejection never proves a hit. Swept polygon contact uses existing reversal/expiry segments and matching player interpolation. Shards retain initial firing-axis orientation, expire only by lifetime and hit once via per-shard state. No origin/homing, collision/wall/offscreen despawn, global immunity, player attacks, contact damage or blocking.
 
@@ -33,16 +53,16 @@ Pursuit stops at direction-dependent silhouette contact with zero extra gap. Act
 
 ## V2 Controls And Feedback
 
-| Input | Action |
-| --- | --- |
-| WASD | Move; diagonals normalized |
-| R / Retry | Immediate fresh attempt, no retry countdown; held R does not repeat |
-| O / P | Zoom out / in; exact valid values persist across same-origin reload |
-| Escape | Pause/resume active play; in Controls, close only and stay paused |
-| Controls | Home/HUD native modal; freezes play/countdown and blocks background gameplay keys |
-| Resume | Deliberately resume after focus loss, pause or closing session Controls |
-| Mute | Visit-local hit-audio checkbox, independent of accepted hits/history |
-| Home | Abort unfinished attempt, remove runtime and focus Start |
+| Input                          | Action                                                                             |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| WASD                           | Move; diagonals normalized                                                         |
+| R / Retry                      | Immediate fresh attempt, no retry countdown; held R does not repeat                |
+| O / P                          | Zoom out / in; exact valid values persist across same-origin reload                |
+| Escape                         | Pause/resume active play; in Controls, close only and stay paused                  |
+| Controls                       | Home/HUD native modal; freezes play/countdown and blocks background gameplay keys  |
+| Resume                         | Deliberately resume after focus loss, pause or closing session Controls            |
+| Mute                           | Visit-local hit-audio checkbox, independent of accepted hits/history               |
+| Home                           | Abort unfinished attempt, remove runtime and focus Start                           |
 | Tab / Shift+Tab, Enter / Space | Standard UI navigation/activation; Controls contains focus and restores its opener |
 
 Start counts down for three active seconds. Focus loss clears held input and pauses; no stale movement/time catch-up. Zoom/resize never changes speed, collision, scoring or rules identity. Keyboard is required at narrow widths; no touch controls.

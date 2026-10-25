@@ -13,6 +13,113 @@ import {
 } from "./storage/attempts";
 import styles from "./App.module.css";
 import { ZoomPreference } from "./storage/zoom";
+import {
+  DEBUG_PARAMETERS,
+  DEBUG_RULES_VERSION,
+  DEFAULT_DEBUG_SETTINGS,
+  loadSelectedDebugValues,
+  updateDebugParameter,
+  type DebugSettings,
+} from "./game/config/debug";
+
+function DebugPanel({
+  settings,
+  onChange,
+  onClose,
+}: {
+  settings: DebugSettings;
+  onChange: (settings: DebugSettings) => void;
+  onClose: () => void;
+}) {
+  return (
+    <aside
+      id="debug-tools"
+      aria-label="Enemy debug tools"
+      data-debug-tools
+      className={styles.debugPanel}
+    >
+      <div className={styles.debugHeading}>
+        <h2>Enemy debug</h2>
+        <button type="button" onClick={onClose}>
+          Close debug
+        </button>
+      </div>
+      <button
+        className={styles.debugLoad}
+        type="button"
+        onClick={() => onChange(loadSelectedDebugValues(settings))}
+      >
+        Load selected values
+      </button>
+      <label className={styles.debugToggle}>
+        <input
+          type="checkbox"
+          checked={settings.godMode}
+          onChange={(event) =>
+            onChange({ ...settings, godMode: event.target.checked })
+          }
+        />
+        God mode
+      </label>
+      <label className={styles.debugToggle}>
+        <input
+          type="checkbox"
+          checked={settings.chaseArenaCenter}
+          onChange={(event) =>
+            onChange({ ...settings, chaseArenaCenter: event.target.checked })
+          }
+        />
+        Chase arena center
+      </label>
+      <label className={styles.debugToggle}>
+        <input
+          type="checkbox"
+          checked={settings.matchPlayerToHead}
+          onChange={(event) =>
+            onChange({ ...settings, matchPlayerToHead: event.target.checked })
+          }
+        />
+        Match player to head
+      </label>
+      {(["Enemy", "Emitters", "Burst", "Projectiles"] as const).map((group) => (
+        <fieldset key={group}>
+          <legend>{group}</legend>
+          {DEBUG_PARAMETERS.filter(
+            (parameter) => parameter.group === group,
+          ).map((parameter) => (
+            <label key={parameter.key} className={styles.debugParameter}>
+              <span>{parameter.label}</span>
+              <output>
+                {Number(settings[parameter.key].toFixed(3))} {parameter.unit}
+              </output>
+              <input
+                type="range"
+                aria-label={parameter.label}
+                data-debug-parameter={parameter.key}
+                min={parameter.min}
+                max={parameter.max}
+                step={parameter.step}
+                value={settings[parameter.key]}
+                onChange={(event) =>
+                  onChange(
+                    updateDebugParameter(
+                      settings,
+                      parameter.key,
+                      Number(event.target.value),
+                    ),
+                  )
+                }
+              />
+            </label>
+          ))}
+        </fieldset>
+      ))}
+      <button type="button" onClick={() => onChange(DEFAULT_DEBUG_SETTINGS)}>
+        Reset defaults
+      </button>
+    </aside>
+  );
+}
 
 function ControlsDialog({ onClose }: { onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -116,6 +223,7 @@ function Encounter({
   zoomPreference,
   zoomStorage,
   muted,
+  debugSettings,
   onHome,
   history,
   historySnapshot,
@@ -124,6 +232,7 @@ function Encounter({
   zoomPreference: RefObject<number>;
   zoomStorage: ZoomPreference;
   muted: boolean;
+  debugSettings: DebugSettings;
   onHome: () => void;
   history: AttemptHistory;
   historySnapshot: HistorySnapshot;
@@ -134,6 +243,7 @@ function Encounter({
   const runtime = useRef<EncounterHandle | null>(null);
   const [controlsOpen, setControlsOpen] = useState(false);
   const initialMuted = useRef(muted);
+  const initialDebugSettings = useRef(debugSettings);
   const [view, setView] = useState<EncounterView>({
     healthHp: PALADIN_STATS.healthHp,
     elapsedSeconds: 0,
@@ -160,12 +270,14 @@ function Encounter({
       {
         initialZoom: zoomPreference.current,
         initialMuted: initialMuted.current,
+        initialDebugSettings: initialDebugSettings.current,
         onZoomChange: (zoom) => {
           if (!active) return;
           zoomPreference.current = zoom;
           zoomStorage.set(zoom);
         },
         onResult: (result) => {
+          if (result.rulesVersion === DEBUG_RULES_VERSION) return;
           if (!active || recordedAttempts.has(result.attemptId)) return;
           recordedAttempts.add(result.attemptId);
           const { attemptId, ...metrics } = result;
@@ -185,6 +297,9 @@ function Encounter({
   useEffect(() => {
     runtime.current?.setMuted(muted);
   }, [muted]);
+  useEffect(() => {
+    runtime.current?.setDebugSettings(debugSettings);
+  }, [debugSettings]);
   return (
     <>
       <div className={styles.telemetry} aria-label="Session HUD">
@@ -201,6 +316,9 @@ function Encounter({
           {view.elapsedSeconds.toFixed(1)} s
         </output>
         <span>{view.hitsTaken} hits</span>
+        {view.debug && (
+          <span className={styles.debugBadge}>Debug attempt / not saved</span>
+        )}
         <span aria-label="Primary stats" className={styles.stats}>
           <span>{PALADIN_STATS.vitality} VIT</span>
           <span>{PALADIN_STATS.speed} SPD</span>
@@ -271,6 +389,9 @@ function Encounter({
             <h2 id="result-title" ref={resultHeading} tabIndex={-1}>
               Attempt complete
             </h2>
+            {view.result.rulesVersion === DEBUG_RULES_VERSION && (
+              <p className={styles.debugBadge}>Debug attempt / not saved</p>
+            )}
             {!!view.finalHitAmounts?.length && (
               <div
                 role="group"
@@ -330,6 +451,11 @@ export default function App() {
   const [launched, setLaunched] = useState(false);
   const [homeControlsOpen, setHomeControlsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugSettings, setDebugSettings] = useState<DebugSettings>(
+    DEFAULT_DEBUG_SETTINGS,
+  );
+  const debugButton = useRef<HTMLButtonElement>(null);
   const startButton = useRef<HTMLButtonElement>(null);
   const [zoomStorage] = useState(
     () => new ZoomPreference(() => window.localStorage),
@@ -346,6 +472,16 @@ export default function App() {
           <h1>Crystal Worm Child</h1>
         </div>
         <div className={styles.headerTools}>
+          <button
+            ref={debugButton}
+            type="button"
+            data-debug-tools
+            aria-expanded={debugOpen}
+            aria-controls="debug-tools"
+            onClick={() => setDebugOpen(!debugOpen)}
+          >
+            Debug
+          </button>
           <span className={styles.encounterLabel}>Head / Survival</span>
           <label className={styles.mute}>
             <input
@@ -359,103 +495,124 @@ export default function App() {
         </div>
       </header>
       <p className={styles.keyboardNotice}>Desktop keyboard required</p>
-      {launched ? (
-        <Encounter
-          zoomPreference={zoomPreference}
-          zoomStorage={zoomStorage}
-          muted={muted}
-          onHome={() => setLaunched(false)}
-          history={history}
-          historySnapshot={historySnapshot}
-          onHistoryChange={setHistorySnapshot}
-        />
-      ) : (
-        <div className={styles.home}>
-          <section className={styles.intro} aria-labelledby="practice-title">
-            <div className={styles.specimen} aria-hidden="true">
-              <div className={styles.crystal} />
-            </div>
-            <div>
-              <span className={styles.eyebrow}>01 / Crystal cavern</span>
-              <h2 id="practice-title">Crystal Worm Child Head</h2>
-              <p>
-                Survive the returning shards of a single pursuing head. A fixed
-                Paladin, one arena, and another attempt whenever you are ready.
-              </p>
-              <button
-                ref={startButton}
-                className={styles.primary}
-                type="button"
-                onClick={() => setLaunched(true)}
+      <div className={styles.debugLayout}>
+        <div className={styles.mainContent}>
+          {launched ? (
+            <Encounter
+              zoomPreference={zoomPreference}
+              zoomStorage={zoomStorage}
+              muted={muted}
+              debugSettings={debugSettings}
+              onHome={() => setLaunched(false)}
+              history={history}
+              historySnapshot={historySnapshot}
+              onHistoryChange={setHistorySnapshot}
+            />
+          ) : (
+            <div className={styles.home}>
+              <section
+                className={styles.intro}
+                aria-labelledby="practice-title"
               >
-                Start
-              </button>
-              <button
-                type="button"
-                className={styles.homeControls}
-                onClick={() => setHomeControlsOpen(true)}
+                <div className={styles.specimen} aria-hidden="true">
+                  <div className={styles.crystal} />
+                </div>
+                <div>
+                  <span className={styles.eyebrow}>01 / Crystal cavern</span>
+                  <h2 id="practice-title">Crystal Worm Child Head</h2>
+                  <p>
+                    Survive the returning shards of a single pursuing head. A
+                    fixed Paladin, one arena, and another attempt whenever you
+                    are ready.
+                  </p>
+                  <button
+                    ref={startButton}
+                    className={styles.primary}
+                    type="button"
+                    onClick={() => setLaunched(true)}
+                  >
+                    Start
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.homeControls}
+                    onClick={() => setHomeControlsOpen(true)}
+                  >
+                    Controls
+                  </button>
+                </div>
+              </section>
+              <section className={styles.preset} aria-labelledby="preset-title">
+                <h2 id="preset-title">Paladin</h2>
+                <span>{PALADIN_STATS.healthHp} HP</span>
+                <span>{PALADIN_STATS.vitality} VIT</span>
+                <span>{PALADIN_STATS.speed} SPD</span>
+                <span>{PALADIN_STATS.defense} DEF</span>
+              </section>
+              <History snapshot={historySnapshot} />
+              <section
+                className={styles.changelog}
+                aria-labelledby="changelog-title"
               >
-                Controls
-              </button>
+                <h2 id="changelog-title">Changelog</h2>
+                <time dateTime="2026-10-25">25 Oct 2026</time>
+                <ul>
+                  <li>
+                    V2 polygon encounter with eleven-shot spirals and versioned
+                    comparisons.
+                  </li>
+                  <li>
+                    Reload-safe zoom, player health bar and individual hit
+                    amounts.
+                  </li>
+                  <li>
+                    Original hit audio, visit-local mute and Home/HUD Controls.
+                  </li>
+                </ul>
+                <time dateTime="2026-10-24">24 Oct 2026</time>
+                <ul>
+                  <li>
+                    Crystal Worm Child Head encounter with returning shard
+                    bursts.
+                  </li>
+                  <li>Pause, immediate retry, and attempt results.</li>
+                  <li>
+                    Local attempt history and retained personal best by rules
+                    version.
+                  </li>
+                </ul>
+              </section>
+              <footer className={styles.footer}>
+                <nav aria-label="References">
+                  <a href="https://www.realmeye.com/wiki/crystal-worm-child">
+                    Enemy reference
+                  </a>
+                  <a href="https://www.realmofthemadgod.com/">
+                    Realm of the Mad God
+                  </a>
+                </nav>
+                <p>
+                  Unofficial practice encounter. Pursuit and timing include
+                  trainer-specific approximations.
+                </p>
+              </footer>
+              {homeControlsOpen && (
+                <ControlsDialog onClose={() => setHomeControlsOpen(false)} />
+              )}
             </div>
-          </section>
-          <section className={styles.preset} aria-labelledby="preset-title">
-            <h2 id="preset-title">Paladin</h2>
-            <span>{PALADIN_STATS.healthHp} HP</span>
-            <span>{PALADIN_STATS.vitality} VIT</span>
-            <span>{PALADIN_STATS.speed} SPD</span>
-            <span>{PALADIN_STATS.defense} DEF</span>
-          </section>
-          <History snapshot={historySnapshot} />
-          <section
-            className={styles.changelog}
-            aria-labelledby="changelog-title"
-          >
-            <h2 id="changelog-title">Changelog</h2>
-            <time dateTime="2026-10-25">25 Oct 2026</time>
-            <ul>
-              <li>
-                V2 polygon encounter with eleven-shot spirals and versioned
-                comparisons.
-              </li>
-              <li>
-                Reload-safe zoom, player health bar and individual hit amounts.
-              </li>
-              <li>
-                Original hit audio, visit-local mute and Home/HUD Controls.
-              </li>
-            </ul>
-            <time dateTime="2026-10-24">24 Oct 2026</time>
-            <ul>
-              <li>
-                Crystal Worm Child Head encounter with returning shard bursts.
-              </li>
-              <li>Pause, immediate retry, and attempt results.</li>
-              <li>
-                Local attempt history and retained personal best by rules
-                version.
-              </li>
-            </ul>
-          </section>
-          <footer className={styles.footer}>
-            <nav aria-label="References">
-              <a href="https://www.realmeye.com/wiki/crystal-worm-child">
-                Enemy reference
-              </a>
-              <a href="https://www.realmofthemadgod.com/">
-                Realm of the Mad God
-              </a>
-            </nav>
-            <p>
-              Unofficial practice encounter. Pursuit and timing include
-              trainer-specific approximations.
-            </p>
-          </footer>
-          {homeControlsOpen && (
-            <ControlsDialog onClose={() => setHomeControlsOpen(false)} />
           )}
         </div>
-      )}
+        {debugOpen && (
+          <DebugPanel
+            settings={debugSettings}
+            onChange={setDebugSettings}
+            onClose={() => {
+              setDebugOpen(false);
+              debugButton.current?.focus();
+            }}
+          />
+        )}
+      </div>
     </main>
   );
 }

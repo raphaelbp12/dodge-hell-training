@@ -3,6 +3,7 @@ import { writeFile } from "node:fs/promises";
 import type { SessionSnapshot, Vector2 } from "../src/game/models.ts";
 
 type Inspection = SessionSnapshot & {
+  debugSettings: Record<string, number | boolean>;
   volleysFired: number;
   ticksElapsed: number;
   accumulatorSeconds: number;
@@ -142,6 +143,195 @@ async function retrySnapshot(
     );
     return snapshot;
   }, source);
+}
+
+for (const width of [1440, 390]) {
+  test(`live enemy debug sliders, god mode and safe Retry work at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+    await page.goto("./");
+    await page.getByRole("button", { name: "Debug", exact: true }).click();
+    await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
+    await page.getByRole("checkbox", { name: "Chase arena center" }).check();
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect
+      .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
+      .toBeGreaterThan(0);
+    const setRange = async (label: string, value: number) => {
+      await page
+        .getByRole("slider", { name: label, exact: true })
+        .evaluate((element, value) => {
+          const input = element as HTMLInputElement;
+          Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value",
+          )!.set!.call(input, String(value));
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }, value);
+    };
+    const sliders = page.getByRole("slider");
+    await expect(sliders).toHaveCount(19);
+    await page.getByRole("button", { name: "Load selected values" }).click();
+    await expect
+      .poll(async () => (await inspect(page)).debugSettings)
+      .toMatchObject({
+        enemyWidth: 1.25,
+        enemyHeight: 1.25,
+        emitterCount: 6,
+        emitterRadiusTiles: 0.35,
+        initialPhaseDegrees: 0,
+        rotationDegreesPerSecond: 45,
+        shotsPerEmitter: 11,
+        shotIntervalSeconds: 0.19,
+        cooldownSeconds: 3,
+        initialCooldownSeconds: 2,
+        projectileDamageHp: 160,
+        projectileSpeedTilesPerSecond: 8,
+        reversalSeconds: 1.5,
+        lifetimeSeconds: 3,
+        projectileWidth: 1.45,
+        projectileHeight: 0.65,
+        godMode: true,
+        chaseArenaCenter: true,
+        matchPlayerToHead: true,
+      });
+    await expect(
+      page.getByRole("checkbox", { name: "Match player to head" }),
+    ).toBeChecked();
+    await setRange("Chase speed", 0);
+    await setRange("Spawn X", 4);
+    await setRange("Spawn Y", 0);
+    await expect
+      .poll(async () => (await inspect(page)).enemy.positionTiles)
+      .toEqual({ x: 4, y: 0 });
+    const matchingBodies = await page.locator("canvas").evaluate((canvas) => {
+      const image = document.createElement("canvas");
+      image.width = (canvas as HTMLCanvasElement).width;
+      image.height = (canvas as HTMLCanvasElement).height;
+      const context = image.getContext("2d")!;
+      context.drawImage(canvas as HTMLCanvasElement, 0, 0);
+      const pixels = context.getImageData(0, 0, image.width, image.height).data;
+      const bounds = {
+        player: { left: image.width, right: -1, top: image.height, bottom: -1 },
+        enemy: { left: image.width, right: -1, top: image.height, bottom: -1 },
+      };
+      let barTop = image.height;
+      for (let offset = 0; offset < pixels.length; offset += 4) {
+        const red = pixels[offset]!,
+          green = pixels[offset + 1]!,
+          blue = pixels[offset + 2]!;
+        const x = (offset / 4) % image.width,
+          y = Math.floor(offset / 4 / image.width);
+        const body =
+          red > 225 && green > 235 && blue > 225
+            ? bounds.player
+            : red > 200 && green > 70 && green < 160 && blue < 150
+              ? bounds.enemy
+              : null;
+        if (body) {
+          body.left = Math.min(body.left, x);
+          body.right = Math.max(body.right, x);
+          body.top = Math.min(body.top, y);
+          body.bottom = Math.max(body.bottom, y);
+        }
+        if (red === 85 && green === 214 && blue === 160)
+          barTop = Math.min(barTop, y);
+      }
+      return {
+        sizes: Object.values(bounds).map((body) => ({
+          width: body.right - body.left + 1,
+          height: body.bottom - body.top + 1,
+        })),
+        barGap: barTop - bounds.player.bottom - 1,
+      };
+    });
+    for (const body of matchingBodies.sizes) {
+      expect(body.width).toBeGreaterThanOrEqual(39);
+      expect(body.width).toBeLessThanOrEqual(41);
+      expect(body.height).toBeGreaterThanOrEqual(39);
+      expect(body.height).toBeLessThanOrEqual(41);
+    }
+    expect(matchingBodies.barGap).toBeGreaterThanOrEqual(5);
+    expect(matchingBodies.barGap).toBeLessThanOrEqual(7);
+    await page.screenshot({
+      path: testInfo.outputPath(`selected-values-${width}.png`),
+      fullPage: true,
+    });
+    const before = await inspect(page);
+    for (const slider of await sliders.all()) {
+      await slider.focus();
+      await slider.press("Home");
+      const key = await slider.getAttribute("data-debug-parameter");
+      expect((await inspect(page)).debugSettings[key!]).toBe(
+        Number(await slider.inputValue()),
+      );
+    }
+    await setRange("Spawn X", 0);
+    await setRange("Spawn Y", 0);
+    await setRange("Projectile damage", 1000);
+    await expect
+      .poll(async () => (await inspect(page)).elapsedSeconds)
+      .toBeGreaterThan(before.elapsedSeconds + 1);
+    const protectedState = await inspect(page);
+    expect(protectedState.hitsTaken).toBe(0);
+    expect(protectedState.player.healthHp).toBe(775);
+    expect(protectedState.audio.requests).toBe(0);
+    expect(protectedState.shards.length).toBeGreaterThan(0);
+    expect(protectedState.enemy.positionTiles).toEqual({ x: 0, y: 0 });
+    const debugPixels = await renderedPixels(page);
+    expect(debugPixels.player).toBeGreaterThan(0);
+    expect(debugPixels.shards).toBeGreaterThan(0);
+    expect(debugPixels.ground).toBeGreaterThan(1000);
+    await page.keyboard.press("r");
+    expect((await inspect(page)).attemptId).toBe(before.attemptId);
+    await page.screenshot({
+      path: testInfo.outputPath(`debug-live-${width}.png`),
+      fullPage: true,
+    });
+    await page
+      .getByRole("checkbox", { name: "God mode", exact: true })
+      .uncheck();
+    await expect(
+      page.getByRole("heading", { name: "Attempt complete" }),
+    ).toBeVisible();
+    expect(await savedAttempts(page)).toBeNull();
+    await expect(
+      page.getByText("Debug attempt / not saved").last(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Reset defaults" }).click();
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    expect((await inspect(page)).rulesVersion).toBe(
+      "crystal-worm-child-head-paladin-v2",
+    );
+    await page
+      .getByRole("button", { name: "Close debug", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Debug", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.down("w");
+    await page.getByRole("region", { name: "Encounter", exact: true }).click();
+    const refocused = await inspect(page);
+    await expect
+      .poll(async () => (await inspect(page)).elapsedSeconds)
+      .toBeGreaterThan(refocused.elapsedSeconds + 0.25);
+    expect((await inspect(page)).player.positionTiles).toEqual(
+      refocused.player.positionTiles,
+    );
+    await page.keyboard.up("w");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(`debug-closed-${width}.png`),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    expect(await savedAttempts(page)).toBeNull();
+  });
 }
 
 for (const width of [1440, 390]) {

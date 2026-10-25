@@ -1,5 +1,10 @@
 import Phaser from "phaser";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
+import {
+  DEFAULT_DEBUG_SETTINGS,
+  DEBUG_RULES_VERSION,
+  type DebugSettings,
+} from "../config/debug";
 import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
 import type { AcceptedHit, Vector2 } from "../models";
@@ -15,6 +20,7 @@ export type EncounterView = {
   zoom: number;
   result: AttemptResult | null;
   finalHitAmounts?: readonly number[];
+  debug?: boolean;
 };
 
 export type EncounterHandle = {
@@ -23,11 +29,13 @@ export type EncounterHandle = {
   retry(): void;
   setMuted(muted: boolean): void;
   setControlsOpen(open: boolean): void;
+  setDebugSettings(settings: DebugSettings): void;
 };
 
 type EncounterOptions = {
   initialZoom?: number;
   initialMuted?: boolean;
+  initialDebugSettings?: DebugSettings;
   onZoomChange?: (zoom: number) => void;
   onResult?: (result: AttemptResult) => void;
 };
@@ -118,6 +126,9 @@ class EncounterScene extends Phaser.Scene {
     this.onResult = options.onResult;
     this.onZoomChange = options.onZoomChange;
     this.hitAudio.setMuted(options.initialMuted ?? false);
+    this.session.setDebugSettings(
+      options.initialDebugSettings ?? DEFAULT_DEBUG_SETTINGS,
+    );
   }
 
   create(): void {
@@ -153,6 +164,15 @@ class EncounterScene extends Phaser.Scene {
     if (this.processedKeyEvents.has(event)) return;
     this.processedKeyEvents.add(event);
     if (this.controlsOpen) return;
+    if (
+      (document.activeElement as HTMLElement | null)?.closest(
+        "[data-debug-tools]",
+      )
+    ) {
+      if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code))
+        this.suppressedMovement.add(event.code);
+      return;
+    }
     if (
       this.disposed ||
       document.hidden ||
@@ -220,7 +240,14 @@ class EncounterScene extends Phaser.Scene {
     this.skipDelta = true;
   }
 
-  private onFocusOut = (): void => {
+  private onFocusOut = (event: FocusEvent): void => {
+    if (
+      event.relatedTarget instanceof HTMLElement &&
+      event.relatedTarget.closest("[data-debug-tools]")
+    ) {
+      this.clearMovement();
+      return;
+    }
     this.pauseForFocus();
   };
   private onVisibility = (): void => {
@@ -274,6 +301,14 @@ class EncounterScene extends Phaser.Scene {
     if (!muted) this.hitAudio.unlock();
   }
 
+  setDebugSettings(settings: DebugSettings): void {
+    if (this.disposed) return;
+    this.session.setDebugSettings(settings);
+    if (!this.bodies) return;
+    this.drawEntities();
+    this.publishView();
+  }
+
   setControlsOpen(open: boolean): void {
     if (this.disposed || this.state.phase === "ended") return;
     this.controlsOpen = open;
@@ -290,24 +325,45 @@ class EncounterScene extends Phaser.Scene {
       this.controlsOpen ||
       this.session.phase === "paused" ||
       this.session.phase === "ended" ||
-      document.hidden ||
-      document.activeElement !== this.host
+      document.hidden
     )
       return;
+    if (
+      document.activeElement !== this.host &&
+      !(document.activeElement as HTMLElement | null)?.closest(
+        "[data-debug-tools]",
+      )
+    ) {
+      this.pauseForFocus();
+      return;
+    }
     if (this.skipDelta) {
       this.skipDelta = false;
       return;
     }
     const previousPhase = this.session.phase;
+    const gameplayFocused = document.activeElement === this.host;
     const previousSeconds = this.state.elapsedSeconds;
     const currentHits: AcceptedHit[] = [];
     const result = this.session.advance(
       delta / presentation.millisecondsPerSecond,
       {
-        north: this.keys.north.isDown && !this.suppressedMovement.has("KeyW"),
-        south: this.keys.south.isDown && !this.suppressedMovement.has("KeyS"),
-        east: this.keys.east.isDown && !this.suppressedMovement.has("KeyD"),
-        west: this.keys.west.isDown && !this.suppressedMovement.has("KeyA"),
+        north:
+          gameplayFocused &&
+          this.keys.north.isDown &&
+          !this.suppressedMovement.has("KeyW"),
+        south:
+          gameplayFocused &&
+          this.keys.south.isDown &&
+          !this.suppressedMovement.has("KeyS"),
+        east:
+          gameplayFocused &&
+          this.keys.east.isDown &&
+          !this.suppressedMovement.has("KeyD"),
+        west:
+          gameplayFocused &&
+          this.keys.west.isDown &&
+          !this.suppressedMovement.has("KeyA"),
       },
       (hit) => {
         currentHits.push(hit);
@@ -353,6 +409,7 @@ class EncounterScene extends Phaser.Scene {
       zoom: this.zoom,
       result: this.session.result,
       finalHitAmounts: this.finalHitAmounts,
+      debug: this.state.rulesVersion === DEBUG_RULES_VERSION,
     });
   }
 
@@ -439,13 +496,13 @@ class EncounterScene extends Phaser.Scene {
     };
     draw(
       this.bodies,
-      ENCOUNTER_CONFIG.enemy.verticesTiles,
+      this.state.config.enemy.verticesTiles,
       enemy.positionTiles,
       presentation.enemy,
     );
     draw(
       this.bodies,
-      ENCOUNTER_CONFIG.player.verticesTiles,
+      this.state.config.player.verticesTiles,
       player.positionTiles,
       presentation.player,
     );
@@ -453,7 +510,7 @@ class EncounterScene extends Phaser.Scene {
     for (const shard of shards) {
       draw(
         this.projectiles,
-        ENCOUNTER_CONFIG.shard.verticesTiles,
+        this.state.config.shard.verticesTiles,
         shard.positionTiles,
         shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
         shard.orientationRadians,
@@ -464,7 +521,7 @@ class EncounterScene extends Phaser.Scene {
     const height = bar.heightCssPixels / this.zoom;
     const border = bar.borderCssPixels / this.zoom;
     const bottom = Math.max(
-      ...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.y),
+      ...this.state.config.player.verticesTiles.map((vertex) => vertex.y),
     );
     const left = player.positionTiles.x * pixelsPerTile - width / 2;
     const top =
@@ -591,6 +648,10 @@ export function createEncounter(
     retry: () => scene?.retry(),
     setMuted: (muted) => scene?.setMuted(muted),
     setControlsOpen: (open) => scene?.setControlsOpen(open),
+    setDebugSettings: (settings) => {
+      options.initialDebugSettings = settings;
+      scene?.setDebugSettings(settings);
+    },
     destroy: () => {
       if (disposed) return;
       disposed = true;

@@ -4,7 +4,14 @@ import {
   sweptConvexOverlap,
   transformBodyVertices,
 } from "./geometry";
-import { ENCOUNTER_CONFIG } from "../config/encounter";
+import { ENCOUNTER_CONFIG, type EncounterConfig } from "../config/encounter";
+import {
+  DEFAULT_DEBUG_SETTINGS,
+  DEBUG_RULES_VERSION,
+  debugEncounterConfig,
+  isDefaultDebugSettings,
+  type DebugSettings,
+} from "../config/debug";
 import {
   assertNonnegative,
   PALADIN_DERIVED_STATS,
@@ -21,6 +28,15 @@ import type {
 import { applyPlayerHit, regeneratePlayer } from "./health";
 
 export type SimulationState = {
+  config: EncounterConfig;
+  debugSettings: DebugSettings;
+  collisionBoundingRadiusTiles: number;
+  attackEpochSeconds: number;
+  volleysAtEpoch: number;
+  attackInitialDelaySeconds: number;
+  rotationEpochSeconds: number;
+  rotationPhaseAtEpoch: number;
+  nextShardId: number;
   rulesVersion: string;
   phase: "playing" | "ended";
   hitsTaken: number;
@@ -53,15 +69,17 @@ const combinedBoundingRadiusTiles =
       Math.hypot(vertex.x, vertex.y),
     ),
   );
-const emitterRadiansPerSecond =
-  (ENCOUNTER_CONFIG.emitters.clockwiseDegreesPerSecond * Math.PI) / 180;
-const burstGroupSeconds =
-  (ENCOUNTER_CONFIG.burst.shotsPerEmitter - 1) *
-    ENCOUNTER_CONFIG.burst.shotIntervalSeconds +
-  ENCOUNTER_CONFIG.burst.cooldownAfterLastShotSeconds;
-
 export function createSimulation(): SimulationState {
   return {
+    config: ENCOUNTER_CONFIG,
+    debugSettings: DEFAULT_DEBUG_SETTINGS,
+    collisionBoundingRadiusTiles: combinedBoundingRadiusTiles,
+    attackEpochSeconds: 0,
+    volleysAtEpoch: 0,
+    attackInitialDelaySeconds: ENCOUNTER_CONFIG.burst.initialCooldownSeconds,
+    rotationEpochSeconds: 0,
+    rotationPhaseAtEpoch: ENCOUNTER_CONFIG.emitters.initialPhaseRadians,
+    nextShardId: 1,
     rulesVersion: ENCOUNTER_CONFIG.rulesVersion,
     phase: "playing",
     hitsTaken: 0,
@@ -82,6 +100,84 @@ export function createSimulation(): SimulationState {
   };
 }
 
+export function setDebugSettings(
+  state: SimulationState,
+  settings: DebugSettings,
+): void {
+  const config = debugEncounterConfig(settings);
+  const previous = state.debugSettings;
+  const changed = Object.keys(settings).some(
+    (key) =>
+      settings[key as keyof DebugSettings] !==
+      previous[key as keyof DebugSettings],
+  );
+  if (!changed) return;
+  state.config = config;
+  state.debugSettings = { ...settings };
+  if (!isDefaultDebugSettings(settings))
+    state.rulesVersion = DEBUG_RULES_VERSION;
+  if (
+    settings.rotationDegreesPerSecond !== previous.rotationDegreesPerSecond ||
+    settings.initialPhaseDegrees !== previous.initialPhaseDegrees
+  ) {
+    state.rotationEpochSeconds = state.elapsedSeconds;
+    state.rotationPhaseAtEpoch =
+      settings.initialPhaseDegrees !== previous.initialPhaseDegrees
+        ? config.emitters.initialPhaseRadians
+        : state.enemy.emitterPhaseRadians;
+    state.enemy.emitterPhaseRadians = state.rotationPhaseAtEpoch;
+  }
+  if (
+    settings.shotsPerEmitter !== previous.shotsPerEmitter ||
+    settings.shotIntervalSeconds !== previous.shotIntervalSeconds ||
+    settings.cooldownSeconds !== previous.cooldownSeconds ||
+    settings.initialCooldownSeconds !== previous.initialCooldownSeconds
+  ) {
+    state.attackEpochSeconds = state.elapsedSeconds;
+    state.volleysAtEpoch = state.volleysFired;
+    state.attackInitialDelaySeconds =
+      state.volleysFired === 0
+        ? settings.initialCooldownSeconds
+        : settings.shotIntervalSeconds;
+  }
+  if (
+    settings.spawnX !== previous.spawnX ||
+    settings.spawnY !== previous.spawnY
+  )
+    state.enemy.positionTiles = { ...config.enemy.spawnTiles };
+  state.player.positionTiles = constrainToArena(
+    state.player.positionTiles,
+    config.player.verticesTiles,
+  );
+  state.enemy.positionTiles = constrainToArena(
+    state.enemy.positionTiles,
+    config.enemy.verticesTiles,
+  );
+  state.collisionBoundingRadiusTiles =
+    Math.max(
+      ...config.player.verticesTiles.map((vertex) =>
+        Math.hypot(vertex.x, vertex.y),
+      ),
+    ) +
+    Math.max(
+      ...config.shard.verticesTiles.map((vertex) =>
+        Math.hypot(vertex.x, vertex.y),
+      ),
+    );
+  state.shards = state.shards.filter((shard) => {
+    shard.reversalAgeSeconds = settings.reversalSeconds;
+    shard.lifetimeSeconds = settings.lifetimeSeconds;
+    if (shard.ageSeconds >= shard.reversalAgeSeconds) shard.hasReversed = true;
+    const speed =
+      settings.projectileSpeedTilesPerSecond * (shard.hasReversed ? -1 : 1);
+    shard.velocityTilesPerSecond = {
+      x: Math.cos(shard.orientationRadians) * speed,
+      y: Math.sin(shard.orientationRadians) * speed,
+    };
+    return shard.ageSeconds < shard.lifetimeSeconds;
+  });
+}
+
 function constrainToArena(
   positionTiles: Vector2,
   verticesTiles: readonly Vector2[],
@@ -94,6 +190,7 @@ function constrainToArena(
 }
 
 function updateMovement(state: SimulationState, input: SimulationInput): void {
+  const config = state.config;
   const stepSeconds = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
   const directionX = Number(input.east) - Number(input.west);
   const directionY = Number(input.south) - Number(input.north);
@@ -109,22 +206,41 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
         state.player.positionTiles.y +
         (directionY / directionLength) * playerTravelTiles,
     },
-    ENCOUNTER_CONFIG.player.verticesTiles,
+    config.player.verticesTiles,
   );
 
   state.enemy.positionTiles = constrainToArena(
-    pursueBody(
-      ENCOUNTER_CONFIG.enemy.verticesTiles,
-      state.enemy.positionTiles,
-      ENCOUNTER_CONFIG.player.verticesTiles,
-      state.player.positionTiles,
-      ENCOUNTER_CONFIG.enemy.speedTilesPerSecond * stepSeconds,
-    ),
-    ENCOUNTER_CONFIG.enemy.verticesTiles,
+    state.debugSettings.chaseArenaCenter
+      ? (() => {
+          const target = config.arena.centerTiles;
+          const deltaX = target.x - state.enemy.positionTiles.x;
+          const deltaY = target.y - state.enemy.positionTiles.y;
+          const length = Math.hypot(deltaX, deltaY);
+          const fraction =
+            length === 0
+              ? 0
+              : Math.min(
+                  1,
+                  (config.enemy.speedTilesPerSecond * stepSeconds) / length,
+                );
+          return {
+            x: state.enemy.positionTiles.x + deltaX * fraction,
+            y: state.enemy.positionTiles.y + deltaY * fraction,
+          };
+        })()
+      : pursueBody(
+          config.enemy.verticesTiles,
+          state.enemy.positionTiles,
+          config.player.verticesTiles,
+          state.player.positionTiles,
+          config.enemy.speedTilesPerSecond * stepSeconds,
+        ),
+    config.enemy.verticesTiles,
   );
 }
 
 function shardOverlapsPlayer(
+  state: SimulationState,
   shardStart: Vector2,
   shardEnd: Vector2,
   playerStart: Vector2,
@@ -140,7 +256,7 @@ function shardOverlapsPlayer(
     y: shardEnd.y - playerEnd.y,
   };
   const bound =
-    combinedBoundingRadiusTiles +
+    state.collisionBoundingRadiusTiles +
     Number.EPSILON *
       64 *
       Math.max(
@@ -159,12 +275,12 @@ function shardOverlapsPlayer(
     return false;
   return sweptConvexOverlap(
     transformBodyVertices(
-      ENCOUNTER_CONFIG.shard.verticesTiles,
+      state.config.shard.verticesTiles,
       shardStart,
       orientationRadians,
     ),
     { x: shardEnd.x - shardStart.x, y: shardEnd.y - shardStart.y },
-    transformBodyVertices(ENCOUNTER_CONFIG.player.verticesTiles, playerStart),
+    transformBodyVertices(state.config.player.verticesTiles, playerStart),
     { x: playerEnd.x - playerStart.x, y: playerEnd.y - playerStart.y },
   );
 }
@@ -181,6 +297,7 @@ function interpolatePosition(
 }
 
 function moveShard(
+  state: SimulationState,
   shard: ShardState,
   elapsedSeconds: number,
   playerStart: Vector2,
@@ -194,6 +311,7 @@ function moveShard(
   return (
     !shard.hasHitPlayer &&
     shardOverlapsPlayer(
+      state,
       shardStart,
       shard.positionTiles,
       playerStart,
@@ -204,6 +322,7 @@ function moveShard(
 }
 
 function advanceShard(
+  state: SimulationState,
   shard: ShardState,
   elapsedSeconds: number,
   playerStart: Vector2,
@@ -221,6 +340,7 @@ function advanceShard(
       endFraction,
     );
     const segmentHit = moveShard(
+      state,
       shard,
       segmentSeconds,
       segmentPlayerStart,
@@ -262,10 +382,8 @@ function registerShardHit(
   shard: ShardState,
   acceptedHits: AcceptedHit[],
 ): void {
-  const damageHp = applyPlayerHit(
-    state.player,
-    ENCOUNTER_CONFIG.shard.damageHp,
-  );
+  if (state.debugSettings.godMode) return;
+  const damageHp = applyPlayerHit(state.player, state.config.shard.damageHp);
   if (damageHp === null) return;
   shard.hasHitPlayer = true;
   state.hitsTaken++;
@@ -278,42 +396,50 @@ function registerShardHit(
 }
 
 function updateAttacks(state: SimulationState): void {
+  const config = state.config;
   state.enemy.emitterPhaseRadians =
-    (ENCOUNTER_CONFIG.emitters.initialPhaseRadians +
-      state.elapsedSeconds * emitterRadiansPerSecond) %
+    (state.rotationPhaseAtEpoch +
+      ((state.elapsedSeconds - state.rotationEpochSeconds) *
+        config.emitters.clockwiseDegreesPerSecond *
+        Math.PI) /
+        180) %
     fullTurnRadians;
-  const { shotsPerEmitter, shotIntervalSeconds, initialCooldownSeconds } =
-    ENCOUNTER_CONFIG.burst;
-  const groupIndex = Math.floor(state.volleysFired / shotsPerEmitter);
-  const shotIndex = state.volleysFired % shotsPerEmitter;
+  const { shotsPerEmitter, shotIntervalSeconds } = config.burst;
+  const burstGroupSeconds =
+    (shotsPerEmitter - 1) * shotIntervalSeconds +
+    config.burst.cooldownAfterLastShotSeconds;
+  const volleysSinceEpoch = state.volleysFired - state.volleysAtEpoch;
+  const groupIndex = Math.floor(volleysSinceEpoch / shotsPerEmitter);
+  const shotIndex = volleysSinceEpoch % shotsPerEmitter;
   const nextShotSeconds =
-    initialCooldownSeconds +
+    state.attackEpochSeconds +
+    state.attackInitialDelaySeconds +
     groupIndex * burstGroupSeconds +
     shotIndex * shotIntervalSeconds;
   const shotToleranceSeconds =
     Math.max(state.elapsedSeconds, nextShotSeconds) * Number.EPSILON * 16;
   if (state.elapsedSeconds + shotToleranceSeconds < nextShotSeconds) return;
 
-  const { count, radiusTiles } = ENCOUNTER_CONFIG.emitters;
+  const { count, radiusTiles } = config.emitters;
   for (let emitter = 0; emitter < count; emitter++) {
     const angleRadians =
       state.enemy.emitterPhaseRadians + (emitter * fullTurnRadians) / count;
     const directionX = Math.cos(angleRadians);
     const directionY = Math.sin(angleRadians);
     state.shards.push({
-      id: state.volleysFired * count + emitter + 1,
+      id: state.nextShardId++,
       orientationRadians: angleRadians,
       positionTiles: {
         x: state.enemy.positionTiles.x + directionX * radiusTiles,
         y: state.enemy.positionTiles.y + directionY * radiusTiles,
       },
       velocityTilesPerSecond: {
-        x: directionX * ENCOUNTER_CONFIG.shard.speedTilesPerSecond,
-        y: directionY * ENCOUNTER_CONFIG.shard.speedTilesPerSecond,
+        x: directionX * config.shard.speedTilesPerSecond,
+        y: directionY * config.shard.speedTilesPerSecond,
       },
       ageSeconds: 0,
-      reversalAgeSeconds: ENCOUNTER_CONFIG.shard.reversalAgeSeconds,
-      lifetimeSeconds: ENCOUNTER_CONFIG.shard.lifetimeSeconds,
+      reversalAgeSeconds: config.shard.reversalAgeSeconds,
+      lifetimeSeconds: config.shard.lifetimeSeconds,
       hasReversed: false,
       hasHitPlayer: false,
     });
@@ -361,6 +487,7 @@ export function advanceSimulation(
     state.shards = state.shards.filter((shard) => {
       if (state.phase === "ended") return true;
       const result = advanceShard(
+        state,
         shard,
         fixedStepSeconds,
         playerStart,
@@ -375,6 +502,7 @@ export function advanceSimulation(
       for (const shard of state.shards.slice(existingCount)) {
         if (
           shardOverlapsPlayer(
+            state,
             shard.positionTiles,
             shard.positionTiles,
             state.player.positionTiles,

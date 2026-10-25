@@ -1,5 +1,14 @@
 import { expect, test } from "vitest";
 import { V2_GEOMETRY_CANDIDATE } from "./geometry-candidate";
+import {
+  DEBUG_PARAMETERS,
+  DEFAULT_DEBUG_SETTINGS,
+  debugEncounterConfig,
+  updateDebugParameter,
+  validateDebugSettings,
+  SELECTED_DEBUG_VALUES,
+  loadSelectedDebugValues,
+} from "./debug";
 import type { SessionSnapshot } from "../models";
 import {
   ENCOUNTER_CONFIG,
@@ -17,6 +26,115 @@ import {
   calculateCombatDurationSeconds,
   derivePlayerStats,
 } from "./stats";
+
+test("loads all screenshot-selected values without changing omitted settings or the scored preset", () => {
+  expect(SELECTED_DEBUG_VALUES).toEqual({
+    enemyWidth: 1.25,
+    enemyHeight: 1.25,
+    emitterCount: 6,
+    emitterRadiusTiles: 0.35,
+    initialPhaseDegrees: 0,
+    rotationDegreesPerSecond: 45,
+    shotsPerEmitter: 11,
+    shotIntervalSeconds: 0.19,
+    cooldownSeconds: 3,
+    initialCooldownSeconds: 2,
+    projectileDamageHp: 160,
+    projectileSpeedTilesPerSecond: 8,
+    reversalSeconds: 1.5,
+    lifetimeSeconds: 3,
+    projectileWidth: 1.45,
+    projectileHeight: 0.65,
+  });
+  const previous = {
+    ...DEFAULT_DEBUG_SETTINGS,
+    enemySpeedTilesPerSecond: 2,
+    spawnX: 3,
+    spawnY: -10,
+    godMode: true,
+    chaseArenaCenter: true,
+  };
+  const selected = loadSelectedDebugValues(previous);
+  expect(selected).toEqual({
+    ...previous,
+    ...SELECTED_DEBUG_VALUES,
+    matchPlayerToHead: true,
+  });
+  expect(previous.enemyWidth).toBe(DEFAULT_DEBUG_SETTINGS.enemyWidth);
+  expect(() => validateDebugSettings(selected)).not.toThrow();
+  expect(debugEncounterConfig(selected).emitters.count).toBe(6);
+  expect(ENCOUNTER_CONFIG.emitters.count).toBe(4);
+  expect(DEFAULT_DEBUG_SETTINGS.cooldownSeconds).toBe(1);
+});
+
+test("the selected preset matches the player body to the head, without resizing normal v2", () => {
+  const selected = loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS);
+  for (const settings of [
+    selected,
+    updateDebugParameter(selected, "enemyWidth", 2),
+  ]) {
+    const config = debugEncounterConfig(settings);
+    for (const axis of ["x", "y"] as const) {
+      const size = (vertices: readonly { x: number; y: number }[]) =>
+        Math.max(...vertices.map((vertex) => vertex[axis])) -
+        Math.min(...vertices.map((vertex) => vertex[axis]));
+      expect(size(config.player.verticesTiles)).toBeCloseTo(
+        size(config.enemy.verticesTiles),
+        12,
+      );
+      expect(size(config.player.verticesTiles)).toBeCloseTo(
+        axis === "x" ? settings.enemyWidth : 1.25,
+        12,
+      );
+    }
+  }
+  expect(
+    debugEncounterConfig(DEFAULT_DEBUG_SETTINGS).player.verticesTiles,
+  ).toEqual(ENCOUNTER_CONFIG.player.verticesTiles);
+});
+
+test.each(DEBUG_PARAMETERS)(
+  "debug slider $key has valid bounded endpoints and retains an independent preset",
+  (parameter) => {
+    for (const value of [parameter.min, parameter.max]) {
+      const settings = updateDebugParameter(
+        DEFAULT_DEBUG_SETTINGS,
+        parameter.key,
+        value,
+      );
+      expect(settings[parameter.key]).toBe(value);
+      expect(() => validateDebugSettings(settings)).not.toThrow();
+      expect(() => debugEncounterConfig(settings)).not.toThrow();
+    }
+    expect(() =>
+      updateDebugParameter(DEFAULT_DEBUG_SETTINGS, parameter.key, Number.NaN),
+    ).toThrow(RangeError);
+    expect(() =>
+      updateDebugParameter(
+        DEFAULT_DEBUG_SETTINGS,
+        parameter.key,
+        parameter.max + 1,
+      ),
+    ).toThrow(RangeError);
+  },
+);
+
+test("debug timing remains ordered while lifetime and reversal sliders cross", () => {
+  const longer = updateDebugParameter(
+    DEFAULT_DEBUG_SETTINGS,
+    "reversalSeconds",
+    8,
+  );
+  expect(longer.lifetimeSeconds).toBeGreaterThan(8);
+  const shorter = updateDebugParameter(longer, "lifetimeSeconds", 0.1);
+  expect(shorter.reversalSeconds).toBe(0.05);
+  expect(ENCOUNTER_CONFIG.shard.lifetimeSeconds).toBe(
+    DEFAULT_DEBUG_SETTINGS.lifetimeSeconds,
+  );
+  expect(() =>
+    validateDebugSettings({ ...DEFAULT_DEBUG_SETTINGS, emitterCount: 1.5 }),
+  ).toThrow(RangeError);
+});
 
 test("keeps published base stats, passive bonuses, and equipped totals separate", () => {
   expect(PALADIN_BASE_STATS).toEqual({

@@ -1,7 +1,16 @@
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { assertNonnegative } from "../config/stats";
 import type { AcceptedHit, SessionPhase, SimulationInput } from "../models";
-import { advanceSimulation, createSimulation } from "../simulation/simulation";
+import {
+  advanceSimulation,
+  createSimulation,
+  setDebugSettings,
+} from "../simulation/simulation";
+import {
+  DEFAULT_DEBUG_SETTINGS,
+  validateDebugSettings,
+  type DebugSettings,
+} from "../config/debug";
 
 export type AttemptResult = Readonly<{
   attemptId: number;
@@ -21,6 +30,7 @@ export class SessionController {
   attemptId = 0;
   result: AttemptResult | null = null;
   private phaseBeforePause: "countdown" | "playing" = "playing";
+  private debugSettings = DEFAULT_DEBUG_SETTINGS;
 
   start(): boolean {
     if (this.phase !== "home") return false;
@@ -36,10 +46,18 @@ export class SessionController {
 
   private initialize(countdownSeconds: number): void {
     this.simulation = createSimulation();
+    setDebugSettings(this.simulation, this.debugSettings);
     this.attemptId++;
     this.result = null;
     this.countdownRemainingSeconds = countdownSeconds;
     this.phase = countdownSeconds > 0 ? "countdown" : "playing";
+  }
+
+  setDebugSettings(settings: DebugSettings): void {
+    validateDebugSettings(settings);
+    this.debugSettings = { ...settings };
+    if (this.phase === "ended") return;
+    setDebugSettings(this.simulation, settings);
   }
 
   home(): void {
