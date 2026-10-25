@@ -208,6 +208,19 @@ for (const width of [1440, 390]) {
     await expect(page.getByLabel("Session status")).toHaveText("Starting");
     await expect(page.getByLabel("Survival time")).toHaveText("0.0 s");
     await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
+    const beforeControls = await renderedPixels(page);
+    await page.getByRole("button", { name: "Controls", exact: true }).click();
+    await expect(page.getByLabel("Session status")).toHaveText("Paused");
+    const frozenTime = await page.getByLabel("Survival time").textContent();
+    for (const key of ["w", "r", "o", "p"]) await page.keyboard.press(key);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByLabel("Paused overlay")).toBeVisible();
+    await expect(page.getByLabel("Survival time")).toHaveText(frozenTime!);
+    expect((await renderedPixels(page)).player).toBe(beforeControls.player);
+    await page.screenshot({ path: testInfo.outputPath(`release-paused-${width}.png`), fullPage: true });
+    await page.getByRole("button", { name: "Resume", exact: true }).click();
+    await expect(page.getByLabel("Session status")).toHaveText("Active");
     if (width === 1440) {
       await page.keyboard.press("o");
       await page.keyboard.press("o");
@@ -1183,6 +1196,49 @@ for (const mode of ["muted", "unavailable"] as const) {
     const reset = await retrySnapshot(page);
     expect(reset.audio).toMatchObject({ requests: 0, played: 0, activeVoices: 0 });
     expect(reset.hitNumbers).toEqual([]);
+  });
+}
+
+for (const phase of ["countdown", "playing", "paused"] as const) {
+  test(`Controls isolates ${phase} and requires explicit Resume without catch-up`, async ({ page }) => {
+    await page.goto("./");
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect.poll(async () => (await inspect(page))?.sessionPhase).toBe("countdown");
+    if (phase !== "countdown") await expect.poll(async () => (await inspect(page)).sessionPhase).toBe("playing");
+    if (phase === "paused") await page.keyboard.press("Escape");
+    const canvas = await page.locator("canvas").elementHandle();
+    await page.keyboard.down("w");
+    const opener = page.getByRole("button", { name: "Controls", exact: true });
+    await opener.click();
+    await expect(page.getByRole("dialog", { name: "Controls" })).toBeVisible();
+    const frozen = await inspect(page);
+    for (const key of ["a", "s", "d", "r", "o", "p"]) await page.keyboard.press(key);
+    await page.waitForTimeout(250);
+    const unchanged = (state: Inspection) => ({ player: state.player, enemy: state.enemy, shards: state.shards, ticks: state.ticksElapsed, zoom: state.zoom, attemptId: state.attemptId, countdown: state.countdownRemainingSeconds });
+    expect(unchanged(await inspect(page))).toEqual(unchanged(frozen));
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(opener).toBeFocused();
+    await expect(page.getByLabel("Paused overlay")).toBeVisible();
+    await page.waitForTimeout(200);
+    expect((await inspect(page)).sessionPhase).toBe("paused");
+    expect(unchanged(await inspect(page))).toEqual(unchanged(frozen));
+    await page.getByRole("button", { name: "Resume", exact: true }).click();
+    await page.waitForTimeout(200);
+    const resumed = await inspect(page);
+    expect(resumed.player.positionTiles).toEqual(frozen.player.positionTiles);
+    expect(resumed.attemptId).toBe(frozen.attemptId);
+    if (phase === "countdown") {
+      expect(resumed.sessionPhase).toBe("countdown");
+      expect(resumed.countdownRemainingSeconds).toBeGreaterThan(frozen.countdownRemainingSeconds - 0.4);
+    } else {
+      expect(resumed.sessionPhase).toBe("playing");
+      expect(resumed.elapsedSeconds - frozen.elapsedSeconds).toBeGreaterThan(0);
+      expect(resumed.elapsedSeconds - frozen.elapsedSeconds).toBeLessThan(0.4);
+    }
+    await page.keyboard.up("w");
+    expect(await canvas!.evaluate((element) => element === document.querySelector("canvas"))).toBe(true);
+    expect(resumed.keydownListeners).toBe(1);
   });
 }
 

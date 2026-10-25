@@ -106,6 +106,7 @@ function Encounter({
   const host = useRef<HTMLDivElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const runtime = useRef<EncounterHandle | null>(null);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const initialMuted = useRef(muted);
   const [view, setView] = useState<EncounterView>({
     healthHp: PALADIN_STATS.healthHp,
@@ -204,6 +205,7 @@ function Encounter({
           <button type="button" onClick={onHome}>
             Home
           </button>
+          <button type="button" onClick={() => { runtime.current?.setControlsOpen(true); setControlsOpen(true); }}>Controls</button>
         </div>
       </div>
       <div className={styles.playfield}>
@@ -219,6 +221,7 @@ function Encounter({
             {Math.ceil(view.countdownRemainingSeconds)}
           </div>
         )}
+        {view.status === "paused" && <div className={`${styles.countdown} ${styles.paused}`} aria-label="Paused overlay">Paused</div>}
         {view.result && (
           <section className={styles.results} aria-labelledby="result-title">
             <span className={styles.eyebrow}>Crystal Worm Child Head</span>
@@ -254,6 +257,7 @@ function Encounter({
           </section>
         )}
       </div>
+      {controlsOpen && <ControlsDialog onClose={() => { runtime.current?.setControlsOpen(false); setControlsOpen(false); }} />}
     </>
   );
 }

@@ -21,6 +21,7 @@ const adapter = vi.hoisted(() => ({
   resume: vi.fn(),
   retry: vi.fn(),
   setMuted: vi.fn(),
+  setControlsOpen: vi.fn(),
   initialMuted: false,
   initialZoom: undefined as number | undefined,
   onZoomChange: undefined as undefined | ((zoom: number) => void),
@@ -45,6 +46,7 @@ vi.mock("./game/phaser/encounter", () => ({
       resume: adapter.resume,
       retry: adapter.retry,
       setMuted: adapter.setMuted,
+      setControlsOpen: adapter.setControlsOpen,
       destroy: () => {
         adapter.active--;
         adapter.destroyed++;
@@ -77,6 +79,23 @@ test("Home Controls is labeled, lists actual bindings, closes and restores its o
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(controls).toHaveFocus();
   expect(adapter.created).toBe(0);
+});
+
+test("HUD Controls uses runtime modal isolation and never resumes on close", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  act(() => adapter.publish!(runningView));
+  await user.click(screen.getByRole("button", { name: "Controls" }));
+  expect(adapter.setControlsOpen).toHaveBeenLastCalledWith(true);
+  act(() => adapter.publish!({ ...runningView, status: "paused" }));
+  expect(screen.getByLabelText("Paused overlay")).toHaveTextContent("Paused");
+  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+  expect(adapter.setControlsOpen).toHaveBeenLastCalledWith(false);
+  expect(adapter.resume).not.toHaveBeenCalled();
+  expect(adapter.created).toBe(1);
+  await user.click(screen.getByRole("button", { name: "Resume" }));
+  expect(adapter.resume).toHaveBeenCalledOnce();
 });
 
 test("launches and unmounts one effective runtime under Strict Mode", async () => {

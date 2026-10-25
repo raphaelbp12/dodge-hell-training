@@ -413,7 +413,7 @@ Add a minimal reusable React dialog with native semantics where suitable, existi
 
 ### Step 13.2 - Integrate Controls With Pause And Input Isolation
 
-Status: pending. Dependencies: 13.1.
+Status: complete. Dependencies: 13.1.
 
 **Implementation prompt**
 
@@ -424,6 +424,13 @@ Block WASD/R/O/P behind the dialog. Escape closes once without also toggling bac
 **Focused checks:** countdown/play/already-paused open, frozen state, blocked keys, Escape dedupe, held-key release, explicit Resume/focus return, blur/visibility, no first-frame catch-up, R/Home cleanup and one canvas/listener set. Use actual browser actions and focused session/React tests.
 
 **Acceptance:** all five gates and desktop/narrow keyboard review pass; modal actions cannot move/reset/resume background play and Paused matches authoritative state.
+
+**Execution and verification - 2026-10-25**
+
+- Step 13.1 remote verified at `3473cd253ef628ba2960797a8b5694a3001ee59b`. HUD opens the same dialog through a synchronous runtime modal gate before focus changes. Gate pauses countdown/play, clears movement/held controls, blocks update/Resume/retry and ignores gameplay keydowns; event objects are still recorded in the existing WeakSet before rejection so retained Phaser queue entries cannot replay after closure. Closing clears stale held input but never resumes. Existing phase-before-pause/countdown and stale-delta policy are preserved.
+- Added centered authoritative Paused overlay, retaining countdown conventions with dark text edging for contrast over the physical body. Results hide/inert HUD actions; Home dialog has no runtime. No second state machine/clock, gameplay, version or persistence change.
+- TDD: HUD React test failed absent Controls, then all 16 React cases passed. Three real Chromium cases cover countdown/playing/already-paused modal opening, frozen body/shards/ticks/countdown/zoom/attempt, blocked WASD/R/O/P, single Escape close with focus return, explicit Resume, pre-held movement release, no catch-up, reused canvas and one listener. Existing focus/visibility/queue regressions remain intact.
+- All five gates passed: 292 unit/component cases, typecheck, lint, build, 25 Chromium cases. Production-safe desktop/narrow flows exercise HUD modal, blocked keys, frozen time/scale, centered Paused and Resume; reviewed narrow capture with nonoverlapping HUD and legible label. Existing chunk warning remains. Technical review is delegated, not fresh human acceptance or hosted verification.
 
 ## Phase 14: Regression, Handoff And Authorized Live Verification
 

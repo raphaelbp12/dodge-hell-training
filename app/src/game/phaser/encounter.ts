@@ -22,6 +22,7 @@ export type EncounterHandle = {
   resume(): void;
   retry(): void;
   setMuted(muted: boolean): void;
+  setControlsOpen(open: boolean): void;
 };
 
 type EncounterOptions = {
@@ -88,6 +89,7 @@ class EncounterScene extends Phaser.Scene {
   >;
   private zoom: number;
   private heldControls = new Set<string>();
+  private controlsOpen = false;
   private suppressedMovement = new Set<string>();
   private processedKeyEvents = new WeakSet<KeyboardEvent>();
   private disposed = false;
@@ -144,6 +146,7 @@ class EncounterScene extends Phaser.Scene {
   private onKeyDown = (event: KeyboardEvent): void => {
     if (this.processedKeyEvents.has(event)) return;
     this.processedKeyEvents.add(event);
+    if (this.controlsOpen) return;
     if (
       this.disposed ||
       document.hidden ||
@@ -226,7 +229,7 @@ class EncounterScene extends Phaser.Scene {
   };
 
   resume(): void {
-    if (this.disposed || document.hidden || this.state.phase === "ended")
+    if (this.disposed || this.controlsOpen || document.hidden || this.state.phase === "ended")
       return;
     this.clearMovement();
     this.hitAudio.unlock();
@@ -236,7 +239,7 @@ class EncounterScene extends Phaser.Scene {
   }
 
   retry(): void {
-    if (this.disposed || document.hidden || !this.session.retry()) return;
+    if (this.disposed || this.controlsOpen || document.hidden || !this.session.retry()) return;
     this.clearHitNumbers();
     this.hitAudio.reset();
     this.hitAudio.unlock();
@@ -254,10 +257,20 @@ class EncounterScene extends Phaser.Scene {
     if (!muted) this.hitAudio.unlock();
   }
 
+  setControlsOpen(open: boolean): void {
+    if (this.disposed || this.state.phase === "ended") return;
+    this.controlsOpen = open;
+    if (open) this.pauseForFocus();
+    this.clearMovement();
+    this.heldControls.clear();
+    this.publishView();
+  }
+
   update(_time: number, delta: number): void {
     if (
       this.disposed ||
       !this.keys ||
+      this.controlsOpen ||
       this.session.phase === "paused" ||
       this.session.phase === "ended" ||
       document.hidden ||
@@ -516,6 +529,7 @@ export function createEncounter(
     resume: () => scene?.resume(),
     retry: () => scene?.retry(),
     setMuted: (muted) => scene?.setMuted(muted),
+    setControlsOpen: (open) => scene?.setControlsOpen(open),
     destroy: () => {
       if (disposed) return;
       disposed = true;
