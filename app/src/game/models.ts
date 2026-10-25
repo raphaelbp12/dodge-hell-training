@@ -38,6 +38,12 @@ export type EnemyState = {
   emitterPhaseRadians: number;
 };
 
+export type AcceptedHit = Readonly<{
+  shardId: number;
+  damageHp: number;
+  positionTiles: Vector2;
+}>;
+
 export type ShardState = {
   id: number;
   orientationRadians: number;

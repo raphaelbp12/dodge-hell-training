@@ -314,7 +314,7 @@ Connect the adapter to the existing React zoom ref and Phaser camera boundary. R
 
 ### Step 12.1 - Expose Ephemeral Accepted-Hit Data
 
-Status: pending. Dependencies: 11.2.
+Status: complete. Dependencies: 11.2.
 
 **Implementation prompt**
 
@@ -323,6 +323,13 @@ Extend existing simulation/session advancement with narrow accepted-hit output u
 **Focused checks:** nonlethal, same-tick independent hits/regeneration, spent-return suppression, lethal amount despite HP clamp, no hits after death, multiple ticks per advance, paused/no-step advances and no replay after Retry/Home.
 
 **Acceptance:** each accepted event reaches the runtime once, including lethal data before result handling, without changing damage/time/history. Focused health/simulation/session tests, typecheck and relevant integration gates pass.
+
+**Execution and verification - 2026-10-25**
+
+- Step 11.2 pushed/remote verified at `78c84f7c5bb39119152e2c19e8705d69dc4c4714`. Existing health rule now returns its already-calculated post-defense amount (or null for dead player). Each simulation advance returns only its own `acceptedHits`: shard identity, damage and copied player position. No stored log, duplicated damage formula, HUD-delta inference, event bus or clock.
+- Session forwards individual hits through an optional narrow callback before its unchanged once-only death-result handoff. Newborn/existing hits use the same registration, stable lethal stop and spent-state rules. Output is bounded by accepted shards in the capped current advance; no cross-advance accumulation/truncation or resource policy changes.
+- TDD: four new simulation/session tests failed absent output/delivery, then 117 focused health/simulation/session cases passed. Covers simultaneous 128-HP events despite regeneration, multiple fixed ticks, lethal 128 with only 1 HP remaining, suppression after lethal/spent/zero-step/pause/end/Retry/Home and delivery before result creation.
+- All five gates passed: 285 unit/component cases, typecheck, lint, build and 20 Chromium cases, including real deaths/history/sustained/25 retries. No visual/audio changes or hosted/human approval claimed. Existing Phaser bundle warning remains.
 
 ### Step 12.2 - Draw The Always-Visible Health Bar
 

@@ -13,6 +13,29 @@ const idle: SimulationInput = {
 const east: SimulationInput = { ...idle, east: true };
 const tick = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
 
+test("session delivers accepted hits once before lethal result, never while paused or after Retry/Home", () => {
+  const session = running();
+  session.simulation.player.healthHp = 1;
+  session.simulation.shards.push({ id: 1, orientationRadians: 0, positionTiles: { x: 0, y: 0 }, velocityTilesPerSecond: { x: 0, y: 0 }, ageSeconds: 0, reversalAgeSeconds: 1, lifetimeSeconds: 2, hasReversed: false, hasHitPlayer: false });
+  const delivered: number[] = [];
+  const receive = (hit: { damageHp: number }) => {
+    expect(session.result).toBeNull();
+    delivered.push(hit.damageHp);
+  };
+  session.pause();
+  session.advance(tick, idle, receive);
+  expect(delivered).toEqual([]);
+  session.resume();
+  expect(session.advance(tick, idle, receive)?.outcome).toBe("death");
+  expect(delivered).toEqual([128]);
+  session.advance(tick, idle, receive);
+  session.retry();
+  session.advance(0, idle, receive);
+  session.home();
+  session.advance(10, idle, receive);
+  expect(delivered).toEqual([128]);
+});
+
 function running(): SessionController {
   const session = new SessionController();
   session.start();

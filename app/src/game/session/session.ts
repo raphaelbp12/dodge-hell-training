@@ -1,6 +1,6 @@
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { assertNonnegative } from "../config/stats";
-import type { SessionPhase, SimulationInput } from "../models";
+import type { AcceptedHit, SessionPhase, SimulationInput } from "../models";
 import { advanceSimulation, createSimulation } from "../simulation/simulation";
 
 export type AttemptResult = Readonly<{
@@ -61,6 +61,7 @@ export class SessionController {
   advance(
     elapsedSeconds: number,
     input: SimulationInput,
+    onHit?: (hit: AcceptedHit) => void,
   ): AttemptResult | null {
     assertNonnegative(elapsedSeconds, "elapsedSeconds");
     if (this.phase === "countdown") {
@@ -75,7 +76,8 @@ export class SessionController {
       if (elapsedSeconds <= countdownRoundingToleranceSeconds) return null;
     }
     if (this.phase !== "playing") return null;
-    advanceSimulation(this.simulation, elapsedSeconds, input);
+    const advance = advanceSimulation(this.simulation, elapsedSeconds, input);
+    for (const hit of advance.acceptedHits) onHit?.(hit);
     if (this.simulation.phase !== "ended") return null;
     this.phase = "ended";
     this.result = Object.freeze({

@@ -11,6 +11,7 @@ import {
   PALADIN_STATS,
 } from "../config/stats";
 import type {
+  AcceptedHit,
   EnemyState,
   PlayerState,
   ShardState,
@@ -35,6 +36,7 @@ export type SimulationState = {
 export type AdvanceResult = Readonly<{
   stepsExecuted: number;
   discardedSeconds: number;
+  acceptedHits: readonly AcceptedHit[];
 }>;
 
 const timeRoundingToleranceSeconds =
@@ -255,10 +257,12 @@ function advanceShard(
   return { alive: shard.ageSeconds < shard.lifetimeSeconds, hitPlayer };
 }
 
-function registerShardHit(state: SimulationState, shard: ShardState): void {
+function registerShardHit(state: SimulationState, shard: ShardState, acceptedHits: AcceptedHit[]): void {
+  const damageHp = applyPlayerHit(state.player, ENCOUNTER_CONFIG.shard.damageHp);
+  if (damageHp === null) return;
   shard.hasHitPlayer = true;
   state.hitsTaken++;
-  applyPlayerHit(state.player, ENCOUNTER_CONFIG.shard.damageHp);
+  acceptedHits.push({ shardId: shard.id, damageHp, positionTiles: { ...state.player.positionTiles } });
   if (state.player.healthHp === 0) state.phase = "ended";
 }
 
@@ -312,8 +316,9 @@ export function advanceSimulation(
   input: SimulationInput,
 ): AdvanceResult {
   assertNonnegative(elapsedSeconds, "elapsedSeconds");
+  const acceptedHits: AcceptedHit[] = [];
   if (state.phase === "ended")
-    return { stepsExecuted: 0, discardedSeconds: elapsedSeconds };
+    return { stepsExecuted: 0, discardedSeconds: elapsedSeconds, acceptedHits };
   const pendingSeconds = state.accumulatorSeconds + elapsedSeconds;
   assertNonnegative(pendingSeconds, "pendingSeconds");
   const { fixedStepSeconds, maxStepsPerUpdate } = ENCOUNTER_CONFIG.simulation;
@@ -350,7 +355,7 @@ export function advanceSimulation(
         playerStart,
         state.player.positionTiles,
       );
-      if (result.hitPlayer) registerShardHit(state, shard);
+      if (result.hitPlayer) registerShardHit(state, shard, acceptedHits);
       return result.alive;
     });
     if (state.player.healthHp > 0) {
@@ -366,7 +371,7 @@ export function advanceSimulation(
             shard.orientationRadians,
           )
         )
-          registerShardHit(state, shard);
+          registerShardHit(state, shard, acceptedHits);
         if (state.player.healthHp === 0) break;
       }
       regeneratePlayer(state.player, fixedStepSeconds);
@@ -376,6 +381,7 @@ export function advanceSimulation(
       state.accumulatorSeconds = 0;
       return {
         stepsExecuted,
+        acceptedHits,
         discardedSeconds: Math.max(
           0,
           pendingSeconds - stepsExecuted * fixedStepSeconds,
@@ -384,5 +390,5 @@ export function advanceSimulation(
     }
   }
   state.accumulatorSeconds = remainderSeconds;
-  return { stepsExecuted, discardedSeconds };
+  return { stepsExecuted, discardedSeconds, acceptedHits };
 }
