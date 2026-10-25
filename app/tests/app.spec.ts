@@ -19,7 +19,7 @@ type Inspection = SessionSnapshot & {
   camera: Vector2;
   viewport: { width: number; height: number };
   keydownListeners: number;
-  hitNumbers: { shardId: number; damageHp: number; ageSeconds: number; text: string }[];
+  hitNumbers: { shardId: number; damageHp: number; ageSeconds: number; text: string; widthCssPixels: number; heightCssPixels: number }[];
   audio: { muted: boolean; requests: number; played: number; activeVoices: number };
 };
 
@@ -75,7 +75,7 @@ async function renderedPixels(page: Page) {
       if (red === 28 && green === 48 && blue === 42) counts.ground++;
       if (red === 85 && green === 214 && blue === 160) counts.healthBar++;
       if (red === 89 && green === 46 && blue === 57) counts.missingHealth++;
-      if (red > 245 && green > 130 && green < 150 && blue > 150 && blue < 180) counts.hitText++;
+      if (red > 130 && green > 50 && green < 160 && blue > green && blue < red) counts.hitText++;
     }
     return {
       ...counts,
@@ -890,12 +890,16 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
   let previous = await inspect(page);
   let simulatedSeconds = 0;
   let peakShards = 0;
+  let peakHitNumbers = 0;
+  let peakAudioVoices = 0;
   let deaths = 0;
   let progressSamples = 0;
   let lastProgress = Date.now();
   while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
     let state = await inspect(page);
     peakShards = Math.max(peakShards, state.shards.length);
+    peakHitNumbers = Math.max(peakHitNumbers, state.hitNumbers.length);
+    peakAudioVoices = Math.max(peakAudioVoices, state.audio.activeVoices);
     expect(state.hitNumbers.length).toBeLessThanOrEqual(16);
     expect(state.audio.activeVoices).toBeLessThanOrEqual(4);
     expect(state.audio.requests).toBe(state.hitsTaken);
@@ -970,6 +974,8 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
         simulatedSeconds,
         deaths,
         peakShards,
+        peakHitNumbers,
+        peakAudioVoices,
         progressSamples,
         retryCount,
         ...frames,
@@ -1315,6 +1321,33 @@ test("resize preserves zoom, movement speed, camera center and the simulation at
   const first = firing.shards.find((shard) => shard.id === 1)!;
   expect(firing.elapsedSeconds - first.ageSeconds).toBeCloseTo(2, 10);
 });
+
+for (const width of [1440, 390]) {
+  test(`real hit feedback stays readable at all zoom levels at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await launch(page);
+    for (const zoom of [0.25, 1, 3]) {
+      const current = (await inspect(page)).zoom;
+      for (let press = 0; press < Math.round(Math.abs(zoom - current) / 0.125); press++) await page.keyboard.press(zoom < current ? "o" : "p");
+      await retrySnapshot(page);
+      await expect.poll(async () => (await inspect(page)).hitNumbers.length, { timeout: 10000, intervals: [50] }).toBeGreaterThan(0);
+      await page.keyboard.press("Escape");
+      const state = await inspect(page);
+      expect(state.zoom).toBe(zoom);
+      expect(state.hitNumbers.length).toBeGreaterThan(0);
+      for (const number of state.hitNumbers) {
+        expect(number.text).toBe("-128");
+        expect(number.widthCssPixels).toBeGreaterThan(30);
+        expect(number.widthCssPixels).toBeLessThan(70);
+        expect(number.heightCssPixels).toBeGreaterThan(15);
+        expect(number.heightCssPixels).toBeLessThan(40);
+      }
+      await page.screenshot({ path: testInfo.outputPath(`feedback-${width}-${zoom}.png`), fullPage: true });
+      await expect.poll(async () => (await renderedPixels(page)).hitText, { intervals: [50] }).toBeGreaterThan(5);
+      await page.getByRole("button", { name: "Resume", exact: true }).click();
+    }
+  });
+}
 
 for (const viewport of [
   { width: 1440, height: 1000 },

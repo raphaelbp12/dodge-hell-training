@@ -466,7 +466,7 @@ class EncounterScene extends Phaser.Scene {
       },
       viewport: { width: this.scale.width, height: this.scale.height },
       keydownListeners: this.input.keyboard?.listenerCount("keydown"),
-      hitNumbers: this.hitNumbers.map((number) => ({ shardId: number.hit.shardId, damageHp: number.hit.damageHp, ageSeconds: number.ageSeconds, text: number.text.text })),
+      hitNumbers: this.hitNumbers.map((number) => ({ shardId: number.hit.shardId, damageHp: number.hit.damageHp, ageSeconds: number.ageSeconds, text: number.text.text, widthCssPixels: number.text.displayWidth * this.zoom, heightCssPixels: number.text.displayHeight * this.zoom })),
       audio: this.hitAudio.inspect(),
     };
   }

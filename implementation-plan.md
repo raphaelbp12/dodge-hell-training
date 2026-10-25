@@ -436,7 +436,7 @@ Block WASD/R/O/P behind the dialog. Escape closes once without also toggling bac
 
 ### Step 14.1 - Run The Full Repeated-Practice Acceptance Matrix
 
-Status: pending. Dependencies: 13.2.
+Status: complete. Dependencies: 13.2.
 
 **Implementation prompt**
 
@@ -447,6 +447,14 @@ Review min/default/max zoom screenshots for nonblank correctly framed play, read
 **Focused checks:** current unit/type/lint/build/browser outputs, actual run counts/bounds, screenshots and repeatability. Historical v1 release evidence is not evidence for this build.
 
 **Acceptance:** all five gates/current visual checks pass and prior geometry/audio approvals are recorded with honest limitations. No publication/live verification implied.
+
+**Execution and verification - 2026-10-25**
+
+- Dependency 13.2 remote verified at `c9a929d0c4ebb11bcf0b74729cb1d6a66e0d8214`. Added only missing actual-feedback 0.25/1/3 zoom evidence for 1440x1000 and 390x844, diagnostic rendered text dimensions and observed effect/voice metrics in the existing sustained report. Real damage, exact -128, screen-sized text bounds and antialiased pink pixels are required; reviewed captures at extremes/default. An initially over-narrow exact-color classifier rejected visibly correct antialiasing; screenshots disconfirmed a rendering defect and the classifier now uses exclusive pink hue, retaining visible-pixel requirements.
+- Full current gates under Node 24.22.1/npm 12.2.1: 292 unit/component cases across nine files, typecheck, lint, production build and all 27 Chromium cases passed. Coverage includes shared polygons/centered-head reach, 11-shot cadence, one reversal/lifetime-only/once-only hits, mixed history, zoom/restoration/extremes, authoritative bar, independent/lethal numbers, original audio/mute/failure, Home/HUD Controls, keyboard/focus/countdown/pause, real deaths/Retry/R/Home/reload, corrupt/blocked/quota storage and cleanup. Production-safe tests remain isolated from source diagnostics and injected successful outcomes.
+- Actual 60-second browser report: 58.95 simulated seconds across three real deaths, 208 progress samples, peak 88 shards/5 texts/1 sampled voice, 25 retries, 3597 measured animation frames, median/p95 16.7 ms and max 33.3 ms gap. Bounds are 88/16/4; sample peaks are observations, not proof of a tighter cap or cross-device performance guarantee. One canvas/listener retained; all reset/cleanup assertions pass. Pure five-minute 30/60/120 Hz schedules remain equivalent.
+- Production files are only index HTML, favicon SVG, JS/CSS assets `index-Cf1kUIzF.js`/`index-COWqyGib.css`; no reference images/crops or generated reports are tracked/bundled. Original reference SHA-256 remains `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`. Existing ~1.72 MB Phaser bundle warning remains nonblocking.
+- Technical acceptance delegated by the batch authorization, with actual earlier G01-G04 geometry approval preserved. No fresh human play/feel/audible comfort approval, non-Chromium certification or live deployment claim. No gameplay tuning, rule identity or artwork-distribution change. Local handoff and actual hosted evidence remain steps 14.2/14.3.
 
 ### Step 14.2 - Finish The Local V2 Handoff
 
