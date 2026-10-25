@@ -982,10 +982,10 @@ test("WASD uses world speed and camera stays centered at the arena edge through 
   await page.keyboard.down("p");
   await page.keyboard.up("p");
   expect((await inspect(page)).zoom).toBe(1.125);
-  for (let press = 0; press < 5; press++) await page.keyboard.press("p");
-  await expect.poll(async () => (await inspect(page)).zoom).toBe(1.5);
-  for (let press = 0; press < 10; press++) await page.keyboard.press("o");
-  await expect.poll(async () => (await inspect(page)).zoom).toBe(0.75);
+  for (let press = 0; press < 24; press++) await page.keyboard.press("p");
+  await expect.poll(async () => (await inspect(page)).zoom).toBe(3);
+  for (let press = 0; press < 32; press++) await page.keyboard.press("o");
+  await expect.poll(async () => (await inspect(page)).zoom).toBe(0.25);
   await page.keyboard.down("d");
   await expect
     .poll(async () => (await inspect(page)).player.positionTiles.x)

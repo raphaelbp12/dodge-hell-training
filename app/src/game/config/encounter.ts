@@ -102,8 +102,8 @@ export const ENCOUNTER_CONFIG = {
   camera: {
     cssPixelsPerTile: 32,
     defaultZoom: 1,
-    minZoom: 0.75,
-    maxZoom: 1.5,
+    minZoom: 0.25,
+    maxZoom: 3,
     zoomStep: 0.125,
   },
   session: {

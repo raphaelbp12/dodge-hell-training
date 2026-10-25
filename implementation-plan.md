@@ -276,7 +276,7 @@ Review actual desktop/narrow practice and shared outlines at currently available
 
 ### Step 11.1 - Add The Defensive Zoom Preference Boundary
 
-Status: pending. Dependencies: 10.2.
+Status: complete. Dependencies: 10.2.
 
 **Implementation prompt**
 
@@ -285,6 +285,12 @@ Set typed camera limits to 0.25-3.0/default 1/step 0.125 without changing world 
 **Focused checks:** absent/valid/boundary/fractional values, malformed/wrong-type/nonfinite/out-of-range data, throwing getter/read/write, quota failure, unchanged-write deduplication and history independence. Reuse neighboring tests or one adapter-specific test where warranted.
 
 **Acceptance:** config/storage tests and relevant regression/type/build checks pass; history is unchanged and persistence rules remain outside simulation. Camera binding/reload restoration is not claimed yet.
+
+**Execution and verification - 2026-10-25**
+
+- Dependency 10.2 pushed and remote verified at `38f0699d792edf4fc92ce266e3ccdcdb8f0fa373`. Added dedicated `ZoomPreference` adapter, key `dodge-hell-training.zoom`, stable JSON-number encoding. Reuses the existing injected storage port; history/schema/data are untouched. Valid finite values in [0.25, 3] retain exact fractional values with no snapping. Missing data defaults to 1; malformed/blocked/read/getter/quota failures retain visit-local operation, preserve invalid saved data and stop failed writes. Only actual changes write.
+- Approved camera limits now 0.25-3, default 1, increment 0.125, 32 CSS pixels/tile unchanged; rules identity stays v2. The existing live camera automatically consumes these limits; updated keyboard clamp evidence without binding persistence early.
+- TDD: adapter suite failed missing module, then 97 focused storage/config/history cases passed. All five gates passed: 280 unit/component cases across eight files, typecheck, lint, build and 20 Chromium cases including sustained/25 retries and desktop/narrow extended-zoom captures. Existing Phaser bundle warning remains. Camera reload restoration remains solely step 11.2; no claim of a bound preference or hosted verification.
 
 ### Step 11.2 - Wire Reload-Safe Camera Restoration
 

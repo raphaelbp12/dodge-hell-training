@@ -16,7 +16,7 @@ export type HistorySnapshot = Readonly<{
   warning: string | null;
 }>;
 
-type HistoryStorage = {
+export type HistoryStorage = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 };

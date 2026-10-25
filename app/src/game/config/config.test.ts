@@ -198,8 +198,8 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   expect(ENCOUNTER_CONFIG.camera).toEqual({
     cssPixelsPerTile: 32,
     defaultZoom: 1,
-    minZoom: 0.75,
-    maxZoom: 1.5,
+    minZoom: 0.25,
+    maxZoom: 3,
     zoomStep: 0.125,
   });
   expect(ENCOUNTER_CONFIG.session).toEqual({
@@ -291,7 +291,7 @@ test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursu
     { ...ENCOUNTER_CONFIG, camera: { ...ENCOUNTER_CONFIG.camera, minZoom: 2 } },
     {
       ...ENCOUNTER_CONFIG,
-      camera: { ...ENCOUNTER_CONFIG.camera, defaultZoom: 2 },
+      camera: { ...ENCOUNTER_CONFIG.camera, defaultZoom: 4 },
     },
     {
       ...ENCOUNTER_CONFIG,
