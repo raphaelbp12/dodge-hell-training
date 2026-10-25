@@ -1,19 +1,32 @@
-# Vertical Slice Implementation Plan
+# Active Implementation Plan
 
 ## Purpose And Execution
 
 Deliver a pure-frontend ROTMG-inspired training game: repeatedly survive against the Crystal Worm Child Head, inspect results, and retry immediately.
 
-This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 2.1`. A smaller model should read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
+This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 8.1`. Read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
 
-All steps start pending. After completing a step, replace its status with `complete`, record the actual checks and outcomes below its prompt, and note any approved deviations. Do not mark a step complete when its required checks are blocked. Do not automatically start the next step.
+New steps start pending. After completing a step, replace its status with `complete`, record the actual checks and outcomes below its prompt, and note any approved deviations. Do not mark a step complete when its required checks are blocked. Do not automatically start the next step.
+
+Completed phases 1-7 and their v1 acceptance history are preserved in [the v1 archive](docs/implementation-plan-v1.md). This file contains pending phases 8-14 for the approved fixes. Begin with `/implement-step 8.1`; the existing command reads this file without changes. Archiving history does not implement or complete any new step.
 
 ## Sources And Decision Authority
 
 - [Original draft](first-draft.md): original requirements and project intent. Keep it intact.
 - This plan: consolidates subsequent user decisions and the approved technical approach. Later explicit user decisions override older statements; record changes here.
-- Step 1.1 will produce a sourced mechanics specification. Do not treat user-supplied wiki numbers or proposed formulas as independently verified facts.
+- [The mechanics contract](docs/mechanics.md) records sources, approvals and fidelity limits. Do not treat user-supplied wiki numbers or proposed formulas as independently verified facts.
+- [The fixes decision record](docs/fixes-plan.md), especially sections 4, 7.7 and 7.8, supplies Q01-Q20/R01-R05 approvals and supersedes conflicting archived v1 design. Its section 5 is a historical high-level outline; executable steps/statuses live here. [The adjustment notes](fixes.md) and reference image are supporting inputs, not permission to publish third-party artwork.
 - Never silently resolve a gameplay ambiguity. Research it, explain alternatives, and ask the user for approval before dependent implementation.
+
+## Completed Baseline
+
+Phases 1-7 are complete; their prompts, earlier blockers, later resolutions and acceptance evidence are archived, not deleted or reopened. The existing playable runtime remains v1 until step 10.1.
+
+| Archived dependency | Final status                                          | Evidence                                                                                                            |
+| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 7.2                 | Complete under delegated technical release acceptance | [Step 7.2 and release verification](docs/implementation-plan-v1.md#step-72---verify-release-and-finish-the-handoff) |
+
+For step 8.1's dependency check, read that archived final status and execution record, not the historical blocked attempt within it. Other completed step records are available in the same archive when needed. Do not rerun completed steps automatically.
 
 ## Confirmed Design
 
@@ -21,17 +34,17 @@ All steps start pending. After completing a step, replace its status with `compl
 - Home screen with a prominent Start button, description, changelog, and links. The requested home screen is intentional, not a marketing landing page.
 - Desktop keyboard play: WASD movement; R immediately retries; O zooms out; P zooms in.
 - Endless survival until death. No player attacks or seal activation in this slice.
-- One fixed, average unpotted level-20 Paladin. Include passive bonuses from a T10 sword, T10 heavy armor, T4 seal, and T4 health ring. Verify exact items, average-stat methodology, bonuses, and rounding before assigning values. Every attempt uses identical stats.
+- One fixed, average unpotted level-20 Paladin using the mechanics contract's approved equipment, stat totals, derivation and rounding. Every attempt uses identical stats; this follow-up does not reopen the preset.
 - Visible primary attributes: health, vitality, speed, defense. Derive gameplay values through verified rules rather than embedding formulas in UI code.
 - Circular arena; player spawns at its center and enemy near an edge. No shrinking floor or hazards.
 - The head slowly chases the player, slower than the configured Paladin. This intentionally replaces the wiki's wandering behavior.
-- Four emitters, spaced 90 degrees apart, rotate clockwise. Every emitter fires four projectiles per burst, separated by a short interval, followed by cooldown. Rotation continues between shots so their origins and directions differ. Each projectile fires radially outward from its emitter's current position.
-- Enemy begins in its firing cooldown. Exact timing and angular speed need research or approved playtesting values.
+- Four emitters, spaced 90 degrees apart, rotate clockwise at 45 degrees/second. Each fires eleven projectiles 0.15 seconds apart, followed by one second after the last shot. Rotation continues during cooldown; the near-center offset is 10% of head width.
+- Enemy begins in a two-second firing cooldown. Keep the approved center-player/near-edge-enemy spawn policy.
 - Shards travel along their initial direction, reverse velocity once at a configured age, and expire only at their configured lifetime. No stored firing origin or homing target is needed. Enemy movement never changes an existing shard's trajectory.
 - A shard can damage the single player only once in its lifetime. Store `hasHitPlayer` per shard. It remains alive after a hit, overlap, or return collision. Do not remove it at arena boundaries or when offscreen.
-- Draft shard values: 160 damage, 8 tiles/second, 19.2-tile range. These require source verification, including the meaning of range for a returning projectile.
-- Player-centered camera, seeking ROTMG fidelity, with O/P zoom. Exact framing, limits, and any camera rotation behavior require approval.
-- Placeholder geometric graphics are acceptable. Gameplay readability and fidelity take priority over final artwork.
+- Shards use 160 incoming damage and speed 8 tiles/second. Approved maximum head-center-to-leading-edge reach and arena radius are 19.2 tiles; exact reversal/lifetime derive from reviewed polygons, not total-path semantics.
+- Player-centered camera with persisted O/P zoom from 0.25 to 3.0, default 1 and step 0.125. Zoom does not change world units or gameplay.
+- Original simple convex silhouettes of at most eight sides share body geometry with collision. Add the approved health bar, hit feedback/audio and Controls/pause behavior through the phased steps below.
 - Local attempt history and comparisons support repeated practice; no backend, accounts, or online leaderboard.
 
 ## Approved Technical Approach
@@ -73,426 +86,279 @@ Every step prompt inherits these instructions:
 7. Run the step's focused checks and relevant existing checks. Disclose unavailable tools, source access failures, and unverified behavior. Never claim that a test or deployment ran when it did not.
 8. End with changed files, actual check outcomes, remaining blockers, and a concise manual verification procedure where relevant. Update this step's status only when its acceptance criteria are met.
 
-## Phase 1: Mechanics And Scope Approval
+## Follow-Up Execution Contract - Phases 8-14
 
-### Step 1.1 - Produce The Sourced Mechanics Contract
+The architecture, shared prompt contract and project instructions still apply. Execute only the requested numbered step and stop afterward. All new steps below are **pending**; this planning task is not an implementation execution record.
 
-Status: complete. Dependencies: none.
+### Approved Scope And Review Gates
 
-**Implementation prompt**
+- One coordinated gameplay identity: `crystal-worm-child-head-paladin-v2`. Retain v1 history, exclude it from v2 bests, and avoid a schema migration unless a demonstrated field change requires it.
+- Four emitters, eleven shots each, 0.15-second spacing, one second after the last shot, two-second initial cooldown, clockwise 45 degrees/second. Group span 1.5 seconds, period 2.5 seconds, forty-four shards per group.
+- Maximum reach is 19.2 tiles from a stationary centered head's simulation center to the projectile's farthest body edge at reversal. Speed remains 8 tiles/second; arena radius is 19.2 tiles. This calibration condition does not confine shards emitted by a moving head.
+- Use the decision record's common scale and nominal body dimensions. Nominal reversal 2.238140 seconds and lifetime 4.476281 seconds are estimates, not immutable rounded runtime constants. Derive exact timing from the approved polygon, emitter offset and edge criterion.
+- Emitter offset is 10% of head width. Player starts at center; enemy starts north with a three-tile center-to-wall margin, nominally `(0, -16.2)`, subject to actual body fit. Derive pursuit stopping separation from silhouettes; an extra gap is not silently authorized.
+- Original convex body silhouettes, three to eight vertices, share their physical outline and transform between drawing and collision. Shard is centrally symmetric and retains firing-axis orientation on reversal; no within-tick spin. Decorations are explicitly nonphysical.
+- Preserve one clock, existing fixed-step/catch-up policy, one reversal, lifetime-only expiry and per-shard once-only hits. No firing-origin storage, homing, global invulnerability, contact damage, blocking, wall/offscreen despawn or shrinking arena.
+- Persist zoom independently of history: 0.25-3.0, default 1, step 0.125. Preserve 32 CSS pixels/tile independently of image reference scale and camera magnification.
+- Always-visible Phaser health bar, individual post-defense floating hit amounts, quiet original cue and visible mute; retain existing HUD. Controls on Home/HUD, accessible modal, explicit Resume after session dialog closure, centered Paused label, no background input/time catch-up.
+- Unspecified polygon coordinates, extra stopping gap, effect durations/placement and numeric audio gain/voice cap require review at their owning steps. Present candidates and record approval; do not reopen settled question batches or invent fidelity. Missing approval blocks completion, not preliminary proposals/tests.
+- Screenshot/crops remain local review material outside runtime assets; public distribution rights are unapproved. No backend, accounts, attacks, seal activation, touch controls, rebinding or tuning UI.
 
-Act as a gameplay researcher and technical designer. Do not scaffold or implement the app. Create `docs/mechanics.md` from the confirmed design above. Research https://www.realmeye.com/wiki/crystal-worm-child and authoritative linked sources for the Paladin, specified equipment, movement, defense, vitality/regeneration, in-combat effects, hit detection, and camera behavior. Record source URLs, access date, values with units, and whether each entry is verified, user-defined, or still unknown. Distinguish behavior mandated by this trainer from authentic ROTMG behavior. If sources are inaccessible or insufficient, report that limitation rather than supplying remembered numbers as facts.
+### Reuse And Verification Policy
 
-For Paladin base stats, document how averages across 19 level-ups are computed and how fractional results are rounded; verify passive item bonuses separately. Do not model unused attack or mana systems just because source tables contain them. For shards, resolve whether 19.2 tiles describes total travel or outward range; document reversal time and lifetime independently. Do not infer a lifetime solely from range divided by speed without establishing the source's range convention.
+Extend existing config/models, `createSimulation`/`advanceSimulation`, shard movement segmentation, health arithmetic, `SessionController`, `EncounterScene`, React screens and defensive storage boundary. Reuse neighboring tests and the existing Playwright helpers, diagnostic/production split and pixel checks. Add a small module only for a real ownership boundary; no parallel simulation, generic settings/event-bus framework, second clock or duplicate test harness.
 
-Present a compact approval checklist for unresolved encounter values: arena radius, spawn offset, enemy pursuit speed/stopping behavior, contact damage or body blocking, emitter radius/initial phase/angular speed, burst interval semantics and cooldown, shard return/lifetime, collision shapes, player damage/regeneration rules, camera framing/rotation/default scale/zoom limits. Also ask about countdown, pause/focus-loss behavior, result metrics, aborted attempts on R, zoom persistence across retry, and history retention. These were proposed during discussion but are not all explicitly approved. Offer clearly labeled recommendations to reduce decision effort.
+Behavior steps start with a focused failing test, run it, implement the smallest change, and rerun it immediately. Documentation/review steps use structural/math/diagram checks. Pure geometry uses existing Node Vitest without DOM/Phaser/React/storage. Prefer suitable installed `@flatten-js/core` operations; a narrow translating-convex sweep helper is justified where those APIs cannot express continuous collision, not as a general physics engine or dependency replacement.
 
-Acceptance: the document distinguishes facts from assumptions and lists remaining questions. Stop for user approval before dependent implementation. Mark this step complete only after recording the user's decisions and all values/rules required by later steps; playtesting values may be explicitly approved as provisional. Do not create custom skills for knowledge that fits in this document.
+Run relevant checks from `app/` using established scripts: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e` (`npm.cmd` for forwarded flags in PowerShell). All five are required for runtime-integrating changes and final acceptance; pure/documentation steps use focused checks plus relevant regression/type/build checks. Build before production-browser checks. Do not weaken meaningful assertions or target historical v1 death times.
 
-**Execution record - 2026-10-24**
+Preparatory geometry remains disconnected from the playable preset until step 10.1. Never deploy intermediate physics as v1 or distinct gameplay presets under one v2 identity. After publication, comparison-breaking changes require explicit version review. Each execution records actual checks, approvals/deviations, blockers and manual verification where relevant. The command never commits/pushes; publication requires separate authorization.
 
-- Drafted [the mechanics contract](docs/mechanics.md), separating confirmed trainer rules, unknown external mechanics, conditional range calculations, and proposed tuning/session policies.
-- RealmEye requests for the enemy, Paladin, stats, candidate equipment, combat rules, and controls returned only `Just a moment...` access-challenge content. Browser access to the enemy article also returned the challenge; no external numeric mechanics or item identities were verified.
-- Later browser follow-up on the same date succeeded: rendered pages supplied the head's shot table, Paladin stats, movement/defense/regeneration formulas, combat rules, controls, and several item identities/bonuses. The mechanics contract now records these facts, corrected item-tier leads, and source inconsistencies. Initial fetch failures no longer mean browser research is blocked.
-- User approved the encounter tuning table provisionally, selected reversal at 1.2 seconds and expiry at 2.4 seconds for the provisional total-path shard interpretation, and approved the camera/session/records table. Full decisions are recorded in the mechanics contract.
-- Final decisions: the user delegated all three remaining clarification questions to the agent for autonomous decisions and later review. Adopted the published integer-average preset (775 HP, 32 DEF, 41 SPD, 42 VIT), excluded extra modifiers, selected the wiki's worked-example combat brackets (trigger 27, duration 5.32 seconds), and documented precise trainer damage/rounding/regeneration rules. These are delegated decisions, not claims of explicit numeric endorsement or exact client fidelity.
-- Status complete under that delegation. The mechanics contract specifies the required rules and documents remaining fidelity limitations as approved/delegated approximations. No app scaffolding, gameplay implementation, or later step was started.
-- Validation: earlier documentation checks passed for required sections, evidence labels/access date, links, conditional range and preset arithmetic, and absence of an app scaffold. Final checks additionally cover combat boundaries, health arithmetic, the completed approval checklist, and step status. No application tests apply yet.
+### Phase Index
 
-## Phase 2: Command-Generated Foundation
+| Phase | Steps      | Outcome                                                | High-level outline |
+| ----- | ---------- | ------------------------------------------------------ | ------------------ |
+| 8     | 8.1, 8.2   | V2 contract and approved exact geometry                | F0-F2              |
+| 9     | 9.1, 9.2   | Tested pure continuous collision and boundary rules    | F2-F3              |
+| 10    | 10.1, 10.2 | Coordinated playable v2 and comparison safety          | F3                 |
+| 11    | 11.1, 11.2 | Defensive zoom preference and restoration              | F4                 |
+| 12    | 12.1-12.4  | Hit data, health bar, floating amounts and audio       | F5                 |
+| 13    | 13.1, 13.2 | Accessible Controls and paused-session safety          | F6                 |
+| 14    | 14.1-14.3  | Regression, local handoff and authorized live evidence | F7                 |
 
-### Step 2.1 - Generate And Verify The React App
+## Phase 8: Revised Contract And Geometry Approval
 
-Status: complete. Dependencies: 1.1.
+### Step 8.1 - Record The Approved V2 Contract
 
-**Implementation prompt**
-
-Inspect installed Node/npm and the current Vite Node requirements. Explain any incompatibility and use a supported environment before proceeding. Ensure `app/` does not contain existing work; if it does, inspect it and ask before replacing anything. From the repository root, generate the bootstrap using `npm create vite@latest app -- --template react-ts`. Use the CLI, not hand-written package, HTML, TypeScript, or Vite bootstrap files. Run `npm install` from `app/` and retain the lockfile. Do not use a force flag or delete repository files to make generation work.
-
-Keep the generated app initially; adjust generated files only for a demonstrated project requirement after generation. Keep the root draft and planning/customization files untouched. Ensure dependencies, output, and local test artifacts are appropriately ignored. Document the actual supported Node version and commands in a root README. Do not initialize another Git repository inside `app/` or commit changes.
-
-Acceptance: `npm run lint` and `npm run build` pass from `app/`. Start the Vite development server on an available port, verify the generated page loads, report its URL, and record commands and generated-tool versions. No game implementation yet.
-
-**Execution record - 2026-10-24**
-
-- Confirmed step 1.1 complete and `app/` absent before generation. Node.js 22.20.0 / npm 11.7.0 satisfy create-vite 9.3.1 and Vite 8.3.5 engine requirements (`^20.19.0 || >=22.12.0`), checked through npm metadata and the Vite setup guide.
-- Generated the official React TypeScript starter with `npm --yes create vite@latest app -- --template react-ts --no-interactive`. The extra flags accept npm's package-install confirmation and disable scaffold prompts; no bootstrap files were manually authored or existing files removed.
-- Ran `npm --prefix app install`; retained the generated lockfile. Installation reported zero vulnerabilities. Installed React/React DOM 19.3.1, TypeScript 6.0.3, Vite 8.3.5, React plugin 6.1.2, and Oxlint 1.89.0.
-- `npm --prefix app run lint` and `npm --prefix app run build` passed on the untouched scaffold. Build includes `tsc -b`. The current template uses Oxlint rather than ESLint; retained the generated choice without changing the approved application stack.
-- Started `npm --prefix app run dev -- --host 127.0.0.1 --port 5173`; live local URL: http://127.0.0.1:5173/. The editor browser loaded the starter, verified its counter changes from 0 to 1, and confirmed every starter image loaded. No browser errors were reported by those checks.
-- Added [the root README](README.md) with actual prerequisites, commands, versions, and current scope. Extended the generated app ignore rules for local test artifacts; retained dependency/build ignores. React components and generated app configuration remain unchanged.
-- No game behavior, Phaser, test framework, CI/deployment workflow, commit, push, or later plan step was introduced. The development server is intentionally left available for local inspection.
-
-**Toolchain follow-up - 2026-10-24**
-
-- At the user's request, reviewed current tools and selected Node 24.22.1 LTS rather than the Node 26 Current release. Remaining installation/update choices were delegated to the agent for later review.
-- Installed fnm 1.39.0 as a per-user WinGet portable package, installed/selected Node 24.22.1, and upgraded npm to 12.2.1 only inside the managed Node installation. The original system Node and PowerShell profile were not modified.
-- Upgraded TypeScript to 7.0.2 through npm and refreshed compatible dependencies; retained Node types on 24.x to match the runtime. Lint and TypeScript/production build passed after the upgrade; install/update audits reported zero vulnerabilities.
-- Added the root Node version file and app engine/package-manager metadata. Updated the README with current versions and reproducible Windows setup, keeping the original bootstrap record as history. No additional implementation step was started.
-- Reinstalled with `npm --prefix app ci` after synchronizing lockfile metadata; lint, TypeScript/production build, and installed dependency checks passed. npm 12's PowerShell entry point misparsed forwarded Vite flags in this environment; verified `npm.cmd` forwards them correctly and documented that Windows-specific invocation.
-- Restarted Vite explicitly under managed Node 24.22.1 / npm 12.2.1 at http://127.0.0.1:5173/. The page and every starter image loaded; a DOM click event changed the React counter from 5 to 6. Normal mouse-actionability automation timed out and is not claimed as passing; manual mouse review remains recommended. Version pins, lockfile engines, documentation links, and editor diagnostics were checked. No application components were changed for the update.
-
-### Step 2.2 - Install Runtime And Testing Tools
-
-Status: complete. Dependencies: 2.1.
+Status: pending. Dependencies: 7.2.
 
 **Implementation prompt**
 
-Install Phaser using npm. Install compatible Vitest, jsdom, React Testing Library, jest-dom, and Playwright test packages through npm rather than editing dependency lists manually. Initialize Playwright with its official CLI and retain only configuration/tests relevant to this project; do not add an extra generated CI workflow because deployment and CI are owned by phase 7. Install the needed browser binaries through Playwright's command. Keep the app's generated TypeScript/lint configuration working.
+Reconcile the latest fixes decisions into an additive v2 section in [the mechanics contract](docs/mechanics.md). Preserve v1 approvals/source history and completed plan statuses. Record approved cadence, range semantics, polygon/emitter/spawn policy, comparison version and UI decisions with units/provenance. Distinguish exact approvals from nominal measurements, geometry-dependent outputs and unspecified presentation constants. Assign remaining review gates to their owning steps rather than making this step depend on unfinished geometry. Do not change runtime or invent polygon/audio numbers.
 
-Configure `test` as a single-run unit-test command, `test:watch`, `typecheck` using the generated TypeScript project references, and `test:e2e`. Separate pure simulation tests from DOM tests using the simplest supported configuration. Configure Playwright's web server to run from `app/`, use a known test port, and avoid accidentally testing an unrelated existing server. Add one minimal React render test and one browser smoke test for the existing app; do not leave example tests for external websites. Verify CSS Module support without adding a styling framework.
+**Focused checks:** all Q/R approvals covered, cadence/range arithmetic, source-image hash unchanged, links and absence of runtime changes.
 
-Acceptance: lint, typecheck, unit tests, production build, and the local browser smoke test pass. Document exact commands and any environment prerequisites. Do not introduce game behavior yet.
+**Acceptance:** authority and remaining review ownership are clear, no settled choice is reopened, and document checks pass. Exact polygon-derived numbers remain explicitly assigned to step 8.2, not a blocker to this contract-reconciliation step.
 
-**Execution record - 2026-10-24**
+### Step 8.2 - Define And Approve Shared Geometry
 
-- Confirmed step 2.1 complete and retained the generated starter components, Vite config, and TypeScript project references. Installed Phaser 4.2.1 with `npm.cmd --prefix app install phaser`; no engine integration or gameplay was added.
-- Installed Vitest 5.0.5, jsdom 30.1.3, React Testing Library 16.3.3, jest-dom 7.0.1, user-event 14.6.8, and Playwright Test 1.64.1 using `npm.cmd --prefix app install --save-dev vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event @playwright/test`. Retained the npm lockfile; installs and clean installation reported zero vulnerabilities.
-- Initialized with the official create-playwright 1.17.139 CLI from `app/`: `npm.cmd --yes create playwright@latest -- --browser chromium --no-browsers --no-examples --quiet --lang ts`. Installed Chromium through `npx.cmd playwright install chromium`. Kept only the local Chromium configuration/test and the generated auth-artifact ignore; no external-site examples or CI workflow were added.
-- The initializer's npm subprocess reported the old system Node 22.20.0/npm 11.7.0 after an interactive terminal reset. Re-selected managed Node 24.22.1/npm 12.2.1 before a clean `npm.cmd --prefix app ci` and all acceptance gates. The first clean-install attempt hit a Windows native-module lock; stopping the existing dev server released it, and the retry passed without elevation.
-- Added the starter render/counter test and test-only CSS Module fixture first. The initial `npx.cmd vitest run src/App.test.tsx` failed both tests due to missing DOM configuration. Configured separate Node (`src/**/*.test.ts`) and jsdom (`src/**/*.test.tsx`) projects, jest-dom/cleanup setup, and CSS Module processing; both tests then passed. Global starter CSS is left to the real browser rather than parsed by jsdom.
-- Added one local browser smoke test first; `npm.cmd run test:e2e -- --reporter=line` failed on the missing base URL. Adapted the generated config to start Vite from `app/` using the current Node executable, dedicated port 4173, `--strictPort`, and `reuseExistingServer: false`. The same test then passed with normal mouse interaction, loaded images, and no uncaught page errors; no forced or synthetic click workaround is used.
-- Added single-run `test`, `test:watch`, `typecheck` (`tsc -b`), and `test:e2e` scripts. Extended the existing Node TypeScript project's include list to cover both test configs and browser tests. The existing app project typechecks React tests and their setup; no replacement bootstrap/configuration system was introduced.
-- Acceptance gates passed from `app/` under Node 24.22.1/npm 12.2.1: `npm run test` (two tests), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one Chromium test). Updated [the root README](README.md) with exact commands, browser prerequisites, test conventions, port ownership, and the Windows file-lock remedy.
-- No gameplay, simulation values, UI redesign, CI/deployment workflow, commit, push, or later step was introduced. No gameplay approval or design deviation was needed. Step 3.1 remains pending.
-
-## Phase 3: Testable Simulation
-
-### Step 3.1 - Define Preset Data, Models, And Derived Stats
-
-Status: complete. Dependencies: 1.1, 2.2.
+Status: pending. Dependencies: 8.1.
 
 **Implementation prompt**
 
-Implement only the models and configuration needed for one Paladin, one enemy, shards, circular arena, simulation inputs, and session snapshots. Encode the approved mechanics document in typed configuration with explicit units and named constants. Keep base stats, passive equipment bonuses, and derived gameplay values distinct; do not build an inventory/equipment UI. Include a preset/rules version so results from different tuning values cannot silently share a personal best.
+Propose original typed local player/head/shard vertices from the measured common scale/proportions, with explicit center anchors/orientation and visible head-occlusion uncertainty. Reuse vector/config conventions; introduce a pure geometry configuration module only as a genuine shared owner. Keep the playable preset/renderer unchanged. Generate a common-scale comparison and collision-overlay review from the same proposed vertices, not independent approximate art. Review artifacts are not runtime assets or a tuning screen.
 
-Write failing tests for the fixed Paladin stat totals, approved derived speed/regeneration/damage formulas, and configuration constraints such as positive lifetime and reversal within lifetime. Test rounding and bounds from the mechanics contract. Unknown values are blockers, not TODO defaults in playable code. Avoid a generic configuration/schema framework unless the existing toolchain makes it genuinely simpler.
+Derive the 10%-head-width emission offset, exact reversal/lifetime from farthest-vertex contact, spawn fit and silhouette-derived pursuit separation. Show the 19.2-tile construction with head at arena center, not its near-edge play spawn. Recalculate the live bound from exact lifetime/group period: nominally 88, not unconditional. Present any extra stopping gap explicitly. Obtain and record approval of actual silhouettes/anchors and necessary unspecified choices; finalize these v2 mechanics entries. Do not retain nominal glyph-centroid timing at the expense of exact edge contact.
 
-Acceptance: focused tests, typecheck, and lint pass; importing the models/configuration does not require DOM, React, Phaser, or localStorage. Record the correspondence between approved mechanics and named configuration values.
+**Focused checks:** finite ordered convex vertices, nonzero area, 3-8 sides, shard central symmetry, documented dimension/aspect tolerances reflecting source uncertainty, shared transforms, exact edge contact/just-beyond failure, spawn fit, positive reversal within lifetime. Use existing Node tests and common-scale visual review.
 
-**Execution record - 2026-10-24**
+**Acceptance:** exact geometry and derived values have actual approval evidence; data/math/comparison checks pass; runtime remains v1. Missing approval is recorded as a blocker, not assumed acceptance.
 
-- Confirmed steps 1.1 and 2.2 complete with recorded approval/tooling evidence and a clean worktree. Used the existing Node Vitest project; no packages, bootstrap files, test infrastructure, or runtime components were changed.
-- Added `app/src/game/config/config.test.ts` first. The focused command from `app/`, `npm.cmd run test -- --project node src/game/config/config.test.ts`, initially failed because the domain configuration modules did not exist. After implementation it passed 46 cases in Node, including assertions that `document`, `window`, and `localStorage` are absent.
-- Added plain types in `app/src/game/models.ts` for primary/derived stats, one player/enemy, shards, circular arena, directional simulation input, session phases, and readonly snapshot shapes. Shards include age, velocity, explicit reversal/lifetime, and per-shard reversal/hit flags; no stored firing origin, rendering object, global invulnerability, or collision-despawn state was introduced.
-- Added `app/src/game/config/stats.ts`: `PALADIN_BASE_STATS` uses the delegated S2 published integer averages; `PALADIN_EQUIPMENT_BONUSES` records only relevant passives from S7/S11/S13/S14. `calculateEquippedStats` derives 775 HP / 32 DEF / 41 SPD / 42 VIT without mutating base data. `STAT_RULES` names the S3/S9 coefficients and delegated trigger brackets/rounding, while pure functions calculate speed, fractional regeneration rates, bounded combat duration/trigger, and incoming damage. These do not apply hits or advance health/combat time.
-- Added typed `ENCOUNTER_CONFIG` in `app/src/game/config/encounter.ts`, with explicit unit-bearing names for approved arena/spawns/collision radii, pursuit, emitter rotation, burst intervals/cooldowns, independent shard reversal/lifetime, camera scale/zoom, countdowns and retention limit. `validateEncounterConfig` rejects nonfinite/nonpositive quantities, noninteger counts, invalid reversal/lifetime ordering, invalid zoom bounds, out-of-arena collision extents, and pursuit at least as fast as the player. Timing and policy values remain the approved provisional trainer rules, not new fidelity claims.
-- Kept comparison identity explicit: `RULES_VERSION` is `crystal-worm-child-head-paladin-v1` and appears in configuration and snapshot data. Documented that comparison-breaking preset/formula/encounter changes must bump it, while viewing zoom does not split records. Best/history comparison behavior remains step 5.2 work.
-- Recorded the contract-to-code correspondence in [the README's Domain Data section](README.md#domain-data): source averages/equipment, delegated arithmetic, encounter tuning, provisional shard timings, camera/session numbers, model shapes, and comparison version all map to named exports/properties. No required value was replaced by an unknown/TODO default.
-- Focused coverage includes all 11 specified DEF trigger boundaries plus saturation/fractional cases, zero/minimum/ceiling damage, zero-stat movement/regeneration, VIT duration floor, invalid negative/nonfinite rule inputs, exact approved tuning, and invalid configuration constraints. Temporal combat refresh, expiry-split regeneration, health caps/death, movement and projectile updates are intentionally not implemented in this step.
-- All established gates passed from `app/` using Node 24.22.1 / npm 12.2.1: `npm run test` (48 tests: 46 Node plus two React/CSS Module), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one Chromium smoke test with normal pointer interaction/assets/error checks). Editor diagnostics reported no errors in the new source/test files. Production output remains the unchanged starter because these modules are not wired into the UI/runtime yet.
-- No simulation clock, movement, firing, health update loop, UI change, Phaser integration, storage, CI/deployment, commit, push, or later-step implementation was introduced. No new gameplay choice or approval was needed; step 3.2 remains pending.
+## Phase 9: Pure Geometry Rules
 
-### Step 3.2 - Implement Fixed-Step Player Movement And Pursuit
+### Step 9.1 - Implement Continuous Convex Hit Detection
 
-Status: complete. Dependencies: 3.1.
+Status: pending. Dependencies: 8.2.
 
 **Implementation prompt**
 
-Introduce one fixed-step simulation entry point, driven by supplied elapsed time and sampled input rather than wall-clock APIs inside game rules. Implement approved WASD movement including normalized diagonals, circular-arena constraints accounting for the approved player collision extent, and slow enemy pursuit. Apply approved enemy stopping/contact/boundary rules; do not invent contact damage. Initialize deterministic spawn positions from configuration.
+Implement minimal shared vertex transforms and continuous translating-convex overlap. Check installed geometry APIs first and reuse suitable operations. Where unsupported, use the reviewed swept separating-axis overlap intervals with axes from both shapes and relative player/shard displacement. Document tangency and numerical tolerance separately from gameplay tuning. Circles/AABBs can reject candidates but never accept final hits. Keep helpers disconnected from playable collision until step 10.1; no new physics framework.
 
-Write failing tests for no input, opposite inputs, equal axial/diagonal speed, movement over a known number of ticks, arena edge movement, enemy distance reduction, and enemy speed below player speed. Verify equivalent simulated elapsed time split across different render-frame schedules produces equivalent state within a stated tolerance. Bound catch-up work according to an explicit policy; do not award survival time for simulation time that was discarded.
+**Focused checks:** newborn/initial overlap, stationary/equal motion, axial/diagonal high-speed crossing, miss, tangency/just-separation, circle false positive rejected, rotated equivalence, reverse crossing and invalid geometry. Extend nearby tests; add one focused geometry test only if ownership warrants it. Verify Node-only imports.
 
-Acceptance: focused movement/timing tests and typecheck pass. No renderer, event bus, pathfinding, or unrelated physics features are introduced.
+**Acceptance:** approved fixed-orientation shapes pass continuous-relative-motion tests; no endpoint-only shortcut, runtime branch or additional clock/framework is introduced.
 
-**Execution record - 2026-10-24**
+### Step 9.2 - Implement Body-Aware Arena And Pursuit Geometry
 
-- Confirmed step 3.1 complete and the worktree clean. Read the existing preset, entity/input types, and approved movement/arena/session rules. No previously selected tick rate or catch-up limit existed, so asked before introducing those values.
-- The user delegated the timing decision for later review. Selected a 60 Hz fixed step, at most 8 ticks per elapsed-time update, excess whole-tick discard with fractional remainder retention, player-first update order, and collision-adjusted radial arena projection. Recorded this as delegated trainer policy in [the mechanics contract](docs/mechanics.md#simulation-timing-and-movement-policy), not an explicit numeric endorsement or ROTMG fidelity claim. This establishes the initial v1 simulation baseline; no earlier playable attempt/history implementation exists. Future comparison-breaking policy changes require a reviewed rules-version bump.
-- Added `app/src/game/simulation/simulation.test.ts` first. The focused command from `app/`, `npm.cmd run test -- --project node src/game/simulation/simulation.test.ts`, initially failed on the missing simulation module; after the smallest implementation it passed 38 cases.
-- Added `ENCOUNTER_CONFIG.simulation.fixedStepSeconds` and `maxStepsPerUpdate` to the existing typed configuration and extended its finite/positive/safe-integer checks. All existing approved encounter, preset, and arithmetic values remain unchanged; no package or bootstrap changes were needed.
-- Added `createSimulation` and the single externally driven `advanceSimulation` entry point in `app/src/game/simulation/simulation.ts`. State copies deterministic spawns, full health, zero combat time, and initial emitter phase. The accumulator uses supplied elapsed seconds only, processes bounded whole ticks, reports discarded seconds, and retains a fractional remainder. Survival seconds derive from executed tick count; there is no wall-clock API, independent timer, delayed catch-up backlog, or credit for discarded time.
-- Implemented independent-axis input cancellation, normalized diagonals, approved world directions/speed, player-first movement, slower pursuit toward the updated player position, and stop-distance clamping without overshoot/division by zero. Circle projection keeps both collision extents inside the arena while permitting tangential movement; bodies neither damage nor block the player.
-- Tests cover no input, all opposite/cardinal directions, diagonal speed, 120-tick distance, fresh independent initialization, pursuit speed/order/distance reduction, exact/inside/coincident stopping cases, overlap behavior, outward wall rejection/tangential sliding, 600 edge-movement ticks, fractional carry, bounded/discarded time including a very large finite duration, invalid elapsed-time rejection without mutation, and invalid timing configuration.
-- Verified equivalent simulated time across 30/60/120 Hz, three-tick, and irregular frame schedules with constant sampled input and no discarded time. Position tolerance is 1e-9 tile and remainder tolerance 1e-12 second; integer tick counts/time agree. Equivalence is not claimed across intentional time discard or differently sampled per-tick inputs. Tick-boundary allowance is machine precision, not gameplay tuning.
-- All established gates passed from `app/` using Node 24.22.1 / npm 12.2.1: `npm run test` (86 tests: prior 48 plus 38 movement/timing), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one existing Chromium smoke test). Editor diagnostics reported no errors in touched source/test files. Formatted only the three touched TypeScript files with temporary npm-exec Prettier; no formatter dependency was added.
-- Updated [the README](README.md#fixed-step-movement) with API/time accounting, scope, test command, and verification tolerances. No new browser movement is expected yet: the unchanged starter remains the UI. No firing, emitter rotation updates, shard motion, health update loop, session lifecycle, renderer, event bus, pathfinding, storage, CI/deployment, commit, push, or step 3.3 implementation was introduced. No unresolved blocker remains; step 3.3 stays pending.
-
-### Step 3.3 - Implement Rotating Bursts And Returning Shards
-
-Status: complete. Dependencies: 3.2.
+Status: pending. Dependencies: 9.1.
 
 **Implementation prompt**
 
-Implement the approved attack scheduler in simulation time. Start in cooldown. Maintain four equally spaced clockwise emitters, sampling enemy position and current emitter phase at each shot. Each burst group emits four shots from each emitter for 16 shards total, respecting the approved intra-burst interval and cooldown definition. Define clockwise using the renderer's eventual coordinate convention and test the actual direction. Keep rotation progressing according to the mechanics contract during cooldown.
+Extend the same pure geometry slice with transformed-vertex circular containment/contact, a tested movement constraint preserving existing tangential edge movement, and silhouette-derived enemy stopping separation. Reuse radial/pursuit semantics where suitable; no polygon-wall replacement, body blocking or contact damage. Validate actual vertices, not bounding-circle overlap as proof of fit. Share exact reach derivation with config validation instead of copying timing formulas into drawing. Do not activate these rules yet.
 
-Represent shard position, velocity, age, reversal state if needed, lifetime, and `hasHitPlayer`. Reverse velocity exactly once at the configured time; when an update crosses reversal or expiry, split movement across the boundary rather than integrating the whole update with the wrong velocity. Do not store the origin, home toward the enemy, remove shards offscreen/on arena exit, or add collision-driven expiration.
+**Focused checks:** interior/edge/outside placements, rotated corner contact, outward rejection/tangential movement, repeated containment, approved spawn, coincident/near pursuit without overshoot/division by zero/jitter, zero emitter offset accepted and negative/nonfinite rejected, exact leading-edge contact across firing phases.
 
-Write failing tests for no premature firing, all four emitter offsets, 16 correctly timed shots, rotation between successive shots, cooldown boundaries, one reversal, partial-step reversal, lifetime-only expiry, and independence from later enemy movement. Test symmetric outbound/return movement returns near the emission location without storing that location in the entity.
+**Acceptance:** shared physical shapes move/stop under approved semantics and fit where required; arena containment never becomes projectile confinement. Helpers remain disconnected from live v1 rules.
 
-Acceptance: focused attack/shard tests and typecheck pass; multiple frame schedules preserve shot counts/times for the same simulated duration.
+## Phase 10: Coordinated Playable V2
 
-**Execution record - 2026-10-24**
+### Step 10.1 - Activate The Revised Encounter Atomically
 
-- Confirmed step 3.2 complete with recorded validation and a clean worktree. Read the approved encounter/shard contract and existing models/configuration/simulation. No new tuning, gameplay approval, dependency, or rules-version change was needed.
-- Extended `app/src/game/simulation/simulation.test.ts` first with 17 attack/shard cases. The focused command from `app/`, `npm.cmd run test -- --project node src/game/simulation/simulation.test.ts`, passed the prior 38 cases and failed all 17 new cases on absent attack state/rotation. After implementation, the same command passed all 55 cases; strengthened shot-time/discard assertions also passed before the full gates.
-- Extended `SimulationState` in `app/src/game/simulation/simulation.ts` with independent shards and a volley count. The existing fixed-step loop remains the only clock. Derive shot deadlines from group/shot indices rather than accumulating cooldown drift. Four emitters fire at 2.00/2.15/2.30/2.45 seconds, followed by the next group at 4.45 seconds; IDs follow stable volley/emitter spawn order.
-- Continuously derive phase from executed simulation time, including cooldown; positive X east and positive Y south make increasing angles clockwise. All approved shot times align to 60 Hz boundaries. Each tick moves entities and advances existing shards before sampling the enemy's updated position/phase for the due volley; newborn shards start at age zero. No additional scheduler or wall-clock API was introduced.
-- Advance each shard with separate outbound/return segments when reversal is crossed, including exact-boundary reversal and reversal plus expiry within one tick. Clip travel at lifetime, snap only machine-precision boundary differences, reverse velocity once, and remove only at lifetime. Preserve hit flags and shards outside the arena or overlapping the player; no hit processing, origin/target field, homing, or collision despawn was added.
-- Tests cover initial cooldown, all four emitter offsets, exact 16-shot group timing, last-shot-based cooldown, moving/rotating emitter resampling, actual clockwise direction/phase wrap, one reversal, partial-tick boundaries, lifetime-only expiry, symmetric return without stored origin, independence from later enemy movement, and no attack/rotation/shard progress from discarded time. Five render schedules over ten simulated seconds produce identical final state and all 64 expected shard emission times within 1e-12 second.
-- All required gates passed from `app/` under Node 24.22.1 / npm 12.2.1: `npm run test` (103 tests: 46 configuration, 55 simulation, two React/CSS Module), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one existing Chromium smoke test). Formatted only the two touched TypeScript files through temporary npm-exec Prettier; no dependency was added.
-- Updated [the README](README.md#rotating-bursts-and-shards) with scheduler/state semantics, tick sampling order, shard invariants, focused checks, and current scope. Manual visual verification remains unavailable until Phaser integration: the starter UI is unchanged. No blockers or approved deviations remain. Step 3.4 stays pending; no hits/health, renderer, session lifecycle, storage, CI/deployment, commit, or push was introduced.
-
-### Step 3.4 - Implement Hits, Health, And Survival End
-
-Status: complete. Dependencies: 3.3.
+Status: pending. Dependencies: 9.2.
 
 **Implementation prompt**
 
-Implement collision and damage using the approved shapes and ROTMG rules. Use suitable proven geometry utilities, including Phaser's independently testable helpers if appropriate, without pulling rendering objects into entity models. Detect fast shard crossings, not only overlap at the end of a tick. Account for player movement during the tick when testing relative motion. Preserve the approved return-path collision behavior when a tick spans reversal.
+Wire reviewed geometry/config/drawing into the existing encounter together under `crystal-worm-child-head-paladin-v2`: cadence, emitter offset, exact shard timing, arena/spawns, pursuit and polygon hits. Physical drawing and collision consume identical vertices/transforms; decorations stay nonphysical. Replace obsolete positive-circle validation with polygon validation and nonnegative emitter radius. Retain firing-axis shape orientation on reversal using only minimal necessary state, never a stored firing origin.
 
-On a shard's first registered hit, apply damage and set `hasHitPlayer`; later collisions by that shard do nothing. Keep it alive. Separate shards can each hit; do not add global invulnerability unless the approved contract requires it. Apply the approved defense minimum-damage rule, regeneration and in-combat rules, health cap, and death transition. Freeze survival time at the approved death instant/tick and prevent post-death simulation from changing results.
+Reuse simulation entry points, `updateAttacks`, reversal/expiry segment splitting, player interpolation, stable shard order, `hasHitPlayer`, health rules and the sole Phaser driver. Replace the local circle hit-test with the tested sweep, including newborn overlap. Existing shards ignore later head movement. Update affected regression expectations deliberately; no zoom/audio/modal work in this step.
 
-Write failing tests for defense boundaries, first hit, repeated overlap, return collision, multiple shards, fast crossings, regeneration timing/caps, lethal damage, and immutable results after death. Handle ordering between damage and regeneration explicitly according to the contract.
+**Focused checks:** eleven shots per phase/44 per group; initial/last/next-group boundaries; moving-head origins/rotation; fractional reversal/expiry inside ticks; swept outward/return hits, independent once-only shards/lethal stop; lifetime-only expiry outside arena; schedule equivalence; spawn/edge constraints and final live bound. Browser checks prove nonblank polygons, matching outlines and repeated-practice lifecycle at desktop/narrow sizes.
 
-Acceptance: focused collision/health tests, existing simulation tests, and typecheck pass. No projectile is destroyed by collision and no player attack/ability behavior is introduced.
+**Acceptance:** all five app gates pass; v2 activates as one coherent preset without hidden circle hits, a second clock or weakened resource/lifetime assertions. Record exact geometry/timing/bounds; later visual acceptance remains pending.
 
-**Execution record - 2026-10-24**
+### Step 10.2 - Verify Geometry And Comparison Isolation
 
-- Confirmed step 3.3 complete with recorded validation and a clean worktree. Read the approved damage/combat, collision-circle, reversal, lifetime, and lethal-tick rules. No new tuning, gameplay decision, or rules-version change was needed.
-- Added collision/health/death tests before implementation. From `app/`, `npm.cmd run test -- --project node src/game/simulation` initially passed the prior 55 simulation cases, failed all 21 new simulation cases, and failed to import the missing health module. After implementation, 91 cases passed and one prior test still assumed overlapping shards could not damage; updated that obsolete expectation while retaining its lifetime-only removal assertions. The same focused command then passed. Added three emission-boundary cases and reran focused tests; the final focused result is 95 passing cases (79 simulation, 16 health).
-- Installed typed, MIT-licensed `@flatten-js/core` 1.6.14 through `npm.cmd --prefix app install @flatten-js/core`, preserving the npm lockfile. npm reported zero vulnerabilities. Verified tangent and zero-length segment distances in pure Node without DOM globals before integration; simulation does not import React, Phaser, DOM, or storage APIs.
-- Isolated the library behind a pure relative swept-circle check in `app/src/game/simulation/simulation.ts`. Each shard segment subtracts the player's matching interpolated movement endpoints and compares distance against the combined approved radii. Preserve separate outbound/return segments and clip both shard and player motion at expiry. Newborn shards test only overlap at the firing boundary, never player movement before birth.
-- Added `app/src/game/simulation/health.ts` and its focused tests. `applyPlayerHit` reuses approved defense/minimum/ceiling arithmetic and the inclusive combat trigger; `regeneratePlayer` retains fractional HP, splits combat-expiry time between half/full rates, clamps health, and cannot resurrect a dead player. The fixed-preset shard applies 128 HP damage and refreshes 5.32 seconds of combat before that tick's regeneration.
-- Registered hits in stable spawn order using per-shard `hasHitPlayer`; separate shards can each hit with no global immunity. Hits do not remove or redirect shards, including consumed return paths and off-arena shards. Only lifetime expiry removes them. Adapted the earlier overlap test to the newly implemented hit behavior rather than disabling its collision coverage.
-- Added minimal simulation `phase` (`playing`/`ended`) and `hitsTaken`. On lethal damage, clamp HP to zero, stop later hits and regeneration, include the lethal tick in survival time, stop remaining catch-up ticks, clear the accumulator, and report remaining supplied time as discarded. Later advance calls execute no ticks and leave ended state unchanged. No start/pause/retry controller was added.
-- Coverage includes defense/minimum/ceiling boundaries; exact/below/above combat trigger and refresh; normal/combat fractional regeneration, expiry splits, and caps; fast crossings, moving-player paths, tangent/near-miss cases; outbound/return reversal paths and expiry clipping; emission-time collisions without pre-birth sweeps; repeated overlap/return immunity per shard; independent hits; stable lethal ordering; and frozen results after death. Existing frame-schedule tests also continue to compare complete simulation state.
-- Typecheck initially exposed phase narrowing across the mutating collision callback; changed local post-collision control flow to use the lethal health outcome. Focused tests and typecheck then passed. All established gates passed under Node 24.22.1 / npm 12.2.1: `npm run test` (143 cases: 46 configuration, 79 simulation, 16 health, two React/CSS Module), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (one existing Chromium starter smoke test). Formatted only the four touched TypeScript files with temporary npm-exec Prettier; no formatter dependency was added.
-- Final editor diagnostics initially retained missing-module errors for the test imports despite passing CLI checks. Explicit `.ts` paths for those two local imports, supported by the generated `allowImportingTsExtensions` configuration, cleared the diagnostics. Reran all 95 focused cases and typecheck after that change; both passed. Final source/test editor diagnostics are clean, and documentation links, step statuses, and package/lockfile metadata checks passed.
-- Updated [the README](README.md#hits-health-and-survival-end) with collision/health/death semantics, dependency, checks, and current scope. Manual encounter verification is unavailable until Phaser integration; the starter UI is unchanged. No blockers or approved deviations remain. Step 4.1 stays pending; no renderer, input/camera integration, session controls, storage, CI/deployment, commit, or push was introduced.
-
-## Phase 4: Playable Engine Integration
-
-### Step 4.1 - Render The Simulation And Bind Controls
-
-Status: complete. Dependencies: 3.4.
+Status: pending. Dependencies: 10.1.
 
 **Implementation prompt**
 
-Create the minimal Phaser adapter and React canvas host. Instantiate the game once per mounted host, run the existing simulation from Phaser's update lifecycle, and destroy the game and all listeners on unmount. Prove React Strict Mode does not create duplicate loops, canvases, or key handlers. Use Phaser rendering and camera APIs, not a parallel custom renderer or React entity tree.
+Reuse existing history/storage and production-safe browser helpers to prove v1 records remain readable/labeled and excluded from v2 bests, while real v2 deaths save once and R/aborts save nothing. Do not migrate/delete/relabel old records or add a schema without need. If current code already satisfies this, add only missing tests/evidence.
 
-Draw the circular arena, player, enemy, and yellow shards with readable placeholder geometry and the approved collision/render alignment. Keep ground, entities, and effects in predictable depth order. Player camera tracking, world scale, O/P zoom bounds, and resize behavior must follow the mechanics contract. Screen size changes and zoom must not change world speed, collision, or attack timing. Prevent page scrolling only for relevant gameplay keys while the game has appropriate focus. Clear held input on focus loss according to the approved pause policy.
+Review actual desktop/narrow practice and shared outlines at currently available min/default/max zoom, including sustained play and 25 retries using the derived resource bound. Verify edge contact in the controlled centered-head condition, not a pursuing-head frame. Obtain user geometry/pattern acceptance; screenshots are not human approval. Repair integration defects only; tuning changes require approval/version review.
 
-Use adapter tests where practical and Playwright for lifecycle/input checks. Capture screenshots at desktop and narrow viewport sizes and verify the canvas is nonblank using canvas pixel checks, the arena/characters/shards render, and layout does not overlap. Narrow-screen layout may communicate keyboard requirements without claiming touch gameplay. Do not add mobile touch controls.
+**Focused checks:** mixed-version best/history, corrupt/future-record handling, one canvas/driver, resets/cleanup, geometry pixels/overlays, actual hits and resource bounds. Run relevant gates, all five if runtime changes.
 
-Acceptance: a temporary minimal React entry can launch the encounter; WASD, pursuit, bursts, returns, hits, health loss, camera follow, and zoom work. Run relevant tests, typecheck, lint, build, and browser checks. Start the dev server and provide its URL.
+**Acceptance:** comparison/practice checks and actual geometry/pattern approval are recorded; no v1 death-time/pixel-radius target or new deployment is claimed.
 
-**Execution record - 2026-10-24**
+## Phase 11: Persisted Camera Zoom
 
-- Confirmed step 3.4 complete with recorded validation and a clean worktree. Read the approved camera/scale/zoom/focus rules and existing simulation/React/browser-test boundaries. No gameplay tuning, rules version, dependency, or approval change was needed.
-- Replaced the starter host test with a focused failing React Strict Mode lifecycle test before implementation. `npm.cmd run test -- --project dom src/App.test.tsx` initially failed because the temporary encounter heading/launch flow did not exist; after implementation both host and retained CSS Module tests passed. The lifecycle test covers Strict Mode's setup/cleanup cycle, one effective mounted runtime/canvas, close/relaunch, and final unmount cleanup.
-- Added `app/src/game/phaser/encounter.ts` using installed Phaser 4.2.1. A cancellable microtask prevents a discarded Strict Mode mount from booting a game. One Phaser scene supplies elapsed seconds and sampled WASD input to the existing fixed-step simulation and renders its state. Unmount synchronously disables adapter input, removes its listeners/canvas, suppresses callbacks, and calls supported `game.destroy(true)` for next-frame engine teardown; no private Phaser destroy API or second simulation clock is used.
-- Replaced the starter in `app/src/App.tsx` with the temporary launch/close entry, effect-owned focusable host, scalar health/time/hit/status display, and minimal focus Resume action. Added scoped `App.module.css` and removed the obsolete starter global CSS import from `main.tsx`; generated scaffold/configuration was not recreated. HUD publication is limited to a named 100 ms interval during play. No per-projectile/per-frame React state is introduced.
-- Draw circular ground/grid/boundary, player, coral/cyan enemy, and yellow shards through Phaser graphics at explicit ground/body/projectile depths. Circle fill radii match approved colliders; no Phaser physics or automatic offscreen/collision destruction changes simulation ownership. Presentation constants are renderer-only, not new gameplay tuning.
-- Camera uses Phaser APIs to remain exactly player-centered with no arena/world clamp, fixed north-up orientation, and configured 32 CSS pixels/tile at zoom 1. O/P apply configured 0.125 increments in 0.75-1.5, ignoring held repeats. Resize changes visible extent only. Keyboard cancellation is limited to focused active gameplay keys and excludes browser modifier shortcuts; mouse/touch gameplay input is disabled.
-- Implemented only the adapter focus-safety portion required here: blur, host focus loss, and hidden visibility clear held keys and pause advancement until explicit Resume; the first resumed frame delta is skipped to prevent hidden-time catch-up. This is not the step 4.2 session controller. The temporary harness starts active play directly, not the future Start/countdown flow; R retry, Escape pause, result flow, and retry zoom retention remain pending.
-- Expanded `app/tests/app.spec.ts` to eight real Chromium checks. Coverage includes three repeated launches with one canvas and one effective keydown handler, cleanup/page errors, all WASD directions and exact active-tick speed, camera centering at the collision-adjusted arena edge, zoom bounds/held repeats, blur/visibility/host focus pause and explicit resume, input clearing, scoped key cancellation/removal, resize preserving zoom/speed/attack clock, and actual pursuit/bursts/reversal/hits/health loss. Read-only detached adapter snapshots are used for inspection; tests do not inject gameplay state.
-- Added pixel checks and screenshots at 1440x1000 and 390x844, with two O presses to expose more world at the approved minimum zoom rather than auto-fitting the arena. Verified nonblank ground/player/yellow shards, desktop enemy pixels, viewport dimensions, no horizontal overflow, and no header/canvas overlap. Opened both saved screenshots for visual review; mobile also visibly includes the enemy. Screenshots are attached in ignored `app/test-results/`.
-- During focused checks, corrected non-erasable constructor parameter properties to ordinary fields; corrected a speed assertion that had included asynchronous key-delivery idle time; added a failing browser-shortcut test and fixed modified-key capture. Expanded browser tests required DOM types in the existing Node test project, explicit `.ts` domain type imports, and a real-canvas type guard. Reran each failed focused check/typecheck after its local correction; all passed.
-- Final gates passed under Node 24.22.1 / npm 12.2.1: `npm run test` (143 cases, including the replacement Strict Mode host test), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (eight Chromium checks). Source/test editor diagnostics are clean. Production build reports a nonblocking Phaser large-chunk warning (about 1.69 MB minified / 453 kB gzip); did not hide it or broaden this step into bundle optimization. No dependencies or lockfile were changed.
-- Started Vite under pinned Node on a new port, leaving the earlier server untouched: http://127.0.0.1:5174/. Updated [the README](README.md#playable-engine-adapter) with ownership, temporary-flow limits, controls, checks, screenshot locations, build warning, and manual verification. No blockers or approved deviations remain. Step 4.2 stays pending; no full session controller, countdown, R retry, final home/results UI, persistence, CI/deployment, commit, or push was introduced.
+### Step 11.1 - Add The Defensive Zoom Preference Boundary
 
-### Step 4.2 - Implement Session Lifecycle, Pause, And Retry
-
-Status: complete. Dependencies: 4.1.
+Status: pending. Dependencies: 10.2.
 
 **Implementation prompt**
 
-Introduce the smallest session controller for the approved home/countdown/running/paused/ended flow. Do not add countdown or pause modes the user rejected. Wire R as an edge-triggered immediate retry from the approved states, not once per repeated keydown event. Restart through the same session initialization path used by Start. Reset health, positions, inputs, shards, attack phase, initial cooldown, counters, and simulation clock. Apply the explicitly approved camera/zoom retention policy.
+Set typed camera limits to 0.25-3.0/default 1/step 0.125 without changing world geometry or comparison identity. Add one dedicated zoom storage adapter/key, reusing attempt storage interfaces/safe-access patterns where suitable. Do not generalize history into a settings framework. Specify a stable encoding; accept finite in-range values including valid fractional O/P sequences, default invalid data without an unapproved snapping policy. Keep visit-local fallback on unavailable/corrupt/blocked/quota storage, write only actual changes, and never overwrite/remove history.
 
-Implement focus-loss behavior and resume input clearing from the contract; hidden-tab wall time must not become survival time or a catch-up burst. Ensure any death/abort result is emitted exactly once and restart cannot deliver stale asynchronous updates to the new attempt. Avoid rebuilding the entire Phaser instance per retry unless required by its lifecycle.
+**Focused checks:** absent/valid/boundary/fractional values, malformed/wrong-type/nonfinite/out-of-range data, throwing getter/read/write, quota failure, unchanged-write deduplication and history independence. Reuse neighboring tests or one adapter-specific test where warranted.
 
-Write failing controller tests and browser checks for repeated R presses, held R, retry during a burst, retry after death, pause/resume, focus loss, and stale input. Verify several consecutive retries leave one canvas and one effective input handler.
+**Acceptance:** config/storage tests and relevant regression/type/build checks pass; history is unchanged and persistence rules remain outside simulation. Camera binding/reload restoration is not claimed yet.
 
-Acceptance: lifecycle tests and browser checks pass, retries are immediate and repeatable, and no timer/projectile state leaks between attempts.
+### Step 11.2 - Wire Reload-Safe Camera Restoration
 
-**Execution record - 2026-10-24**
-
-- Confirmed step 4.1 complete with recorded acceptance evidence and a clean worktree. Read the shared contract, original draft, approved camera/session policy, and nearby simulation/adapter/host/tests. Used the already approved Start/retry countdowns (3/0 seconds), Escape/focus policy, full reset/abort rules, and visit-long zoom retention without tuning, dependency, or rules-version changes.
-- Added `app/src/game/session/session.test.ts` first. The initial command used the repository root rather than the app package; corrected to `npm.cmd --prefix app run test -- --project node src/game/session/session.test.ts`, which failed on the missing controller as expected. Implemented the pure `SessionController` in neighboring `session.ts`; all 16 focused Node cases passed. Coverage includes ignored home actions, frozen/precise countdown boundaries, no countdown time credited to survival, pause/resume for countdown/play, fresh initialization from countdown/playing/paused/ended, old-object isolation, one frozen death result, abort discard, invalid durations, and operation without browser globals.
-- Start/retry use one initialization path and existing `createSimulation()`. Retry replaces all encounter state, including health/combat, positions, shards/hit flags, emitter phase, initial cooldown, counters, executed ticks, and fractional accumulator. The controller advances only supplied active seconds and returns a completed result exactly once on death. It owns no timers, browser APIs, storage, or asynchronous callbacks; an old simulation/result cannot mutate or complete the new attempt. Home/retry before death produce no record.
-- Phaser remains the sole driver and retains its scene/game/canvas on retry. Added edge-triggered R from countdown/playing/paused/ended and ignored home, held repeats, and modified shortcuts. Escape toggles active play/pause; focus loss also pauses countdown, preserving remaining countdown time until explicit Resume. Resume/retry reset sampled input and skip the first delta; held movement is suppressed until release/fresh press, so no hidden time or stale movement leaks. The adapter supports a synchronous optional death-result callback for later persistence; no persistence is introduced here.
-- The temporary React host shows countdown and minimal Resume/Retry actions, not the step 5.1 Home/results interface. Zoom remains outside simulation and is retained through retry and temporary close/relaunch for the app visit. Existing Strict Mode lifecycle coverage still passes; no per-frame React entity updates, second clock, or game rebuild on retry was introduced.
-- Added a failing Chromium countdown test before integration, then passed the initial three lifecycle browser checks. Full-suite validation exposed resource contention with eight simultaneous Chromium/Phaser workers (GPU stalls/timeouts); the suite passed at two workers. Bounded local workers to two while preserving the existing one-worker CI setting, without weakening timing/gameplay assertions.
-- A subsequent full run caught an intermittent extra retry. Inspected Phaser's keyboard manager/plugin: the same queued event objects can be processed again when more input arrives before the next frame. Added a deterministic same-frame R/Escape browser regression, observed expected attempt 2 versus actual 4, then fixed adapter dispatch with a weak event-identity set for keydown/keyup. The regression, held-R workflow, and real death/retry checks passed after the correction.
-- Final gates passed under the pinned toolchain: `npm run test` (159 cases), `npm run typecheck`, `npm run lint`, `npm run build`, and unmodified `npm run test:e2e` (12 Chromium checks with two local workers). Browser checks cover repeated/held R, complete reset during a burst, retry after actual death, Retry button, pause/resume, countdown focus loss, stale movement, same-frame queue replay, retained zoom, and consecutive retries with one unchanged canvas/one effective keydown handler. Retained movement/camera/render tests and desktop/narrow screenshot/pixel/layout checks also pass. The existing nonblocking Phaser large-chunk warning remains (about 1.70 MB minified / 454 kB gzip).
-- Updated the README with lifecycle ownership, controls, reset/result handoff, validation counts, worker rationale, and local manual checks. No unapproved design choices or blockers remain. Step 5.1 and later remain pending; no final Home/results design, history storage, deployment, commit, or push was added.
-
-## Phase 5: Practice Interface And Records
-
-### Step 5.1 - Build Home, HUD, And Results
-
-Status: complete. Dependencies: 4.2.
+Status: pending. Dependencies: 11.1.
 
 **Implementation prompt**
 
-Replace the temporary entry with the requested React home screen: prominent Start action, concise description, changelog, and approved links. Ask for unknown link targets rather than inventing them. Build a compact in-session health/timer/primary-stat HUD and results view with approved metrics, Retry, and Home actions. Honor the session controller rather than duplicating lifecycle logic in components.
+Connect the adapter to the existing React zoom ref and Phaser camera boundary. Read safely at initialization, restore before first encounter rendering, and persist only actual O/P changes. Preserve R/Home/Start continuity and visit-local fallback. No writes per HUD/frame update or per-projectile React state; zoom cannot alter units, collisions, survival time or rules identity.
 
-Use CSS Modules, semantic buttons, visible keyboard focus, and accessible health/status output without announcing every animation tick. Use library icons for icon controls if needed. Keep game state out of per-frame React updates: publish bounded HUD snapshots and lifecycle events through one well-cleaned-up boundary. Clearly distinguish result metrics from proposed features not approved in step 1.1.
+**Focused checks:** actual O/P -> reload -> rendered restored scale, min/max clamp, R/Home preservation, resize, write counts, blocked/quota fallback, untouched history and comparable simulation outcomes across zoom. Reuse pixel helpers without old circle assumptions.
 
-Write React tests for Start, results, Retry/Home, HUD values, and disabled/paused states that actually exist. Check desktop and narrow-screen screenshots for clipped text, obstructed play area, and layout shifts. Preserve the explicit home description/changelog requirement; do not turn it into an oversized promotional page.
+**Acceptance:** all five gates pass; desktop/narrow min/default/max views are nonblank/layout-safe; same-origin persistence works and storage failures do not prevent practice.
 
-Acceptance: the complete Home -> Session -> Results -> Retry flow works with buttons and the approved keybinds; relevant React/browser tests, accessibility checks available in the toolchain, lint, typecheck, and build pass.
+## Phase 12: Health And Accepted-Hit Feedback
 
-**Execution record - 2026-10-24**
+### Step 12.1 - Expose Ephemeral Accepted-Hit Data
 
-- Confirmed step 4.2 complete with recorded lifecycle/controller/browser evidence and a clean worktree. Read the original draft, shared architecture/contract, approved mechanics, and nearby React/adapter/tests. No gameplay tuning, rules-version, package, lockfile, or controller changes were needed.
-- Asked for Home link targets as required. The user delegated the choice for later review: "The user is not available to respond and will review your work later. Work autonomously and make good decisions." Selected the RealmEye Crystal Worm Child article and official Realm of the Mad God website. These are delegated presentation choices, not previously approved numeric mechanics or new fidelity claims.
-- Updated `app/src/App.test.tsx` first. `npm.cmd --prefix app run test -- --project dom src/App.test.tsx` initially failed four interface cases because the temporary entry lacked Start/Home and the requested surfaces; the CSS Module case passed. Implemented the UI, resolved ambiguous status queries with a named lifecycle status, and reran the same focused tests successfully. Typecheck then caught unsupported Testing Library `exact` options; removed them and reran focused tests/typecheck successfully. Final React coverage is six passing cases.
-- Replaced the temporary entry in `app/src/App.tsx` with compact Home content, prominent Start, configured Paladin stats, accurate dated changelog, delegated reference links, and a trainer-fidelity disclosure. Reused geometric artwork and existing CSS Module conventions. No oversized promotional layout, new UI library, touch controls, tuning UI, or speculative features were added.
-- HUD reads bounded adapter publications and configured HP/VIT/SPD/DEF. HP display uses approved upward rounding; meter retains fractional health. Timer output is explicitly non-live, countdown numbers are not live-announced, and a named status announces lifecycle changes only. Resume is disabled outside pause. Semantic buttons, visible focus, and keyboard activation are retained.
-- Results consume the controller's frozen result, displaying survival seconds to two decimals and hits taken with Retry/Home. Results focus their heading; Home unmounts/cleans the runtime and returns focus to Start. Retry uses the existing adapter/controller without rebuilding Phaser. A disposed-effect guard rejects stale publications. No React clock, lifecycle-rule duplication, per-projectile updates, result scoring, history, personal-best comparison, or storage was introduced.
-- Stabilized HUD/control space and arena sizing across countdown/play/results; result-only controls are exposed while hidden HUD controls are inert. Extended browser coverage to actual death/result metrics, result button Retry and ended-state R, keyboard Start, focus/disabled states, cleanup, retained canvas/listener, and Home/Start. Retained all existing gameplay/camera/retry/focus regressions.
-- Focused Chromium command `npm.cmd --prefix app run test:e2e -- --grep "death results|renders readable"` passed all four desktop/narrow workflows. Saved and visually reviewed Home, arena, and results screenshots at 1440x1000 and 390x844. Checks cover canvas pixels, text/viewport overflow, result containment, header separation, and unchanged arena bounds across countdown/play/death. Artifacts remain ignored under `app/test-results/`.
-- Final required gates passed from `app/` under Node 24.22.1/npm 12.2.1: `npm run test` (163 cases across five files, including six React/CSS cases), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (13 Chromium checks, two workers, 59.7 seconds). Existing nonblocking Phaser chunk warning remains (1,699.09 kB minified / 454.47 kB gzip); no warning limits changed. Editor diagnostics were clean. Available accessibility checks passed through roles/names, focus/keyboard activation, disabled states, non-live timer, and layout assertions; no screen-reader or axe audit is claimed.
-- Updated the README with current flow, ownership, delegated links, tests, limits, and manual checks. Reloaded the existing preview successfully at http://127.0.0.1:5174/; preserved the running servers. Manual review: Start, WASD/O/P, Escape/focus pause and Resume, R/Retry before and after death, result metrics, Home focus/cleanup, and narrow-screen readability. No unresolved blocker remains. Step 5.2 stays pending; no persistence, deployment, commit, or push was performed.
-
-### Step 5.2 - Persist Comparable Attempt History
-
-Status: complete. Dependencies: 5.1.
+Status: pending. Dependencies: 11.2.
 
 **Implementation prompt**
 
-Implement a small localStorage adapter and typed record format following the approved result/abort/retention policy. Include record schema version and encounter/preset rules version. Only compare best times within the same compatible rules version; zoom alone should affect comparison only if the contract says it changes scoring eligibility. Use structured JSON parsing plus runtime shape validation; never trust stored data via a TypeScript assertion alone.
+Extend existing simulation/session advancement with narrow accepted-hit output using the existing damage calculation's result, not a duplicated formula, HUD/HP delta or raw overlap. Report post-defense amount independently of lethal HP clamping; distinguish simultaneous hits and include the lethal hit. Output is ephemeral/bounded to the current advance, including multi-tick advances. Preserve session result-once behavior or adapt callers narrowly; no persistent event log/event bus or framework dependency.
 
-Keep storage out of simulation and publish each eligible result once through the application layer. Handle unavailable storage, invalid JSON, unknown versions, malformed records, and quota failures without preventing practice. Enforce the approved history bound. Do not implement export, cloud sync, arbitrary migrations, or settings UI unless requested.
+**Focused checks:** nonlethal, same-tick independent hits/regeneration, spent-return suppression, lethal amount despite HP clamp, no hits after death, multiple ticks per advance, paused/no-step advances and no replay after Retry/Home.
 
-Write failing adapter tests using an injected storage boundary, and integration tests for a completed attempt, retry deduplication, refresh persistence, compatible personal best, and corrupt/unavailable storage. Display approved history/comparisons in the existing result/home surfaces rather than adding a dashboard.
+**Acceptance:** each accepted event reaches the runtime once, including lethal data before result handling, without changing damage/time/history. Focused health/simulation/session tests, typecheck and relevant integration gates pass.
 
-Acceptance: tests pass and manual refresh retains valid attempts while storage failure leaves Start/Retry usable.
+### Step 12.2 - Draw The Always-Visible Health Bar
 
-**Execution record - 2026-10-24**
-
-- Confirmed step 5.1 complete with recorded test/browser evidence and a clean worktree at `e4677fe`. Read the original draft, shared architecture/contract, approved records/session policy, and nearby App/result/tests. Death-only eligibility, latest-100 retention, compatible retained best, abort discard, and zoom-neutral compatibility were already approved. No gameplay tuning, rules-version, dependency, or further design approval was needed.
-- Added `app/src/storage/attempts.test.ts` before implementation. `npm.cmd --prefix app run test -- --project node src/storage/attempts.test.ts` failed on the missing adapter module. Added neighboring `attempts.ts`; the same focused command passed 25 Node cases without browser globals. Coverage includes versioned serialization/reload, duplicate IDs, remount-safe record identity, all-version retention and eviction of an old best, compatibility filtering, oversized/duplicate input, invalid JSON/schema/envelope/records, blocked getters/reads, quota failures, and immutable copies.
-- The small injected adapter owns key `dodge-hell-training.attempts` and schema-version-1 JSON. Every record is runtime-validated as a unique ID, nonempty rules version, finite nonnegative survival seconds, nonnegative safe-integer hits, and death outcome. Newest-first records are deduplicated and bounded by `ENCOUNTER_CONFIG.session.historyLimit`; bests use exact matching rules versions and only retained data. Unknown rules can remain in recent history without competing. Zoom is not stored as a scoring field.
-- Failure policy: unreadable JSON, unknown schema, malformed records, unavailable getter/read, or quota/write errors never block practice. Preserve unreadable storage without speculative repair/migration; use visit-only in-memory results and a visible warning. After failed writes, stop repeatedly attempting writes for this visit. No export, cloud sync, arbitrary migration, cross-tab merge, settings UI, backend, or all-time-best store was introduced.
-- Added failing React integration cases before wiring. The focused DOM command initially failed six cases on absent history/callback wiring; after implementation it passed all eleven cases. App wires the existing synchronous `onResult` boundary rather than saving from HUD rendering. A random per-runtime namespace plus attempt ID avoids collisions on Home/Start/refresh. Per-runtime attempt delivery, disposed-effect, and stored-ID guards prevent duplicate/stale results. Controller, simulation, engine files, mechanics, and rules version remain unchanged.
-- Reused a compact history summary in existing Home/results surfaces: retained personal best for current rules, latest-100 label, newest-first expandable/scrollable recent records, current/other-rules labels, and nonfatal warnings. Result Retry/Home stay first in keyboard order, result size is constrained to the playfield, and active HUD/arena geometry remains stable. No new dashboard, scoring metric, clock, or per-projectile React state was added.
-- Extended real-death desktop/narrow browser checks to confirm one saved result, O/P zoom not splitting eligibility, immediate R/button retry and abort deduplication, Home/reload preserving history, and compatible bests. Added corrupt, unavailable-getter, and quota-failure browser cases that complete actual deaths and still use Retry/Home/Start with no page errors. Focused command `npm.cmd --prefix app run test:e2e -- --grep "death results|loaded history|storage still"` passed all six cases (54.2 seconds).
-- Final required gates passed from `app/` under the pinned toolchain: `npm run test` (193 cases across six files, including 25 adapter and eleven React/CSS cases), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (17 Chromium checks, two workers, about 1.4 minutes). Editor diagnostics were clean. Existing nonblocking Phaser chunk warning remains (1,702.38 kB minified / 455.53 kB gzip); no warning limit or test timeout was increased to conceal failures.
-- Saved/reviewed desktop/narrow history/results and narrow quota-warning screenshots; retained full Home/arena pixel/layout checks. Browser reload acceptance is verified through real Chromium UI flows. Additional shared-preview interaction could not be completed: the old 5174 server served a 163-byte empty App transform/source map; a fresh server on http://127.0.0.1:5175/ loads the new Home correctly, but integrated-browser mouse/keyboard automation timed out. That interactive refresh check is not claimed as passing. Existing servers/storage were left untouched; origin-specific histories do not transfer between ports.
-- Updated the README with schema/identity/retention/failure semantics, scope limits, actual checks, preview URL, and manual instructions: complete a death, note count/best, Retry, Home, reload, and confirm exactly one retained record with Start still usable; aborted attempts must not add records. No application blocker remains; the integrated-browser interaction limitation is disclosed. Step 6.1 stays pending. No tuning, deployment, commit, push, or later-step work was performed.
-
-## Phase 6: Fidelity And Repeated-Practice Validation
-
-### Step 6.1 - Tune And Approve The Encounter
-
-Status: complete. Dependencies: 5.2.
+Status: pending. Dependencies: 12.1.
 
 **Implementation prompt**
 
-Run the full playable loop and review it against `docs/mechanics.md` with the user. Compare available references for player speed, camera scale, clockwise rotation, burst cadence, return timing, damage, and regeneration. Explicitly separate pursuit and other trainer-specific choices from faithful mechanics. Do not claim authenticity based on the wiki's descriptive prose alone.
+Extend existing Phaser drawing with a below-player bar from authoritative HP/max HP; retain HUD. Propose/review unspecified dimensions, spacing/colors and encode named unit-aware presentation constants. Reuse drawing/cleanup primitives; no React entity overlay, collider extent, timer or independent health state. Keep it readable at approved zoom limits without hiding the physical outline.
 
-Ask the user to approve changes to provisional angular speed, cooldown, arena/spawn dimensions, hitboxes, and other feel-related values. Change only approved configuration and corresponding expectations. Do not add a permanent tuning panel or adaptive difficulty. Increment the encounter/preset rules version when a change invalidates comparisons, and document the reason.
+**Focused checks:** full/partial/zero health, min/default/max zoom, resize/anchor/draw order, Retry/Home/results cleanup, unchanged physical body and HUD agreement. Reuse pixel/screenshots rather than canvas-existence assertions.
 
-Validate sustained play and repeated resets with user-approved test durations/counts. Check active projectile counts follow firing/lifetime bounds instead of growing forever; inspect listener/canvas counts and frame responsiveness without assuming a universal FPS guarantee. Check multiple render schedules through deterministic tests and a browser run where practical. Retain representative screenshots as test artifacts rather than committing large binaries by default.
+**Acceptance:** presentation values/review and all five app gates pass; no gameplay/version change.
 
-Acceptance: the user approves the training feel, the approval/provisional status is recorded, and all affected tests plus lint, typecheck, build, and complete browser loop pass. Report remaining deviations and performance limitations honestly.
+### Step 12.3 - Render Individual Floating Hit Amounts
 
-**Execution record - 2026-10-24**
-
-- Confirmed step 5.2 complete at `4dd032c` with recorded unit, browser, storage-failure, and refresh evidence. Read the shared contract, original draft, approved mechanics, implementation, and neighboring tests. Scope is validation of the existing encounter; no production code, tuning, rules version, dependency, storage policy, or later phase changed.
-- Asked separately about training-feel acceptance/tuning and validation duration/count. Both answers delegated decisions for later review: "The user is not available to respond and will review your work later. Work autonomously and make good decisions." Selected the offered standard budget: five simulated minutes at each of 30/60/120 Hz, 60 seconds of browser play, and 25 consecutive retries. This authorizes the validation budget, not a claim of the user's personal training-feel approval. Existing provisional tuning remains unchanged.
-- Reviewed source versus implementation in `docs/mechanics.md`. The readable S1 page still lists the head shot as 160 damage, speed 8, and range 19.2, and labels its update Aug 2019. Its isolated-head description says irregular movement and returning yellow shards, not numeric rotation/cadence/reversal timings. Pursuit, 45 degrees/second clockwise rotation, four-emitter burst timing, camera scale, hitboxes, and the 1.2/2.4-second reversal/lifetime remain intentional trainer rules or provisional interpretations. Stat formulas match the recorded S3/S9 contract; no current-client fidelity claim is made.
-- Added one sustained schedule test to `app/src/game/simulation/simulation.test.ts`. The focused `npm.cmd --prefix app run test -- --project node src/game/simulation/simulation.test.ts -t "five-minute moving"` passed before and after formatting. At every schedule, real movement without injected health/invulnerability survives 300 simulated seconds, executes 18,000 ticks and 488 volleys (1,952 distinct shards), discards no time, and finishes in an exactly equal state. Peak active shards is 16 and all observed ages remain below lifetime. This is validation-only coverage of unchanged behavior, not a fabricated failing runtime test or an implementation fix.
-- Added one browser soak to `app/tests/app.spec.ts`. The focused `npm.cmd --prefix app run test:e2e -- --grep "sustained play for 60"` passed; it also passed after adding a persistent ignored JSON artifact because the list reporter did not retain an attachment body. Samples every 250 ms check shard/lifetime bounds, one canvas, one keydown handler, and no simulation-progress stall reaching two seconds. Twenty-five retries each reset time, hits, health, volleys, and shards, increment attempt identity once, and retain the original canvas and one handler. Home removes the canvas; no page errors occur.
-- The 16-shard bound follows the unchanged configuration: each of four emitters has four shot slots per 2.45-second group period, longer than the 2.4-second lifetime. Two generations of the same slot cannot coexist. The deterministic check observes this bound across five minutes, and browser samples check it during wall-time play; neither is an exhaustive memory-leak proof.
-- Final full-suite soak observed 59.9833 simulated seconds during the 60-second browser budget, zero deaths, 16 peak shards, and 219 progressing samples. A test-only requestAnimationFrame observer recorded 3,601 frames with median/p95/max gaps approximately 16.7/16.7/16.8 ms. It does not drive gameplay. These are headless Chromium observations on this machine, not a universal FPS guarantee, GPU benchmark, heap profile, or guarantee for long sessions/background tabs. The soak's route did not die; separate complete-loop browser cases exercise actual death/results/history/retry.
-- All required gates passed under Node 24.22.1/npm 12.2.1: `npm run test` (194 cases across six files), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test:e2e` (18 Chromium checks, two workers, about two minutes). The complete loop retains desktop/narrow pixel/layout checks, actual combat/death, focus/pause, repeated mounts, records/reload, and storage failures. Existing nonblocking Phaser chunk warning remains: 1,702.38 kB minified / 455.53 kB gzip. No warning limit or existing timeout was raised to conceal failure.
-- Saved metrics and representative screenshots under ignored `app/test-results/`, including `sustained-validation.json` and `after-25-retries.png`; visually reviewed the retry screenshot and retained desktop/narrow coverage. Updated README/manual review instructions. Existing preview remains http://127.0.0.1:5175/; no additional integrated-browser interactive acceptance is claimed.
-- At the end of technical validation, user training-feel approval remained outstanding, so step 6.1 was left pending. The encounter remained provisional under `crystal-worm-child-head-paladin-v1`; any approved comparison-breaking change needs a rules-version bump and rerun checks. No deployment, commit, or push was performed.
-- Approval follow-up on 2026-10-24: the user explicitly accepted the current implementation: "let's approve for now what we have. I will make the adjustments later, after our full plan is implemented". This resolves the remaining acceptance gate with the existing passing technical evidence. Step 6.1 is complete; current tuning and rules version remain unchanged, with known fidelity limitations retained. Adjustment notes are deferred until after the full plan as requested. This records acceptance, not an independently observed user playtest or proof of current-client fidelity. Step 7.1 remains pending and requires a separate request; no later-step implementation, commit, push, or deployment was performed.
-
-## Phase 7: Continuous Delivery And Handoff
-
-### Step 7.1 - Add CI And GitHub Pages Deployment
-
-Status: complete. Dependencies: 6.1.
+Status: pending. Dependencies: 12.2.
 
 **Implementation prompt**
 
-Create a GitHub Actions workflow for pull-request validation and deployment on every push to `main`. Run install commands from `app/` using `npm ci`, a supported pinned Node major, and npm caching keyed to `app/package-lock.json`. Gate deployment on lint, typecheck, unit/component tests, build, and Playwright smoke/critical-loop checks. Install CI browser dependencies using Playwright's official command and retain useful failure artifacts.
+Consume accepted-hit output in the runtime for one post-defense number per hit, including independent same-update events. Review missing placement/duration/concurrency values; use named constants and the existing runtime's elapsed/pause policy, not another simulation clock/timer framework. Bound visual resources without changing accepted-hit data. Make lethal feedback observable during the immediate result transition, using a narrow presentation handoff if needed; propose that treatment explicitly. Do not delay death/results or destroy the only lethal display before it is visible.
 
-Use GitHub Pages' official artifact/deployment actions with least-required permissions, the appropriate environment, and concurrency behavior that prevents conflicting deployments. Pull requests must never deploy. Confirm the actual GitHub repository name/owner and Pages URL before hardcoding a base path. Configure Vite for the real project-site or user-site path and test assets under that prefix. Avoid client-side path routing for this one-screen app unless necessary; any router must handle direct loads on Pages.
+**Focused checks:** exact amounts, independent numbers, no regeneration/spent-return false events, resource bound/cleanup, visible lethal feedback, pause and no stale Retry/Home effects; unchanged health/time/records.
 
-Publish only `app/dist`, never the repository root or development dependencies. Document the required repository Pages source setting and any manual owner action. Do not request tokens through chat, create a repository, push, or change remote settings without authorization.
+**Acceptance:** approved numbers are observable once including at death without delaying results; all five gates and desktop/narrow review pass. Audio is not implemented yet.
 
-Acceptance: local production preview works with the deployment base path, the workflow's event/job/permission logic is reviewed, and all local gates pass. An actual successful Actions deployment and live smoke check are required to mark this step complete; if push/Pages authorization is unavailable, record it as blocked rather than claiming deployment.
+### Step 12.4 - Add Quiet Hit Audio And Mute
 
-**Execution record - 2026-10-24**
-
-- Confirmed step 6.1 complete, explicitly accepted by the user, and published in `0a2611e`; its 194-unit/18-browser and five-gate evidence is recorded above. Read the shared architecture, original draft, project instructions, approved mechanics, Vite configuration, test runner, and neighboring browser tests. The worktree initially had no tracked changes; preserved the user's untracked adjustment notes and image. No gameplay, rules version, dependency, lockfile, persistence policy, or later-step behavior changed.
-- Confirmed remote `git@github.com:raphaelbp12/dodge-hell-training.git` and public API identity `raphaelbp12/dodge-hell-training`, default branch `main`. The expected default project-site URL is `https://raphaelbp12.github.io/dodge-hell-training/`, hence the `/dodge-hell-training/` Vite base. Public metadata reports `has_pages: false`; unauthenticated `/pages` returns 404, so no existing Pages configuration/live URL is claimed. No authenticated settings inspection, settings change, custom domain, repository creation, or token request was performed.
-- Added the focused public-UI production-path test in `app/tests/app.spec.ts` before configuration changes. `npm.cmd --prefix app run test:e2e -- --grep "production assets"` failed as expected because pathname `/` did not equal `/dodge-hell-training/`. Added the Vite base, prefix-aware navigation/diagnostic imports, and separate dev/production Playwright projects; the build and same focused command then passed. Production checks assert prefixed hashed JS/CSS paths, successful responses/content types, Start/countdown/play, R retry, Home cleanup, and no page errors. Production does not import source-only diagnostics or add a runtime test hook.
-- `app/playwright.config.ts` reuses Vite's base and keeps all eighteen diagnostic checks on the prefixed dev server at port 4173. One production smoke runs on built output through preview port 4174. Both servers use strict ports with no existing-server reuse; `npm run build` must precede `test:e2e`. No client-side router was added. This preserves existing diagnostic coverage rather than treating dev source imports as production verification.
-- Added `.github/workflows/pages.yml`: pull-request validation and every `main` push, Ubuntu 24.04, exact Node from `.node-version` (24.22.1), pinned npm 12.2.1, npm cache keyed by `app/package-lock.json`, `npm ci` from `app/`, and official `npx playwright install --with-deps chromium`. All five gates run, with CI's existing one-worker browser limit. Browser evidence is uploaded for seven days on non-cancelled success/failure; Pages artifact upload follows successful gates and contains only `app/dist`.
-- Reviewed the event/job/permission matrix: PRs run validation with only `contents: read`, never upload a Pages artifact, and never deploy; non-main pushes do not trigger the workflow; a failed/cancelled validation prevents deployment; successful main pushes upload the site and unblock the dependent deploy job. Checkout disables persisted credentials. Only deploy receives `pages: write` and `id-token: write`, targets `github-pages`, and exposes the official deployment `page_url`. Per-ref concurrency does not cancel an active deployment. Official configure-pages has `enablement: false`, leaving Pages activation to the owner.
-- Read current official action documentation/metadata before selecting published major refs: checkout/setup-node/upload-artifact v7, configure-pages v6, and upload-pages-artifact/deploy-pages v5. Downloaded official actionlint 1.7.12 to temporary storage, verified the release SHA-256 checksum, and validated the workflow before and after formatting with no diagnostics. PowerShell initially exposed the checksum response as non-text; reading the downloaded checksum file resolved that tooling issue. No validator dependency or binary was added to the repository.
-- All required local gates passed under the pinned toolchain: `npm run test` (194 cases across six files), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm.cmd --prefix app run test:e2e -- --workers=1` (nineteen Chromium checks, about 3.9 minutes). The full suite preserves real combat/death/history/reload, storage failures, pause/retry/cleanup, desktop/narrow canvas pixels/layout, and the sustained-play/reset checks. The added production screenshot was visually reviewed and is nonblank/readable. Generated screenshots, metrics, and traces remain ignored under `app/test-results/`. Existing nonblocking Phaser bundle warning remains: 1,702.38 kB minified / 455.53 kB gzip; no limits were raised.
-- Started a persistent production preview at `http://127.0.0.1:5176/dodge-hell-training/` without stopping existing development servers; confirmed HTTP 200 after the test runner stopped its own servers. Updated README with the real target, workflow/permission/artifact behavior, build-before-browser requirement, current counts/URLs, origin-specific history caveat, and manual owner instructions.
-- Remaining acceptance blockers: owner must select GitHub Actions as the Pages source, confirm allowed actions/environment policy, separately authorize a commit/push, obtain an actual successful main-push Actions deployment, and smoke-test its emitted live URL. No Linux Actions run, Pages deployment, live smoke, commit, push, or remote settings change is claimed. Step 7.1 remains blocked, not complete; step 7.2 remains pending and unstarted.
-
-**Workflow visibility follow-up - 2026-10-24**
-
-- After publishing the initial workflow in `8dff4d0`, the user requested separate jobs for clearer Actions progress. Split validation into three independent matrix jobs named Lint, Typecheck, and Unit Tests, with fail-fast disabled; Build runs in parallel. Browser Tests depends on Build, and Deploy Pages depends on all matrix checks and Browser Tests, transitively requiring a successful Build. The graph exposes six separately named job results without a new reusable-workflow/composite-action abstraction.
-- Build uploads only `app/dist` as the one-day standard `production-build` artifact. Browser Tests and Deploy Pages both download that same artifact through the verified official `actions/download-artifact@v8`; no rebuild occurs between testing and publication. Standard build artifacts can exist on PRs, but only the main-push deployment job can package a Pages artifact or deploy. Existing read-only validation, scoped deployment permissions, environment, concurrency, pinned toolchain, browser evidence, and nineteen browser checks remain unchanged. Each isolated runner installs its own dependencies with the existing npm cache.
-- Focused checks passed: actionlint 1.7.12 and parsed-YAML assertions for six job names, independent matrix results, the build/browser dependency, the all-check deployment gate, same-name/path build artifact handoff, main-only deployment, and read-only validation permissions. YAML parsing used a temporary npm-exec package; no repository dependency or lockfile changed. Application files and tests were not changed or rerun for this workflow-only follow-up; their prior full-gate results remain recorded above. README documents the new graph. Actual execution of the split workflow remains unverified until a separate authorized push; no commit, push, settings change, or later-step work was performed for this follow-up. Step 7.1 acceptance remains blocked on deployment evidence.
-
-**Deployment And Approval - 2026-10-24**
-
-- Confirmed the split-workflow [run 40117403684](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40117403684) completed successfully for commit `5db1674636bc0042afefa36d98876f863896caf3`. All six jobs succeeded: Lint, Typecheck, Unit Tests, Build, Browser Tests, and Deploy Pages. This supplies actual Linux Actions execution evidence for the already-recorded local checks and reviewed workflow gates.
-- Confirmed deployment `7302230739` reports `success`, with timestamp `2026-10-24T17:49:16Z` and emitted URL `https://raphaelbp12.github.io/dodge-hell-training/`. The successful [deployment job](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40117403684/job/120942782891) belongs to the same commit. Earlier setup/push/deployment blockers are resolved; unauthenticated Pages metadata returning 404 is not evidence that the live site is disabled.
-- Ran the required minimal live smoke in a fresh isolated Chromium context at 1440x1000: Home returned HTTP 200, prefixed production JS/CSS returned successful responses with correct content types, Start created one canvas and advanced through countdown into play, R reset and resumed the timer, and Home removed the canvas. No page errors occurred. Saved `app/test-results/live-step-7.1-smoke.png` as an ignored generated artifact. No existing browser-profile history or storage was changed.
-- User explicitly approved step 7.1: "the builds are green, we can approve the 7.1". With the successful Actions deployment, live smoke, and prior local/structural validation evidence, all step 7.1 acceptance criteria are met. Status is complete; the prior step 7.2 dependency blocker is resolved. Updated README to distinguish verified deployment from the broader release verification still pending in step 7.2.
-- This approval follow-up changes documentation only. No application, gameplay tuning, rules version, workflow, dependency, remote setting, commit, or push was changed. Did not perform the full step 7.2 controls/combat/persistence/responsive/release-review checklist or mark the vertical slice shipped.
-
-### Step 7.2 - Verify Release And Finish The Handoff
-
-Status: complete under delegated technical release acceptance. Dependencies: 7.1.
+Status: pending. Dependencies: 12.3.
 
 **Implementation prompt**
 
-Test the deployed GitHub Pages URL, not only localhost: home loads, assets resolve, Start works, controls work, the head begins in cooldown, damage and death work, R retries, O/P zoom, and valid local records survive refresh. Confirm the hosted app needs no API or server secrets. Check the agreed desktop browsers and responsive layout; do not claim touch support.
+Use the same hit output for an original quiet synthesized cue with visible accessible mute. Prefer the existing Phaser audio lifecycle where suitable; add only the smallest owned synthesis adapter needed. Obtain audible review/approval of gain, cue duration and voice cap. Bound mixing without stale catch-up sounds, dropping visual numbers or changing accepted hits. Keep mute visit-local unless persistence is separately approved; lethal cue must survive the immediate result handoff appropriately.
 
-Update the root README with actual install/dev/test/build commands, controls, architecture summary, Pages setup, known fidelity limitations, and links to the approved mechanics and this plan. Keep changelog content accurate and explain where future tuning values live. Review the final diff for generated boilerplate that is truly unused, accidental assets, secrets, and unrelated edits; remove only task-owned unused material.
+Unlock/resume from supported user gestures. Unavailable/blocked/suspended/rejected audio must not block practice. Dispose owned voices/listeners/resources and clear stale playback on lifecycle changes. No copied sounds, soundtrack, generic audio system or simulation audio imports.
 
-Acceptance: record the live URL, deployment/run evidence, tests actually run, user acceptance outcome, and unresolved limitations. Do not mark the vertical slice shipped until live verification and repeated-practice acceptance succeed.
+**Focused checks:** cue request per accepted event, simultaneous voice cap, lethal cue, mute/unmute, gesture unlock, unavailable/rejected audio, pause policy, no stale Resume/Retry/Home playback and repeated-session cleanup. Automation does not replace audible approval.
 
-**Dependency check - 2026-10-24**
+**Acceptance:** numerical audio policy/audible approval and all five gates pass; mute/fallback work without changing gameplay, history or result timing.
 
-- Requested step 7.2; inspected the step 7.1 status and recorded acceptance requirements before release work. Step 7.1 remains recorded as blocked. Following the single-step dependency gate, did not automatically complete that step, change its status, or implement its outstanding acceptance work.
-- Read-only public Actions evidence now confirms the earlier workflow for commit `8dff4d051a35af2ea2f4a3c53b91f634f1b03e93` succeeded: [run 40116708591](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40116708591), with both validate and deploy jobs successful. Deployment `7302118473` reports success at `https://raphaelbp12.github.io/dodge-hell-training/`, with deployment status timestamp `2026-10-24T17:39:43Z`. This supersedes the earlier absence of deployment evidence, but is not a recorded live gameplay smoke test or final release acceptance.
-- At this check, the newer split-workflow [run 40117403684](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40117403684), for commit `5db1674636bc0042afefa36d98876f863896caf3`, was still `in_progress` with no conclusion. Its success is not assumed from the previous workflow's result.
-- The public site returned HTTP 200 and production HTML referencing prefixed JS/CSS assets. The unauthenticated Pages metadata API still returned 404 despite the successful deployment and reachable site; that metadata response is not evidence that Pages is disabled. No browser controls, initial cooldown, damage/death, retry/zoom, refresh persistence, responsive screenshots, or final release review were executed for step 7.2. No fresh application test run, user playtest, shipped status, or live gameplay success is claimed.
-- Remaining gate: finish and record step 7.1 acceptance, including completion evidence for the split workflow and its live smoke check, then rerun step 7.2 for the full release verification and handoff. Only this requested step's status/evidence record was changed. No application, workflow, README, gameplay, dependency, remote setting, commit, or push was changed during this blocked attempt; existing user work was preserved.
-- This dependency-check blocker was subsequently resolved by the step 7.1 deployment/approval record above. Step 7.2 is pending again; its full verification has not been resumed by that approval follow-up.
+## Phase 13: Controls And Paused-Session Safety
 
-**Release Verification And Handoff - 2026-10-24**
+### Step 13.1 - Build The Accessible Controls Dialog
 
-- Confirmed step 7.1 complete, with explicit user approval, all six successful Actions jobs in [run 40117403684](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40117403684), commit `5db1674636bc0042afefa36d98876f863896caf3`, and successful deployment `7302230739` at `2026-10-24T17:49:16Z`. Tested its actual emitted URL, https://raphaelbp12.github.io/dodge-hell-training/, rather than treating localhost or an unauthenticated Pages metadata 404 as release evidence. Preserved the historical blocked attempt above and the prior 7.1 approval changes.
-- Focused routing check first failed as expected: with `PLAYWRIGHT_LIVE_URL` set, `npm.cmd --prefix app run test:e2e -- --list --project live-chromium` reported the project missing. Added an opt-in hosted project to the existing Playwright config, selecting only production-safe tests with no localhost servers. The same project then ran the existing live smoke successfully. Default local/CI projects, strict ports, framework boundaries, one-clock behavior, and read-only diagnostic imports remain unchanged.
-- Expanded the existing production test into two public-UI cases at 1440x1000 and 390x844; reused the existing canvas pixel inspection instead of a second harness. History reads use the public storage contract without importing hosted source modules. `npm.cmd --prefix app run test:e2e -- --project live-chromium --workers=1`, with the live URL set only for that command and removed in `finally`, passed both expanded cases in about one minute. Tests use isolated contexts, not the user's browser profile.
-- Live checks passed: Home/Changelog and prefixed JS/CSS responses/content types; Start and frozen countdown; desktop WASD through rendered camera-relative movement and O/P through changed rendered player size; Escape/Resume and frozen paused timer; R restoring full health/zero time; no rendered shards at one active second before the configured initial cooldown ends, then rendered shards and real health loss; two actual deaths per context with matching results metrics; button Retry and five additional R resets per context with one canvas and no duplicate records; Home canvas cleanup; valid rules-versioned death records and compatible retained best surviving refresh; a subsequent countdown/Home abort preserving those records. No production diagnostic imports, invulnerability, injected results, simulation fast-forward, or gameplay tuning were used.
-- Desktop's two stationary post-reset deaths each recorded 12.10 simulated seconds and seven hits. Across the two viewport contexts, four real deaths were saved exactly once, with unique IDs and schema version 1. Actual page requests were same-origin static GETs only, with no API/XHR/fetch/WebSocket or page errors. Source/diff review found no backend or application-secret requirement. Saved per-width Home/arena/results/history screenshots and JSON reports under ignored `app/test-results/`; reviewed desktop arena and narrow Home/arena/results visually and checked nonblank pixels, horizontal overflow, text clipping, header/arena separation, and viewport-contained results.
-- All five required local gates passed: `npm run test` (194 cases across six files), `npm run typecheck`, `npm run lint`, `npm run build`, and `npm.cmd --prefix app run test:e2e -- --workers=1 --output=test-results/local-release` (twenty Chromium cases, about 4.9 minutes). This includes the retained 60-second sustained-play/25-retry test, real combat, lifecycle/cleanup, responsive rendering, and corrupt/blocked/quota storage fallback. Local and live artifacts were kept separately. No fresh `npm ci` was needed or attempted against the user's running servers in this step; the successful published Actions run provides the prior clean-lockfile install evidence. The existing nonblocking Phaser warning remains 1,702.38 kB minified / 455.53 kB gzip; no limit was raised.
-- Reviewed the scoped diff and references. Removed only unused, unchanged Vite-generated `app/src/App.css`, `app/src/assets/react.svg`, `app/src/assets/vite.svg`, `app/src/assets/hero.png`, `app/public/icons.svg`, and the redundant template `app/README.md` plus its root link. Kept the referenced favicon, original draft, lockfile, mechanics, user adjustment notes/image, and existing servers. The patch tool could not delete the binary PNG, so the failed patch was confirmed transactional, text deletions were reapplied, and only that exact binary was removed through the filesystem; production builds passed after cleanup. Common token/private-key pattern scan found no matches; this is not a security certification.
-- Confirmed exact local/hosted production parity through SHA-256: `index-SNee4Uv6.js` = `bb4aab524f8deff74ecfc17b403de1a1a652a41eefc76c13cf8fdc713e6e076e`; `index-Cg5yX67d.css` = `fb4acc6f158f92464dc7dd5942edcf6a8987767ebf22428aed0511c5d8107a00`. An initial ad-hoc parity script used Playwright's `ok()` spelling with Node fetch; correcting it to `Response.ok` resolved that tooling-only error and the check passed.
-- Updated README with exact install/dev/test/build commands, the opt-in hosted command and context/output behavior, controls, existing architecture/configuration ownership, actual Pages evidence, future-tuning/version policy, accurate implemented changelog scope, known limitations, and manual review guidance. No gameplay, preset/rules version, dependency, lockfile, workflow behavior, remote setting, commit, or push changed. The hosted gameplay is still `5db1674`; this step's test/handoff/unused-starter changes are local and not claimed as a new CI run or deployment.
-- Acceptance outcome: when shown the successful checks and explicitly asked about releasing the baseline with Chromium-only scope, the user responded, "The user is not available to respond and will review your work later. Work autonomously and make good decisions." Under that delegation, the agent accepts the technical release: the unchanged gameplay already had explicit step 6.1 acceptance, step 7.1 had explicit deployment approval, and the actual live repeated-practice flow now passes. This is delegated release acceptance, not a fresh human playtest or an invented explicit approval of individual tuning values. Marked step 7.2 complete and the current live vertical-slice baseline shipped under these recorded limits; no later tuning or unrelated work was started.
-- Final handoff checks passed: completion/dependency and delegation/evidence assertions, recorded SHA-256 values, required README sections, 29 local Markdown links/anchors, removed-starter/preserved-user-file checks, and editor diagnostics for both documents and changed test/config files. `git diff --check` passed; Git emitted only its configured LF-to-CRLF notices for formatted Playwright files. Final worktree review contains only the four intended modified documents/test/config files and six starter deletions; user notes/image remain untracked and unchanged. No files were staged, committed, or pushed.
-- Limitations/manual review: only Chromium was exercised; no Firefox, WebKit/Safari, physical-mobile/touch, screen-reader, or axe certification is claimed. Narrow checks use a desktop keyboard, not touch. Existing pursuit/collider/camera/cadence/range/health-integration fidelity approximations, origin-specific latest-100 history, and bundle warning remain. For later human review, open the live URL, Start and use WASD/O/P, check the initial cooldown, take hits and die, Retry/R repeatedly, then Home/refresh and confirm one record per death and a compatible best. Future approved tuning belongs in the named config/stat modules and requires a rules-version bump when comparisons break. No remaining technical release blocker was found within this delegated scope.
+Status: pending. Dependencies: 12.4.
 
-## Definition Of Done
+**Implementation prompt**
 
-- A fresh install reproduces the tested build using the committed lockfile.
-- The user-approved Paladin and encounter rules are encoded as named, unit-aware configuration and pure tested rules.
-- Four clockwise rotating four-shot bursts, initial cooldown, reversal, lifetime-only expiration, and one-hit-per-shard behavior are verified.
-- Player-centered camera and WASD/R/O/P work; retry fully resets the encounter with no duplicate loops or listeners.
-- Death, results, history, and personal-best comparisons obey the approved policy and tolerate localStorage failures.
-- Frame scheduling, focus changes, and zoom cannot silently alter gameplay rules or inflate recorded time.
-- The requested home screen and complete repeated-practice loop work on the live Pages site.
-- CI validates changes and successful `main` pushes deploy automatically.
+Add a minimal reusable React dialog with native semantics where suitable, existing CSS Modules/button patterns, labeled title/close action, focus containment/restoration and responsive content. List actual WASD/R/O/P/Escape, mute/Resume and UI actions, distinguishing standard browser keyboard activation from custom bindings. No UI framework, rebinding, tutorial page or touch controls. Expose Home access now; defer gameplay access until step 13.2 so incomplete pause/input isolation cannot leak into play.
+
+**Focused checks:** accessible naming, keyboard open/close/Tab/Shift+Tab/focus return, Escape once, repeated opens, unchanged Home/session state, desktop/narrow clipping. Reuse React/browser tests, not another modal harness.
+
+**Acceptance:** Home dialog passes relevant interaction/type/lint/build/browser checks and reflects current controls; no unguarded gameplay entry point.
+
+### Step 13.2 - Integrate Controls With Pause And Input Isolation
+
+Status: pending. Dependencies: 13.1.
+
+**Implementation prompt**
+
+Expose the same dialog from HUD through existing runtime/session boundaries. Opening during play/countdown freezes state and clears held input; closing leaves an explicit Resume requirement, preserving countdown remainder/prior phase and focus-loss safety. Draw centered Paused using existing countdown-overlay conventions, not another state machine.
+
+Block WASD/R/O/P behind the dialog. Escape closes once without also toggling background pause. Preserve existing keyboard event-identity deduplication rather than removing queue safeguards. Clear held inputs, skip stale delta and require deliberate Resume. Home closure cannot start play; results/ended state cannot resurrect a session.
+
+**Focused checks:** countdown/play/already-paused open, frozen state, blocked keys, Escape dedupe, held-key release, explicit Resume/focus return, blur/visibility, no first-frame catch-up, R/Home cleanup and one canvas/listener set. Use actual browser actions and focused session/React tests.
+
+**Acceptance:** all five gates and desktop/narrow keyboard review pass; modal actions cannot move/reset/resume background play and Paused matches authoritative state.
+
+## Phase 14: Regression, Handoff And Authorized Live Verification
+
+### Step 14.1 - Run The Full Repeated-Practice Acceptance Matrix
+
+Status: pending. Dependencies: 13.2.
+
+**Implementation prompt**
+
+Run all five app gates under the pinned toolchain. Reuse sustained-play/25-retry and desktop/narrow production-safe tests with explicit projectile/effect/audio bounds, one clock/canvas and once-only records. Add only missing coverage for cadence, calibrated edge condition/shared polygons, restored zoom extremes, bar, independent/lethal feedback, mute/audio failure, Controls/pause/focus and mixed versions. Preserve diagnostic versus production-safe separation: no hosted source imports or injected successful outcomes.
+
+Review min/default/max zoom screenshots for nonblank correctly framed play, readable bar/numbers/dialog/results and no overlap/clipping. Exercise real deaths/Retry/R/Home/reload and storage/audio failures. Verify production assets exclude reference screenshots/crops. Fix only task regressions; record unrelated blockers without broad cleanup. Automated checks do not supply audible/human feel approval.
+
+**Focused checks:** current unit/type/lint/build/browser outputs, actual run counts/bounds, screenshots and repeatability. Historical v1 release evidence is not evidence for this build.
+
+**Acceptance:** all five gates/current visual checks pass and prior geometry/audio approvals are recorded with honest limitations. No publication/live verification implied.
+
+### Step 14.2 - Finish The Local V2 Handoff
+
+Status: pending. Dependencies: 14.1.
+
+**Implementation prompt**
+
+Update README/changelog/mechanics links for implemented behavior, controls, zoom, feedback/mute, versioned history and known fidelity/browser limits. Preserve v1 history and nominal-versus-final geometry provenance. Review scoped changes for duplicate rules/helpers, unused task-owned artifacts, accidental reference artwork, generated output and secrets; preserve user notes/images and avoid unrelated refactoring. Record final config/shape values, gate evidence and a short manual practice checklist.
+
+Obtain actual completed-feature repeated-practice acceptance. Record any explicit technical-acceptance delegation and its limits, not invented human playtesting. List local reference files excluded from publication pending permission. Commit/push require separate authorization; live verification belongs to step 14.3.
+
+**Focused checks:** links/document structure, config-to-doc correspondence, scope/artifact exclusion and acceptance evidence. Runtime repairs require relevant gates again rather than stale step 14.1 evidence.
+
+**Acceptance:** local handoff/acceptance are recorded, publishing boundaries clear, and no new deployment is claimed. Step 14.3 remains pending until external prerequisites exist.
+
+### Step 14.3 - Verify The Authorized Deployed V2
+
+Status: pending. Dependencies: 14.2; separately authorized publication performed outside this command, with successful Actions/deployment evidence for the v2 commit.
+
+**Implementation prompt**
+
+Check external publication prerequisites first; if absent, record blocker and stop without committing/pushing/deploying or completing them automatically. Verify deployed commit, actual six-job Actions success, artifact/deployment identity and emitted Pages URL. Run existing opt-in hosted production-safe Chromium checks against that URL with isolated contexts/prefixed assets, not localhost/diagnostics or the user's profile.
+
+Verify Start/cooldown/pattern, real damage/death/retry, zoom/reload, bar/hit feedback, mute/Controls/Resume, v2 records and compatible bests. Record asset/build parity where practical, network/page errors and actual browser/viewport scope. Public image exposure still requires separate permission. A live defect requires separately scoped local repair; never accept a failed deployment.
+
+**Focused checks:** hosted suite, asset responses/version identity, screenshots and actual run/commit/deployment evidence. Audio automation is not fresh audible approval.
+
+**Acceptance:** the authorized deployed v2 passes hosted checks with evidence/limitations; only then record v2 live-verified. No implied cross-browser certification or further feature work.
 
 ## Customization Choice
 

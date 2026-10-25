@@ -90,15 +90,15 @@ Two production Chromium checks use built output without importing dev-only diagn
 
 ## Controls
 
-| Input | Action |
-| ----- | ------ |
-| WASD | Move north/west/south/east; diagonals normalized |
-| R | Immediately reset the attempt without countdown; ignore held repeats |
-| O / P | Zoom out / in; viewing preference persists during this app visit |
-| Escape | Pause/resume active play |
-| Resume | Explicitly resume after focus loss or pause |
-| Retry | Start again immediately, including from results |
-| Home | Discard an unfinished attempt and return to Home |
+| Input  | Action                                                               |
+| ------ | -------------------------------------------------------------------- |
+| WASD   | Move north/west/south/east; diagonals normalized                     |
+| R      | Immediately reset the attempt without countdown; ignore held repeats |
+| O / P  | Zoom out / in; viewing preference persists during this app visit     |
+| Escape | Pause/resume active play                                             |
+| Resume | Explicitly resume after focus loss or pause                          |
+| Retry  | Start again immediately, including from results                      |
+| Home   | Discard an unfinished attempt and return to Home                     |
 
 Start has a three-second countdown. Changing focus pauses play and clears held input. Keyboard input is required even at narrow widths; no touch controls are implemented.
 
@@ -138,7 +138,7 @@ npm.cmd run test -- --project node src/game/session/session.test.ts
 
 ## Training-Feel Review
 
-Step 6.1's [technical review](docs/mechanics.md#step-61-technical-review) and [execution record](implementation-plan.md#step-61---tune-and-approve-the-encounter) separate verified wiki formulas from trainer choices. Pursuit, camera scale, hitboxes, rotation/cadence, reversal/lifetime interpretation, and exact health integration remain intentional or provisional approximations. No tuning or rules-version change was made, and no current-client fidelity is claimed.
+Step 6.1's [technical review](docs/mechanics.md#step-61-technical-review) and [execution record](docs/implementation-plan-v1.md#step-61---tune-and-approve-the-encounter) separate verified wiki formulas from trainer choices. Pursuit, camera scale, hitboxes, rotation/cadence, reversal/lifetime interpretation, and exact health integration remain intentional or provisional approximations. No tuning or rules-version change was made, and no current-client fidelity is claimed.
 
 Under delegated decision-making, validation used five simulated minutes at each of 30/60/120 Hz, 60 seconds of browser play, and 25 consecutive retries. All schedules matched exactly with a 16-shard peak. The final browser run observed 59.98 simulated seconds, no deaths, one canvas/handler, and approximately 16.7/16.7/16.8 ms median/p95/max animation-frame gaps. These are machine-specific observations, not a universal FPS or memory-leak guarantee; separate browser cases cover real deaths and the complete results/history loop. Generated JSON metrics and screenshots remain under ignored `app/test-results/`.
 
@@ -151,7 +151,6 @@ Open http://127.0.0.1:5176/dodge-hell-training/ with a keyboard and review:
 5. For future tuning, note desired changes without altering the accepted baseline. The user accepted the current implementation for now on 2026-10-24 and deferred adjustments until after the full plan. Step 6.1 is complete; steps 7.1/7.2 subsequently supplied deployment and technical release evidence. Future adjustments still require approval and comparison-breaking changes require a rules-version bump.
 
 ## Prerequisites
-
 
 - Use Node.js 24.22.1 LTS and npm 12.2.1. The root [.node-version](.node-version) selects the exact Node version; app package metadata records npm and supported Node/npm ranges.
 - Node 24 is LTS; Node 26 is still Current as of 2026-10-24. See [Node release status](https://nodejs.org/en/about/previous-releases). The selected runtime satisfies the [Vite requirements](https://vite.dev/guide/) and npm 12's engine requirements.
