@@ -444,3 +444,25 @@ G01-G04 were presented together with the local review page and are now approved 
 | G04 | Accept the exact candidate-derived offset/reversal/lifetime/live bound, fitted north spawn and silhouette-derived pursuit separation with **zero extra gap**?               | Approved 2026-10-25 |
 
 The actual user response, not technical checks or delegated acceptance, resolves this approval gate. The reviewed vertices and derived numeric values are unchanged. Step 8.2 is complete with focused verification recorded in the active plan. Preparatory data stays disconnected; steps 9-14 remain unstarted and require separate requests. No runtime activation, commit, push or deployment is authorized by this approval.
+
+### Step 9.1 Continuous Convex Geometry
+
+The pure [geometry adapter](../app/src/game/simulation/geometry.ts) is preparatory, not a change to playable collision. The installed `@flatten-js/core` 1.6.14 declarations expose static polygon intersections and affine transforms, but no continuous translating-convex query. `transformBodyVertices` reuses its `Matrix` to rotate canonical local vertices about the body-center origin, then translate them into world tiles. It returns plain `Vector2` data without modifying the input. No dependency or framework is added.
+
+`sweptConvexOverlap` accepts two world-space start polygons and their full displacements in tiles over the **same** motion segment. Both orientations must remain fixed throughout that segment. It projects onto normalized edge normals from **both** bodies, using relative displacement `firstDisplacement - secondDisplacement` and a common projection origin. For each axis, start intervals `A` and `B` and projected relative displacement `s` give:
+
+$$
+u_1 = \frac{b_{min} - a_{max} - \tau}{s}, \qquad
+u_2 = \frac{b_{max} - a_{min} + \tau}{s}
+$$
+
+For nonzero `s`, intersect `[min(u1,u2), max(u1,u2)]` with the other axes' intervals and `[0,1]`. For exactly zero `s`, reject only if the initial intervals are separated by more than the numerical allowance. No near-zero velocity cutoff substitutes for motion. A nonempty common interval means contact: initial/newborn overlap, edge/corner tangency and contact exactly at segment end all count, including contact while moving apart. Disjoint endpoints do not imply a miss; overlapping swept AABBs or enclosing circles do not imply a hit. No broad-phase acceptance or endpoint-only shortcut is used.
+
+#### Numerical Policy, Not Gameplay Tuning
+
+- `tau = 64 * Number.EPSILON * S` tiles, where `S` is the largest absolute X/Y coordinate among both start polygons. Unit-length axes keep this allowance in world tiles. There is no fixed tile floor or adjustable collider padding. The factor 64 is an engineering roundoff budget for the small coordinate differences, normalized normals and projections, not a measured gameplay value or fidelity claim.
+- Projections subtract a common start vertex before taking dot products to limit cancellation. Validation uses the same coordinate-scaled allowance per polygon. At the centered arena's approximately 19.2-tile scale, `tau` is approximately `2.73e-13` tile; it is unrelated to the source-pixel review uncertainty, the pursuit gap or shape dimensions. Separations within roundoff may count as touching; representable gaps above it remain misses. Changing world-coordinate scale also changes roundoff, not physical tuning.
+- Inputs require 3-8 finite, ordered, strictly convex vertices, in either winding. Duplicate/collinear corners, zero-area shapes, concavity, self-crossing order, nonfinite transforms/motion and numerically unresolvable edges throw `RangeError`. Every non-edge vertex must lie strictly on the same interior side of every edge; a same-turn self-crossing star is not accepted as convex. Transform output is validated too, so an unrepresentable translation cannot silently collapse a body.
+- The focused Node suite covers tiny/ordinary/large scales, rotated tangency and just-separation, approved shapes under common rotations, relative motion of both bodies, axial/diagonal/return crossings, mutually disjoint axis-time intervals, enclosing-circle false positives and invalid inputs. Numerical policy does not authorize changes to approved vertices, timing or rules identity.
+
+No live simulation, configuration or drawing imports these helpers yet. Step 10.1 will reuse existing reversal/expiry segments and matching player interpolation, retaining the firing-axis orientation on reversal and the sole Phaser-driven simulation clock. Arena/pursuit helpers remain separate step 9.2 work. This step adds no collision despawn, hit state, rendering, persistence or runtime branch.

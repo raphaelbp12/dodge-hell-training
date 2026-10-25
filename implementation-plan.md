@@ -184,7 +184,7 @@ Derive the 10%-head-width emission offset, exact reversal/lifetime from farthest
 
 ### Step 9.1 - Implement Continuous Convex Hit Detection
 
-Status: pending. Dependencies: 8.2.
+Status: complete. Dependencies: 8.2.
 
 **Implementation prompt**
 
@@ -193,6 +193,15 @@ Implement minimal shared vertex transforms and continuous translating-convex ove
 **Focused checks:** newborn/initial overlap, stationary/equal motion, axial/diagonal high-speed crossing, miss, tangency/just-separation, circle false positive rejected, rotated equivalence, reverse crossing and invalid geometry. Extend nearby tests; add one focused geometry test only if ownership warrants it. Verify Node-only imports.
 
 **Acceptance:** approved fixed-orientation shapes pass continuous-relative-motion tests; no endpoint-only shortcut, runtime branch or additional clock/framework is introduced.
+
+**Execution and verification - 2026-10-25**
+
+- Confirmed step 8.2 completion and explicit G01-G04 approval before implementation. Inspected installed `@flatten-js/core` 1.6.14 declarations: static polygon intersection and affine transforms are available, but no continuous translating-convex query. The new pure [geometry adapter](app/src/game/simulation/geometry.ts) reuses `Matrix` for rotation-then-translation and implements the reviewed swept overlap intervals on normalized edge normals from both bodies, with relative displacement over one shared motion segment. No dependency or physics framework was added.
+- Added one focused [Node geometry test file](app/src/game/simulation/geometry.test.ts) beside the simulation owner. TDD first failed on the absent module; implementation passed 36 cases and exposed a malformed one-component test vector. Correcting that fixture made all 37 pass. Strengthened coverage to 41 passing cases, including initial/newborn and endpoint-only contact, equal/stationary motion, high-speed axial/diagonal/return crossings, both bodies moving, disjoint axis-time intervals, edge/corner tangency versus just-separation, enclosing-circle and world-AABB false positives, either winding, approved-body rotation equivalence, scale variation, nonmutation and invalid geometry. Motion fixtures now require typed two-component tuples.
+- Documented the [collision and numerical contract](docs/mechanics.md#step-91-continuous-convex-geometry): touching counts as contact; a coordinate-scaled `64 * Number.EPSILON` allowance is numerical roundoff, not source uncertainty, invisible collider tuning or a velocity cutoff. Finite ordered strictly convex 3-8-vertex bodies and finite transforms/displacements are required; degenerate, concave, self-crossing or numerically unresolvable inputs throw `RangeError`. Projections use a shared origin and no broad-phase overlap can accept a hit.
+- Under pinned Node 24.22.1, all 239 unit/component tests across seven files, typecheck, lint and production build passed. The existing approximately 1.70 MB Phaser chunk warning remains. Editor diagnostics are clear. The Node-only suite and import inspection confirm no React, Phaser, DOM or storage integration; only the new test imports the geometry adapter. The production bundle retains the existing v1 asset identities.
+- Local Playwright initially passed 19/20 cases; the production desktop retry assertion observed `2.0` seconds after a pixel readback against its existing strict `< 2` bound. The affected production desktop case passed on an isolated rerun (1/1). This scheduling-sensitive result is recorded rather than claimed as a clean full-suite pass; no runtime/test assertion was weakened or unrelated failure repaired. Development and production narrow-screen scenarios passed in the initial run. No hosted check or fresh human playtest was performed.
+- Acceptance met with no design deviation or remaining step 9.1 blocker: approved fixed-orientation polygons pass continuous-relative-motion checks without an endpoint-only shortcut or another runtime branch/clock. Live v1 configuration, simulation, renderer, hit/lifetime behavior, rules identity, history and dependencies remain unchanged; helpers stay disconnected until 10.1. Preserved the pre-existing Vite formatting edit. Step 9.2 and later steps remain pending and unstarted; no commit, push or deployment was performed.
 
 ### Step 9.2 - Implement Body-Aware Arena And Pursuit Geometry
 
