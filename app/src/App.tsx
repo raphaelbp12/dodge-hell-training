@@ -12,6 +12,7 @@ import {
   type HistorySnapshot,
 } from "./storage/attempts";
 import styles from "./App.module.css";
+import { ZoomPreference } from "./storage/zoom";
 
 function History({ snapshot }: { snapshot: HistorySnapshot }) {
   const best = retainedBestSeconds(snapshot.records, RULES_VERSION);
@@ -57,12 +58,14 @@ function History({ snapshot }: { snapshot: HistorySnapshot }) {
 
 function Encounter({
   zoomPreference,
+  zoomStorage,
   onHome,
   history,
   historySnapshot,
   onHistoryChange,
 }: {
   zoomPreference: RefObject<number>;
+  zoomStorage: ZoomPreference;
   onHome: () => void;
   history: AttemptHistory;
   historySnapshot: HistorySnapshot;
@@ -96,6 +99,11 @@ function Encounter({
       },
       {
         initialZoom: zoomPreference.current,
+        onZoomChange: (zoom) => {
+          if (!active) return;
+          zoomPreference.current = zoom;
+          zoomStorage.set(zoom);
+        },
         onResult: (result) => {
           if (!active || recordedAttempts.has(result.attemptId)) return;
           recordedAttempts.add(result.attemptId);
@@ -112,7 +120,7 @@ function Encounter({
       runtime.current = null;
       handle.destroy();
     };
-  }, [zoomPreference, history, onHistoryChange]);
+  }, [zoomPreference, zoomStorage, history, onHistoryChange]);
   return (
     <>
       <div className={styles.telemetry} aria-label="Session HUD">
@@ -221,7 +229,8 @@ export default function App() {
   );
   const [launched, setLaunched] = useState(false);
   const startButton = useRef<HTMLButtonElement>(null);
-  const zoomPreference = useRef<number>(ENCOUNTER_CONFIG.camera.defaultZoom);
+  const [zoomStorage] = useState(() => new ZoomPreference(() => window.localStorage));
+  const zoomPreference = useRef<number>(zoomStorage.get());
   useEffect(() => {
     if (!launched) startButton.current?.focus();
   }, [launched]);
@@ -238,6 +247,7 @@ export default function App() {
       {launched ? (
         <Encounter
           zoomPreference={zoomPreference}
+          zoomStorage={zoomStorage}
           onHome={() => setLaunched(false)}
           history={history}
           historySnapshot={historySnapshot}

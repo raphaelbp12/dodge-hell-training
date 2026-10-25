@@ -361,6 +361,9 @@ for (const width of [1440, 390]) {
     });
     await page.getByRole("button", { name: "Start", exact: true }).click();
     await expect(page.getByLabel("Session status")).toHaveText("Starting");
+    await expect(page.getByLabel("Session status")).toHaveText("Active");
+    const restoredPixels = await renderedPixels(page);
+    expect(Math.abs(restoredPixels.player - pixels.player)).toBeLessThan(pixels.player * 0.1 + 4);
     await page.getByRole("button", { name: "Home", exact: true }).click();
     expect(await savedAttempts(page)).toEqual(saved);
     expect(

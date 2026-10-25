@@ -20,14 +20,18 @@ const adapter = vi.hoisted(() => ({
   onResult: null as null | ((result: AttemptResult) => void),
   resume: vi.fn(),
   retry: vi.fn(),
+  initialZoom: undefined as number | undefined,
+  onZoomChange: undefined as undefined | ((zoom: number) => void),
 }));
 
 vi.mock("./game/phaser/encounter", () => ({
   createEncounter: (
     host: HTMLElement,
     publish: (view: EncounterView) => void,
-    options: { onResult?: (result: AttemptResult) => void },
+    options: { initialZoom?: number; onZoomChange?: (zoom: number) => void; onResult?: (result: AttemptResult) => void },
   ) => {
+    adapter.initialZoom = options.initialZoom;
+    adapter.onZoomChange = options.onZoomChange;
     adapter.publish = publish;
     adapter.onResult = options.onResult ?? null;
     adapter.created++;
@@ -90,6 +94,25 @@ const runningView: EncounterView = {
   zoom: 1,
   result: null,
 };
+
+test("restores zoom before runtime creation and persists only explicit camera changes", async () => {
+  localStorage.setItem("dodge-hell-training.zoom", "2.375");
+  const writes = vi.spyOn(Storage.prototype, "setItem");
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.initialZoom).toBe(2.375);
+  act(() => adapter.publish!({ ...runningView, zoom: 2.375 }));
+  expect(writes).not.toHaveBeenCalled();
+  act(() => adapter.onZoomChange?.(2.5));
+  expect(writes).toHaveBeenCalledExactlyOnceWith("dodge-hell-training.zoom", "2.5");
+  act(() => adapter.onZoomChange?.(2.5));
+  expect(writes).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("button", { name: "Home" }));
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.initialZoom).toBe(2.5);
+  expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
+});
 
 test("Home includes description, accurate changelog, and delegated links", () => {
   render(<App />);

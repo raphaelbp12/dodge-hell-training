@@ -22,6 +22,7 @@ export type EncounterHandle = {
 
 type EncounterOptions = {
   initialZoom?: number;
+  onZoomChange?: (zoom: number) => void;
   onResult?: (result: AttemptResult) => void;
 };
 
@@ -64,6 +65,7 @@ class EncounterScene extends Phaser.Scene {
   private host: HTMLElement;
   private publish: (view: EncounterView) => void;
   private onResult: EncounterOptions["onResult"];
+  private onZoomChange: EncounterOptions["onZoomChange"];
 
   constructor(
     host: HTMLElement,
@@ -75,6 +77,7 @@ class EncounterScene extends Phaser.Scene {
     this.publish = publish;
     this.zoom = options.initialZoom ?? ENCOUNTER_CONFIG.camera.defaultZoom;
     this.onResult = options.onResult;
+    this.onZoomChange = options.onZoomChange;
   }
 
   create(): void {
@@ -138,10 +141,12 @@ class EncounterScene extends Phaser.Scene {
     if (event.repeat) return;
     this.suppressedMovement.delete(event.code);
     const { minZoom, maxZoom, zoomStep } = ENCOUNTER_CONFIG.camera;
+    const previousZoom = this.zoom;
     if (event.code === "KeyO")
       this.zoom = Math.max(minZoom, this.zoom - zoomStep);
     if (event.code === "KeyP")
       this.zoom = Math.min(maxZoom, this.zoom + zoomStep);
+    if (this.zoom !== previousZoom) this.onZoomChange?.(this.zoom);
     this.centerCamera();
     if (event.code === "KeyO" || event.code === "KeyP") this.publishView();
   };

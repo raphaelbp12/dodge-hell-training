@@ -294,7 +294,7 @@ Set typed camera limits to 0.25-3.0/default 1/step 0.125 without changing world 
 
 ### Step 11.2 - Wire Reload-Safe Camera Restoration
 
-Status: pending. Dependencies: 11.1.
+Status: complete. Dependencies: 11.1.
 
 **Implementation prompt**
 
@@ -303,6 +303,12 @@ Connect the adapter to the existing React zoom ref and Phaser camera boundary. R
 **Focused checks:** actual O/P -> reload -> rendered restored scale, min/max clamp, R/Home preservation, resize, write counts, blocked/quota fallback, untouched history and comparable simulation outcomes across zoom. Reuse pixel helpers without old circle assumptions.
 
 **Acceptance:** all five gates pass; desktop/narrow min/default/max views are nonblank/layout-safe; same-origin persistence works and storage failures do not prevent practice.
+
+**Execution and verification - 2026-10-25**
+
+- Step 11.1 remote verified at `80882ee9c44716c45b62822fed3dbb9835b4232d`. React initializes the dedicated preference once and supplies its value before Phaser's first render. Retains existing zoom ref across R/Home/Start. An explicit camera-change callback writes only actual O/P changes, never HUD/frame publication; disposed callbacks are ignored. No simulation, history, comparison or clock change.
+- Focused React test failed initial 1 versus saved 2.375, then all 34 React/storage cases passed. Covers exact restoration, no HUD writes, deduplication, Home/Start continuity and untouched history. Existing storage-failure tests and adapter cases retain nonfatal visit-local operation.
+- Production-safe desktop/narrow tests now verify rendered player area after real O/P, reload and Start, without diagnostic source imports/injected outcomes; both passed. Final gates: 281 unit/component tests, typecheck, lint, build and all 20 Chromium cases passed, including 0.25/1/3 captures, resize/world-speed/camera invariance, storage failures, real deaths, sustained play and 25 retries. Nonblocking Phaser chunk warning unchanged; no hosted or human play approval claimed.
 
 ## Phase 12: Health And Accepted-Hit Feedback
 
