@@ -8,7 +8,7 @@ The preset is `crystal-worm-child-head-paladin-v2`: shared polygon bodies/collis
 
 [The active plan](implementation-plan.md) records actual execution. Step 14.1 passed all five gates on 2026-10-25: 292 unit/component tests and 27 Chromium cases. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
 
-Site: https://raphaelbp12.github.io/dodge-hell-training/. Publication is authorized, but **v2 hosted verification belongs to step 14.3**, after actual Actions/deployment and live checks. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage.
+Site: https://raphaelbp12.github.io/dodge-hell-training/. **V2 live-verified on 2026-10-25** at runtime commit `e12f3fe4742cb9d02374f07563192dcc5a727b72`: [Actions run 40193885409](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40193885409), all six jobs successful, Pages deployment `7313260767` and both hosted Chromium checks passed. All four emitted files match the tested local build byte-for-byte. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage. Fresh local preview: http://127.0.0.1:5177/dodge-hell-training/.
 
 ## V2 Contract
 
@@ -54,6 +54,8 @@ The authoritative Phaser health bar stays 48x6 CSS pixels below the body at ever
 ## V2 Verification And Handoff
 
 Step 14.1: 292 unit/component tests, typecheck, lint, build and 27 Chromium cases passed. Coverage includes pure geometry/cadence/health/lifecycle, actual desktop/narrow min/default/max feedback pixels, real deaths/results, zoom reload, mute/audio failure, Controls/focus/pause, mixed history and storage failure. Five-minute 30/60/120 Hz schedules agree on 1313 volleys. The 60-second browser run observed three deaths, peak 88 shards/5 texts/1 sampled voice, and 25 retries retaining one canvas/listener set. These are machine-specific observations, not universal FPS/leak certification.
+
+Step 14.2 reran all five gates successfully after the final changelog/formatting/unused-palette cleanup: 292 unit/component and 27 Chromium cases. Step 14.3 passed both isolated hosted production-safe cases at 1440x1000 and 390x844 (57.6 seconds), with real damage/deaths/retries, zoom reload, bar/numbers/lethal feedback, Mute, Home/HUD Controls/Resume and versioned records/bests. Each width saved two real v2 deaths (seven accepted hits each), made only same-origin prefixed static GETs and reported no page errors. Reviewed hosted Controls, feedback and results captures; build JS/CSS `index-DRHTVvPH.js` / `index-BFA9crZS.css`. This completion record is a documentation-only follow-up to that verified runtime, not a claim that future commits/deployments have already passed.
 
 Technical acceptance is delegated by the batch request, preserving earlier G01-G04 approval. Human feel/listening comfort, Firefox/WebKit, physical mobile input, screen readers and axe remain unverified. The initial Phaser bundle is about 1.72 MB with a retained nonblocking warning. Reference screenshot/crops remain local-only, ignored and absent from runtime assets; public distribution rights are unapproved.
 
