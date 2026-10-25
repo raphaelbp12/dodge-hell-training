@@ -257,12 +257,23 @@ function advanceShard(
   return { alive: shard.ageSeconds < shard.lifetimeSeconds, hitPlayer };
 }
 
-function registerShardHit(state: SimulationState, shard: ShardState, acceptedHits: AcceptedHit[]): void {
-  const damageHp = applyPlayerHit(state.player, ENCOUNTER_CONFIG.shard.damageHp);
+function registerShardHit(
+  state: SimulationState,
+  shard: ShardState,
+  acceptedHits: AcceptedHit[],
+): void {
+  const damageHp = applyPlayerHit(
+    state.player,
+    ENCOUNTER_CONFIG.shard.damageHp,
+  );
   if (damageHp === null) return;
   shard.hasHitPlayer = true;
   state.hitsTaken++;
-  acceptedHits.push({ shardId: shard.id, damageHp, positionTiles: { ...state.player.positionTiles } });
+  acceptedHits.push({
+    shardId: shard.id,
+    damageHp,
+    positionTiles: { ...state.player.positionTiles },
+  });
   if (state.player.healthHp === 0) state.phase = "ended";
 }
 

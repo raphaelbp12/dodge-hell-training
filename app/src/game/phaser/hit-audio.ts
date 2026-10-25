@@ -17,7 +17,9 @@ export class HitAudio {
   private played = 0;
   private getContext: () => AudioContext | null;
 
-  constructor(getContext: () => AudioContext | null) { this.getContext = getContext; }
+  constructor(getContext: () => AudioContext | null) {
+    this.getContext = getContext;
+  }
 
   unlock(): void {
     if (this.disposed) return;
@@ -42,9 +44,15 @@ export class HitAudio {
       const policy = HIT_AUDIO_POLICY;
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(policy.startFrequencyHz, now);
-      oscillator.frequency.linearRampToValueAtTime(policy.endFrequencyHz, now + policy.durationSeconds);
+      oscillator.frequency.linearRampToValueAtTime(
+        policy.endFrequencyHz,
+        now + policy.durationSeconds,
+      );
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(policy.peakGain, now + policy.attackSeconds);
+      gain.gain.linearRampToValueAtTime(
+        policy.peakGain,
+        now + policy.attackSeconds,
+      );
       gain.gain.linearRampToValueAtTime(0, now + policy.durationSeconds);
       oscillator.connect(gain);
       gain.connect(context.destination);
@@ -69,13 +77,32 @@ export class HitAudio {
 
   stop(): void {
     for (const voice of this.voices) {
-      try { voice.oscillator.stop(); } catch {}
+      try {
+        voice.oscillator.stop();
+      } catch {}
       this.release(voice);
     }
   }
 
-  setMuted(muted: boolean): void { this.muted = muted; if (muted) this.stop(); }
-  reset(): void { this.stop(); this.requests = 0; this.played = 0; }
-  dispose(): void { this.stop(); this.disposed = true; }
-  inspect() { return { muted: this.muted, requests: this.requests, played: this.played, activeVoices: this.voices.size }; }
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (muted) this.stop();
+  }
+  reset(): void {
+    this.stop();
+    this.requests = 0;
+    this.played = 0;
+  }
+  dispose(): void {
+    this.stop();
+    this.disposed = true;
+  }
+  inspect() {
+    return {
+      muted: this.muted,
+      requests: this.requests,
+      played: this.played,
+      activeVoices: this.voices.size,
+    };
+  }
 }

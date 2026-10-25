@@ -16,7 +16,17 @@ const tick = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
 test("session delivers accepted hits once before lethal result, never while paused or after Retry/Home", () => {
   const session = running();
   session.simulation.player.healthHp = 1;
-  session.simulation.shards.push({ id: 1, orientationRadians: 0, positionTiles: { x: 0, y: 0 }, velocityTilesPerSecond: { x: 0, y: 0 }, ageSeconds: 0, reversalAgeSeconds: 1, lifetimeSeconds: 2, hasReversed: false, hasHitPlayer: false });
+  session.simulation.shards.push({
+    id: 1,
+    orientationRadians: 0,
+    positionTiles: { x: 0, y: 0 },
+    velocityTilesPerSecond: { x: 0, y: 0 },
+    ageSeconds: 0,
+    reversalAgeSeconds: 1,
+    lifetimeSeconds: 2,
+    hasReversed: false,
+    hasHitPlayer: false,
+  });
   const delivered: number[] = [];
   const receive = (hit: { damageHp: number }) => {
     expect(session.result).toBeNull();

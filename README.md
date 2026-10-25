@@ -2,7 +2,75 @@
 
 A pure-frontend bullet-hell practice game targeting repeated survival training against the Crystal Worm Child Head from Realm of the Mad God.
 
-## Current State
+## Current V2 State
+
+The preset is `crystal-worm-child-head-paladin-v2`: shared polygon bodies/collision, eleven-shot spirals, persisted zoom, a below-player health bar, individual hit amounts, original quiet hit audio with visit-local mute, and accessible Home/HUD Controls with explicit pause safety.
+
+[The active plan](implementation-plan.md) records actual execution. Step 14.1 passed all five gates on 2026-10-25: 292 unit/component tests and 27 Chromium cases. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
+
+Site: https://raphaelbp12.github.io/dodge-hell-training/. Publication is authorized, but **v2 hosted verification belongs to step 14.3**, after actual Actions/deployment and live checks. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage.
+
+## V2 Contract
+
+[The mechanics contract](docs/mechanics.md#implemented-v2-handoff) records provenance and fidelity limits. [Canonical geometry](app/src/game/config/geometry-candidate.ts), [encounter config](app/src/game/config/encounter.ts) and [pure geometry](app/src/game/simulation/geometry.ts) own the implementation.
+
+| Quantity | Implemented Value |
+| --- | --- |
+| Paladin | 775 HP, 32 DEF, 41 SPD, 42 VIT; unchanged fixed equipment/stat formulas |
+| Arena/spawn | Radius 19.2 tiles; player `(0,0)`, head `(0,-16.2)` |
+| Physical shapes | Upright player/head octagons, pointed symmetric shard hexagon; shared drawing/collision vertices and transforms |
+| Emission | Four emitters, eleven shots each, 0.15 s spacing, 1 s after last shot, initial 2 s cooldown, clockwise 45 degrees/s |
+| Offset/speed/damage | 0.18532903718071878 tile (10% head width), 8 tiles/s, incoming 160 HP, accepted post-defense 128 HP |
+| Reversal/lifetime | 2.2208044714307382 / 4.4416089428614765 seconds; exact polygon leading-edge calibration, not rounded to ticks |
+| Reach/bound | 19.2 tiles from a stationary centered head to leading body edge; 44 shards/group, period 2.5 s, conservative live bound 88 |
+| Camera | 32 CSS pixels/tile at zoom 1; zoom 0.25-3, default 1, step 0.125 |
+| Clock | One Phaser driver; pure simulation at 1/60 s, max eight ticks/advance, no inactive-time catch-up |
+| History | Latest 100 completed deaths, exact-version best; v1 retained as Other rules and excluded from v2 bests |
+
+Pursuit stops at direction-dependent silhouette contact with zero extra gap. Actual vertices constrain player/head to the circle; broad-phase rejection never proves a hit. Swept polygon contact uses existing reversal/expiry segments and matching player interpolation. Shards retain initial firing-axis orientation, expire only by lifetime and hit once via per-shard state. No origin/homing, collision/wall/offscreen despawn, global immunity, player attacks, contact damage or blocking.
+
+[Simulation](app/src/game/simulation/simulation.ts) returns only the current advance's individual accepted hits, including lethal post-defense amounts. [Session](app/src/game/session/session.ts) forwards them once before frozen results. React receives bounded HUD/result summaries, never per-projectile frame state; Phaser owns drawing/input/camera and the only runtime clock.
+
+## V2 Controls And Feedback
+
+| Input | Action |
+| --- | --- |
+| WASD | Move; diagonals normalized |
+| R / Retry | Immediate fresh attempt, no retry countdown; held R does not repeat |
+| O / P | Zoom out / in; exact valid values persist across same-origin reload |
+| Escape | Pause/resume active play; in Controls, close only and stay paused |
+| Controls | Home/HUD native modal; freezes play/countdown and blocks background gameplay keys |
+| Resume | Deliberately resume after focus loss, pause or closing session Controls |
+| Mute | Visit-local hit-audio checkbox, independent of accepted hits/history |
+| Home | Abort unfinished attempt, remove runtime and focus Start |
+| Tab / Shift+Tab, Enter / Space | Standard UI navigation/activation; Controls contains focus and restores its opener |
+
+Start counts down for three active seconds. Focus loss clears held input and pauses; no stale movement/time catch-up. Zoom/resize never changes speed, collision, scoring or rules identity. Keyboard is required at narrow widths; no touch controls.
+
+The authoritative Phaser health bar stays 48x6 CSS pixels below the body at every zoom. Individual -128 numbers use 18 px text, 0.9 active seconds, a 16-text cap, paused aging and Retry/Home cleanup. Final-update amounts remain individually visible in immediate results without delaying death. Original [hit synthesis](app/src/game/phaser/hit-audio.ts) borrows Phaser's context: 55 ms sine cue, gain 0.018, max four voices. Muted/suspended/unsupported cues drop without catch-up. Numeric presentation policy is delegated trainer design, not human audible approval.
+
+[History](app/src/storage/attempts.ts) saves deaths once at `dodge-hell-training.attempts`, schema 1; R/Home aborts save nothing. [Zoom](app/src/storage/zoom.ts) independently stores a JSON number at `dodge-hell-training.zoom`, restores before first render and writes only actual O/P changes. Valid fractions are not snapped. Invalid/blocked/quota storage preserves unreadable data and falls back for the visit. No history migration, mute persistence, backend or accounts.
+
+## V2 Verification And Handoff
+
+Step 14.1: 292 unit/component tests, typecheck, lint, build and 27 Chromium cases passed. Coverage includes pure geometry/cadence/health/lifecycle, actual desktop/narrow min/default/max feedback pixels, real deaths/results, zoom reload, mute/audio failure, Controls/focus/pause, mixed history and storage failure. Five-minute 30/60/120 Hz schedules agree on 1313 volleys. The 60-second browser run observed three deaths, peak 88 shards/5 texts/1 sampled voice, and 25 retries retaining one canvas/listener set. These are machine-specific observations, not universal FPS/leak certification.
+
+Technical acceptance is delegated by the batch request, preserving earlier G01-G04 approval. Human feel/listening comfort, Firefox/WebKit, physical mobile input, screen readers and axe remain unverified. The initial Phaser bundle is about 1.72 MB with a retained nonblocking warning. Reference screenshot/crops remain local-only, ignored and absent from runtime assets; public distribution rights are unapproved.
+
+Manual practice checklist:
+
+1. Start, move with WASD, inspect clockwise eleven-shot groups and returning polygons.
+2. Change O/P to both extremes, reload then Start; verify restored scale and readable bar/numbers.
+3. Take independent hits, toggle Mute, let a real death show final amounts and save once.
+4. Open Controls from Home/HUD, close by Escape/Close; verify frozen play/countdown until Resume and no held-input replay.
+5. Repeat R/Retry/Home/Start; aborts add no records, and v1 remains Other rules without raising the v2 best.
+
+<details>
+<summary>Historical V1 Implementation And Acceptance (Superseded By V2 Above)</summary>
+
+The following sections through Training-Feel Review preserve the v1 handoff. Circles, four-shot groups, 1.2/2.4 s timing, 0.75-1.5 zoom, old counts and preview URL are historical only. Current behavior is the v2 contract above; phase 1-7 execution evidence remains in [the v1 archive](docs/implementation-plan-v1.md).
+
+## Historical V1 State
 
 Step 6.1 is complete: technical validation passed, and the user accepted the current implementation on 2026-10-24. Adjustments are deferred until after the full plan, as requested. No tuning changed; rules version remains `crystal-worm-child-head-paladin-v1`, with known trainer-fidelity limitations retained.
 
@@ -150,6 +218,8 @@ Open http://127.0.0.1:5176/dodge-hell-training/ with a keyboard and review:
 4. Use R/Retry repeatedly, Escape/Resume, and Home/Start; confirm a predictable reset and comfortable practice loop.
 5. For future tuning, note desired changes without altering the accepted baseline. The user accepted the current implementation for now on 2026-10-24 and deferred adjustments until after the full plan. Step 6.1 is complete; steps 7.1/7.2 subsequently supplied deployment and technical release evidence. Future adjustments still require approval and comparison-breaking changes require a rules-version bump.
 
+</details>
+
 ## Prerequisites
 
 - Use Node.js 24.22.1 LTS and npm 12.2.1. The root [.node-version](.node-version) selects the exact Node version; app package metadata records npm and supported Node/npm ranges.
@@ -225,6 +295,8 @@ In Windows PowerShell 5.1, use `npm.cmd` when forwarding flags after `--`: npm 1
 
 ## Validation And Build
 
+Current v2 evidence is step 14.1: all five commands passed with 292 unit/component tests and 27 Chromium cases. Dated step 7.2 counts below are retained historical v1 evidence, not the current suite size. Step 14.2 reruns relevant checks for handoff edits; step 14.3 separately records deployed evidence.
+
 Run these from `app/`:
 
 ```powershell
@@ -250,6 +322,8 @@ On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwrig
 With `PLAYWRIGHT_LIVE_URL` unset, build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server on port 4173 and production preview on 4174, both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. Keep both ports free: `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Default runs never navigate to external websites; hosted verification is an explicit opt-in below. Failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
 
 ## Hosted Release Verification
+
+The command below now exercises current v2 production-safe Controls, pause, persisted rendered zoom, bar/numbers/lethal feedback, mute and real versioned death records. Current v2 run/deployment identity and outcome are recorded in step 14.3 of the active plan. The dated step 7.2 hosted outcomes/acceptance below are historical v1 only.
 
 From `app/`, after installing dependencies and Chromium, run only the two production-safe tests against Pages:
 
@@ -279,6 +353,8 @@ npm.cmd run preview -- --host 127.0.0.1
 Use the URL printed by the preview command. Preview also defaults to port 4173, so stop it before running browser tests.
 
 ## GitHub Pages Setup
+
+The six-job workflow remains current; its browser suite now contains 27 cases. The deployment IDs/commit and old suite counts in the following dated setup history describe the first v1 release. They must not be used to claim current v2 deployment success; see active step 14.3 for that evidence.
 
 The repository is [raphaelbp12/dodge-hell-training](https://github.com/raphaelbp12/dodge-hell-training), with default branch `main`. The verified live project-site URL is https://raphaelbp12.github.io/dodge-hell-training/. [Actions run 40117403684](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40117403684) succeeded for `5db1674`, including all six jobs and deployment `7302230739` at `2026-10-24T17:49:16Z`. Initial metadata reported Pages disabled before setup; the unauthenticated Pages metadata endpoint later still returned 404 despite successful publication and live HTTP 200, so that endpoint alone must not be used to diagnose site availability. No custom domain or remote settings change was made by the assistant.
 

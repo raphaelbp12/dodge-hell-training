@@ -40,9 +40,7 @@ const presentation = {
   grid: 0x29423a,
   boundary: 0x648575,
   player: 0xf0f5ef,
-  playerOutline: 0x55d6a0,
   enemy: 0xea7969,
-  enemyCore: 0x86ded9,
   shard: 0xffdf69,
   spentShard: 0xc9a948,
   hitNumbers: {
@@ -79,9 +77,17 @@ class EncounterScene extends Phaser.Scene {
   private bodies!: Phaser.GameObjects.Graphics;
   private projectiles!: Phaser.GameObjects.Graphics;
   private healthBar!: Phaser.GameObjects.Graphics;
-  private hitNumbers: { hit: AcceptedHit; ageSeconds: number; text: Phaser.GameObjects.Text }[] = [];
+  private hitNumbers: {
+    hit: AcceptedHit;
+    ageSeconds: number;
+    text: Phaser.GameObjects.Text;
+  }[] = [];
   private finalHitAmounts: number[] = [];
-  private hitAudio = new HitAudio(() => this.sound instanceof Phaser.Sound.WebAudioSoundManager ? this.sound.context : null);
+  private hitAudio = new HitAudio(() =>
+    this.sound instanceof Phaser.Sound.WebAudioSoundManager
+      ? this.sound.context
+      : null,
+  );
   private unlockAudio = (): void => this.hitAudio.unlock();
   private keys!: Record<
     "north" | "south" | "east" | "west",
@@ -229,7 +235,12 @@ class EncounterScene extends Phaser.Scene {
   };
 
   resume(): void {
-    if (this.disposed || this.controlsOpen || document.hidden || this.state.phase === "ended")
+    if (
+      this.disposed ||
+      this.controlsOpen ||
+      document.hidden ||
+      this.state.phase === "ended"
+    )
       return;
     this.clearMovement();
     this.hitAudio.unlock();
@@ -239,7 +250,13 @@ class EncounterScene extends Phaser.Scene {
   }
 
   retry(): void {
-    if (this.disposed || this.controlsOpen || document.hidden || !this.session.retry()) return;
+    if (
+      this.disposed ||
+      this.controlsOpen ||
+      document.hidden ||
+      !this.session.retry()
+    )
+      return;
     this.clearHitNumbers();
     this.hitAudio.reset();
     this.hitAudio.unlock();
@@ -292,13 +309,18 @@ class EncounterScene extends Phaser.Scene {
         east: this.keys.east.isDown && !this.suppressedMovement.has("KeyD"),
         west: this.keys.west.isDown && !this.suppressedMovement.has("KeyA"),
       },
-      (hit) => { currentHits.push(hit); this.addHitNumber(hit); this.hitAudio.play(); },
+      (hit) => {
+        currentHits.push(hit);
+        this.addHitNumber(hit);
+        this.hitAudio.play();
+      },
     );
     if (result) this.finalHitAmounts = currentHits.map((hit) => hit.damageHp);
     const activeSeconds = this.state.elapsedSeconds - previousSeconds;
     this.hitNumbers = this.hitNumbers.filter((number) => {
       number.ageSeconds += activeSeconds;
-      if (number.ageSeconds < presentation.hitNumbers.lifetimeSeconds) return true;
+      if (number.ageSeconds < presentation.hitNumbers.lifetimeSeconds)
+        return true;
       number.text.destroy();
       return false;
     });
@@ -376,11 +398,18 @@ class EncounterScene extends Phaser.Scene {
 
   private addHitNumber(hit: AcceptedHit): void {
     const policy = presentation.hitNumbers;
-    while (this.hitNumbers.length >= policy.maxVisible) this.hitNumbers.shift()!.text.destroy();
-    const text = this.add.text(0, 0, `-${hit.damageHp}`, {
-      fontFamily: "Consolas, monospace", fontSize: `${policy.fontSizeCssPixels}px`,
-      color: policy.color, stroke: policy.stroke, strokeThickness: policy.strokeCssPixels,
-    }).setOrigin(0.5, 1).setDepth(4);
+    while (this.hitNumbers.length >= policy.maxVisible)
+      this.hitNumbers.shift()!.text.destroy();
+    const text = this.add
+      .text(0, 0, `-${hit.damageHp}`, {
+        fontFamily: "Consolas, monospace",
+        fontSize: `${policy.fontSizeCssPixels}px`,
+        color: policy.color,
+        stroke: policy.stroke,
+        strokeThickness: policy.strokeCssPixels,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(4);
     this.hitNumbers.push({ hit, ageSeconds: 0, text });
   }
 
@@ -434,20 +463,45 @@ class EncounterScene extends Phaser.Scene {
     const width = bar.widthCssPixels / this.zoom;
     const height = bar.heightCssPixels / this.zoom;
     const border = bar.borderCssPixels / this.zoom;
-    const bottom = Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.y));
+    const bottom = Math.max(
+      ...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.y),
+    );
     const left = player.positionTiles.x * pixelsPerTile - width / 2;
-    const top = (player.positionTiles.y + bottom) * pixelsPerTile + bar.gapCssPixels / this.zoom;
-    this.healthBar.clear()
-      .fillStyle(bar.border).fillRect(left - border, top - border, width + border * 2, height + border * 2)
-      .fillStyle(bar.empty).fillRect(left, top, width, height)
-      .fillStyle(bar.fill).fillRect(left, top, width * player.healthHp / PALADIN_STATS.healthHp, height);
+    const top =
+      (player.positionTiles.y + bottom) * pixelsPerTile +
+      bar.gapCssPixels / this.zoom;
+    this.healthBar
+      .clear()
+      .fillStyle(bar.border)
+      .fillRect(
+        left - border,
+        top - border,
+        width + border * 2,
+        height + border * 2,
+      )
+      .fillStyle(bar.empty)
+      .fillRect(left, top, width, height)
+      .fillStyle(bar.fill)
+      .fillRect(
+        left,
+        top,
+        (width * player.healthHp) / PALADIN_STATS.healthHp,
+        height,
+      );
     const policy = presentation.hitNumbers;
     for (const number of this.hitNumbers) {
-      const lane = number.hit.shardId % policy.lanes - (policy.lanes - 1) / 2;
-      number.text.setScale(1 / this.zoom).setPosition(
-        number.hit.positionTiles.x * pixelsPerTile + lane * policy.laneWidthCssPixels / this.zoom,
-        (number.hit.positionTiles.y - bottom) * pixelsPerTile - (policy.gapCssPixels + policy.riseCssPixels * number.ageSeconds / policy.lifetimeSeconds) / this.zoom,
-      );
+      const lane = (number.hit.shardId % policy.lanes) - (policy.lanes - 1) / 2;
+      number.text
+        .setScale(1 / this.zoom)
+        .setPosition(
+          number.hit.positionTiles.x * pixelsPerTile +
+            (lane * policy.laneWidthCssPixels) / this.zoom,
+          (number.hit.positionTiles.y - bottom) * pixelsPerTile -
+            (policy.gapCssPixels +
+              (policy.riseCssPixels * number.ageSeconds) /
+                policy.lifetimeSeconds) /
+              this.zoom,
+        );
     }
   }
 
@@ -466,7 +520,14 @@ class EncounterScene extends Phaser.Scene {
       },
       viewport: { width: this.scale.width, height: this.scale.height },
       keydownListeners: this.input.keyboard?.listenerCount("keydown"),
-      hitNumbers: this.hitNumbers.map((number) => ({ shardId: number.hit.shardId, damageHp: number.hit.damageHp, ageSeconds: number.ageSeconds, text: number.text.text, widthCssPixels: number.text.displayWidth * this.zoom, heightCssPixels: number.text.displayHeight * this.zoom })),
+      hitNumbers: this.hitNumbers.map((number) => ({
+        shardId: number.hit.shardId,
+        damageHp: number.hit.damageHp,
+        ageSeconds: number.ageSeconds,
+        text: number.text.text,
+        widthCssPixels: number.text.displayWidth * this.zoom,
+        heightCssPixels: number.text.displayHeight * this.zoom,
+      })),
       audio: this.hitAudio.inspect(),
     };
   }

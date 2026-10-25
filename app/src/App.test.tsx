@@ -31,7 +31,12 @@ vi.mock("./game/phaser/encounter", () => ({
   createEncounter: (
     host: HTMLElement,
     publish: (view: EncounterView) => void,
-    options: { initialMuted?: boolean; initialZoom?: number; onZoomChange?: (zoom: number) => void; onResult?: (result: AttemptResult) => void },
+    options: {
+      initialMuted?: boolean;
+      initialZoom?: number;
+      onZoomChange?: (zoom: number) => void;
+      onResult?: (result: AttemptResult) => void;
+    },
   ) => {
     adapter.initialZoom = options.initialZoom;
     adapter.initialMuted = options.initialMuted ?? false;
@@ -64,8 +69,18 @@ beforeEach(() => {
   adapter.destroyed = 0;
   adapter.publish = null;
   vi.clearAllMocks();
-  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function(this: HTMLDialogElement) { this.open = true; } });
-  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function(this: HTMLDialogElement) { this.open = false; } });
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+    configurable: true,
+    value: function (this: HTMLDialogElement) {
+      this.open = true;
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", {
+    configurable: true,
+    value: function (this: HTMLDialogElement) {
+      this.open = false;
+    },
+  });
 });
 
 test("Home Controls is labeled, lists actual bindings, closes and restores its opener without launching", async () => {
@@ -74,7 +89,8 @@ test("Home Controls is labeled, lists actual bindings, closes and restores its o
   const controls = screen.getByRole("button", { name: "Controls" });
   await user.click(controls);
   const dialog = screen.getByRole("dialog", { name: "Controls" });
-  for (const binding of ["WASD", "R", "O / P", "Escape", "Mute", "Resume"]) expect(within(dialog).getByText(binding, { exact: true })).toBeVisible();
+  for (const binding of ["WASD", "R", "O / P", "Escape", "Mute", "Resume"])
+    expect(within(dialog).getByText(binding, { exact: true })).toBeVisible();
   await user.click(within(dialog).getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(controls).toHaveFocus();
@@ -90,7 +106,9 @@ test("HUD Controls uses runtime modal isolation and never resumes on close", asy
   expect(adapter.setControlsOpen).toHaveBeenLastCalledWith(true);
   act(() => adapter.publish!({ ...runningView, status: "paused" }));
   expect(screen.getByLabelText("Paused overlay")).toHaveTextContent("Paused");
-  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+  await user.click(
+    within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }),
+  );
   expect(adapter.setControlsOpen).toHaveBeenLastCalledWith(false);
   expect(adapter.resume).not.toHaveBeenCalled();
   expect(adapter.created).toBe(1);
@@ -143,7 +161,10 @@ test("restores zoom before runtime creation and persists only explicit camera ch
   act(() => adapter.publish!({ ...runningView, zoom: 2.375 }));
   expect(writes).not.toHaveBeenCalled();
   act(() => adapter.onZoomChange?.(2.5));
-  expect(writes).toHaveBeenCalledExactlyOnceWith("dodge-hell-training.zoom", "2.5");
+  expect(writes).toHaveBeenCalledExactlyOnceWith(
+    "dodge-hell-training.zoom",
+    "2.5",
+  );
   act(() => adapter.onZoomChange?.(2.5));
   expect(writes).toHaveBeenCalledTimes(1);
   await user.click(screen.getByRole("button", { name: "Home" }));
@@ -306,8 +327,20 @@ test("lethal feedback remains individually observable in immediate results", asy
   const user = userEvent.setup();
   render(<App />);
   await user.click(screen.getByRole("button", { name: "Start" }));
-  act(() => adapter.publish!({ ...runningView, status: "ended", healthHp: 0, result: completedResult, finalHitAmounts: [128, 128] }));
-  expect(within(screen.getByRole("group", { name: "Final hit amounts" })).getAllByText("-128")).toHaveLength(2);
+  act(() =>
+    adapter.publish!({
+      ...runningView,
+      status: "ended",
+      healthHp: 0,
+      result: completedResult,
+      finalHitAmounts: [128, 128],
+    }),
+  );
+  expect(
+    within(
+      screen.getByRole("group", { name: "Final hit amounts" }),
+    ).getAllByText("-128"),
+  ).toHaveLength(2);
 });
 
 test("completed attempts save once despite duplicate callbacks, survive remount, and exclude aborted retries", async () => {

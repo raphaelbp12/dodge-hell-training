@@ -4,6 +4,8 @@ Status: complete under delegated decision-making on 2026-10-24; ready for user r
 
 Initial encounter/preset rules version: `crystal-worm-child-head-paladin-v1`.
 
+Current implementation: `crystal-worm-child-head-paladin-v2`. See [Implemented V2 Handoff](#implemented-v2-handoff) for active behavior, presentation policies and acceptance limits. Earlier sections preserve dated v1/preparatory evidence; their not-yet-activated wording describes those earlier steps, not today's runtime.
+
 Research/access date: 2026-10-24.
 
 ## Authority And Evidence
@@ -492,3 +494,48 @@ $$
 `deriveShardTiming` reuses the exact vertex ray limit: `centerTravel = D - emitterOffset`, `reversalAge = centerTravel / speed`, and `lifetime = 2 * reversalAge`. Zero emitter offset is valid; negative/nonfinite offsets, nonpositive/nonfinite speed or radius, invalid geometry, failed centered fit and nonpositive/unrepresentable travel/timing throw `RangeError`. All results use tiles/seconds without rounding to ticks. Approved exact values remain emitter `0.18532903718071878` tile, center reach `17.951764808626624` tiles, reversal `2.2208044714307382` seconds, lifetime `4.4416089428614765` seconds and conservative live bound 88.
 
 These circle operations are available for player/head movement and centered-head calibration only. They do not constrain, despawn or otherwise alter shards in play. Step 10.1 remains responsible for coordinated runtime activation; no projectile trajectory, lifetime or rules identity changes in step 9.2.
+
+## Implemented V2 Handoff
+
+Implemented through steps 10-13 on 2026-10-25 under the user's explicit all-remaining-steps authorization, with tests and a separate verified commit/push per step. The current identity is `crystal-worm-child-head-paladin-v2`. Earlier v1 data and dated preparation/approval records above remain historical. Actual G01-G04 shape approval is preserved; subsequent technical presentation/release acceptance is delegated, not fresh human visual/play/listening approval.
+
+### Active Geometry And Gameplay
+
+- Shared source scale is `435.118 / 19.2 = 22.662395833333335` source pixels/tile, separate from 32 CSS pixels/tile at zoom 1. Source dimensions remain player 36x33, partly occluded head 42x55 and shard 56.576x34.660 pixels; exact local octagons/hexagon and body-center anchors remain in [canonical geometry](../app/src/game/config/geometry-candidate.ts) and [approved silhouettes](#approved-silhouettes-and-anchors).
+- Physical drawing/collision consume the same vertices and transforms: upright player/head, fixed initial-firing-axis shard orientation even after reversal. Pure translating-convex swept SAT uses both silhouettes' axes over existing reversal/expiry segments with matching player interpolation. Conservative relative broad-phase rejection never accepts a hit. Numerical roundoff is not collider padding.
+- Arena radius 19.2 tiles, player `(0,0)`, head `(0,-16.2)`, actual spawned head max vertex radius 17.422337611416594. Player/head movement checks actual vertices and preserves radial/tangential semantics. Pursuit stops at silhouette contact (axial 1.7209124881066744/1.9415422942741967, diagonal approximately 2.093284691954207 tiles), zero extra gap, no blocking/contact damage.
+- Four emitters, eleven shots per emitter, 0.15-second spacing, one second after the last shot, initial cooldown two seconds and clockwise 45 degrees/second continuously. First volleys 2.00 through 3.50 seconds; next group 4.50 seconds. Forty-four shards/group, period 2.5 seconds. Offset 0.18532903718071878 tile is 10% head width.
+- Speed 8 tiles/second, incoming 160 HP. Exact maximum shard center distance 17.951764808626624 tiles, center travel 17.766435771445905, reversal 2.2208044714307382 seconds and lifetime 4.4416089428614765 seconds. No nominal screenshot timings or tick rounding. Leading-edge reach 19.2 tiles applies to a stationary centered head; moving emissions are not confined to the arena. Conservative live bound `44 * ceil(lifetime / 2.5) = 88`.
+- Shards reverse velocity once, expire only by lifetime, retain once-per-shard hit state and never store an origin/target. No wall/offscreen/collision despawn, global immunity, homing, player attacks, contact damage, seal, touch controls, shrinking arena, accounts or backend. Paladin/stat/health formulas are unchanged.
+
+### Feedback And Audio Policy
+
+Presentation choices below were delegated under the batch authorization, not independently measured ROTMG values or human comfort approval. They do not alter geometry, damage, comparison identity or result timing.
+
+| Surface | Named Policy And Ownership |
+| --- | --- |
+| Health bar | One Phaser Graphics, authoritative HP/775; 48x6 CSS pixels, 1 px dark border, 6 px gap below physical body; green `#55d6a0`, empty `#592e39`, border `#101b1b`; inverse camera scaling keeps it screen-sized |
+| Floating amounts | One Phaser Text per accepted hit, exact post-defense amount (-128 now); 18 px Consolas, pink `#ff8fa3`, 3 px dark stroke; 0.9 active seconds, 28 px rise, 12 px gap above body, seven 54 px lanes, at most 16 texts; no merged or inferred HP-delta events |
+| Lethal handoff | Immediate frozen result is not delayed; only final-advance amounts also appear individually in React's accessible Final hit amounts group until Retry/Home; no independent timer |
+| Audio | Original sine 440 -> 220 Hz, 5 ms attack, total 55 ms, peak gain 0.018, max four voices; borrows Phaser WebAudio context, no copied assets/new context; same accepted-hit callback |
+| Audio fallback | Muted/saturated/suspended/closed/unavailable cues drop, never queue. Supported gestures attempt resume; rejection is nonfatal. Pause stops voices, Retry resets, Home/disposal disconnects owned nodes/listeners; lethal cue may finish naturally while results appear |
+
+The pure health rule returns its calculated post-defense amount independently of lethal HP clamping. Simulation output contains only current-advance accepted hits, including multi-tick/simultaneous/lethal events; session forwards each before its once-only death-result handoff. No persistent log, event bus or extra clock. Numbers age only by actual advanced simulation seconds, freeze on pause/end and clear on Retry/Home. React does not update per hit/projectile during play. Visible accessible Mute remains visit-local across Home/Start, not persisted.
+
+### Zoom, Controls And Records
+
+Zoom limits 0.25-3, default 1, increment 0.125. Dedicated [zoom storage](../app/src/storage/zoom.ts) key `dodge-hell-training.zoom` uses a JSON number and exact finite in-range values, including arbitrary valid fractions without snapping. Read before first scene render; write only actual O/P changes, not HUD/frame updates. Missing/invalid/blocked/quota data retains visit-local operation; unreadable data is preserved, with no history coupling. World units, collision, elapsed time and v2 compatibility are unchanged by zoom/resize.
+
+Home/HUD use one native labeled Controls dialog with keyboard containment, Escape/Close and opener restoration. Actual bindings: WASD, R, O/P, Escape, Mute, Resume and standard Tab/Enter/Space UI activation. HUD opening synchronously pauses play/countdown and clears held input. Modal gate blocks gameplay keys/advance/retry/resume; existing event-identity WeakSet records rejected keys so Phaser's retained queue cannot replay them after closure. Closing leaves explicit Resume, preserved phase/countdown and first-delta skip; centered Paused uses existing overlay conventions. Results cannot resurrect a runtime; Home dialog cannot start play.
+
+[Attempt storage](../app/src/storage/attempts.ts) remains schema 1, latest 100 deaths across rules, exact-version retained best. V1 records remain readable/labeled Other rules, untouched and excluded from v2 bests. Actual deaths save once; retries/aborts do not save. Malformed/future/blocked/quota data falls back without overwriting unreadable history. No migration, deletion, relabeling, all-time-best promise, cross-tab merge or cloud storage.
+
+### Acceptance And Limits
+
+Step 14.1 passed 292 unit/component tests, typecheck, lint, production build and 27 Chromium cases under Node 24.22.1/npm 12.2.1. Real desktop/narrow 0.25/1/3 feedback captures, production-safe actual death/records/reload/Controls/mute flows and storage/audio failures pass. Pure five-minute schedules at 30/60/120 Hz agree on 1313 volleys. The 60-second browser observation recorded three deaths, 58.95 simulated seconds, peaks 88 shards/5 texts/1 sampled voice and 25 retries with one canvas/listener. Bounds are 88/16/4; observations do not prove tighter caps, cross-device FPS or leak freedom.
+
+Technical repeated-practice acceptance is delegated; human feel/listening comfort, Firefox/WebKit, physical mobile input, screen readers and axe remain unverified. Screenshot-based geometry/occluded-head reconstruction, pursuit, range interpretation, cadence and integration are intentional trainer approximations, not current-client fidelity. Future comparison-breaking tuning requires approval/version review. Existing ~1.72 MB Phaser bundle warning remains.
+
+Original `image.png`, `docs/fixes-*-candidate.png` and `docs/fixes-calibration-reference.png` remain local-only/ignored. Generated review pages, screenshots, metrics and browser artifacts stay under ignored `app/test-results/`; none are runtime assets or approved for public distribution. The original SHA-256 remains `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`.
+
+The [README checklist](../README.md#v2-verification-and-handoff) supplies manual practice steps. Actual local checks/statuses and independently authorized publication/live evidence belong to [the active plan](../implementation-plan.md), especially steps 14.1-14.3; a local pass is not deployment evidence.

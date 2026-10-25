@@ -458,7 +458,7 @@ Review min/default/max zoom screenshots for nonblank correctly framed play, read
 
 ### Step 14.2 - Finish The Local V2 Handoff
 
-Status: pending. Dependencies: 14.1.
+Status: complete. Dependencies: 14.1.
 
 **Implementation prompt**
 
@@ -469,6 +469,15 @@ Obtain actual completed-feature repeated-practice acceptance. Record any explici
 **Focused checks:** links/document structure, config-to-doc correspondence, scope/artifact exclusion and acceptance evidence. Runtime repairs require relevant gates again rather than stale step 14.1 evidence.
 
 **Acceptance:** local handoff/acceptance are recorded, publishing boundaries clear, and no new deployment is claimed. Step 14.3 remains pending until external prerequisites exist.
+
+**Execution and verification - 2026-10-25**
+
+- Dependency 14.1 remote verified at `b09762e0c18dd19ba57ef4ee105e4cc828a81a50`. README now leads with the implemented v2 contract, exact configuration, actual controls/feedback/persistence, delegated technical acceptance and a five-item manual practice checklist. Original v1 implementation/acceptance is preserved in a labeled historical section; old setup/release evidence is explicitly not v2 evidence. Added the mechanics Implemented V2 Handoff and dated Home changelog while preserving its v1 entry.
+- Final canonical shapes/scale, eleven-shot cadence, exact non-tick-rounded reversal/lifetime/leading-edge calibration, bound 88, v2 comparison isolation, independent zoom storage and presentation policies are documented with code links. No gameplay tuning, rules identity, dependency, audio policy, artwork permission or new human approval change.
+- Removed only the task-owned unused player-outline/enemy-core palette constants. Formatted task-owned additions to existing style; formatter-canonical comparison against HEAD confirms no other semantic source changes. An initial whitespace-only comparison incorrectly flagged harmless JSX parentheses; canonical comparison resolves that probe failure, with all runtime gates clean.
+- Current build gates rerun after handoff/cleanup: 292 unit/component tests across nine files, typecheck, lint, build and 27 Chromium cases passed. Editor diagnostics clean. Checked 69 local links/18 anchors, exact geometry/config-to-doc timing/offset correspondence, whitespace, obvious secret patterns, tracked/generated/reference exclusions and original image SHA-256. Artifact is only index HTML, favicon SVG, `index-DRHTVvPH.js` and `index-BFA9crZS.css`; existing ~1.72 MB chunk warning remains nonblocking.
+- Reference `image.png`, `docs/fixes-player-candidate.png`, `docs/fixes-head-candidate.png`, `docs/fixes-shard-candidate.png`, `docs/fixes-calibration-reference.png`, generated review/browser/metrics output remain ignored/local-only and absent from runtime/build/tracked artifacts. Preserved/excluded unrelated `app/vite.config.ts` formatting and new user `debugging-tools.md`.
+- Completed-feature technical repeated-practice acceptance is delegated by the user's explicit batch request, preserving actual G01-G04 approval. No fresh human feel/listening approval, non-Chromium certification, screen-reader/axe result or live deployment claimed. Separate per-step commit/push is authorized by that same batch request; step 14.3 must verify actual external deployment and hosted checks next.
 
 ### Step 14.3 - Verify The Authorized Deployed V2
 

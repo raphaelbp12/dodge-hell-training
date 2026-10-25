@@ -22,26 +22,52 @@ function ControlsDialog({ onClose }: { onClose: () => void }) {
     element.showModal();
     return () => {
       element.close();
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+      if (opener instanceof HTMLElement && opener.isConnected)
+        opener.focus({ preventScroll: true });
     };
   }, []);
-  return <dialog ref={dialog} className={styles.controls} aria-labelledby="controls-title" onCancel={(event) => { event.preventDefault(); onClose(); }} onKeyDown={(event) => {
-    if (event.key === "Tab") { event.preventDefault(); dialog.current?.querySelector<HTMLButtonElement>("button")?.focus(); }
-  }}>
-    <h2 id="controls-title">Controls</h2>
-    <dl>
-      <dt>WASD</dt><dd>Move</dd>
-      <dt>R</dt><dd>Immediate retry</dd>
-      <dt>O / P</dt><dd>Zoom out / in</dd>
-      <dt>Escape</dt><dd>Pause / resume, or close Controls</dd>
-      <dt>Mute</dt><dd>Hit audio checkbox</dd>
-      <dt>Resume</dt><dd>Continue a paused attempt</dd>
-      <dt>Start / Retry / Home</dt><dd>Screen actions</dd>
-      <dt>Tab / Shift+Tab</dt><dd>Move focus</dd>
-      <dt>Enter / Space</dt><dd>Activate a focused control</dd>
-    </dl>
-    <button type="button" autoFocus onClick={onClose}>Close</button>
-  </dialog>;
+  return (
+    <dialog
+      ref={dialog}
+      className={styles.controls}
+      aria-labelledby="controls-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          dialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
+        }
+      }}
+    >
+      <h2 id="controls-title">Controls</h2>
+      <dl>
+        <dt>WASD</dt>
+        <dd>Move</dd>
+        <dt>R</dt>
+        <dd>Immediate retry</dd>
+        <dt>O / P</dt>
+        <dd>Zoom out / in</dd>
+        <dt>Escape</dt>
+        <dd>Pause / resume, or close Controls</dd>
+        <dt>Mute</dt>
+        <dd>Hit audio checkbox</dd>
+        <dt>Resume</dt>
+        <dd>Continue a paused attempt</dd>
+        <dt>Start / Retry / Home</dt>
+        <dd>Screen actions</dd>
+        <dt>Tab / Shift+Tab</dt>
+        <dd>Move focus</dd>
+        <dt>Enter / Space</dt>
+        <dd>Activate a focused control</dd>
+      </dl>
+      <button type="button" autoFocus onClick={onClose}>
+        Close
+      </button>
+    </dialog>
+  );
 }
 
 function History({ snapshot }: { snapshot: HistorySnapshot }) {
@@ -156,7 +182,9 @@ function Encounter({
       handle.destroy();
     };
   }, [zoomPreference, zoomStorage, history, onHistoryChange]);
-  useEffect(() => { runtime.current?.setMuted(muted); }, [muted]);
+  useEffect(() => {
+    runtime.current?.setMuted(muted);
+  }, [muted]);
   return (
     <>
       <div className={styles.telemetry} aria-label="Session HUD">
@@ -205,7 +233,15 @@ function Encounter({
           <button type="button" onClick={onHome}>
             Home
           </button>
-          <button type="button" onClick={() => { runtime.current?.setControlsOpen(true); setControlsOpen(true); }}>Controls</button>
+          <button
+            type="button"
+            onClick={() => {
+              runtime.current?.setControlsOpen(true);
+              setControlsOpen(true);
+            }}
+          >
+            Controls
+          </button>
         </div>
       </div>
       <div className={styles.playfield}>
@@ -221,16 +257,31 @@ function Encounter({
             {Math.ceil(view.countdownRemainingSeconds)}
           </div>
         )}
-        {view.status === "paused" && <div className={`${styles.countdown} ${styles.paused}`} aria-label="Paused overlay">Paused</div>}
+        {view.status === "paused" && (
+          <div
+            className={`${styles.countdown} ${styles.paused}`}
+            aria-label="Paused overlay"
+          >
+            Paused
+          </div>
+        )}
         {view.result && (
           <section className={styles.results} aria-labelledby="result-title">
             <span className={styles.eyebrow}>Crystal Worm Child Head</span>
             <h2 id="result-title" ref={resultHeading} tabIndex={-1}>
               Attempt complete
             </h2>
-            {!!view.finalHitAmounts?.length && <div role="group" aria-label="Final hit amounts" className={styles.finalHits}>
-              {view.finalHitAmounts.map((amount, index) => <span key={index}>-{amount}</span>)}
-            </div>}
+            {!!view.finalHitAmounts?.length && (
+              <div
+                role="group"
+                aria-label="Final hit amounts"
+                className={styles.finalHits}
+              >
+                {view.finalHitAmounts.map((amount, index) => (
+                  <span key={index}>-{amount}</span>
+                ))}
+              </div>
+            )}
             <dl>
               <div>
                 <dt>Survival time</dt>
@@ -257,7 +308,14 @@ function Encounter({
           </section>
         )}
       </div>
-      {controlsOpen && <ControlsDialog onClose={() => { runtime.current?.setControlsOpen(false); setControlsOpen(false); }} />}
+      {controlsOpen && (
+        <ControlsDialog
+          onClose={() => {
+            runtime.current?.setControlsOpen(false);
+            setControlsOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -273,7 +331,9 @@ export default function App() {
   const [homeControlsOpen, setHomeControlsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const startButton = useRef<HTMLButtonElement>(null);
-  const [zoomStorage] = useState(() => new ZoomPreference(() => window.localStorage));
+  const [zoomStorage] = useState(
+    () => new ZoomPreference(() => window.localStorage),
+  );
   const zoomPreference = useRef<number>(zoomStorage.get());
   useEffect(() => {
     if (!launched) startButton.current?.focus();
@@ -287,7 +347,15 @@ export default function App() {
         </div>
         <div className={styles.headerTools}>
           <span className={styles.encounterLabel}>Head / Survival</span>
-          <label className={styles.mute}><input type="checkbox" aria-label="Mute hit audio" checked={muted} onChange={(event) => setMuted(event.target.checked)} />Mute</label>
+          <label className={styles.mute}>
+            <input
+              type="checkbox"
+              aria-label="Mute hit audio"
+              checked={muted}
+              onChange={(event) => setMuted(event.target.checked)}
+            />
+            Mute
+          </label>
         </div>
       </header>
       <p className={styles.keyboardNotice}>Desktop keyboard required</p>
@@ -322,7 +390,13 @@ export default function App() {
               >
                 Start
               </button>
-              <button type="button" className={styles.homeControls} onClick={() => setHomeControlsOpen(true)}>Controls</button>
+              <button
+                type="button"
+                className={styles.homeControls}
+                onClick={() => setHomeControlsOpen(true)}
+              >
+                Controls
+              </button>
             </div>
           </section>
           <section className={styles.preset} aria-labelledby="preset-title">
@@ -338,6 +412,19 @@ export default function App() {
             aria-labelledby="changelog-title"
           >
             <h2 id="changelog-title">Changelog</h2>
+            <time dateTime="2026-10-25">25 Oct 2026</time>
+            <ul>
+              <li>
+                V2 polygon encounter with eleven-shot spirals and versioned
+                comparisons.
+              </li>
+              <li>
+                Reload-safe zoom, player health bar and individual hit amounts.
+              </li>
+              <li>
+                Original hit audio, visit-local mute and Home/HUD Controls.
+              </li>
+            </ul>
             <time dateTime="2026-10-24">24 Oct 2026</time>
             <ul>
               <li>
@@ -364,7 +451,9 @@ export default function App() {
               trainer-specific approximations.
             </p>
           </footer>
-          {homeControlsOpen && <ControlsDialog onClose={() => setHomeControlsOpen(false)} />}
+          {homeControlsOpen && (
+            <ControlsDialog onClose={() => setHomeControlsOpen(false)} />
+          )}
         </div>
       )}
     </main>

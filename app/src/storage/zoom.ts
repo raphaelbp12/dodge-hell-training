@@ -4,8 +4,12 @@ import type { HistoryStorage } from "./attempts";
 export const ZOOM_STORAGE_KEY = "dodge-hell-training.zoom";
 
 function validZoom(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) &&
-    value >= ENCOUNTER_CONFIG.camera.minZoom && value <= ENCOUNTER_CONFIG.camera.maxZoom;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= ENCOUNTER_CONFIG.camera.minZoom &&
+    value <= ENCOUNTER_CONFIG.camera.maxZoom
+  );
 }
 
 export class ZoomPreference {
@@ -27,7 +31,9 @@ export class ZoomPreference {
     }
   }
 
-  get(): number { return this.value; }
+  get(): number {
+    return this.value;
+  }
 
   set(value: number): void {
     if (!validZoom(value)) throw new RangeError("Zoom outside camera limits");

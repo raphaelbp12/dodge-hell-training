@@ -19,8 +19,20 @@ type Inspection = SessionSnapshot & {
   camera: Vector2;
   viewport: { width: number; height: number };
   keydownListeners: number;
-  hitNumbers: { shardId: number; damageHp: number; ageSeconds: number; text: string; widthCssPixels: number; heightCssPixels: number }[];
-  audio: { muted: boolean; requests: number; played: number; activeVoices: number };
+  hitNumbers: {
+    shardId: number;
+    damageHp: number;
+    ageSeconds: number;
+    text: string;
+    widthCssPixels: number;
+    heightCssPixels: number;
+  }[];
+  audio: {
+    muted: boolean;
+    requests: number;
+    played: number;
+    activeVoices: number;
+  };
 };
 
 async function inspect(page: Page): Promise<Inspection> {
@@ -58,7 +70,15 @@ async function renderedPixels(page: Page) {
     const context = copy.getContext("2d")!;
     context.drawImage(canvas, 0, 0);
     const data = context.getImageData(0, 0, copy.width, copy.height).data;
-    const counts = { player: 0, enemy: 0, shards: 0, ground: 0, healthBar: 0, missingHealth: 0, hitText: 0 };
+    const counts = {
+      player: 0,
+      enemy: 0,
+      shards: 0,
+      ground: 0,
+      healthBar: 0,
+      missingHealth: 0,
+      hitText: 0,
+    };
     let enemyX = 0;
     let enemyY = 0;
     for (let offset = 0; offset < data.length; offset += 4) {
@@ -75,7 +95,8 @@ async function renderedPixels(page: Page) {
       if (red === 28 && green === 48 && blue === 42) counts.ground++;
       if (red === 85 && green === 214 && blue === 160) counts.healthBar++;
       if (red === 89 && green === 46 && blue === 57) counts.missingHealth++;
-      if (red > 130 && green > 50 && green < 160 && blue > green && blue < red) counts.hitText++;
+      if (red > 130 && green > 50 && green < 160 && blue > green && blue < red)
+        counts.hitText++;
     }
     return {
       ...counts,
@@ -162,12 +183,20 @@ for (const width of [1440, 390]) {
       fullPage: true,
     });
     await page.getByRole("checkbox", { name: "Mute hit audio" }).check();
-    await expect(page.getByRole("checkbox", { name: "Mute hit audio" })).toBeChecked();
+    await expect(
+      page.getByRole("checkbox", { name: "Mute hit audio" }),
+    ).toBeChecked();
     await page.getByRole("checkbox", { name: "Mute hit audio" }).uncheck();
     for (const closeBy of ["Escape", "button"] as const) {
-      const opener = page.getByRole("button", { name: "Controls", exact: true });
+      const opener = page.getByRole("button", {
+        name: "Controls",
+        exact: true,
+      });
       await opener.click();
-      const dialog = page.getByRole("dialog", { name: "Controls", exact: true });
+      const dialog = page.getByRole("dialog", {
+        name: "Controls",
+        exact: true,
+      });
       await expect(dialog).toBeVisible();
       const close = dialog.getByRole("button", { name: "Close", exact: true });
       await expect(close).toBeFocused();
@@ -175,12 +204,26 @@ for (const width of [1440, 390]) {
         await page.keyboard.press(key);
         await expect(close).toBeFocused();
       }
-      expect(await dialog.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight && ![...element.querySelectorAll("h2, dt, dd, button")].some((child) => child.scrollWidth > child.clientWidth);
-      })).toBe(true);
-      await page.screenshot({ path: testInfo.outputPath(`release-controls-${width}.png`), fullPage: true });
-      if (closeBy === "Escape") await page.keyboard.press("Escape"); else await close.click();
+      expect(
+        await dialog.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return (
+            box.left >= 0 &&
+            box.right <= innerWidth &&
+            box.top >= 0 &&
+            box.bottom <= innerHeight &&
+            ![...element.querySelectorAll("h2, dt, dd, button")].some(
+              (child) => child.scrollWidth > child.clientWidth,
+            )
+          );
+        }),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`release-controls-${width}.png`),
+        fullPage: true,
+      });
+      if (closeBy === "Escape") await page.keyboard.press("Escape");
+      else await close.click();
       await expect(dialog).toHaveCount(0);
       await expect(opener).toBeFocused();
       await expect(page.locator("canvas")).toHaveCount(0);
@@ -218,7 +261,10 @@ for (const width of [1440, 390]) {
     await expect(page.getByLabel("Paused overlay")).toBeVisible();
     await expect(page.getByLabel("Survival time")).toHaveText(frozenTime!);
     expect((await renderedPixels(page)).player).toBe(beforeControls.player);
-    await page.screenshot({ path: testInfo.outputPath(`release-paused-${width}.png`), fullPage: true });
+    await page.screenshot({
+      path: testInfo.outputPath(`release-paused-${width}.png`),
+      fullPage: true,
+    });
     await page.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(page.getByLabel("Session status")).toHaveText("Active");
     if (width === 1440) {
@@ -321,14 +367,25 @@ for (const width of [1440, 390]) {
         { timeout: 15000 },
       )
       .toBeLessThan(775);
-    await expect.poll(async () => (await renderedPixels(page)).missingHealth).toBeGreaterThan(5);
-    await expect.poll(async () => (await renderedPixels(page)).hitText, { intervals: [50] }).toBeGreaterThan(5);
-    await page.screenshot({ path: testInfo.outputPath(`release-feedback-${width}.png`), fullPage: true });
+    await expect
+      .poll(async () => (await renderedPixels(page)).missingHealth)
+      .toBeGreaterThan(5);
+    await expect
+      .poll(async () => (await renderedPixels(page)).hitText, {
+        intervals: [50],
+      })
+      .toBeGreaterThan(5);
+    await page.screenshot({
+      path: testInfo.outputPath(`release-feedback-${width}.png`),
+      fullPage: true,
+    });
     const results = page.getByRole("region", { name: "Attempt complete" });
     const completed = [];
     for (let attempt = 1; attempt <= 2; attempt++) {
       await expect(results).toBeVisible({ timeout: 70000 });
-      await expect(results.getByRole("group", { name: "Final hit amounts" })).toContainText("-128");
+      await expect(
+        results.getByRole("group", { name: "Final hit amounts" }),
+      ).toContainText("-128");
       await expect(page.getByRole("meter", { name: "Health" })).toHaveAttribute(
         "value",
         "0",
@@ -398,7 +455,9 @@ for (const width of [1440, 390]) {
     await expect(page.locator("canvas")).toHaveCount(0);
     await page.reload();
     expect(await savedAttempts(page)).toEqual(saved);
-    await expect(page.getByRole("checkbox", { name: "Mute hit audio" })).not.toBeChecked();
+    await expect(
+      page.getByRole("checkbox", { name: "Mute hit audio" }),
+    ).not.toBeChecked();
     await expect(
       page.getByRole("listitem", { name: /completed attempt/i }),
     ).toHaveCount(2);
@@ -413,7 +472,9 @@ for (const width of [1440, 390]) {
     await expect(page.getByLabel("Session status")).toHaveText("Starting");
     await expect(page.getByLabel("Session status")).toHaveText("Active");
     const restoredPixels = await renderedPixels(page);
-    expect(Math.abs(restoredPixels.player - pixels.player)).toBeLessThan(pixels.player * 0.1 + 4);
+    expect(Math.abs(restoredPixels.player - pixels.player)).toBeLessThan(
+      pixels.player * 0.1 + 4,
+    );
     await page.getByRole("button", { name: "Home", exact: true }).click();
     expect(await savedAttempts(page)).toEqual(saved);
     expect(
@@ -788,7 +849,11 @@ test("loaded history compares only compatible retained records", async ({
   await page.getByRole("button", { name: "Home", exact: true }).click();
   expect((await savedAttempts(page)).records).toHaveLength(2);
   expect((await savedAttempts(page)).records[0]).toEqual({
-    id: "other", rulesVersion: "crystal-worm-child-head-paladin-v1", outcome: "death", elapsedSeconds: 999, hitsTaken: 1,
+    id: "other",
+    rulesVersion: "crystal-worm-child-head-paladin-v1",
+    outcome: "death",
+    elapsedSeconds: 999,
+    hitsTaken: 1,
   });
 });
 
@@ -1155,7 +1220,10 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
     )
     .toBe(true);
   await expect
-    .poll(async () => (await inspect(page)).hitNumbers.length, { timeout: 4000, intervals: [50] })
+    .poll(async () => (await inspect(page)).hitNumbers.length, {
+      timeout: 4000,
+      intervals: [50],
+    })
     .toBeGreaterThan(0);
   const hit = await inspect(page);
   expect(hit.hitsTaken).toBeGreaterThan(0);
@@ -1163,7 +1231,11 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
   expect(hit.audio.played).toBeGreaterThan(0);
   expect(hit.player.healthHp).toBeLessThan(775);
   expect(hit.hitNumbers.length).toBeGreaterThan(0);
-  expect(hit.hitNumbers.every((number) => number.damageHp === 128 && number.text === "-128")).toBe(true);
+  expect(
+    hit.hitNumbers.every(
+      (number) => number.damageHp === 128 && number.text === "-128",
+    ),
+  ).toBe(true);
   expect(hit.shards.some((shard) => shard.hasHitPlayer)).toBe(true);
   expect(
     hit.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
@@ -1176,41 +1248,68 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
 });
 
 for (const mode of ["muted", "unavailable"] as const) {
-  test(`${mode} audio never blocks hits, results or retry`, async ({ page }) => {
-    if (mode === "unavailable") await page.addInitScript(() => {
-      Object.defineProperty(window, "AudioContext", { value: undefined });
-      Object.defineProperty(window, "webkitAudioContext", { value: undefined });
-    });
+  test(`${mode} audio never blocks hits, results or retry`, async ({
+    page,
+  }) => {
+    if (mode === "unavailable")
+      await page.addInitScript(() => {
+        Object.defineProperty(window, "AudioContext", { value: undefined });
+        Object.defineProperty(window, "webkitAudioContext", {
+          value: undefined,
+        });
+      });
     await launch(page);
     if (mode === "muted") {
       await page.getByRole("checkbox", { name: "Mute hit audio" }).check();
       await page.getByRole("button", { name: "Resume", exact: true }).click();
     }
-    await expect.poll(async () => (await inspect(page)).hitNumbers.length, { timeout: 10000, intervals: [50] }).toBeGreaterThan(0);
+    await expect
+      .poll(async () => (await inspect(page)).hitNumbers.length, {
+        timeout: 10000,
+        intervals: [50],
+      })
+      .toBeGreaterThan(0);
     const silent = await inspect(page);
     expect(silent.audio.requests).toBe(silent.hitsTaken);
     expect(silent.audio.played).toBe(0);
     if (mode === "muted") {
       await page.getByRole("checkbox", { name: "Mute hit audio" }).uncheck();
       await page.getByRole("button", { name: "Resume", exact: true }).click();
-      await expect.poll(async () => (await inspect(page)).audio.played, { timeout: 10000 }).toBeGreaterThan(0);
+      await expect
+        .poll(async () => (await inspect(page)).audio.played, {
+          timeout: 10000,
+        })
+        .toBeGreaterThan(0);
     }
-    await expect(page.getByRole("region", { name: "Attempt complete" })).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByRole("region", { name: "Attempt complete" }),
+    ).toBeVisible({ timeout: 15000 });
     const ended = await inspect(page);
     expect(ended.audio.requests).toBe(ended.hitsTaken);
     expect(ended.audio.activeVoices).toBeLessThanOrEqual(4);
     const reset = await retrySnapshot(page);
-    expect(reset.audio).toMatchObject({ requests: 0, played: 0, activeVoices: 0 });
+    expect(reset.audio).toMatchObject({
+      requests: 0,
+      played: 0,
+      activeVoices: 0,
+    });
     expect(reset.hitNumbers).toEqual([]);
   });
 }
 
 for (const phase of ["countdown", "playing", "paused"] as const) {
-  test(`Controls isolates ${phase} and requires explicit Resume without catch-up`, async ({ page }) => {
+  test(`Controls isolates ${phase} and requires explicit Resume without catch-up`, async ({
+    page,
+  }) => {
     await page.goto("./");
     await page.getByRole("button", { name: "Start", exact: true }).click();
-    await expect.poll(async () => (await inspect(page))?.sessionPhase).toBe("countdown");
-    if (phase !== "countdown") await expect.poll(async () => (await inspect(page)).sessionPhase).toBe("playing");
+    await expect
+      .poll(async () => (await inspect(page))?.sessionPhase)
+      .toBe("countdown");
+    if (phase !== "countdown")
+      await expect
+        .poll(async () => (await inspect(page)).sessionPhase)
+        .toBe("playing");
     if (phase === "paused") await page.keyboard.press("Escape");
     const canvas = await page.locator("canvas").elementHandle();
     await page.keyboard.down("w");
@@ -1218,9 +1317,18 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
     await opener.click();
     await expect(page.getByRole("dialog", { name: "Controls" })).toBeVisible();
     const frozen = await inspect(page);
-    for (const key of ["a", "s", "d", "r", "o", "p"]) await page.keyboard.press(key);
+    for (const key of ["a", "s", "d", "r", "o", "p"])
+      await page.keyboard.press(key);
     await page.waitForTimeout(250);
-    const unchanged = (state: Inspection) => ({ player: state.player, enemy: state.enemy, shards: state.shards, ticks: state.ticksElapsed, zoom: state.zoom, attemptId: state.attemptId, countdown: state.countdownRemainingSeconds });
+    const unchanged = (state: Inspection) => ({
+      player: state.player,
+      enemy: state.enemy,
+      shards: state.shards,
+      ticks: state.ticksElapsed,
+      zoom: state.zoom,
+      attemptId: state.attemptId,
+      countdown: state.countdownRemainingSeconds,
+    });
     expect(unchanged(await inspect(page))).toEqual(unchanged(frozen));
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -1236,14 +1344,20 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
     expect(resumed.attemptId).toBe(frozen.attemptId);
     if (phase === "countdown") {
       expect(resumed.sessionPhase).toBe("countdown");
-      expect(resumed.countdownRemainingSeconds).toBeGreaterThan(frozen.countdownRemainingSeconds - 0.4);
+      expect(resumed.countdownRemainingSeconds).toBeGreaterThan(
+        frozen.countdownRemainingSeconds - 0.4,
+      );
     } else {
       expect(resumed.sessionPhase).toBe("playing");
       expect(resumed.elapsedSeconds - frozen.elapsedSeconds).toBeGreaterThan(0);
       expect(resumed.elapsedSeconds - frozen.elapsedSeconds).toBeLessThan(0.4);
     }
     await page.keyboard.up("w");
-    expect(await canvas!.evaluate((element) => element === document.querySelector("canvas"))).toBe(true);
+    expect(
+      await canvas!.evaluate(
+        (element) => element === document.querySelector("canvas"),
+      ),
+    ).toBe(true);
     expect(resumed.keydownListeners).toBe(1);
   });
 }
@@ -1323,14 +1437,26 @@ test("resize preserves zoom, movement speed, camera center and the simulation at
 });
 
 for (const width of [1440, 390]) {
-  test(`real hit feedback stays readable at all zoom levels at ${width}px`, async ({ page }, testInfo) => {
+  test(`real hit feedback stays readable at all zoom levels at ${width}px`, async ({
+    page,
+  }, testInfo) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await launch(page);
     for (const zoom of [0.25, 1, 3]) {
       const current = (await inspect(page)).zoom;
-      for (let press = 0; press < Math.round(Math.abs(zoom - current) / 0.125); press++) await page.keyboard.press(zoom < current ? "o" : "p");
+      for (
+        let press = 0;
+        press < Math.round(Math.abs(zoom - current) / 0.125);
+        press++
+      )
+        await page.keyboard.press(zoom < current ? "o" : "p");
       await retrySnapshot(page);
-      await expect.poll(async () => (await inspect(page)).hitNumbers.length, { timeout: 10000, intervals: [50] }).toBeGreaterThan(0);
+      await expect
+        .poll(async () => (await inspect(page)).hitNumbers.length, {
+          timeout: 10000,
+          intervals: [50],
+        })
+        .toBeGreaterThan(0);
       await page.keyboard.press("Escape");
       const state = await inspect(page);
       expect(state.zoom).toBe(zoom);
@@ -1342,8 +1468,15 @@ for (const width of [1440, 390]) {
         expect(number.heightCssPixels).toBeGreaterThan(15);
         expect(number.heightCssPixels).toBeLessThan(40);
       }
-      await page.screenshot({ path: testInfo.outputPath(`feedback-${width}-${zoom}.png`), fullPage: true });
-      await expect.poll(async () => (await renderedPixels(page)).hitText, { intervals: [50] }).toBeGreaterThan(5);
+      await page.screenshot({
+        path: testInfo.outputPath(`feedback-${width}-${zoom}.png`),
+        fullPage: true,
+      });
+      await expect
+        .poll(async () => (await renderedPixels(page)).hitText, {
+          intervals: [50],
+        })
+        .toBeGreaterThan(5);
       await page.getByRole("button", { name: "Resume", exact: true }).click();
     }
   });
@@ -1394,18 +1527,35 @@ for (const viewport of [
       .getByRole("region", { name: "Encounter", exact: true })
       .boundingBox();
     const camera = await page.evaluate(async () => {
-      const path = new URL("src/game/config/encounter.ts", document.baseURI).href;
+      const path = new URL("src/game/config/encounter.ts", document.baseURI)
+        .href;
       return (await import(/* @vite-ignore */ path)).ENCOUNTER_CONFIG.camera;
     });
-    for (const target of [camera.minZoom, camera.defaultZoom, camera.maxZoom, camera.defaultZoom]) {
+    for (const target of [
+      camera.minZoom,
+      camera.defaultZoom,
+      camera.maxZoom,
+      camera.defaultZoom,
+    ]) {
       const current = (await inspect(page)).zoom;
-      for (let step = 0; step < Math.round(Math.abs(target - current) / camera.zoomStep); step++) {
+      for (
+        let step = 0;
+        step < Math.round(Math.abs(target - current) / camera.zoomStep);
+        step++
+      ) {
         await page.keyboard.press(target < current ? "o" : "p");
       }
       await expect.poll(async () => (await inspect(page)).zoom).toBe(target);
-      await expect.poll(async () => (await renderedPixels(page)).player).toBeGreaterThan(10);
-      await expect.poll(async () => (await renderedPixels(page)).healthBar).toBeGreaterThan(150);
-      await page.screenshot({ path: testInfo.outputPath(`geometry-${viewport.width}-${target}.png`), fullPage: true });
+      await expect
+        .poll(async () => (await renderedPixels(page)).player)
+        .toBeGreaterThan(10);
+      await expect
+        .poll(async () => (await renderedPixels(page)).healthBar)
+        .toBeGreaterThan(150);
+      await page.screenshot({
+        path: testInfo.outputPath(`geometry-${viewport.width}-${target}.png`),
+        fullPage: true,
+      });
     }
     await expect
       .poll(async () => (await inspect(page)).elapsedSeconds)

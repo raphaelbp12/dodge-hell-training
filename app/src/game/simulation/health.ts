@@ -6,7 +6,10 @@ import {
 } from "../config/stats";
 import type { PlayerState } from "../models";
 
-export function applyPlayerHit(player: PlayerState, rawDamageHp: number): number | null {
+export function applyPlayerHit(
+  player: PlayerState,
+  rawDamageHp: number,
+): number | null {
   const damageHp = calculateDamageHp(rawDamageHp, PALADIN_STATS.defense);
   if (player.healthHp <= 0) return null;
   player.healthHp = Math.max(0, player.healthHp - damageHp);

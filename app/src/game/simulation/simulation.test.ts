@@ -510,7 +510,9 @@ test("lethal output reports post-defense damage, not clamped HP, and stops later
   state.player.healthHp = 1;
   state.shards.push(makeShard({ id: 1 }), makeShard({ id: 2 }));
   const result = advanceSimulation(state, stepSeconds * 8, idle);
-  expect(result.acceptedHits).toEqual([{ shardId: 1, damageHp: 128, positionTiles: { x: 0, y: 0 } }]);
+  expect(result.acceptedHits).toEqual([
+    { shardId: 1, damageHp: 128, positionTiles: { x: 0, y: 0 } },
+  ]);
   expect(state.player.healthHp).toBe(0);
   expect(state.shards[1]!.hasHitPlayer).toBe(false);
   expect(advanceSimulation(state, 10, idle).acceptedHits).toEqual([]);
@@ -518,8 +520,19 @@ test("lethal output reports post-defense damage, not clamped HP, and stops later
 
 test("one advance collects accepted hits from later fixed ticks without a persistent log", () => {
   const state = createSimulation();
-  state.shards.push(makeShard({ id: 1 }), makeShard({ id: 2, positionTiles: { x: -2.5, y: 0 }, velocityTilesPerSecond: { x: 20, y: 0 } }));
-  expect(advanceSimulation(state, stepSeconds * 3, idle).acceptedHits.map((hit) => hit.shardId)).toEqual([1, 2]);
+  state.shards.push(
+    makeShard({ id: 1 }),
+    makeShard({
+      id: 2,
+      positionTiles: { x: -2.5, y: 0 },
+      velocityTilesPerSecond: { x: 20, y: 0 },
+    }),
+  );
+  expect(
+    advanceSimulation(state, stepSeconds * 3, idle).acceptedHits.map(
+      (hit) => hit.shardId,
+    ),
+  ).toEqual([1, 2]);
   expect(state).not.toHaveProperty("acceptedHits");
 });
 
