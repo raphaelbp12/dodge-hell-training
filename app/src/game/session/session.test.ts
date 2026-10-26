@@ -19,6 +19,8 @@ test("session delivers accepted hits once before lethal result, never while paus
   session.simulation.player.healthHp = 1;
   session.simulation.shards.push({
     id: 1,
+    archetypeId: "crystal-worm-child-head",
+    damageHp: 160,
     orientationRadians: 0,
     positionTiles: { x: 0, y: 0 },
     velocityTilesPerSecond: { x: 0, y: 0 },
@@ -58,6 +60,8 @@ function kill(session: SessionController) {
   session.simulation.player.healthHp = 1;
   session.simulation.shards.push({
     id: 100,
+    archetypeId: "crystal-worm-child-head",
+    damageHp: 160,
     orientationRadians: 0,
     positionTiles: { ...session.simulation.player.positionTiles },
     velocityTilesPerSecond: { x: 0, y: 0 },
@@ -149,8 +153,8 @@ test.each(["countdown", "playing", "paused", "ended"] as const)(
     const old = session.simulation;
     old.player.healthHp = 10;
     old.player.combatRemainingSeconds = 5;
-    old.enemy.emitterPhaseRadians = 1;
-    old.volleysFired = 20;
+    old.enemies[0].emitterPhaseRadians = 1;
+    old.enemies[0].volleysFired = 20;
     old.hitsTaken = 4;
     old.accumulatorSeconds = tick / 2;
     expect(session.retry()).toBe(true);

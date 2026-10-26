@@ -5,9 +5,10 @@ import {
   transformBodyVertices,
 } from "./geometry";
 import {
+  archetypeOf,
   ENCOUNTER_CONFIG,
-  primaryArchetype,
   type EncounterConfig,
+  type EnemyArchetype,
 } from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
@@ -35,19 +36,15 @@ export type SimulationState = {
   config: EncounterConfig;
   debugSettings: DebugSettings;
   collisionBoundingRadiusTiles: number;
-  attackEpochSeconds: number;
-  volleysAtEpoch: number;
-  attackInitialDelaySeconds: number;
-  rotationEpochSeconds: number;
-  rotationPhaseAtEpoch: number;
   nextShardId: number;
+  nextEnemyId: number;
   rulesVersion: string;
   phase: "playing" | "ended";
   hitsTaken: number;
   player: PlayerState;
-  enemy: EnemyState;
+  /** Insertion-ordered so a fixed input sequence stays reproducible. */
+  enemies: EnemyState[];
   shards: ShardState[];
-  volleysFired: number;
   ticksElapsed: number;
   elapsedSeconds: number;
   accumulatorSeconds: number;
@@ -77,19 +74,40 @@ function boundingRadiusTiles(config: EncounterConfig): number {
     )
   );
 }
+/**
+ * Builds one enemy instance with its own attack and rotation clock anchored at
+ * its spawn time, so a later arrival serves its own initial cooldown.
+ */
+export function createEnemy(
+  config: EncounterConfig,
+  archetypeId: string,
+  id: number,
+  spawnedAtSeconds: number,
+  positionTiles?: Vector2,
+): EnemyState {
+  const archetype = archetypeOf(config, archetypeId);
+  return {
+    id,
+    archetypeId,
+    positionTiles: { ...(positionTiles ?? archetype.spawnTiles) },
+    emitterPhaseRadians: archetype.weapon.emitters.initialPhaseRadians,
+    spawnedAtSeconds,
+    attackEpochSeconds: spawnedAtSeconds,
+    volleysAtEpoch: 0,
+    attackInitialDelaySeconds: archetype.weapon.burst.initialCooldownSeconds,
+    rotationEpochSeconds: spawnedAtSeconds,
+    rotationPhaseAtEpoch: archetype.weapon.emitters.initialPhaseRadians,
+    volleysFired: 0,
+  };
+}
+
 export function createSimulation(): SimulationState {
   return {
     config: ENCOUNTER_CONFIG,
     debugSettings: DEFAULT_DEBUG_SETTINGS,
     collisionBoundingRadiusTiles: combinedBoundingRadiusTiles,
-    attackEpochSeconds: 0,
-    volleysAtEpoch: 0,
-    attackInitialDelaySeconds:
-      primaryArchetype(ENCOUNTER_CONFIG).weapon.burst.initialCooldownSeconds,
-    rotationEpochSeconds: 0,
-    rotationPhaseAtEpoch:
-      primaryArchetype(ENCOUNTER_CONFIG).weapon.emitters.initialPhaseRadians,
     nextShardId: 1,
+    nextEnemyId: 2,
     rulesVersion: ENCOUNTER_CONFIG.rulesVersion,
     phase: "playing",
     hitsTaken: 0,
@@ -98,13 +116,15 @@ export function createSimulation(): SimulationState {
       healthHp: PALADIN_STATS.healthHp,
       combatRemainingSeconds: 0,
     },
-    enemy: {
-      positionTiles: { ...primaryArchetype(ENCOUNTER_CONFIG).spawnTiles },
-      emitterPhaseRadians:
-        primaryArchetype(ENCOUNTER_CONFIG).weapon.emitters.initialPhaseRadians,
-    },
+    enemies: [
+      createEnemy(
+        ENCOUNTER_CONFIG,
+        ENCOUNTER_CONFIG.primaryArchetypeId,
+        1,
+        0,
+      ),
+    ],
     shards: [],
-    volleysFired: 0,
     ticksElapsed: 0,
     elapsedSeconds: 0,
     accumulatorSeconds: 0,
@@ -127,50 +147,71 @@ export function setDebugSettings(
   state.debugSettings = { ...settings };
   if (!isDefaultDebugSettings(settings))
     state.rulesVersion = DEBUG_RULES_VERSION;
-  if (
+  const rotationChanged =
     settings.rotationDegreesPerSecond !== previous.rotationDegreesPerSecond ||
-    settings.initialPhaseDegrees !== previous.initialPhaseDegrees
-  ) {
-    state.rotationEpochSeconds = state.elapsedSeconds;
-    state.rotationPhaseAtEpoch =
-      settings.initialPhaseDegrees !== previous.initialPhaseDegrees
-        ? primaryArchetype(config).weapon.emitters.initialPhaseRadians
-        : state.enemy.emitterPhaseRadians;
-    state.enemy.emitterPhaseRadians = state.rotationPhaseAtEpoch;
-  }
-  if (
+    settings.initialPhaseDegrees !== previous.initialPhaseDegrees;
+  const burstChanged =
     settings.shotsPerEmitter !== previous.shotsPerEmitter ||
     settings.shotIntervalSeconds !== previous.shotIntervalSeconds ||
     settings.cooldownSeconds !== previous.cooldownSeconds ||
-    settings.initialCooldownSeconds !== previous.initialCooldownSeconds
-  ) {
-    state.attackEpochSeconds = state.elapsedSeconds;
-    state.volleysAtEpoch = state.volleysFired;
-    state.attackInitialDelaySeconds =
-      state.volleysFired === 0
-        ? settings.initialCooldownSeconds
-        : settings.shotIntervalSeconds;
+    settings.initialCooldownSeconds !== previous.initialCooldownSeconds;
+  const spawnChanged =
+    settings.spawnX !== previous.spawnX || settings.spawnY !== previous.spawnY;
+  for (const enemy of state.enemies) {
+    const archetype = archetypeOf(config, enemy.archetypeId);
+    if (rotationChanged) {
+      enemy.rotationEpochSeconds = state.elapsedSeconds;
+      enemy.rotationPhaseAtEpoch =
+        settings.initialPhaseDegrees !== previous.initialPhaseDegrees
+          ? archetype.weapon.emitters.initialPhaseRadians
+          : enemy.emitterPhaseRadians;
+      enemy.emitterPhaseRadians = enemy.rotationPhaseAtEpoch;
+    }
+    if (burstChanged) {
+      enemy.attackEpochSeconds = state.elapsedSeconds;
+      enemy.volleysAtEpoch = enemy.volleysFired;
+      enemy.attackInitialDelaySeconds =
+        enemy.volleysFired === 0
+          ? settings.initialCooldownSeconds
+          : settings.shotIntervalSeconds;
+    }
+    if (spawnChanged) enemy.positionTiles = { ...archetype.spawnTiles };
+    enemy.positionTiles = constrainToArena(
+      enemy.positionTiles,
+      archetype.verticesTiles,
+    );
   }
-  if (
-    settings.spawnX !== previous.spawnX ||
-    settings.spawnY !== previous.spawnY
-  )
-    state.enemy.positionTiles = { ...primaryArchetype(config).spawnTiles };
   state.player.positionTiles = constrainToArena(
     state.player.positionTiles,
     config.player.verticesTiles,
   );
-  state.enemy.positionTiles = constrainToArena(
-    state.enemy.positionTiles,
-    primaryArchetype(config).verticesTiles,
-  );
   state.collisionBoundingRadiusTiles = boundingRadiusTiles(config);
-  state.shards = state.shards.filter((shard) => {
-    shard.reversalAgeSeconds = settings.reversalSeconds;
-    shard.lifetimeSeconds = settings.lifetimeSeconds;
+  state.shards = restampLiveShards(
+    state.shards,
+    archetypeOf(config, config.primaryArchetypeId).weapon,
+  );
+}
+
+/**
+ * Re-applies a weapon's fired-with values to shards already in flight and drops
+ * any that the new lifetime has already expired.
+ *
+ * Damage, reversal age and lifetime are one category - values a shard was fired
+ * with - so one rule governs all three (G09). This is the single write site for
+ * that category outside `updateEnemyAttacks`, which is why it is a named
+ * operation here rather than inline in the debug setter.
+ */
+export function restampLiveShards(
+  shards: readonly ShardState[],
+  weapon: EnemyArchetype["weapon"],
+): ShardState[] {
+  return shards.filter((shard) => {
+    shard.damageHp = weapon.shard.damageHp;
+    shard.reversalAgeSeconds = weapon.shard.reversalAgeSeconds;
+    shard.lifetimeSeconds = weapon.shard.lifetimeSeconds;
     if (shard.ageSeconds >= shard.reversalAgeSeconds) shard.hasReversed = true;
     const speed =
-      settings.projectileSpeedTilesPerSecond * (shard.hasReversed ? -1 : 1);
+      weapon.shard.speedTilesPerSecond * (shard.hasReversed ? -1 : 1);
     shard.velocityTilesPerSecond = {
       x: Math.cos(shard.orientationRadians) * speed,
       y: Math.sin(shard.orientationRadians) * speed,
@@ -210,36 +251,37 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
     config.player.verticesTiles,
   );
 
-  state.enemy.positionTiles = constrainToArena(
-    state.debugSettings.chaseArenaCenter
-      ? (() => {
-          const target = config.arena.centerTiles;
-          const deltaX = target.x - state.enemy.positionTiles.x;
-          const deltaY = target.y - state.enemy.positionTiles.y;
-          const length = Math.hypot(deltaX, deltaY);
-          const fraction =
-            length === 0
-              ? 0
-              : Math.min(
-                  1,
-                  (primaryArchetype(config).speedTilesPerSecond *
-                    stepSeconds) /
-                    length,
-                );
-          return {
-            x: state.enemy.positionTiles.x + deltaX * fraction,
-            y: state.enemy.positionTiles.y + deltaY * fraction,
-          };
-        })()
-      : pursueBody(
-          primaryArchetype(config).verticesTiles,
-          state.enemy.positionTiles,
-          config.player.verticesTiles,
-          state.player.positionTiles,
-          primaryArchetype(config).speedTilesPerSecond * stepSeconds,
-        ),
-    primaryArchetype(config).verticesTiles,
-  );
+  for (const enemy of state.enemies) {
+    const archetype = archetypeOf(config, enemy.archetypeId);
+    enemy.positionTiles = constrainToArena(
+      state.debugSettings.chaseArenaCenter
+        ? (() => {
+            const target = config.arena.centerTiles;
+            const deltaX = target.x - enemy.positionTiles.x;
+            const deltaY = target.y - enemy.positionTiles.y;
+            const length = Math.hypot(deltaX, deltaY);
+            const fraction =
+              length === 0
+                ? 0
+                : Math.min(
+                    1,
+                    (archetype.speedTilesPerSecond * stepSeconds) / length,
+                  );
+            return {
+              x: enemy.positionTiles.x + deltaX * fraction,
+              y: enemy.positionTiles.y + deltaY * fraction,
+            };
+          })()
+        : pursueBody(
+            archetype.verticesTiles,
+            enemy.positionTiles,
+            config.player.verticesTiles,
+            state.player.positionTiles,
+            archetype.speedTilesPerSecond * stepSeconds,
+          ),
+      archetype.verticesTiles,
+    );
+  }
 }
 
 function shardOverlapsPlayer(
@@ -248,7 +290,7 @@ function shardOverlapsPlayer(
   shardEnd: Vector2,
   playerStart: Vector2,
   playerEnd: Vector2,
-  orientationRadians: number,
+  shard: ShardState,
 ): boolean {
   const relativeStart = {
     x: shardStart.x - playerStart.x,
@@ -278,9 +320,9 @@ function shardOverlapsPlayer(
     return false;
   return sweptConvexOverlap(
     transformBodyVertices(
-      primaryArchetype(state.config).weapon.shard.verticesTiles,
+      archetypeOf(state.config, shard.archetypeId).weapon.shard.verticesTiles,
       shardStart,
-      orientationRadians,
+      shard.orientationRadians,
     ),
     { x: shardEnd.x - shardStart.x, y: shardEnd.y - shardStart.y },
     transformBodyVertices(state.config.player.verticesTiles, playerStart),
@@ -319,7 +361,7 @@ function moveShard(
       shard.positionTiles,
       playerStart,
       playerEnd,
-      shard.orientationRadians,
+      shard,
     )
   );
 }
@@ -386,10 +428,7 @@ function registerShardHit(
   acceptedHits: AcceptedHit[],
 ): void {
   if (state.debugSettings.godMode) return;
-  const damageHp = applyPlayerHit(
-    state.player,
-    primaryArchetype(state.config).weapon.shard.damageHp,
-  );
+  const damageHp = applyPlayerHit(state.player, shard.damageHp);
   if (damageHp === null) return;
   shard.hasHitPlayer = true;
   state.hitsTaken++;
@@ -403,10 +442,19 @@ function registerShardHit(
 
 function updateAttacks(state: SimulationState): void {
   const config = state.config;
-  const weapon = primaryArchetype(config).weapon;
-  state.enemy.emitterPhaseRadians =
-    (state.rotationPhaseAtEpoch +
-      ((state.elapsedSeconds - state.rotationEpochSeconds) *
+  for (const enemy of state.enemies) updateEnemyAttacks(state, config, enemy);
+}
+
+/** Advances one enemy's rotation and fires its volley when its clock is due. */
+function updateEnemyAttacks(
+  state: SimulationState,
+  config: EncounterConfig,
+  enemy: EnemyState,
+): void {
+  const weapon = archetypeOf(config, enemy.archetypeId).weapon;
+  enemy.emitterPhaseRadians =
+    (enemy.rotationPhaseAtEpoch +
+      ((state.elapsedSeconds - enemy.rotationEpochSeconds) *
         weapon.emitters.clockwiseDegreesPerSecond *
         Math.PI) /
         180) %
@@ -415,12 +463,12 @@ function updateAttacks(state: SimulationState): void {
   const burstGroupSeconds =
     (shotsPerEmitter - 1) * shotIntervalSeconds +
     weapon.burst.cooldownAfterLastShotSeconds;
-  const volleysSinceEpoch = state.volleysFired - state.volleysAtEpoch;
+  const volleysSinceEpoch = enemy.volleysFired - enemy.volleysAtEpoch;
   const groupIndex = Math.floor(volleysSinceEpoch / shotsPerEmitter);
   const shotIndex = volleysSinceEpoch % shotsPerEmitter;
   const nextShotSeconds =
-    state.attackEpochSeconds +
-    state.attackInitialDelaySeconds +
+    enemy.attackEpochSeconds +
+    enemy.attackInitialDelaySeconds +
     groupIndex * burstGroupSeconds +
     shotIndex * shotIntervalSeconds;
   const shotToleranceSeconds =
@@ -430,28 +478,30 @@ function updateAttacks(state: SimulationState): void {
   const { count, radiusTiles } = weapon.emitters;
   for (let emitter = 0; emitter < count; emitter++) {
     const angleRadians =
-      state.enemy.emitterPhaseRadians + (emitter * fullTurnRadians) / count;
+      enemy.emitterPhaseRadians + (emitter * fullTurnRadians) / count;
     const directionX = Math.cos(angleRadians);
     const directionY = Math.sin(angleRadians);
     state.shards.push({
       id: state.nextShardId++,
+      archetypeId: enemy.archetypeId,
       orientationRadians: angleRadians,
       positionTiles: {
-        x: state.enemy.positionTiles.x + directionX * radiusTiles,
-        y: state.enemy.positionTiles.y + directionY * radiusTiles,
+        x: enemy.positionTiles.x + directionX * radiusTiles,
+        y: enemy.positionTiles.y + directionY * radiusTiles,
       },
       velocityTilesPerSecond: {
         x: directionX * weapon.shard.speedTilesPerSecond,
         y: directionY * weapon.shard.speedTilesPerSecond,
       },
       ageSeconds: 0,
+      damageHp: weapon.shard.damageHp,
       reversalAgeSeconds: weapon.shard.reversalAgeSeconds,
       lifetimeSeconds: weapon.shard.lifetimeSeconds,
       hasReversed: false,
       hasHitPlayer: false,
     });
   }
-  state.volleysFired++;
+  enemy.volleysFired++;
 }
 
 export function advanceSimulation(
@@ -514,7 +564,7 @@ export function advanceSimulation(
             shard.positionTiles,
             state.player.positionTiles,
             state.player.positionTiles,
-            shard.orientationRadians,
+            shard,
           )
         )
           registerShardHit(state, shard, acceptedHits);

@@ -489,6 +489,8 @@ test("imports in Node and carries the comparison version in plain session snapsh
   expect(RULES_VERSION).toBe(ENCOUNTER_CONFIG.rulesVersion);
   const shard: ShardState = {
     id: 0,
+    archetypeId: "crystal-worm-child-head",
+    damageHp: 160,
     orientationRadians: 0,
     positionTiles: { x: 0, y: 0 },
     velocityTilesPerSecond: { x: 8, y: 0 },

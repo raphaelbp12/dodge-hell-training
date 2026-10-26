@@ -350,7 +350,7 @@ Debug defaults, slider ranges and every shipped gameplay value must be unchanged
 
 ### Step 16.1 - Make Enemy State A Collection With Its Own Attack Clock
 
-Status: pending. Dependencies: 15.4.
+Status: complete. Dependencies: 15.4.
 
 **Implementation prompt**
 
@@ -368,9 +368,18 @@ Do not add spawning, placement, concurrency caps or enemy-to-enemy interaction. 
 
 **Acceptance:** enemies are a collection with per-enemy clocks, exactly one enemy still exists at `t = 0`, a fixed input sequence reproduces the previous run's shard and hit timeline exactly, and all five gates pass.
 
+**Execution and verification - 2026-10-26**
+
+- `SimulationState.enemy` became `enemies: EnemyState[]` with `nextEnemyId`, and the six attack-clock fields - `attackEpochSeconds`, `volleysAtEpoch`, `attackInitialDelaySeconds`, `rotationEpochSeconds`, `rotationPhaseAtEpoch`, `volleysFired` - moved onto `EnemyState` alongside `id`, `archetypeId` and `spawnedAtSeconds`. They were never global; one enemy made them look that way. Added `createEnemy(config, archetypeId, id, spawnedAtSeconds, positionTiles?)`, which anchors each clock at its own spawn time so a later arrival serves its own initial cooldown.
+- `updateMovement`, `setDebugSettings` and `updateAttacks` now iterate `state.enemies` in insertion order; `updateEnemyAttacks` was extracted so one enemy's rotation and volley logic is a single named unit. The per-tick phase order is unchanged - player movement, enemy movement, shard advance and hit resolution, firing, regeneration.
+- `volleysFired` is deliberately not kept at the top level. A stored aggregate would duplicate state, so `inspect()` computes the total across enemies for diagnostics while unit tests read `state.enemies[0].volleysFired`. The e2e spec's existing `volleysFired` assertions needed no change.
+- `phaser/encounter.ts` draws every enemy, and the Playwright `Inspection` type now carries `enemies` and `nextEnemyId`.
+- Two new focused tests: `createSimulation` yields exactly one enemy with its clock anchored at zero and no clock fields left on the simulation; and a fixed 600-tick input sequence with alternating movement reproduces an identical timeline of volley counts, shard ids, health and hits across runs.
+- All five gates pass: typecheck, lint, 333 unit/component tests, build, 34 Chromium cases. No observable gameplay value changed - cadence, positions, damage and death times are held by the pre-existing exact assertions, including the 671-volley count and the 30/60/120 Hz equivalence test.
+
 ### Step 16.2 - Capture Shard Damage And Body At Fire Time
 
-Status: pending. Dependencies: 16.1.
+Status: complete. Dependencies: 16.1.
 
 **Implementation prompt**
 
@@ -386,9 +395,16 @@ Update the collision bounding radius to the maximum over archetypes rather than 
 
 **Acceptance:** shards carry their own damage and archetype, hit resolution no longer reads global config, the broadphase bound is archetype-safe, the re-stamp decision is recorded, and all five gates pass.
 
+**Execution and verification - 2026-10-26**
+
+- `ShardState` gained `archetypeId` and `damageHp`. These landed during 16.1 rather than here, because `updateEnemyAttacks` could not be rewritten per enemy without writing them at fire time; recorded as a pulled-forward dependency, not extra scope. `registerShardHit` now uses `shard.damageHp` instead of reading global config at hit time, and both the drawing body and the broadphase body resolve through `archetypeOf(config, shard.archetypeId)`. The bounding radius already took the maximum across archetypes from 15.3.
+- This step completes G09's second half. TDD: wrote the `restampLiveShards` test first and confirmed `restampLiveShards is not a function`, then extracted the operation out of `setDebugSettings`. It now owns the single write site for the fired-with category outside `updateEnemyAttacks`, covering damage, reversal age, lifetime, the `hasReversed` reconciliation, the velocity re-derivation and the expiry filter.
+- Damage now joins reversal age and lifetime, so a live damage edit applies to shards already in flight - the behaviour chosen in Q4. A second focused test drives it through `setDebugSettings` rather than the helper, proving the debug path end to end. No existing debug assertion needed weakening.
+- All five gates pass: typecheck, lint, 335 unit/component tests, build, 34 Chromium cases.
+
 ### Step 16.3 - Prove Many Enemies Work Without Spawning Them
 
-Status: pending. Dependencies: 16.2.
+Status: complete. Dependencies: 16.2.
 
 **Implementation prompt**
 
@@ -403,6 +419,14 @@ Also record the open questions phase 17 must answer before implementation: wheth
 **Focused checks:** the new multi-enemy tests, all passing, plus the full unit suite, typecheck, lint, build and `npm run test:e2e` to confirm no regression. Report the measured peak live shard count for the multi-enemy cases.
 
 **Acceptance:** multi-enemy behavior is proven by tests with one archetype and no spawn rule, the derived shard bound holds, phase 17's open questions are written down, and all five gates pass.
+
+**Execution and verification - 2026-10-26**
+
+- Added five tests only, no production feature. A local `withEnemies` helper builds extra instances through the public `createEnemy`, so no production API was widened and no internals were exported for tests.
+- Covered: each enemy fires on its own clock from its own `spawnedAtSeconds`, verified by a late arrival still at zero volleys while the original has already fired; every enemy pursues independently and stops at its own silhouette contact distance; shard ids stay unique across enemies; every enemy stays inside the arena under `constrainBodyToArena`; accepted hits stay once-per-shard with four enemies firing at one player; and live shards stay within the derived bound times the enemy count.
+- **Measured peak: 264 live shards with four enemies, against a derived bound of 264** - `liveShardBoundPerEnemy` is 66 for the shipped v3 cadence, so the bound is exactly tight rather than loose. Step 17.4 should assert against this derived value, and the existing browser bound of 88 is the single-enemy case.
+- Open questions recorded for phase 17, unanswered here as the step required: enemy-to-enemy overlap is settled by G16 (pass through), the ring tie-break by G15 (golden angle), and the undefined bearing at arena centre by G12 and G13 (seeded random among candidates), which G14 notes is the default opening rather than an edge case.
+- All five gates pass: typecheck, lint, 340 unit/component tests across ten files, build, 34 Chromium cases in 2.7 minutes.
 
 ## Phase 17: Timed Spawning
 

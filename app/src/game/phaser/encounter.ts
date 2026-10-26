@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { ENCOUNTER_CONFIG, primaryArchetype } from "../config/encounter";
+import { archetypeOf, ENCOUNTER_CONFIG } from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
   DEBUG_RULES_VERSION,
@@ -476,7 +476,7 @@ class EncounterScene extends Phaser.Scene {
   }
 
   private drawEntities(): void {
-    const { player, enemy, shards } = this.state;
+    const { player, enemies, shards } = this.state;
     this.bodies.clear();
     const draw = (
       graphics: Phaser.GameObjects.Graphics,
@@ -494,12 +494,14 @@ class EncounterScene extends Phaser.Scene {
       );
       graphics.fillStyle(color).fillPoints(points, true);
     };
-    draw(
-      this.bodies,
-      primaryArchetype(this.state.config).verticesTiles,
-      enemy.positionTiles,
-      presentation.enemy,
-    );
+    for (const enemy of enemies) {
+      draw(
+        this.bodies,
+        archetypeOf(this.state.config, enemy.archetypeId).verticesTiles,
+        enemy.positionTiles,
+        presentation.enemy,
+      );
+    }
     draw(
       this.bodies,
       this.state.config.player.verticesTiles,
@@ -510,7 +512,8 @@ class EncounterScene extends Phaser.Scene {
     for (const shard of shards) {
       draw(
         this.projectiles,
-        primaryArchetype(this.state.config).weapon.shard.verticesTiles,
+        archetypeOf(this.state.config, shard.archetypeId).weapon.shard
+          .verticesTiles,
         shard.positionTiles,
         shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
         shard.orientationRadians,
@@ -565,6 +568,10 @@ class EncounterScene extends Phaser.Scene {
   inspect() {
     return {
       ...structuredClone(this.state),
+      volleysFired: this.state.enemies.reduce(
+        (total, enemy) => total + enemy.volleysFired,
+        0,
+      ),
       paused: this.session.phase === "paused",
       sessionPhase: this.session.phase,
       attemptId: this.session.attemptId,

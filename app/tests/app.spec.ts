@@ -30,7 +30,8 @@ type Inspection = {
   elapsedSeconds: number;
   hitsTaken: number;
   player: PlayerState;
-  enemy: EnemyState;
+  enemies: EnemyState[];
+  nextEnemyId: number;
   shards: ShardState[];
   volleysFired: number;
   ticksElapsed: number;
@@ -287,7 +288,7 @@ for (const width of [1440, 390]) {
     await setRange("Spawn X", 4);
     await setRange("Spawn Y", 0);
     await expect
-      .poll(async () => (await inspect(page)).enemy.positionTiles)
+      .poll(async () => (await inspect(page)).enemies[0].positionTiles)
       .toEqual({ x: 4, y: 0 });
     const matchingBodies = await page.locator("canvas").evaluate((canvas) => {
       const image = document.createElement("canvas");
@@ -362,7 +363,7 @@ for (const width of [1440, 390]) {
     expect(protectedState.player.healthHp).toBe(775);
     expect(protectedState.audio.requests).toBe(0);
     expect(protectedState.shards.length).toBeGreaterThan(0);
-    expect(protectedState.enemy.positionTiles).toEqual({ x: 0, y: 0 });
+    expect(protectedState.enemies[0].positionTiles).toEqual({ x: 0, y: 0 });
     const debugPixels = await renderedPixels(page);
     expect(debugPixels.player).toBeGreaterThan(0);
     expect(debugPixels.shards).toBeGreaterThan(0);
@@ -847,7 +848,7 @@ test("Start countdown freezes world, focus pause preserves it, and R skips count
   expect(paused.elapsedSeconds).toBe(0);
   expect(paused.volleysFired).toBe(0);
   expect(paused.player.positionTiles).toEqual({ x: 0, y: 0 });
-  expect(paused.enemy.positionTiles).toEqual({ x: 0, y: -16.2 });
+  expect(paused.enemies[0].positionTiles).toEqual({ x: 0, y: -16.2 });
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page)).sessionPhase)
@@ -883,10 +884,21 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     healthHp: 775,
     combatRemainingSeconds: 0,
   });
-  expect(reset.enemy).toEqual({
-    positionTiles: { x: 0, y: -16.2 },
-    emitterPhaseRadians: 0,
-  });
+  expect(reset.enemies).toEqual([
+    {
+      id: 1,
+      archetypeId: "crystal-worm-child-head",
+      positionTiles: { x: 0, y: -16.2 },
+      emitterPhaseRadians: 0,
+      spawnedAtSeconds: 0,
+      attackEpochSeconds: 0,
+      volleysAtEpoch: 0,
+      attackInitialDelaySeconds: 2,
+      rotationEpochSeconds: 0,
+      rotationPhaseAtEpoch: 0,
+      volleysFired: 0,
+    },
+  ]);
   expect(reset.shards).toEqual([]);
   expect(reset.volleysFired).toBe(0);
   expect(reset.ticksElapsed).toBe(0);
@@ -1529,8 +1541,8 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
     .poll(async () => (await inspect(page)).volleysFired, { timeout: 6000 })
     .toBeGreaterThanOrEqual(4);
   const burst = await inspect(page);
-  expect(burst.enemy.positionTiles.y).toBeGreaterThan(
-    initial.enemy.positionTiles.y,
+  expect(burst.enemies[0].positionTiles.y).toBeGreaterThan(
+    initial.enemies[0].positionTiles.y,
   );
   expect(burst.shards.length).toBeGreaterThanOrEqual(16);
   await expect
@@ -1644,7 +1656,7 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
     await page.clock.runFor(250);
     const unchanged = (state: Inspection) => ({
       player: state.player,
-      enemy: state.enemy,
+      enemies: state.enemies,
       shards: state.shards,
       ticks: state.ticksElapsed,
       zoom: state.zoom,
