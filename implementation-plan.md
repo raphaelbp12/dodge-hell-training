@@ -557,7 +557,7 @@ Raise a bound only when the derived calculation justifies it, and never lower an
 
 ### Step 18.1 - Run The Full Acceptance Matrix
 
-Status: pending. Dependencies: 17.4.
+Status: complete. Dependencies: 17.4.
 
 **Implementation prompt**
 
@@ -571,9 +571,19 @@ Fix only regressions owned by this follow-up. Record unrelated findings - includ
 
 **Acceptance:** all five gates pass on the pinned toolchain with recorded counts and measurements, mixed-version history behaves correctly, and limitations are stated honestly. No publication implied.
 
+**Execution and verification - 2026-10-26**
+
+- **Run on the pinned toolchain.** Installed Node 24.22.1 through nvm and npm 12.2.1 globally, matching `.node-version` and `package.json`, then a clean `npm ci`. Earlier phases ran on Node 22.21.1 and said so; this acceptance run does not.
+- **All five gates pass on the pinned toolchain:** lint, typecheck, 356 unit/component tests across eleven files, production build, and 34 Chromium cases in 2.7 minutes.
+- **The frame-timing question from 17.4 is resolved, and it is not a regression.** The recorded baseline of median 16.7 ms, p95 16.7 ms and maximum 33.3 ms came from a different machine, so it was not a fair comparison. Measuring the pre-phase-15 commit `3857e5c` in a throwaway worktree on this same machine and the same pinned toolchain gives median 16 ms, p95 18 ms, maximum 98 ms over 3735 frames at a peak of 66 shards. The current build gives median 16 ms, p95 19 ms, maximum 113 ms over 3709 frames at a peak of 162 shards. On equal footing the median is unchanged, p95 is one millisecond higher, and the worst single gap is about 15 percent higher while carrying 2.45 times the live shards. The roughly 100 ms worst-case gap is a property of this machine, not of these phases. No budget was relaxed and no assertion weakened; the earlier 102 ms observation was reported honestly and has now been explained.
+- **Measured sustained run on the pinned toolchain**, 60 browser seconds with spawning active: 59.2 simulated seconds, 2 real deaths, 25 retries, 219 progress samples, peak 162 live shards against the derived 264 bound, peak 3 concurrent enemies against the cap of 4, peak 7 hit texts against 16, peak 1 audio voice against 4, one canvas and one keyboard listener throughout. The baseline run at the same settings recorded 0 deaths, confirming that timed spawning does raise the difficulty as intended.
+- Coverage confirmed across the feature set: data-layer rejection paths, archetype validation with the shipped-versus-structural rule split, multi-enemy cadence and independent pursuit, deterministic seeded spawning including the catch-up path, archetype-level debug with the new Spawns group and cap reduction, derived bounds, and mixed-version history spanning v1 through v4 with "Other rules" display and exclusion from the retained best.
+- **Out of scope, recorded not fixed.** These [principles review](principles-review.md) findings remain: F4, the `EncounterScene` responsibility split; F5, the simulation's four remaining global `ENCOUNTER_CONFIG` reads in `advanceSimulation` and `constrainToArena`, still latent rather than live; F6, the test-only `inspect()` instrumentation and `HitAudio` counters still present in the production bundle; F8, the palette duplicated between CSS strings and Phaser numbers and the unused `index.css` token system; F9, the duplicated storage load/degrade protocol. F1, F2, F3, F7, F10, F11 and F12 were addressed by phases 15 to 17.
+- **Limitations stated plainly.** Automated checks are not human visual or audible acceptance. No screenshots were reviewed by a person in this run; the suite's own pixel and layout assertions passed. Firefox, WebKit, touch input, screen readers and an axe audit remain unverified. Frame figures are observations on one machine, not cross-device guarantees. No deployment is claimed or implied.
+
 ### Step 18.2 - Update The Handoff Documentation
 
-Status: pending. Dependencies: 18.1.
+Status: complete. Dependencies: 18.1.
 
 **Implementation prompt**
 
@@ -584,6 +594,15 @@ State clearly which values are approved ROTMG-derived facts, which are trainer-s
 **Focused checks:** documentation structural checks, link integrity, version and value accuracy against the shipped data files, and confirmation that no runtime file changed.
 
 **Acceptance:** documentation matches the shipped runtime and data, provenance is preserved, authoring a new archetype is documented, and no deployment or approval is claimed that was not granted.
+
+**Execution and verification - 2026-10-26**
+
+- `README.md` now opens with a **Current V4 State** section covering the spawn rule and its approved values, the random opening bearing with the `?seed=` parameter, the unchanged weapon and arena policy, and the retained-but-excluded v1/v2/v3 history. An **Authored Data** subsection tables the four JSON files, says which file to edit for the arena, the enemy and spawning, and documents that adding a second archetype is pure data while being explicit that no second archetype's gameplay values are approved. A **V4 Verification** subsection records the pinned-toolchain gate run and the frame-timing comparison.
+- Recorded in the README that the geometry study is retired, that its source dimensions never affected a shipped vertex because bodies scale from a normalized outline, and that its conclusions remain in the mechanics contract even though the code is gone.
+- The Home changelog gained a 26 Oct 2026 entry in player-facing language - heads arriving over time, data-authored arena and enemies with `?seed=` replay, and the new comparison identity - preserving the earlier entries.
+- [The mechanics contract](docs/mechanics.md) keeps the additive V4 Swarm Contract written in step 17.1; v1, v2 and v3 provenance is untouched.
+- **Link integrity repaired.** Deleting the study broke ten markdown links across `README.md`, `docs/mechanics.md` and the v2 archive. Historical prose keeps its wording, with each dead link converted to a plain code reference marked retired, rather than rewriting history or leaving broken links. Every relative link in the plan, both archives, the README, the principles review, the mechanics and fixes documents and all four instruction files now resolves on disk.
+- No runtime behaviour changed by this step. Re-ran all five gates on the pinned toolchain after the changelog edit: lint, typecheck, 356 unit/component tests, build and 34 Chromium cases. No deployment is claimed; publication remains a separate authorized step.
 
 ## Customization Choice
 

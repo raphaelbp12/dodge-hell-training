@@ -2,15 +2,42 @@
 
 A pure-frontend bullet-hell practice game targeting repeated survival training against the Crystal Worm Child Head from Realm of the Mad God.
 
-## Current V3 State
+## Current V4 State
 
-The preset is `crystal-worm-child-head-paladin-v3`. On 2026-10-25 the user explicitly requested that **Load selected values** become the normal defaults: player and head 1.25x1.25 tiles; six emitters at 0.35 tiles; eleven shots at 0.19-second intervals; 3-second cooldown after the last shot; 2-second initial cooldown; projectiles 1.45x0.65 tiles, 160 HP damage, 8 tiles/s, reversing at 1.5 seconds and expiring at 3 seconds. Phase stays zero and clockwise rotation stays 45 degrees/s. Chase speed/spawn, arena, Paladin stats, camera and collision policies are unchanged. These are user-selected trainer values, not new ROTMG fidelity claims.
+The preset is `crystal-worm-child-swarm-paladin-v4`. On 2026-10-26 the user approved timed enemy spawning: the opening enemy arrives at `t = 0` and further Crystal Worm Child Heads join every 10 seconds up to four at once, each on the spawn ring at `0.84375` of the arena radius - exactly 16.2 tiles, the historical spawn distance. Each arrival is placed diametrically opposite the player's bearing from the arena centre, offset by the golden angle per concurrent spawn so two never share a point. Enemies pass through each other, never despawn, and each fires on its own clock from its own spawn time, serving its own initial cooldown. Death remains the only end condition.
 
-Normal Start/Retry and Reset defaults now use these values without opening Debug. Match player to head is enabled by default. Loading the same values does not mark an untouched attempt as debug; actual deviations still do. Existing v1/v2 records are retained but excluded from the v3 personal best. This promotion is a local follow-up; the v2 deployment evidence below does not verify v3 publication.
+**The opening bearing is now random.** The player stands exactly at the arena centre at `t = 0`, so "farthest from the player" is undefined there, and the direction is drawn from a seeded generator. This supersedes the v2/v3 statement that the enemy starts due north at `(0, -16.2)`; the distance is unchanged and only the bearing varies. Append `?seed=<integer>` to the URL to pin placement and reproduce or share a run.
 
-Local v3 verification on 2026-10-25 passed 327 unit/component tests, typecheck, lint, build and all 34 Chromium cases with one worker and no retries. Coverage includes normal selected-value startup, scoring eligibility after loading unchanged defaults, retained-but-incompatible v2 history, six-emitter fixed-tick scheduling, matching body dimensions and the new player wall extent. The first browser runs exposed a historical wall-coordinate assertion and a first-volley head-pixel sampling race; both were corrected before the complete passing run. The existing Phaser chunk-size warning remains nonblocking. These default-promotion changes are not committed, pushed or live-verified.
+Weapon, body, arena, Paladin stats, camera and collision policies are unchanged from v3: player and head 1.25x1.25 tiles; six emitters at 0.35 tiles; eleven shots at 0.19-second intervals; 3-second cooldown after the last shot; 2-second initial cooldown; projectiles 1.45x0.65 tiles, 160 HP damage, 8 tiles/s, reversing at 1.5 seconds and expiring at 3 seconds; phase zero and clockwise rotation 45 degrees/s. The arena stays 19.2 tiles: the `fixes.md` request for an arena at double the enemy's reach is superseded, since shipped reach is `0.35 + 8 * 1.5 = 12.35` tiles. These are user-selected trainer values, not new ROTMG fidelity claims.
 
-[The v2 archive](docs/implementation-plan-v2.md) records actual execution. Step 14.1 passed all five gates on 2026-10-25: 292 unit/component tests and 27 Chromium cases. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
+v1, v2 and v3 records are retained, shown as **Other rules** and excluded from the v4 personal best. No history schema change was needed.
+
+### Authored Data
+
+Gameplay values are authored as JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`, because `strict` is not enabled and the compiler cannot reject a missing or mistyped field. A malformed data file throws at module load rather than falling back.
+
+| File | Holds |
+| --- | --- |
+| `shapes.json` | Named convex outlines normalized to a 1x1 tile box |
+| `arena.json` | Circular arena centre and radius, in tiles |
+| `enemies.json` | Enemy archetypes keyed by id: body, movement and weapon |
+| `encounter.json` | Rules version, primary archetype, simulation, player, spawns, camera, session |
+
+**To change the arena,** edit `arena.json`. **To retune the enemy,** edit its archetype in `enemies.json`. **To change spawning,** edit `encounter.json`'s `spawns` block. All derivation - outline scaling, degrees to radians, derived bounds - happens in one loader, so there is no second mapping to keep in sync.
+
+**To add a second enemy kind,** add another entry to `enemies.json` and point `spawns.archetype` at it. The data layer already models archetypes as a keyed collection and the simulation already carries per-enemy archetype references, so this is pure data. **No second archetype's gameplay values are approved**: a new enemy needs its own research and approval before it ships, exactly as the head did.
+
+The pixel-measurement geometry study that originally derived these shapes is retired. Its source dimensions never affected a shipped vertex, because bodies scale from a normalized outline, so the measurements cancelled out. Its conclusions remain recorded in [the mechanics contract](docs/mechanics.md); only the code is gone.
+
+### V4 Verification
+
+Local v4 verification on 2026-10-26 ran all five gates on the pinned toolchain, Node 24.22.1 and npm 12.2.1: 356 unit/component tests across eleven files, typecheck, lint, production build and all 34 Chromium cases. A 60-second sustained browser run with spawning active and 25 retries measured a peak of 162 live shards against a derived bound of 264, a peak of 3 concurrent enemies against the cap of 4, 7 hit texts against 16 and 1 audio voice against 4, with one canvas and one keyboard listener throughout.
+
+Frame timing measured median 16 ms, p95 19 ms and a worst gap of 113 ms over 3709 frames. For a fair comparison the pre-change commit `3857e5c` was measured on the same machine and toolchain: median 16 ms, p95 18 ms, worst gap 98 ms over 3735 frames at a peak of 66 shards. The median is unchanged and the worst gap is about 15 percent higher while carrying 2.45 times the live shards, so the roughly 100 ms worst case is a property of this machine rather than of spawning. The earlier recorded 33.3 ms maximum came from a different machine and is not comparable.
+
+No human visual or audible acceptance was performed in this run, and no deployment is claimed. Firefox, WebKit, touch input, screen readers and an axe audit remain unverified. These v4 changes are committed and pushed; the v2 deployment evidence below does not verify v4 publication.
+
+[The v2 archive](docs/implementation-plan-v2.md) records phases 8-14. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
 
 Site: https://raphaelbp12.github.io/dodge-hell-training/. **V2 live-verified on 2026-10-25** at runtime commit `e12f3fe4742cb9d02374f07563192dcc5a727b72`: [Actions run 40193885409](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40193885409), all six jobs successful, Pages deployment `7313260767` and both hosted Chromium checks passed. All four emitted files match the tested local build byte-for-byte. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage. Fresh local preview: http://127.0.0.1:5177/dodge-hell-training/.
 
@@ -38,7 +65,7 @@ The latest values and matched-player follow-up passed 323 unit/component tests, 
 
 This section preserves the historical v2 contract. The selected v3 defaults above supersede its tuning and body dimensions; the other mechanics remain unchanged.
 
-[The mechanics contract](docs/mechanics.md#implemented-v2-handoff) records provenance and fidelity limits. [Canonical geometry](app/src/game/config/geometry-candidate.ts), [encounter config](app/src/game/config/encounter.ts) and [pure geometry](app/src/game/simulation/geometry.ts) own the implementation.
+[The mechanics contract](docs/mechanics.md#implemented-v2-handoff) records provenance and fidelity limits. Canonical geometry (`app/src/game/config/geometry-candidate.ts`, retired), [encounter config](app/src/game/config/encounter.ts) and [pure geometry](app/src/game/simulation/geometry.ts) own the implementation.
 
 | Quantity            | Implemented Value                                                                                                          |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |

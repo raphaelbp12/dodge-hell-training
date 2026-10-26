@@ -551,6 +551,21 @@ export default function App() {
                 aria-labelledby="changelog-title"
               >
                 <h2 id="changelog-title">Changelog</h2>
+                <time dateTime="2026-10-26">26 Oct 2026</time>
+                <ul>
+                  <li>
+                    Heads now arrive over time, up to four at once, each firing
+                    on its own clock.
+                  </li>
+                  <li>
+                    Arena and enemies are authored as data; add{" "}
+                    <code>?seed=</code> to replay an opening.
+                  </li>
+                  <li>
+                    New comparison identity; earlier records are kept as other
+                    rules.
+                  </li>
+                </ul>
                 <time dateTime="2026-10-25">25 Oct 2026</time>
                 <ul>
                   <li>
