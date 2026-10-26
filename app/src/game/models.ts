@@ -58,13 +58,3 @@ export type ShardState = {
 
 export type SessionPhase =
   "home" | "countdown" | "playing" | "paused" | "ended";
-
-export type SessionSnapshot = Readonly<{
-  rulesVersion: string;
-  phase: SessionPhase;
-  elapsedSeconds: number;
-  hitsTaken: number;
-  player: Readonly<PlayerState>;
-  enemy: Readonly<EnemyState>;
-  shards: readonly Readonly<ShardState>[];
-}>;

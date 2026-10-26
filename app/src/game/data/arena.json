@@ -1,0 +1,5 @@
+{
+  "comment": "Circular arena in tiles. Radius 19.2 is the approved v2 calibration value, retained by G10.",
+  "centerTiles": { "x": 0, "y": 0 },
+  "radiusTiles": 19.2
+}

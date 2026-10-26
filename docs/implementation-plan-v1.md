@@ -1,6 +1,6 @@
 # V1 Implementation Plan Archive
 
-Historical v1 design, completed phases 1-7 and original execution evidence, archived on 2026-10-25. Read [the active implementation plan](../implementation-plan.md) for pending work and current decisions. This archive is evidence, not a queue of steps to rerun. Preserve historical blocked attempts alongside their later resolution; step 7.2 is complete under its recorded delegated technical acceptance.
+Historical v1 design, completed phases 1-7 and original execution evidence, archived on 2026-10-25. Read [the active implementation plan](../implementation-plan.md) for pending work and current decisions, and [the v2 archive](implementation-plan-v2.md) for completed phases 8-14. This archive is evidence, not a queue of steps to rerun. Preserve historical blocked attempts alongside their later resolution; step 7.2 is complete under its recorded delegated technical acceptance.
 
 ## Confirmed Design
 

@@ -1,16 +1,58 @@
 import { expect, test } from "vitest";
-import { V2_GEOMETRY_CANDIDATE } from "../config/geometry-candidate";
+import {
+  ENCOUNTER_CONFIG,
+  primaryArchetype,
+} from "../config/encounter";
 import type { Vector2 } from "../models";
 import {
   constrainBodyToArena,
   convexBodyFitsCircle,
   convexContactDistance,
-  deriveShardTiming,
   maximumBodyCenterDistance,
   pursueBody,
   sweptConvexOverlap,
   transformBodyVertices,
 } from "./geometry";
+
+// Local fixture bodies at the historical review scale. They exercise the
+// geometry kernel against larger, non-square silhouettes than the shipped
+// 1.25 x 1.25 encounter bodies, and the expected contact distances and radii
+// asserted below are properties of these shapes. The retired geometry study
+// (G01) built its bodies the same way; this is test-local fixture
+// construction, not production derivation. Provenance: docs/mechanics.md 8.2.
+const fixturePixelsPerTile = 435.118 / 19.2;
+const scaleFixture = (
+  outline: readonly (readonly [number, number])[],
+  widthPixels: number,
+  heightPixels: number,
+): readonly Vector2[] =>
+  outline.map(([horizontal, vertical]) => ({
+    x: (horizontal * widthPixels) / fixturePixelsPerTile,
+    y: (vertical * heightPixels) / fixturePixelsPerTile,
+  }));
+const beveledFixtureOutline = [
+  [-0.3, -0.5],
+  [0.3, -0.5],
+  [0.5, -0.3],
+  [0.5, 0.3],
+  [0.3, 0.5],
+  [-0.3, 0.5],
+  [-0.5, 0.3],
+  [-0.5, -0.3],
+] as const;
+const shardFixtureOutline = [
+  [0.5, 0],
+  [0.25, 0.5],
+  [-0.25, 0.5],
+  [-0.5, 0],
+  [-0.25, -0.5],
+  [0.25, -0.5],
+] as const;
+const fixtureBodies = {
+  player: { verticesTiles: scaleFixture(beveledFixtureOutline, 36, 33) },
+  head: { verticesTiles: scaleFixture(beveledFixtureOutline, 42, 55) },
+  shard: { verticesTiles: scaleFixture(shardFixtureOutline, 56.576, 34.66) },
+};
 
 const square: readonly Vector2[] = [
   { x: -0.5, y: -0.5 },
@@ -31,7 +73,7 @@ type SweepCase = Readonly<{
 
 test("transforms the shared vertices by rotation then translation without mutating them", () => {
   const original = structuredClone(
-    V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles,
+    fixtureBodies.shard.verticesTiles,
   );
   const transformed = transformBodyVertices(
     original,
@@ -43,7 +85,7 @@ test("transforms the shared vertices by rotation then translation without mutati
     expect(vertex.y).toBeCloseTo(-3 + original[index].x, 12);
     expect(Object.getPrototypeOf(vertex)).toBe(Object.prototype);
   });
-  expect(original).toEqual(V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles);
+  expect(original).toEqual(fixtureBodies.shard.verticesTiles);
 });
 
 test.each<SweepCase>([
@@ -218,8 +260,8 @@ test("uses axes from both bodies instead of accepting world-axis overlap", () =>
 });
 
 test("rejects enclosing-circle overlap for the approved player and elongated shard", () => {
-  const player = V2_GEOMETRY_CANDIDATE.bodies.player.verticesTiles;
-  const shard = V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles;
+  const player = fixtureBodies.player.verticesTiles;
+  const shard = fixtureBodies.shard.verticesTiles;
   const radius = (vertices: readonly Vector2[]) =>
     Math.max(...vertices.map((vertex) => Math.hypot(vertex.x, vertex.y)));
   expect(radius(player) + radius(shard)).toBeGreaterThan(2);
@@ -241,7 +283,7 @@ test.each([0, 0.37, Math.PI / 2, 2.2])(
       y: vector.x * Math.sin(angle) + vector.y * Math.cos(angle),
     });
     const player = transformBodyVertices(
-      V2_GEOMETRY_CANDIDATE.bodies.player.verticesTiles,
+      fixtureBodies.player.verticesTiles,
       stationary,
       angle,
     );
@@ -250,7 +292,7 @@ test.each([0, 0.37, Math.PI / 2, 2.2])(
       [3, false],
     ] as const) {
       const shard = transformBodyVertices(
-        V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles,
+        fixtureBodies.shard.verticesTiles,
         rotate({ x: -5, y: height }),
         angle,
       );
@@ -505,21 +547,17 @@ test("rejects outward movement while retaining tangential edge movement over rep
 });
 
 test("fits the approved north spawn and constrains both approved upright bodies", () => {
-  const candidate = V2_GEOMETRY_CANDIDATE;
-  const approvedArena = {
-    centerTiles: stationary,
-    radiusTiles: candidate.arenaRadiusTiles,
-  };
+  const approvedArena = ENCOUNTER_CONFIG.arena;
   expect(
     convexBodyFitsCircle(
       transformBodyVertices(
-        candidate.bodies.head.verticesTiles,
-        candidate.enemySpawnTiles,
+        primaryArchetype(ENCOUNTER_CONFIG).verticesTiles,
+        primaryArchetype(ENCOUNTER_CONFIG).spawnTiles,
       ),
       approvedArena,
     ),
   ).toBe(true);
-  for (const body of [candidate.bodies.player, candidate.bodies.head]) {
+  for (const body of [ENCOUNTER_CONFIG.player, primaryArchetype(ENCOUNTER_CONFIG)]) {
     for (const direction of [
       { x: 30, y: 0 },
       { x: 0, y: -30 },
@@ -588,7 +626,7 @@ test.each([
 ])(
   "stops pursuit at shared-silhouette contact for $direction",
   ({ direction, expected }) => {
-    const { player, head } = V2_GEOMETRY_CANDIDATE.bodies;
+    const { player, head } = fixtureBodies;
     expect(
       convexContactDistance(
         player.verticesTiles,
@@ -645,7 +683,7 @@ test.each([
 );
 
 test("limits pursuit travel without pushing already-overlapping or coincident bodies apart", () => {
-  const { player, head } = V2_GEOMETRY_CANDIDATE.bodies;
+  const { player, head } = fixtureBodies;
   const start = { x: 8, y: 6 };
   const moved = pursueBody(
     head.verticesTiles,
@@ -680,13 +718,15 @@ test("limits pursuit travel without pushing already-overlapping or coincident bo
   expect(
     pursueBody(head.verticesTiles, target, player.verticesTiles, target, 1),
   ).toBe(target);
-  const near = {
-    x: V2_GEOMETRY_CANDIDATE.pursuit.eastSeparationTiles + 0.001,
-    y: 0,
-  };
+  const eastSeparationTiles = convexContactDistance(
+    player.verticesTiles,
+    head.verticesTiles,
+    { x: 1, y: 0 },
+  );
+  const near = { x: eastSeparationTiles + 0.001, y: 0 };
   expect(
     pursueBody(head.verticesTiles, near, player.verticesTiles, stationary, 1).x,
-  ).toBeCloseTo(V2_GEOMETRY_CANDIDATE.pursuit.eastSeparationTiles, 12);
+  ).toBeCloseTo(eastSeparationTiles, 12);
 });
 
 test("rejects invalid pursuit inputs even at coincident centers", () => {
@@ -716,115 +756,6 @@ test("rejects invalid pursuit inputs even at coincident centers", () => {
     ).toThrow(RangeError);
     expect(() =>
       pursueBody(square, stationary, vertices, stationary, 1),
-    ).toThrow(RangeError);
-  }
-});
-
-test.each([0, 0.37, Math.PI / 2, 2.2])(
-  "shares exact leading-edge timing across firing rotation %s",
-  (angle) => {
-    const candidate = V2_GEOMETRY_CANDIDATE;
-    const direction = { x: Math.cos(angle), y: Math.sin(angle) };
-    const vertices = transformBodyVertices(
-      candidate.bodies.shard.verticesTiles,
-      stationary,
-      angle,
-    );
-    const timing = deriveShardTiming(
-      vertices,
-      direction,
-      candidate.arenaRadiusTiles,
-      candidate.emitterOffsetTiles,
-      candidate.shardSpeedTilesPerSecond,
-    );
-    expect(timing.maximumCenterDistanceTiles).toBeCloseTo(
-      candidate.maximumShardCenterDistanceTiles,
-      12,
-    );
-    expect(timing.reversalAgeSeconds).toBeCloseTo(2.2208044714307382, 12);
-    expect(timing.lifetimeSeconds).toBeCloseTo(4.4416089428614765, 12);
-    expect(timing.centerTravelTiles).toBeCloseTo(
-      timing.maximumCenterDistanceTiles - candidate.emitterOffsetTiles,
-      12,
-    );
-    const positionAt = (distance: number) => ({
-      x: direction.x * distance,
-      y: direction.y * distance,
-    });
-    const approvedArena = {
-      centerTiles: stationary,
-      radiusTiles: candidate.arenaRadiusTiles,
-    };
-    expect(
-      convexBodyFitsCircle(
-        transformBodyVertices(
-          vertices,
-          positionAt(candidate.emitterOffsetTiles),
-        ),
-        approvedArena,
-      ),
-    ).toBe(true);
-    expect(
-      convexBodyFitsCircle(
-        transformBodyVertices(
-          vertices,
-          positionAt(timing.maximumCenterDistanceTiles),
-        ),
-        approvedArena,
-      ),
-    ).toBe(true);
-    expect(
-      convexBodyFitsCircle(
-        transformBodyVertices(
-          vertices,
-          positionAt(timing.maximumCenterDistanceTiles + 0.000001),
-        ),
-        approvedArena,
-      ),
-    ).toBe(false);
-    const zeroOffset = deriveShardTiming(
-      vertices,
-      direction,
-      candidate.arenaRadiusTiles,
-      0,
-      candidate.shardSpeedTilesPerSecond,
-    );
-    expect(
-      zeroOffset.reversalAgeSeconds * candidate.shardSpeedTilesPerSecond,
-    ).toBeCloseTo(timing.maximumCenterDistanceTiles, 12);
-  },
-);
-
-test("rejects invalid emission, speed and nonpositive travel in reach derivation", () => {
-  const candidate = V2_GEOMETRY_CANDIDATE;
-  const vertices = candidate.bodies.shard.verticesTiles;
-  const direction = { x: 1, y: 0 };
-  for (const offset of [
-    -1,
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-    candidate.maximumShardCenterDistanceTiles,
-    candidate.maximumShardCenterDistanceTiles + 1,
-  ]) {
-    expect(() =>
-      deriveShardTiming(
-        vertices,
-        direction,
-        candidate.arenaRadiusTiles,
-        offset,
-        8,
-      ),
-    ).toThrow(RangeError);
-  }
-  for (const speed of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
-    expect(() =>
-      deriveShardTiming(
-        vertices,
-        direction,
-        candidate.arenaRadiusTiles,
-        0,
-        speed,
-      ),
     ).toThrow(RangeError);
   }
 });

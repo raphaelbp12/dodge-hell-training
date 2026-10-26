@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
-import { V2_GEOMETRY_CANDIDATE } from "./geometry-candidate";
 import {
+  DEBUG_GROUPS,
   DEBUG_PARAMETERS,
+  DEBUG_RULES_VERSION,
+  DEBUG_TOGGLES,
   DEFAULT_DEBUG_SETTINGS,
   debugEncounterConfig,
   updateDebugParameter,
@@ -10,12 +12,19 @@ import {
   loadSelectedDebugValues,
   isDefaultDebugSettings,
 } from "./debug";
-import type { SessionSnapshot } from "../models";
+import type { ShardState } from "../models";
 import {
+  AUTHORED_TUNING,
+  bodyExtentTiles,
+  buildEncounterConfig,
   ENCOUNTER_CONFIG,
+  liveShardBoundPerEnemy,
+  primaryArchetype,
   RULES_VERSION,
   validateEncounterConfig,
-  scaleBody,
+  validateShippedEncounter,
+  type EncounterConfig,
+  type EnemyArchetype,
 } from "./encounter";
 import {
   PALADIN_BASE_STATS,
@@ -28,6 +37,51 @@ import {
   calculateCombatDurationSeconds,
   derivePlayerStats,
 } from "./stats";
+
+const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
+
+/** ENCOUNTER_CONFIG with the primary archetype partially overridden. */
+const withArchetype = (
+  overrides: Partial<EnemyArchetype>,
+): EncounterConfig => ({
+  ...ENCOUNTER_CONFIG,
+  archetypes: { [PRIMARY.id]: { ...PRIMARY, ...overrides } },
+});
+
+/** ENCOUNTER_CONFIG with one weapon section of the primary archetype overridden. */
+const withWeapon = (
+  section: "emitters" | "burst" | "shard",
+  overrides: Record<string, unknown>,
+): EncounterConfig =>
+  withArchetype({
+    weapon: {
+      ...PRIMARY.weapon,
+      [section]: { ...PRIMARY.weapon[section], ...overrides },
+    } as EnemyArchetype["weapon"],
+  });
+
+// Approved shipped geometry, in tiles. The player and head bodies are the same
+// beveled octagon at the same 1.25 x 1.25 size, so their vertices are identical.
+// Provenance: docs/mechanics.md step 8.2.
+const BEVELED_BODY_1_25_TILES = [
+  { x: -0.375, y: -0.625 },
+  { x: 0.375, y: -0.625 },
+  { x: 0.625, y: -0.375 },
+  { x: 0.625, y: 0.375 },
+  { x: 0.375, y: 0.625 },
+  { x: -0.375, y: 0.625 },
+  { x: -0.625, y: 0.375 },
+  { x: -0.625, y: -0.375 },
+];
+
+const SHARD_BODY_TILES = [
+  { x: 0.725, y: 0 },
+  { x: 0.3625, y: 0.325 },
+  { x: -0.3625, y: 0.325 },
+  { x: -0.725, y: 0 },
+  { x: -0.3625, y: -0.325 },
+  { x: 0.3625, y: -0.325 },
+];
 
 test("selected values are the normal scoring-eligible defaults", () => {
   expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
@@ -46,8 +100,8 @@ test("selected values are the normal scoring-eligible defaults", () => {
 
 test("loads all screenshot-selected values without changing omitted settings", () => {
   expect(SELECTED_DEBUG_VALUES).toEqual({
-    enemyWidth: 1.25,
-    enemyHeight: 1.25,
+    headWidth: 1.25,
+    headHeight: 1.25,
     emitterCount: 6,
     emitterRadiusTiles: 0.35,
     initialPhaseDegrees: 0,
@@ -77,10 +131,12 @@ test("loads all screenshot-selected values without changing omitted settings", (
     ...SELECTED_DEBUG_VALUES,
     matchPlayerToHead: true,
   });
-  expect(previous.enemyWidth).toBe(DEFAULT_DEBUG_SETTINGS.enemyWidth);
+  expect(previous.headWidth).toBe(DEFAULT_DEBUG_SETTINGS.headWidth);
   expect(() => validateDebugSettings(selected)).not.toThrow();
-  expect(debugEncounterConfig(selected).emitters.count).toBe(6);
-  expect(ENCOUNTER_CONFIG.emitters.count).toBe(6);
+  expect(
+    primaryArchetype(debugEncounterConfig(selected)).weapon.emitters.count,
+  ).toBe(6);
+  expect(PRIMARY.weapon.emitters.count).toBe(6);
   expect(DEFAULT_DEBUG_SETTINGS.cooldownSeconds).toBe(3);
 });
 
@@ -88,7 +144,7 @@ test("the selected preset matches the player body to the head and follows live s
   const selected = loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS);
   for (const settings of [
     selected,
-    updateDebugParameter(selected, "enemyWidth", 2),
+    updateDebugParameter(selected, "headWidth", 2),
   ]) {
     const config = debugEncounterConfig(settings);
     for (const axis of ["x", "y"] as const) {
@@ -96,11 +152,11 @@ test("the selected preset matches the player body to the head and follows live s
         Math.max(...vertices.map((vertex) => vertex[axis])) -
         Math.min(...vertices.map((vertex) => vertex[axis]));
       expect(size(config.player.verticesTiles)).toBeCloseTo(
-        size(config.enemy.verticesTiles),
+        size(primaryArchetype(config).verticesTiles),
         12,
       );
       expect(size(config.player.verticesTiles)).toBeCloseTo(
-        axis === "x" ? settings.enemyWidth : 1.25,
+        axis === "x" ? settings.headWidth : 1.25,
         12,
       );
     }
@@ -145,7 +201,7 @@ test("debug timing remains ordered while lifetime and reversal sliders cross", (
   expect(longer.lifetimeSeconds).toBeGreaterThan(8);
   const shorter = updateDebugParameter(longer, "lifetimeSeconds", 0.1);
   expect(shorter.reversalSeconds).toBe(0.05);
-  expect(ENCOUNTER_CONFIG.shard.lifetimeSeconds).toBe(
+  expect(PRIMARY.weapon.shard.lifetimeSeconds).toBe(
     DEFAULT_DEBUG_SETTINGS.lifetimeSeconds,
   );
   expect(() =>
@@ -200,7 +256,7 @@ test("derives the approved speed, fractional regeneration, combat duration and t
   expect(PALADIN_DERIVED_STATS.combatDurationSeconds).toBeCloseTo(5.32);
   expect(PALADIN_DERIVED_STATS.combatTriggerHp).toBe(27);
   expect(
-    calculateDamageHp(ENCOUNTER_CONFIG.shard.damageHp, PALADIN_STATS.defense),
+    calculateDamageHp(PRIMARY.weapon.shard.damageHp, PALADIN_STATS.defense),
   ).toBe(128);
 });
 
@@ -299,48 +355,43 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   });
   expect(ENCOUNTER_CONFIG.player).toEqual({
     spawnTiles: { x: 0, y: 0 },
-    verticesTiles: scaleBody(
-      V2_GEOMETRY_CANDIDATE.bodies.player.verticesTiles,
-      1.25,
-      1.25,
-    ),
+    verticesTiles: BEVELED_BODY_1_25_TILES,
   });
-  expect(ENCOUNTER_CONFIG.enemy).toEqual({
+  expect(Object.keys(ENCOUNTER_CONFIG.archetypes)).toEqual([
+    "crystal-worm-child-head",
+  ]);
+  expect(ENCOUNTER_CONFIG.primaryArchetypeId).toBe("crystal-worm-child-head");
+  expect(PRIMARY).toEqual({
+    id: "crystal-worm-child-head",
     spawnTiles: { x: 0, y: -16.2 },
-    verticesTiles: scaleBody(
-      V2_GEOMETRY_CANDIDATE.bodies.head.verticesTiles,
-      1.25,
-      1.25,
-    ),
+    verticesTiles: BEVELED_BODY_1_25_TILES,
     speedTilesPerSecond: 1.5,
     contactDamageHp: 0,
     blocksPlayer: false,
-  });
-  expect(ENCOUNTER_CONFIG.emitters).toEqual({
-    count: 6,
-    radiusTiles: 0.35,
-    initialPhaseRadians: 0,
-    clockwiseDegreesPerSecond: 45,
-    rotateDuringCooldown: true,
-  });
-  expect(ENCOUNTER_CONFIG.burst).toEqual({
-    shotsPerEmitter: 11,
-    shotIntervalSeconds: 0.19,
-    cooldownAfterLastShotSeconds: 3,
-    initialCooldownSeconds: 2,
-  });
-  expect(ENCOUNTER_CONFIG.shard).toEqual({
-    damageHp: 160,
-    speedTilesPerSecond: 8,
-    verticesTiles: scaleBody(
-      V2_GEOMETRY_CANDIDATE.bodies.shard.verticesTiles,
-      1.45,
-      0.65,
-    ),
-    reversalAgeSeconds: 1.5,
-    lifetimeSeconds: 3,
-    expiration: "lifetime-only",
-    hitPolicy: "once-per-shard",
+    weapon: {
+      emitters: {
+        count: 6,
+        radiusTiles: 0.35,
+        initialPhaseRadians: 0,
+        clockwiseDegreesPerSecond: 45,
+        rotateDuringCooldown: true,
+      },
+      burst: {
+        shotsPerEmitter: 11,
+        shotIntervalSeconds: 0.19,
+        cooldownAfterLastShotSeconds: 3,
+        initialCooldownSeconds: 2,
+      },
+      shard: {
+        damageHp: 160,
+        speedTilesPerSecond: 8,
+        verticesTiles: SHARD_BODY_TILES,
+        reversalAgeSeconds: 1.5,
+        lifetimeSeconds: 3,
+        expiration: "lifetime-only",
+        hitPolicy: "once-per-shard",
+      },
+    },
   });
   expect(ENCOUNTER_CONFIG.camera).toEqual({
     cssPixelsPerTile: 32,
@@ -355,16 +406,28 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
     historyLimit: 100,
   });
   expect(() => validateEncounterConfig(ENCOUNTER_CONFIG)).not.toThrow();
+  expect(() => validateShippedEncounter(ENCOUNTER_CONFIG)).not.toThrow();
+});
+
+test("the shipped encounter requires pursuit slower than the Paladin", () => {
+  // Structural validity alone permits a faster enemy, because the debug panel
+  // deliberately exposes speeds above the Paladin's; only the shipped
+  // encounter is held to the approved rule.
+  const faster = withArchetype({
+    speedTilesPerSecond: PALADIN_DERIVED_STATS.speedTilesPerSecond,
+  });
+  expect(() => validateEncounterConfig(faster)).not.toThrow();
+  expect(() => validateShippedEncounter(faster)).toThrow(RangeError);
+  expect(PRIMARY.speedTilesPerSecond).toBeLessThan(
+    PALADIN_DERIVED_STATS.speedTilesPerSecond,
+  );
 });
 
 test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
   "rejects invalid shard lifetime %s",
   (lifetimeSeconds) => {
     expect(() =>
-      validateEncounterConfig({
-        ...ENCOUNTER_CONFIG,
-        shard: { ...ENCOUNTER_CONFIG.shard, lifetimeSeconds },
-      }),
+      validateEncounterConfig(withWeapon("shard", { lifetimeSeconds })),
     ).toThrow(RangeError);
   },
 );
@@ -372,16 +435,13 @@ test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
 test.each([
   0,
   -1,
-  ENCOUNTER_CONFIG.shard.lifetimeSeconds,
+  PRIMARY.weapon.shard.lifetimeSeconds,
   5,
   Number.NaN,
   Number.POSITIVE_INFINITY,
 ])("rejects reversal outside the lifetime: %s", (reversalAgeSeconds) => {
   expect(() =>
-    validateEncounterConfig({
-      ...ENCOUNTER_CONFIG,
-      shard: { ...ENCOUNTER_CONFIG.shard, reversalAgeSeconds },
-    }),
+    validateEncounterConfig(withWeapon("shard", { reversalAgeSeconds })),
   ).toThrow(RangeError);
 });
 
@@ -400,41 +460,13 @@ test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursu
       ...ENCOUNTER_CONFIG,
       player: { ...ENCOUNTER_CONFIG.player, spawnTiles: { x: 19.2, y: 0 } },
     },
-    {
-      ...ENCOUNTER_CONFIG,
-      enemy: { ...ENCOUNTER_CONFIG.enemy, spawnTiles: { x: Number.NaN, y: 0 } },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      enemy: { ...ENCOUNTER_CONFIG.enemy, spawnTiles: { x: 19.2, y: 0 } },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      enemy: {
-        ...ENCOUNTER_CONFIG.enemy,
-        speedTilesPerSecond: PALADIN_DERIVED_STATS.speedTilesPerSecond,
-      },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      emitters: { ...ENCOUNTER_CONFIG.emitters, count: 0 },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      emitters: { ...ENCOUNTER_CONFIG.emitters, count: 1.5 },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      burst: { ...ENCOUNTER_CONFIG.burst, shotsPerEmitter: 1.5 },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      burst: { ...ENCOUNTER_CONFIG.burst, shotIntervalSeconds: 0 },
-    },
-    {
-      ...ENCOUNTER_CONFIG,
-      burst: { ...ENCOUNTER_CONFIG.burst, cooldownAfterLastShotSeconds: -1 },
-    },
+    withArchetype({ spawnTiles: { x: Number.NaN, y: 0 } }),
+    withArchetype({ spawnTiles: { x: 19.2, y: 0 } }),
+    withWeapon("emitters", { count: 0 }),
+    withWeapon("emitters", { count: 1.5 }),
+    withWeapon("burst", { shotsPerEmitter: 1.5 }),
+    withWeapon("burst", { shotIntervalSeconds: 0 }),
+    withWeapon("burst", { cooldownAfterLastShotSeconds: -1 }),
     { ...ENCOUNTER_CONFIG, camera: { ...ENCOUNTER_CONFIG.camera, minZoom: 2 } },
     {
       ...ENCOUNTER_CONFIG,
@@ -454,169 +486,78 @@ test("imports in Node and carries the comparison version in plain session snapsh
   expect(typeof document).toBe("undefined");
   expect(typeof window).toBe("undefined");
   expect(typeof localStorage).toBe("undefined");
-  const snapshot: SessionSnapshot = {
-    rulesVersion: RULES_VERSION,
-    phase: "playing",
-    elapsedSeconds: 0,
-    hitsTaken: 0,
-    player: {
-      positionTiles: ENCOUNTER_CONFIG.player.spawnTiles,
-      healthHp: PALADIN_STATS.healthHp,
-      combatRemainingSeconds: 0,
-    },
-    enemy: {
-      positionTiles: ENCOUNTER_CONFIG.enemy.spawnTiles,
-      emitterPhaseRadians: ENCOUNTER_CONFIG.emitters.initialPhaseRadians,
-    },
-    shards: [
-      {
-        id: 0,
-        orientationRadians: 0,
-        positionTiles: { x: 0, y: 0 },
-        velocityTilesPerSecond: { x: 8, y: 0 },
-        ageSeconds: 0,
-        reversalAgeSeconds: 1.2,
-        lifetimeSeconds: 2.4,
-        hasReversed: false,
-        hasHitPlayer: false,
-      },
-    ],
+  expect(RULES_VERSION).toBe(ENCOUNTER_CONFIG.rulesVersion);
+  const shard: ShardState = {
+    id: 0,
+    orientationRadians: 0,
+    positionTiles: { x: 0, y: 0 },
+    velocityTilesPerSecond: { x: 8, y: 0 },
+    ageSeconds: 0,
+    reversalAgeSeconds: 1.2,
+    lifetimeSeconds: 2.4,
+    hasReversed: false,
+    hasHitPlayer: false,
   };
-  expect(snapshot.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion);
-  expect(snapshot.shards[0]).not.toHaveProperty("origin");
-  expect(snapshot.shards[0].hasHitPlayer).toBe(false);
+  expect(shard).not.toHaveProperty("origin");
+  expect(shard.hasHitPlayer).toBe(false);
 });
 
-test("v2 geometry candidate keeps finite ordered convex bodies at the measured common scale", () => {
-  const candidate = V2_GEOMETRY_CANDIDATE;
-  expect(candidate.approval).toBe("approved");
-  expect(candidate.sourcePixelsPerTile).toBeCloseTo(435.118 / 19.2, 12);
-  for (const body of Object.values(candidate.bodies)) {
-    const vertices = body.verticesTiles;
-    expect(vertices.length).toBeGreaterThanOrEqual(3);
-    expect(vertices.length).toBeLessThanOrEqual(8);
-    const turns = vertices.map((vertex, index) => {
-      expect(Number.isFinite(vertex.x) && Number.isFinite(vertex.y)).toBe(true);
-      const next = vertices[(index + 1) % vertices.length];
-      const after = vertices[(index + 2) % vertices.length];
-      return (
-        (next.x - vertex.x) * (after.y - next.y) -
-        (next.y - vertex.y) * (after.x - next.x)
-      );
-    });
-    expect(turns.every((turn) => turn > 0)).toBe(true);
-    const twiceArea = vertices.reduce((area, vertex, index) => {
-      const next = vertices[(index + 1) % vertices.length];
-      return area + vertex.x * next.y - next.x * vertex.y;
-    }, 0);
-    expect(twiceArea).toBeGreaterThan(0);
-    const width =
-      Math.max(...vertices.map((vertex) => vertex.x)) -
-      Math.min(...vertices.map((vertex) => vertex.x));
-    const height =
-      Math.max(...vertices.map((vertex) => vertex.y)) -
-      Math.min(...vertices.map((vertex) => vertex.y));
-    expect(width * candidate.sourcePixelsPerTile).toBeCloseTo(
-      body.sourceWidthPixels,
-      10,
-    );
-    expect(height * candidate.sourcePixelsPerTile).toBeCloseTo(
-      body.sourceHeightPixels,
-      10,
-    );
-    expect(width / height).toBeCloseTo(
-      body.sourceWidthPixels / body.sourceHeightPixels,
-      10,
-    );
-    expect(body.anchor).toBe("body-center");
-    expect(body.dimensionToleranceSourcePixels.width).toBeGreaterThan(0);
-    expect(body.dimensionToleranceSourcePixels.height).toBeGreaterThan(0);
-  }
-});
-
-test("v2 geometry candidate shard is centrally symmetric and keeps its firing-axis orientation on reversal", () => {
-  const shard = V2_GEOMETRY_CANDIDATE.bodies.shard;
-  expect(shard.orientation).toBe("initial-firing-axis");
-  expect(shard.verticesTiles.length % 2).toBe(0);
-  shard.verticesTiles.forEach((vertex, index, vertices) => {
-    const opposite = vertices[(index + vertices.length / 2) % vertices.length];
-    expect(vertex.x + opposite.x).toBeCloseTo(0, 12);
-    expect(vertex.y + opposite.y).toBeCloseTo(0, 12);
+test("one builder drives both the shipped and the debug config", () => {
+  // The debug path at default settings must reproduce the shipped config
+  // field for field, apart from the rules version and the player-size
+  // override that matchPlayerToHead applies.
+  const fromDebug = debugEncounterConfig({
+    ...DEFAULT_DEBUG_SETTINGS,
+    matchPlayerToHead: false,
   });
+  expect(fromDebug.archetypes).toEqual(ENCOUNTER_CONFIG.archetypes);
+  expect(fromDebug.player).toEqual(ENCOUNTER_CONFIG.player);
+  expect(fromDebug.arena).toEqual(ENCOUNTER_CONFIG.arena);
+  expect(fromDebug.simulation).toEqual(ENCOUNTER_CONFIG.simulation);
+  expect(fromDebug.camera).toEqual(ENCOUNTER_CONFIG.camera);
+  expect(fromDebug.session).toEqual(ENCOUNTER_CONFIG.session);
+  expect(fromDebug.rulesVersion).toBe(DEBUG_RULES_VERSION);
 });
 
-test("v2 geometry candidate derives exact leading-vertex reversal and rejects just-beyond reach across firing phases", () => {
-  const candidate = V2_GEOMETRY_CANDIDATE;
-  const {
-    emitterOffsetTiles,
-    maximumShardCenterDistanceTiles,
-    reversalAgeSeconds,
-    lifetimeSeconds,
-  } = candidate;
-  expect(emitterOffsetTiles).toBeCloseTo(
-    (candidate.bodies.head.sourceWidthPixels / candidate.sourcePixelsPerTile) *
-      0.1,
-    12,
+test("buildEncounterConfig maps every tuning value into the config", () => {
+  const config = buildEncounterConfig(
+    { ...AUTHORED_TUNING, headWidth: 2, projectileDamageHp: 7, spawnX: 1 },
+    { rulesVersion: "probe", matchPlayerToHead: false },
   );
-  expect(reversalAgeSeconds).toBeGreaterThan(0);
-  expect(lifetimeSeconds).toBeCloseTo(2 * reversalAgeSeconds, 12);
-  expect(reversalAgeSeconds).toBeLessThan(lifetimeSeconds);
-  expect(
-    emitterOffsetTiles +
-      reversalAgeSeconds * candidate.shardSpeedTilesPerSecond,
-  ).toBeCloseTo(maximumShardCenterDistanceTiles, 12);
-  for (const phase of [0, Math.PI / 7, Math.PI / 2, Math.PI, Math.PI * 1.75]) {
-    const farthest = (distance: number) =>
-      Math.max(
-        ...candidate.bodies.shard.verticesTiles.map((vertex) => {
-          const localX = distance + vertex.x;
-          return Math.hypot(
-            localX * Math.cos(phase) - vertex.y * Math.sin(phase),
-            localX * Math.sin(phase) + vertex.y * Math.cos(phase),
-          );
-        }),
-      );
-    expect(farthest(emitterOffsetTiles)).toBeLessThan(
-      candidate.arenaRadiusTiles,
-    );
-    expect(farthest(maximumShardCenterDistanceTiles)).toBeCloseTo(
-      candidate.arenaRadiusTiles,
-      11,
-    );
-    expect(
-      farthest(maximumShardCenterDistanceTiles + 0.000001),
-    ).toBeGreaterThan(candidate.arenaRadiusTiles);
-  }
-  expect(candidate.conservativeLiveShardBound).toBe(
-    44 * Math.ceil(lifetimeSeconds / 2.5),
-  );
+  const archetype = primaryArchetype(config);
+  expect(bodyExtentTiles(archetype.verticesTiles, "x")).toBeCloseTo(2, 12);
+  expect(archetype.weapon.shard.damageHp).toBe(7);
+  expect(archetype.spawnTiles.x).toBeCloseTo(1, 12);
+  expect(config.rulesVersion).toBe("probe");
 });
 
-test("historical v2 geometry still fits the approved spawn independently of selected v3 tuning", () => {
-  const candidate = V2_GEOMETRY_CANDIDATE;
-  expect(candidate.enemySpawnTiles).toEqual({ x: 0, y: -16.2 });
-  for (const vertex of candidate.bodies.head.verticesTiles) {
+test("the live shard bound derives from configuration, not a literal", () => {
+  // 6 emitters x 11 shots x ceil(3 / 4.9) = 66 for the shipped v3 cadence.
+  expect(liveShardBoundPerEnemy(PRIMARY)).toBe(66);
+  const faster = primaryArchetype(
+    buildEncounterConfig(
+      { ...AUTHORED_TUNING, lifetimeSeconds: 11, reversalSeconds: 1.5 },
+      { rulesVersion: "probe", matchPlayerToHead: false },
+    ),
+  );
+  expect(liveShardBoundPerEnemy(faster)).toBe(6 * 11 * 3);
+});
+
+test("debug parameter groups and toggles are derived from the registry", () => {
+  expect(DEBUG_GROUPS).toEqual([
+    "Enemy",
+    "Player",
+    "Emitters",
+    "Burst",
+    "Projectiles",
+  ]);
+  expect(DEBUG_TOGGLES.map((toggle) => toggle.key)).toEqual([
+    "godMode",
+    "chaseArenaCenter",
+    "matchPlayerToHead",
+  ]);
+  for (const group of DEBUG_GROUPS)
     expect(
-      Math.hypot(vertex.x, vertex.y + candidate.enemySpawnTiles.y),
-    ).toBeLessThan(candidate.arenaRadiusTiles);
-  }
-  for (const vertex of candidate.bodies.player.verticesTiles) {
-    expect(Math.hypot(vertex.x, vertex.y)).toBeLessThan(
-      candidate.arenaRadiusTiles,
-    );
-  }
-  expect(candidate.pursuit.extraGapTiles).toBe(0);
-  expect(candidate.pursuit.eastSeparationTiles).toBeCloseTo(
-    (36 + 42) / (2 * candidate.sourcePixelsPerTile),
-    12,
-  );
-  expect(candidate.pursuit.southSeparationTiles).toBeCloseTo(
-    (33 + 55) / (2 * candidate.sourcePixelsPerTile),
-    12,
-  );
-  expect(candidate.bodies.player.orientation).toBe("upright");
-  expect(candidate.bodies.head.orientation).toBe("upright");
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
-  expect(ENCOUNTER_CONFIG.burst.shotsPerEmitter).toBe(11);
-  expect(ENCOUNTER_CONFIG.shard.reversalAgeSeconds).toBe(1.5);
+      DEBUG_PARAMETERS.some((parameter) => parameter.group === group),
+    ).toBe(true);
 });

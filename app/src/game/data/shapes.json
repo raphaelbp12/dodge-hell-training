@@ -1,0 +1,23 @@
+{
+  "comment": "Convex body outlines normalized to a 1x1 tile box, scaled to authored dimensions by the loader. Provenance: docs/mechanics.md step 8.2.",
+  "shapes": {
+    "beveled-octagon": [
+      { "x": -0.3, "y": -0.5 },
+      { "x": 0.3, "y": -0.5 },
+      { "x": 0.5, "y": -0.3 },
+      { "x": 0.5, "y": 0.3 },
+      { "x": 0.3, "y": 0.5 },
+      { "x": -0.3, "y": 0.5 },
+      { "x": -0.5, "y": 0.3 },
+      { "x": -0.5, "y": -0.3 }
+    ],
+    "shard-hexagon": [
+      { "x": 0.5, "y": 0 },
+      { "x": 0.25, "y": 0.5 },
+      { "x": -0.25, "y": 0.5 },
+      { "x": -0.5, "y": 0 },
+      { "x": -0.25, "y": -0.5 },
+      { "x": 0.25, "y": -0.5 }
+    ]
+  }
+}

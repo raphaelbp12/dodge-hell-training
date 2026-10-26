@@ -300,7 +300,7 @@ The final full-suite soak recorded 59.9833 simulated seconds, no deaths, 16 peak
 
 Recorded 2026-10-25. This additive section defines the approved follow-up target, not implemented gameplay. It supersedes conflicting v1 tuning above only when the coordinated encounter is activated in step 10.1. Until then, the runtime remains `crystal-worm-child-head-paladin-v1`; all preceding source history, approvals and release evidence remain historical v1 records.
 
-Authority: [the fixes decision record](fixes-plan.md#4-one-batch-decision-table) supplies Q01-Q20; [the follow-up answers](fixes-plan.md#77-follow-up-decisions-recorded---2026-10-25) supply R01-R05; [the selected calibration](fixes-plan.md#78-selected-leading-edge-calibration) supplies nominal measurements and their uncertainty. The [active implementation plan](../implementation-plan.md#phase-8-revised-contract-and-geometry-approval) owns execution status and remaining review gates. These are user-defined provisional trainer decisions, not new independent verification of ROTMG or permission to implement later steps.
+Authority: [the fixes decision record](fixes-plan.md#4-one-batch-decision-table) supplies Q01-Q20; [the follow-up answers](fixes-plan.md#77-follow-up-decisions-recorded---2026-10-25) supply R01-R05; [the selected calibration](fixes-plan.md#78-selected-leading-edge-calibration) supplies nominal measurements and their uncertainty. The [v2 archive](implementation-plan-v2.md#phase-8-revised-contract-and-geometry-approval) records their execution status and completed review gates. These are user-defined provisional trainer decisions, not new independent verification of ROTMG or permission to implement later steps.
 
 ### Decision Coverage And Provenance
 
@@ -546,7 +546,7 @@ Technical repeated-practice acceptance is delegated; human feel/listening comfor
 
 Original `image.png`, `docs/fixes-*-candidate.png` and `docs/fixes-calibration-reference.png` remain local-only/ignored. Generated review pages, screenshots, metrics and browser artifacts stay under ignored `app/test-results/`; none are runtime assets or approved for public distribution. The original SHA-256 remains `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`.
 
-The [README checklist](../README.md#v2-verification-and-handoff) supplies manual practice steps. Actual local checks/statuses and independently authorized publication/live evidence belong to [the active plan](../implementation-plan.md), especially steps 14.1-14.3; a local pass is not deployment evidence.
+The [README checklist](../README.md#v2-verification-and-handoff) supplies manual practice steps. Actual local checks/statuses and independently authorized publication/live evidence belong to [the v2 archive](implementation-plan-v2.md), especially steps 14.1-14.3; a local pass is not deployment evidence.
 
 ## Requested Debug Tools Follow-Up
 

@@ -1,0 +1,45 @@
+{
+  "comment": "Enemy archetypes. Body dimensions are in tiles and scale a named outline from shapes.json. Weapon values are the approved v3 tuning; provenance docs/mechanics.md.",
+  "archetypes": {
+    "crystal-worm-child-head": {
+      "comment": "spawnTiles is the approved north spawn, a 3-tile center-to-wall margin inside the 19.2-tile arena.",
+      "spawnTiles": { "x": 0, "y": -16.2 },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 1.25,
+        "heightTiles": 1.25
+      },
+      "speedTilesPerSecond": 1.5,
+      "contactDamageHp": 0,
+      "blocksPlayer": false,
+      "weapon": {
+        "emitters": {
+          "count": 6,
+          "radiusTiles": 0.35,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 45,
+          "rotateDuringCooldown": true
+        },
+        "burst": {
+          "shotsPerEmitter": 11,
+          "shotIntervalSeconds": 0.19,
+          "cooldownAfterLastShotSeconds": 3,
+          "initialCooldownSeconds": 2
+        },
+        "shard": {
+          "damageHp": 160,
+          "speedTilesPerSecond": 8,
+          "body": {
+            "shape": "shard-hexagon",
+            "widthTiles": 1.45,
+            "heightTiles": 0.65
+          },
+          "reversalAgeSeconds": 1.5,
+          "lifetimeSeconds": 3,
+          "expiration": "lifetime-only",
+          "hitPolicy": "once-per-shard"
+        }
+      }
+    }
+  }
+}

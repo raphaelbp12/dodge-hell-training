@@ -14,8 +14,10 @@ import {
 import styles from "./App.module.css";
 import { ZoomPreference } from "./storage/zoom";
 import {
+  DEBUG_GROUPS,
   DEBUG_PARAMETERS,
   DEBUG_RULES_VERSION,
+  DEBUG_TOGGLES,
   DEFAULT_DEBUG_SETTINGS,
   loadSelectedDebugValues,
   updateDebugParameter,
@@ -51,37 +53,19 @@ function DebugPanel({
       >
         Load selected values
       </button>
-      <label className={styles.debugToggle}>
-        <input
-          type="checkbox"
-          checked={settings.godMode}
-          onChange={(event) =>
-            onChange({ ...settings, godMode: event.target.checked })
-          }
-        />
-        God mode
-      </label>
-      <label className={styles.debugToggle}>
-        <input
-          type="checkbox"
-          checked={settings.chaseArenaCenter}
-          onChange={(event) =>
-            onChange({ ...settings, chaseArenaCenter: event.target.checked })
-          }
-        />
-        Chase arena center
-      </label>
-      <label className={styles.debugToggle}>
-        <input
-          type="checkbox"
-          checked={settings.matchPlayerToHead}
-          onChange={(event) =>
-            onChange({ ...settings, matchPlayerToHead: event.target.checked })
-          }
-        />
-        Match player to head
-      </label>
-      {(["Enemy", "Emitters", "Burst", "Projectiles"] as const).map((group) => (
+      {DEBUG_TOGGLES.map((toggle) => (
+        <label key={toggle.key} className={styles.debugToggle}>
+          <input
+            type="checkbox"
+            checked={settings[toggle.key]}
+            onChange={(event) =>
+              onChange({ ...settings, [toggle.key]: event.target.checked })
+            }
+          />
+          {toggle.label}
+        </label>
+      ))}
+      {DEBUG_GROUPS.map((group) => (
         <fieldset key={group}>
           <legend>{group}</legend>
           {DEBUG_PARAMETERS.filter(

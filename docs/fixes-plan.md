@@ -126,7 +126,7 @@ The wiki value is 19.2 **tiles of range**, not 19.2 tiles/second. The recorded w
 
 ## 5. Staged Implementation Plan
 
-The executable follow-up is now [phases 8-14 of the main implementation plan](../implementation-plan.md#phase-8-revised-contract-and-geometry-approval), beginning with `/implement-step 8.1`. That plan owns numbered step dependencies, prompts, acceptance checks and completion records. The F0-F7 outline below is retained as design history, not a second status tracker; no runtime step has started.
+The executable follow-up is now [phases 8-14, now archived](implementation-plan-v2.md#phase-8-revised-contract-and-geometry-approval). That plan owns numbered step dependencies, prompts, acceptance checks and completion records. The F0-F7 outline below is retained as design history, not a second status tracker; no runtime step has started.
 
 Each future implementation slice starts with a focused failing behavior test, then the smallest change, then the same focused check. Reuse [the existing browser tests](../app/tests/app.spec.ts) and neighboring config/simulation/session/storage/React tests. Do not create a second game clock or duplicate test framework. No stage below is being implemented automatically.
 

@@ -10,7 +10,7 @@ Normal Start/Retry and Reset defaults now use these values without opening Debug
 
 Local v3 verification on 2026-10-25 passed 327 unit/component tests, typecheck, lint, build and all 34 Chromium cases with one worker and no retries. Coverage includes normal selected-value startup, scoring eligibility after loading unchanged defaults, retained-but-incompatible v2 history, six-emitter fixed-tick scheduling, matching body dimensions and the new player wall extent. The first browser runs exposed a historical wall-coordinate assertion and a first-volley head-pixel sampling race; both were corrected before the complete passing run. The existing Phaser chunk-size warning remains nonblocking. These default-promotion changes are not committed, pushed or live-verified.
 
-[The active plan](implementation-plan.md) records actual execution. Step 14.1 passed all five gates on 2026-10-25: 292 unit/component tests and 27 Chromium cases. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
+[The v2 archive](docs/implementation-plan-v2.md) records actual execution. Step 14.1 passed all five gates on 2026-10-25: 292 unit/component tests and 27 Chromium cases. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
 
 Site: https://raphaelbp12.github.io/dodge-hell-training/. **V2 live-verified on 2026-10-25** at runtime commit `e12f3fe4742cb9d02374f07563192dcc5a727b72`: [Actions run 40193885409](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40193885409), all six jobs successful, Pages deployment `7313260767` and both hosted Chromium checks passed. All four emitted files match the tested local build byte-for-byte. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage. Fresh local preview: http://127.0.0.1:5177/dodge-hell-training/.
 
@@ -452,7 +452,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Implementation plan](implementation-plan.md): phased prompts, dependencies, acceptance criteria, and execution records. Steps 7.1 and 7.2 are complete; release evidence and delegated acceptance limitations are recorded explicitly.
+- [Active implementation plan](implementation-plan.md): pending phases 15-18. Completed phases are archived in the [v1](docs/implementation-plan-v1.md) and [v2](docs/implementation-plan-v2.md) archives, which hold the phased prompts, dependencies, acceptance criteria and execution records. Steps 7.1 and 7.2 are complete; release evidence and delegated acceptance limitations are recorded explicitly.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 

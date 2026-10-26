@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { ENCOUNTER_CONFIG } from "../config/encounter";
+import { ENCOUNTER_CONFIG, primaryArchetype } from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
   DEBUG_RULES_VERSION,
@@ -496,7 +496,7 @@ class EncounterScene extends Phaser.Scene {
     };
     draw(
       this.bodies,
-      this.state.config.enemy.verticesTiles,
+      primaryArchetype(this.state.config).verticesTiles,
       enemy.positionTiles,
       presentation.enemy,
     );
@@ -510,7 +510,7 @@ class EncounterScene extends Phaser.Scene {
     for (const shard of shards) {
       draw(
         this.projectiles,
-        this.state.config.shard.verticesTiles,
+        primaryArchetype(this.state.config).weapon.shard.verticesTiles,
         shard.positionTiles,
         shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
         shard.orientationRadians,

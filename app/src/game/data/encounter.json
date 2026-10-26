@@ -1,0 +1,29 @@
+{
+  "comment": "Encounter-wide authored values. The player body is sized independently of any enemy (G08).",
+  "rulesVersion": "crystal-worm-child-head-paladin-v3",
+  "primaryArchetype": "crystal-worm-child-head",
+  "simulation": {
+    "fixedStepHz": 60,
+    "maxStepsPerUpdate": 8
+  },
+  "player": {
+    "spawnTiles": { "x": 0, "y": 0 },
+    "body": {
+      "shape": "beveled-octagon",
+      "widthTiles": 1.25,
+      "heightTiles": 1.25
+    }
+  },
+  "camera": {
+    "cssPixelsPerTile": 32,
+    "defaultZoom": 1,
+    "minZoom": 0.25,
+    "maxZoom": 3,
+    "zoomStep": 0.125
+  },
+  "session": {
+    "startCountdownSeconds": 3,
+    "retryCountdownSeconds": 0,
+    "historyLimit": 100
+  }
+}

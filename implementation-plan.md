@@ -2,33 +2,40 @@
 
 ## Purpose And Execution
 
-**Batch authorization - 2026-10-25:** The user explicitly requested all remaining steps in order, tests and a separate commit/push between steps, with no further confirmation prompts. For this batch this overrides the single-step invocation/publication restrictions below. Use conservative presentation choices and record them as delegated technical decisions, not human visual/audible acceptance. Never treat a failed gate as complete or invent deployment evidence. Preserve unrelated local edits. Each completed step still requires its own checks, execution record, commit and verified push before the next step begins.
+Deliver a pure-frontend ROTMG-inspired training game: repeatedly survive against the Crystal Worm Child, inspect results, and retry immediately.
 
-Deliver a pure-frontend ROTMG-inspired training game: repeatedly survive against the Crystal Worm Child Head, inspect results, and retry immediately.
+This file holds the **pending** work only: phases 15-18, which retire the concluded geometry study, replace the hand-maintained encounter constants with a JSON data layer, and add timed enemy spawning.
 
-This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 8.1`. Read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
+This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 15.1`. Read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
 
-New steps start pending. After completing a step, replace its status with `complete`, record the actual checks and outcomes below its prompt, and note any approved deviations. Do not mark a step complete when its required checks are blocked. Do not automatically start the next step.
+**Execution modes (G22).** Two modes are available and the user chooses per request:
 
-Completed phases 1-7 and their v1 acceptance history are preserved in [the v1 archive](docs/implementation-plan-v1.md). This file contains pending phases 8-14 for the approved fixes. Begin with `/implement-step 8.1`; the existing command reads this file without changes. Archiving history does not implement or complete any new step.
+- **Single step (default).** Run exactly one step, then stop and report. Do not commit, push, deploy or begin the next step. This is the mode whenever the user does not say otherwise.
+- **Batch, on explicit request.** When the user explicitly asks for a batch - naming the steps or phases - run them in dependency order, each with its own focused checks, execution record and gate run before the next begins. A failed gate stops the batch and is reported; it is never recorded as complete. Still no commit, push or deployment without separate authorization. A batch request covers only the steps named in it and does not carry to later requests.
+
+Phases 8-14 ran under a one-off batch authorization recorded in [the v2 archive](docs/implementation-plan-v2.md#historical-execution-authorization); it expired with them and does not apply here.
+
+Steps start pending. After completing a step, replace its status with `complete`, record the actual checks and outcomes below its prompt, and note any approved deviations. Do not mark a step complete when its required checks are blocked. Do not automatically start the next step.
 
 ## Sources And Decision Authority
 
 - [Original draft](first-draft.md): original requirements and project intent. Keep it intact.
 - This plan: consolidates subsequent user decisions and the approved technical approach. Later explicit user decisions override older statements; record changes here.
 - [The mechanics contract](docs/mechanics.md) records sources, approvals and fidelity limits. Do not treat user-supplied wiki numbers or proposed formulas as independently verified facts.
-- [The fixes decision record](docs/fixes-plan.md), especially sections 4, 7.7 and 7.8, supplies Q01-Q20/R01-R05 approvals and supersedes conflicting archived v1 design. Its section 5 is a historical high-level outline; executable steps/statuses live here. [The adjustment notes](fixes.md) and reference image are supporting inputs, not permission to publish third-party artwork.
+- [The fixes decision record](docs/fixes-plan.md) supplies the Q01-Q20/R01-R05 approvals behind phases 8-14. [The adjustment notes](fixes.md) and reference image are supporting inputs, not permission to publish third-party artwork.
+- [The principles review](principles-review.md) records measured YAGNI/DRY/SOLID findings at commit `3857e5c`. Phases 15-18 address F1, F2, F3, F7, F10, F11 and F12 as a consequence of the data layer; the remaining findings are explicitly out of scope and listed in step 18.1.
 - Never silently resolve a gameplay ambiguity. Research it, explain alternatives, and ask the user for approval before dependent implementation.
 
 ## Completed Baseline
 
-Phases 1-7 are complete; their prompts, earlier blockers, later resolutions and acceptance evidence are archived, not deleted or reopened. The existing playable runtime remains v1 until step 10.1.
+Phases 1-14 are complete. Their prompts, blockers, resolutions and acceptance evidence are archived, not deleted or reopened. The deployed runtime is the verified v2 release, with `3857e5c` having promoted the selected tuning to the `crystal-worm-child-head-paladin-v3` encounter defaults.
 
-| Archived dependency | Final status                                          | Evidence                                                                                                            |
-| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 7.2                 | Complete under delegated technical release acceptance | [Step 7.2 and release verification](docs/implementation-plan-v1.md#step-72---verify-release-and-finish-the-handoff) |
+| Archive | Phases | Contents |
+| ------- | ------ | -------- |
+| [V1 archive](docs/implementation-plan-v1.md) | 1-7 | Mechanics contract, generated foundation, testable simulation, playable engine, practice interface, delivery and handoff |
+| [V2 archive](docs/implementation-plan-v2.md) | 8-14 | V2 contract and geometry, continuous collision, persisted zoom, hit feedback and audio, Controls and pause safety, verified release |
 
-For step 8.1's dependency check, read that archived final status and execution record, not the historical blocked attempt within it. Other completed step records are available in the same archive when needed. Do not rerun completed steps automatically.
+For step 15.1's dependency check, read step 14.3's archived final status and execution record in the v2 archive. Do not rerun completed steps automatically.
 
 ## Confirmed Design
 
@@ -49,6 +56,9 @@ For step 8.1's dependency check, read that archived final status and execution r
 - Original simple convex silhouettes of at most eight sides share body geometry with collision. Add the approved health bar, hit feedback/audio and Controls/pause behavior through the phased steps below.
 - Local attempt history and comparisons support repeated practice; no backend, accounts, or online leaderboard.
 
+
+Phases 15-18 do not reopen this design. They change where its values are authored, and add one approved element: several enemies of the same kind present at once, arriving over time.
+
 ## Approved Technical Approach
 
 - Application in `app/`; planning and project-shared Copilot customizations at repository root.
@@ -59,6 +69,8 @@ For step 8.1's dependency check, read that archived final status and execution r
 - A fixed-step, framework-independent simulation owns gameplay. Phaser adapts input and renders its state; React renders session summaries and low-frequency HUD updates.
 - Do not introduce a backend, ECS, dependency injection framework, event bus library, state library, generic plugin system, or custom physics engine without a demonstrated need.
 
+- Authored gameplay data lives in validated JSON under `app/src/game/data`, imported at build time. No runtime fetching, schema library, authoring UI or user-supplied content.
+
 ## Architecture
 
 Create folders only when their step introduces actual code. Names below describe ownership, not a requirement to create empty scaffolding.
@@ -66,6 +78,7 @@ Create folders only when their step introduces actual code. Names below describe
 | Boundary                  | Suggested home under app/src | Owns                                                                                       | Must not depend on               |
 | ------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------- |
 | Models                    | game/models                  | Typed entities, inputs, snapshots, session states                                          | React, Phaser, storage           |
+| Authored data             | game/data                    | Arena, enemy archetypes and encounter values as JSON in source units                       | Everything; it is inert data     |
 | Configuration/data        | game/config                  | Validated stats, encounter values, units, preset version                                   | React, Phaser, browser APIs      |
 | Simulation/rules          | game/simulation              | Fixed-step movement, pursuit, burst scheduling, shards, damage, regeneration, elapsed time | React, Phaser, DOM, localStorage |
 | Session application layer | game/session                 | Start, pause, resume, death, retry, result handoff                                         | UI components, drawing details   |
@@ -88,421 +101,427 @@ Every step prompt inherits these instructions:
 7. Run the step's focused checks and relevant existing checks. Disclose unavailable tools, source access failures, and unverified behavior. Never claim that a test or deployment ran when it did not.
 8. End with changed files, actual check outcomes, remaining blockers, and a concise manual verification procedure where relevant. Update this step's status only when its acceptance criteria are met.
 
-## Follow-Up Execution Contract - Phases 8-14
+## Execution Contract - Phases 15-18
 
-The architecture, shared prompt contract and project instructions still apply. Execute only the requested numbered step and stop afterward. Steps were initially planned as pending; each step's status and execution record below now report its actual progress.
+The architecture, shared prompt contract and project instructions above still apply. Execute only the requested numbered step and stop afterward. All steps below start pending; phases 1-14 are complete and archived.
+
+This follow-up has two coupled goals: retire the concluded geometry study, and replace the hand-maintained encounter constants with a JSON data layer that can describe an arena, enemy archetypes and a timed spawn rule. Multi-enemy spawning is the first feature that actually needs the data layer, so the layer is introduced first and proven behavior-identical before any gameplay changes.
+
+### Recorded User Decisions - 2026-10-26
+
+- **G01 - Geometry study is concluded.** `app/src/game/config/geometry-candidate.ts` and `app/scripts/review-geometry.mjs` are retired, not preserved. Their measurement/derivation machinery will never be used again. Keep the surviving approved facts (arena radius 19.2 tiles, enemy spawn margin, the two normalized outlines) as authored data; keep provenance in [the mechanics contract](docs/mechanics.md), not in code.
+- **G02 - Data layer is file-backed and static.** Arena and enemies are specified in JSON files imported at build time. No runtime fetching, authoring UI, or user-supplied content in this slice. "Constants for now" means the data is fixed, not that it stays in TypeScript literals.
+- **G03 - Spawn model is rule-driven.** `encounter.json` holds `firstSpawnSeconds`, `everySeconds`, `maxConcurrent`, `archetype` and a `placement` rule. Endless survival stays endless; no finite hand-maintained spawn list.
+- **G04 - One archetype, many instances.** Only the Crystal Worm Child Head exists. Spawning adds more instances of it. The data layer models archetypes as a keyed collection so a second kind is pure data later, but no new enemy's gameplay values are introduced or approved here.
+- **G05 - Debug is archetype-level.** Sliders edit the archetype spec and therefore every live and future instance of that type. The existing per-instance `spawnX`/`spawnY` sliders are replaced by spawn-rule and placement controls.
+
+- **G06 - Floating-point deviation accepted (Q1).** Replacing the measurement chain shifts each body vertex by at most 6e-17 tiles, roughly 200 times below the geometry kernel's own `64 * Number.EPSILON` budget. Assert the clean literals and record the rounding as an approved deviation. Do not preserve bit-exact output by keeping the retired divisor.
+- **G07 - `SessionSnapshot` is deleted (Q2).** It has no production reader. The Playwright `Inspection` type derives from `SimulationState` instead.
+- **G08 - Player body size is authored independently (Q3).** `encounter.json` carries the player's own `widthTiles`/`heightTiles`, set to 1.25 x 1.25 so no shipped value changes. The enemy pair is renamed `headWidth`/`headHeight` and no longer sizes the player. `matchPlayerToHead` becomes an explicit override that copies head size onto the player, not the default coupling.
+- **G09 - A damage edit re-stamps shards already in flight (Q4).** Chosen explicitly by the user. Damage joins reversal age and lifetime as a *fired-with* value, so one rule governs all three and a debug edit takes effect immediately rather than after up to one shard lifetime. Separately, shards carry `damageHp` and `archetypeId` captured at fire time so hit resolution never reads global config; that is the dependency-inversion fix that makes a second archetype correct, and it is required regardless of the re-stamp choice. Implementation note, behavior-neutral: the re-stamping that currently sits inline inside `setDebugSettings` moves into one named operation owned by the simulation module, for example `restampLiveShards(shards, weapon)`, covering all three fields plus the existing `hasReversed` and expiry reconciliation. That function is about to grow anyway, since step 16.1 makes it loop over every enemy. If a smaller diff is preferred, keeping the mutation inline is acceptable and changes no behavior.
+- **G10 - Arena radius stays 19.2 tiles (Q5).** The `fixes.md` request for an arena at double the enemy's reach is recorded as superseded by the v3 tuning; shipped reach is 12.35 tiles. More dodging room matters more once several enemies fire.
+- **G11 - Cadence is 10 seconds, cap 4 (Q6).** `firstSpawnSeconds` 10, `everySeconds` 10, `maxConcurrent` 4. The cap is reached at 30 seconds. Recorded v2 deaths near 8 seconds mean most attempts meet one enemy and better attempts meet more.
+- **G12 - Placement is the arena ring, farthest from the player, with a seeded random fallback (Q7).** `ringRadiusFraction` is `0.84375`, which is exactly `16.2 / 19.2` and therefore reproduces today's spawn distance. Direction is the point diametrically opposite the player's bearing from the arena center. When that bearing is undefined - the player standing exactly at the center - pick uniformly at random among the candidate directions. See G13 for how that randomness is implemented, and G14 for its consequence.
+- **G13 - Randomness is a seeded generator injected into the simulation (Q7, implementation).** `Math.random` must not be called inside the simulation. Add a small seeded generator advanced from simulation state and inject it the way `HitAudio` takes `getContext` and the storage adapters take `getStorage`, with a default for production. Tests inject a fixed sequence. This keeps the fixed-step catch-up path reproducible - the same elapsed time and input must produce the same result regardless of how many steps run in one update - which is a correctness requirement independent of gameplay variety. The seed is **not** recorded in `AttemptRecord`; attempts stay non-reproducible across runs and no storage schema change is needed. Add the seed later only if replay is actually wanted.
+- **G14 - The opening enemy's direction is no longer fixed north (Q7 + Q11 consequence).** Because the first enemy spawns at `t = 0` when the player is always exactly at the arena center, the undefined-bearing case is the *default opening*, not a rare edge case. Every attempt therefore opens from a random direction at distance 16.2 tiles. This supersedes the recorded v2 statement that the enemy starts north at `(0, -16.2)`. Step 17.1 records it as an approved deviation; the distance is unchanged, only the bearing varies.
+- **G15 - Concurrent spawns are spread by the golden angle (Q8).** Offset each additional concurrent spawn by 137.5 degrees from the computed point so two enemies never resolve to the same position.
+- **G16 - Enemies pass through each other (Q9).** Consistent with `blocksPlayer: false`. No enemy-to-enemy collision, so per-tick cost stays O(shards) rather than O(shards + enemies squared).
+- **G17 - Enemies never despawn (Q10).** They accumulate to the cap and remain. Pressure plateaus rather than oscillating. No enemy lifetime field.
+- **G18 - The first enemy is the schedule's `t = 0` entry (Q11).** One code path, placed by the ring rule, with no special-cased initial enemy.
+- **G19 - New rules version is `crystal-worm-child-swarm-paladin-v4` (Q12).** v1, v2 and v3 records are retained, displayed as "Other rules" and excluded from the new retained best. No storage schema change.
+- **G20 - A lowered `maxConcurrent` despawns the newest enemies (Q13).** The debug slider takes effect immediately rather than applying only to future spawns.
+- **G21 - TypeScript `strict` stays off (Q15).** The loader validates every authored value at runtime, in the same defensive style as the storage adapter. Enabling `strict` project-wide is not bundled into these phases.
+- **G22 - Both execution modes stay available (Q14).** Single step is the default; a batch runs only when the user explicitly asks for one, and covers only the steps named in that request. See Purpose And Execution above.
 
 ### Approved Scope And Review Gates
 
-- One coordinated gameplay identity: `crystal-worm-child-head-paladin-v2`. Retain v1 history, exclude it from v2 bests, and avoid a schema migration unless a demonstrated field change requires it.
-- Four emitters, eleven shots each, 0.15-second spacing, one second after the last shot, two-second initial cooldown, clockwise 45 degrees/second. Group span 1.5 seconds, period 2.5 seconds, forty-four shards per group.
-- Maximum reach is 19.2 tiles from a stationary centered head's simulation center to the projectile's farthest body edge at reversal. Speed remains 8 tiles/second; arena radius is 19.2 tiles. This calibration condition does not confine shards emitted by a moving head.
-- Use the decision record's common scale and nominal body dimensions. Nominal reversal 2.238140 seconds and lifetime 4.476281 seconds are estimates, not immutable rounded runtime constants. Derive exact timing from the approved polygon, emitter offset and edge criterion.
-- Emitter offset is 10% of head width. Player starts at center; enemy starts north with a three-tile center-to-wall margin, nominally `(0, -16.2)`, subject to actual body fit. Derive pursuit stopping separation from silhouettes; an extra gap is not silently authorized.
-- Original convex body silhouettes, three to eight vertices, share their physical outline and transform between drawing and collision. Shard is centrally symmetric and retains firing-axis orientation on reversal; no within-tick spin. Decorations are explicitly nonphysical.
-- Preserve one clock, existing fixed-step/catch-up policy, one reversal, lifetime-only expiry and per-shard once-only hits. No firing-origin storage, homing, global invulnerability, contact damage, blocking, wall/offscreen despawn or shrinking arena.
-- Persist zoom independently of history: 0.25-3.0, default 1, step 0.125. Preserve 32 CSS pixels/tile independently of image reference scale and camera magnification.
-- Always-visible Phaser health bar, individual post-defense floating hit amounts, quiet original cue and visible mute; retain existing HUD. Controls on Home/HUD, accessible modal, explicit Resume after session dialog closure, centered Paused label, no background input/time catch-up.
-- Unspecified polygon coordinates, extra stopping gap, effect durations/placement and numeric audio gain/voice cap require review at their owning steps. Present candidates and record approval; do not reopen settled question batches or invent fidelity. Missing approval blocks completion, not preliminary proposals/tests.
-- Screenshot/crops remain local review material outside runtime assets; public distribution rights are unapproved. No backend, accounts, attacks, seal activation, touch controls, rebinding or tuning UI.
+- Retiring the study must not change gameplay beyond documented floating-point rounding. Any shipped-value change needs an explicit recorded deviation.
+- The data layer owns authored values in source units. All derivation - outline scaling, degrees to radians, derived player stats, derived shard bounds - happens in exactly one loader. Do not reintroduce a second mapping from authored values to runtime config.
+- `strict` is not enabled in `tsconfig.app.json` and `resolveJsonModule` is unset. The compiler will not catch absent or mistyped JSON fields, so the loader validates every value at runtime in the same defensive style as the storage adapter. Enabling `strict` project-wide is out of scope here; do not bundle it into a step.
+- Preserve one clock, the existing fixed-step/catch-up policy, one shard reversal, lifetime-only expiry and per-shard once-only hits. No ECS, entity framework, event bus, scene graph or second simulation.
+- Randomness is confined to spawn placement and enters only through the injected seeded generator (G13). Gameplay variety is deliberate; nondeterminism inside a seeded run is a defect.
+- Multi-enemy generalization (phase 16) is behavior-identical refactoring: exactly one enemy at `t = 0`, same cadence, same positions, same death times. Phase 16 must not change any observable gameplay value.
+- Spawn cadence, concurrency cap, ring fraction, placement, tie-breaking, enemy-to-enemy interaction, despawn policy and the rules version are **approved** in G10-G20. Step 17.1 verifies the arithmetic and records the deviations rather than reopening the choices. Do not substitute different values; if verification shows an approved value cannot hold - for example a ring fraction that puts a body outside the arena - report it as a blocker instead of silently adjusting it.
+- Adding enemies multiplies live shards and per-tick collision work. Re-derive the live-shard bound from configuration instead of a literal, and re-measure the sustained-play browser bounds. Never weaken an existing bound to make a run pass.
+- A comparison-breaking rules version is required once spawning ships. Retain v1/v2/v3 history, exclude it from the new bests, and avoid a storage schema change - `rulesVersion` is already a record field.
+- No backend, accounts, player attacks, seal activation, touch controls, rebinding or tuning UI beyond the existing debug panel.
+
+### Target Architecture
+
+```
+app/src/game/data/            authored data, build-time imports (G02)
+  shapes.json                 named outlines normalized to a 1x1 box
+  arena.json                  circular arena: center, radius
+  enemies.json                archetypes keyed by id: body, movement, weapon
+  encounter.json              rulesVersion, simulation, player, camera, session, spawns
+app/src/game/config/
+  data.ts                     imports + runtime-validates JSON -> typed authored data
+  encounter.ts                derives ENCOUNTER_CONFIG from authored data; validates invariants
+  debug.ts                    one tuning registry over the same authored data
+```
+
+Target runtime shapes, for reference by the steps below:
+
+```ts
+type EnemyArchetype = Readonly<{
+  id: string;
+  verticesTiles: readonly Vector2[];
+  speedTilesPerSecond: number;
+  contactDamageHp: number;
+  blocksPlayer: boolean;
+  weapon: Readonly<{ emitters: ...; burst: ...; shard: ... }>;
+}>;
+
+type EnemyState = {
+  id: number;                       // instance identity, not archetype
+  archetypeId: string;
+  positionTiles: Vector2;
+  emitterPhaseRadians: number;
+  spawnedAtSeconds: number;
+  attackEpochSeconds: number;       // these six were global SimulationState
+  volleysAtEpoch: number;           // fields; they are per-enemy clock state
+  attackInitialDelaySeconds: number;
+  rotationEpochSeconds: number;
+  rotationPhaseAtEpoch: number;
+  volleysFired: number;
+};
+```
+
+`ShardState` gains `damageHp` and `archetypeId`, captured at fire time. Today `registerShardHit` reads `state.config.shard.damageHp` globally at hit time while reversal and lifetime are already copied per shard; that inconsistency must not survive into a multi-archetype world. Per G09 those three fired-with fields are re-stamped together by one named operation, not inline inside the debug setter.
+
+Randomness (G13) is an injected seeded generator with a production default, following the existing `HitAudio(getContext)` and `AttemptHistory(getStorage)` pattern. The simulation never calls `Math.random`; tests inject a fixed sequence. It is injected state, not a new boundary in the table above.
+
+### Measured Surface Area
+
+Taken from the current tree at `3857e5c`, to size each step rather than guess:
+
+| Coupling | Sites | Where |
+| --- | --- | --- |
+| Reads of singular `enemy`/`emitters`/`burst`/`shard` config | 68 production | `simulation.ts`, `encounter.ts`, `debug.ts`, `phaser/encounter.ts` |
+| Reads of `state.enemy` | 30 production | `simulation.ts`, `phaser/encounter.ts` |
+| `enemy` references in tests | 55 / 16 / 30 / 1 | `simulation.test.ts`, `config.test.ts`, `tests/app.spec.ts`, `session.test.ts` |
+| Study-only modules | 2 files | `config/geometry-candidate.ts`, `scripts/review-geometry.mjs` |
+| Study-only kernel export | `deriveShardTiming` | `simulation/geometry.ts` |
+| Study-only tests | 6 tests | 4 in `config.test.ts`, 2 in `geometry.test.ts` |
+
+`maximumBodyCenterDistance` and `convexContactDistance` are **not** study code - `constrainBodyToArena` and `pursueBody` depend on them. They stay.
 
 ### Reuse And Verification Policy
 
-Extend existing config/models, `createSimulation`/`advanceSimulation`, shard movement segmentation, health arithmetic, `SessionController`, `EncounterScene`, React screens and defensive storage boundary. Reuse neighboring tests and the existing Playwright helpers, diagnostic/production split and pixel checks. Add a small module only for a real ownership boundary; no parallel simulation, generic settings/event-bus framework, second clock or duplicate test harness.
+Extend the existing config/models, `createSimulation`/`advanceSimulation`, shard segmentation, health arithmetic, `SessionController`, `EncounterScene`, React screens and storage boundary. Reuse neighboring tests and the existing Playwright helpers, diagnostic/production split and pixel checks.
 
-Behavior steps start with a focused failing test, run it, implement the smallest change, and rerun it immediately. Documentation/review steps use structural/math/diagram checks. Pure geometry uses existing Node Vitest without DOM/Phaser/React/storage. Prefer suitable installed `@flatten-js/core` operations; a narrow translating-convex sweep helper is justified where those APIs cannot express continuous collision, not as a general physics engine or dependency replacement.
-
-Run relevant checks from `app/` using established scripts: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e` (`npm.cmd` for forwarded flags in PowerShell). All five are required for runtime-integrating changes and final acceptance; pure/documentation steps use focused checks plus relevant regression/type/build checks. Build before production-browser checks. Do not weaken meaningful assertions or target historical v1 death times.
-
-Preparatory geometry remains disconnected from the playable preset until step 10.1. Never deploy intermediate physics as v1 or distinct gameplay presets under one v2 identity. After publication, comparison-breaking changes require explicit version review. Each execution records actual checks, approvals/deviations, blockers and manual verification where relevant. The command never commits/pushes; publication requires separate authorization.
+Behavior steps start with a focused failing test, run it, implement the smallest change, and rerun it. Run relevant checks from `app/`: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e`. All five are required for runtime-integrating changes and final acceptance. Use the pinned toolchain in `.node-version` (24.22.1) and `npm@12.2.1`; a local `node` that does not match is a disclosed limitation, not an acceptable substitute for a final gate run.
 
 ### Phase Index
 
-| Phase | Steps      | Outcome                                                | High-level outline |
-| ----- | ---------- | ------------------------------------------------------ | ------------------ |
-| 8     | 8.1, 8.2   | V2 contract and approved exact geometry                | F0-F2              |
-| 9     | 9.1, 9.2   | Tested pure continuous collision and boundary rules    | F2-F3              |
-| 10    | 10.1, 10.2 | Coordinated playable v2 and comparison safety          | F3                 |
-| 11    | 11.1, 11.2 | Defensive zoom preference and restoration              | F4                 |
-| 12    | 12.1-12.4  | Hit data, health bar, floating amounts and audio       | F5                 |
-| 13    | 13.1, 13.2 | Accessible Controls and paused-session safety          | F6                 |
-| 14    | 14.1-14.3  | Regression, local handoff and authorized live evidence | F7                 |
+| Phase | Steps | Outcome | Gate |
+| ----- | ----- | ------- | ---- |
+| 15 | 15.1-15.4 | Retired study and a validated JSON data layer | G1 |
+| 16 | 16.1-16.3 | Many-enemy simulation state, behavior-identical | G2 |
+| 17 | 17.1-17.4 | Approved timed spawning and debug controls | G3 |
+| 18 | 18.1, 18.2 | Regression, compatibility and handoff | G4 |
 
-## Phase 8: Revised Contract And Geometry Approval
+## Phase 15: Retire The Study And Introduce The Data Layer
 
-### Step 8.1 - Record The Approved V2 Contract
+### Step 15.1 - Retire The Concluded Geometry Study
 
-Status: complete. Dependencies: 7.2.
+Status: complete. Dependencies: 14.3.
 
 **Implementation prompt**
 
-Reconcile the latest fixes decisions into an additive v2 section in [the mechanics contract](docs/mechanics.md). Preserve v1 approvals/source history and completed plan statuses. Record approved cadence, range semantics, polygon/emitter/spawn policy, comparison version and UI decisions with units/provenance. Distinguish exact approvals from nominal measurements, geometry-dependent outputs and unspecified presentation constants. Assign remaining review gates to their owning steps rather than making this step depend on unfinished geometry. Do not change runtime or invent polygon/audio numbers.
+Remove the concluded geometry study (G01) without changing gameplay. Delete `app/src/game/config/geometry-candidate.ts`, `app/scripts/review-geometry.mjs` and the `deriveShardTiming` export in `app/src/game/simulation/geometry.ts`. Keep `maximumBodyCenterDistance` and `convexContactDistance`; `constrainBodyToArena` and `pursueBody` depend on them.
 
-**Focused checks:** all Q/R approvals covered, cadence/range arithmetic, source-image hash unchanged, links and absence of runtime changes.
+Inline the three facts the shipped config actually consumes as named constants in `encounter.ts` with units and a `docs/mechanics.md` citation: arena radius 19.2 tiles, the enemy three-tile center-to-wall margin producing spawn `(0, -16.2)`, and the two outlines normalized to a 1x1 box - the eight-vertex beveled octagon used by player and head, and the six-vertex centrally symmetric shard hexagon. Do not carry over `sourceWidthPixels`, `sourceHeightPixels`, `dimensionToleranceSourcePixels`, `anchor`, `orientation`, `sourcePixelsPerTile`, `pursuit`, `groupPeriodSeconds`, `shardsPerGroup`, `conservativeLiveShardBound` or `maximumShardCenterDistanceTiles`. They are inert in production, and `shardsPerGroup: 44` / `conservativeLiveShardBound: 88` are stale against the v3 cadence of six emitters times eleven shots.
 
-**Acceptance:** authority and remaining review ownership are clear, no settled choice is reopened, and document checks pass. Exact polygon-derived numbers remain explicitly assigned to step 8.2, not a blocker to this contract-reconciliation step.
+Because `scaleBody` normalizes by source extents, the source-pixel measurements already cancel out of every shipped vertex. Scaling a 1x1-normalized outline therefore reproduces the same geometry, with each vertex differing by at most 6e-17 tiles of floating-point rounding - roughly three orders of magnitude below the geometry module's own `64 * Number.EPSILON` budget. Replace the four tautological `scaleBody(V2_GEOMETRY_CANDIDATE...)` expectations in `config.test.ts` with the explicit literal vertices, and record the rounding as an approved deviation rather than asserting bit-identical output:
 
-**Execution record - 2026-10-25**
+- player and head, 1.25 x 1.25 tiles: `x` in `{+/-0.375, +/-0.625}`, `y` in `{+/-0.625, +/-0.375}`
+- shard, 1.45 x 0.65 tiles: `x` in `{+/-0.725, +/-0.3625, 0}`, `y` in `{0, +/-0.325}`
 
-- Verified the final [archived step 7.2 release record](docs/implementation-plan-v1.md#step-72---verify-release-and-finish-the-handoff): complete under delegated technical release acceptance, with prior successful deployment and live/local checks. Preserved its earlier blocked attempt and subsequent resolution; no fresh deployment verification was needed or claimed.
-- Appended [the approved v2 contract](docs/mechanics.md#approved-v2-contract---step-81) without rewriting v1 mechanics/source/approval text. Covered Q01-Q20 and R01-R05, cadence/range units, shared polygon/emitter/spawn policy, nominal calibration, comparison isolation, UI/session/persistence decisions and preserved invariants. Explicitly separated user approvals from uncertain image measurements, geometry-derived outputs and unspecified presentation values.
-- Assigned exact vertices/anchors, tolerances, edge-contact timing, spawn fit, live bound and pursuit separation to step 8.2; implementation/acceptance and presentation/audio reviews remain with their numbered owning steps. No settled question was reopened, geometry/audio value invented or additional approval assumed. No deviation or remaining blocker for step 8.1.
-- Focused Node assertions passed: all 25 approval IDs; group span 1.5 seconds, period 2.5 seconds, 44 shards/group and 17.6 shards/second; nominal dimensions, offset, reversal/lifetime, 19.2/38.4-tile radius/diameter, north spawn and conditional 88-shard bound; 13 local file links/anchors across mechanics/active plan; original screenshot SHA-256 `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`; exact pre-edit v1 mechanics prefix and archive/decision-record/original-draft preservation; hashes of every tracked app file unchanged. Scoped Git whitespace checks passed.
-- Documentation-only checks replace artificial behavior tests here. Application unit/type/lint/build/browser suites were not rerun; no runtime, dependency, storage, rules activation, commit, push or deployment changed. Preserved pre-existing mechanics table formatting and the unrelated local Vite formatting edit. Step 8.2 and all later steps remain pending and unstarted.
-- Manual review: read the appended v2 section and its approval/review tables alongside the linked decision record; confirm that exact polygon outputs belong to 8.2 and runtime activation to 10.1. No new application behavior is expected from this step.
+Delete the four study tests in `config.test.ts` ("v2 geometry candidate ..." x3 and "historical v2 geometry still fits ...") and the two `deriveShardTiming` tests in `geometry.test.ts`. Retarget the two kernel tests that merely used candidate bodies as fixtures - "fits the approved north spawn and constrains both approved upright bodies" and "limits pursuit travel without pushing already-overlapping or coincident bodies apart" - to the shipped `ENCOUNTER_CONFIG` bodies, computing the east separation inline with `convexContactDistance` so the assertion keeps its meaning. Confirm the surviving `validateEncounterConfig` still proves both bodies fit the arena at spawn, so no coverage is lost. Delete the unused `SessionSnapshot` type (G07) and derive the Playwright `Inspection` type from `SimulationState`.
 
-### Step 8.2 - Define And Approve Shared Geometry
+Do not start the data layer, do not touch `debug.ts` mappings, and do not change any gameplay value.
 
-Status: complete. Dependencies: 8.1.
+**Focused checks:** full unit suite with the six study tests removed and the two retargeted tests passing; `validateEncounterConfig` still runs at module load; typecheck, lint and build clean; `grep` confirms no remaining reference to the deleted modules, `deriveShardTiming` or the inert fields. Run `npm run test:e2e` because `tests/app.spec.ts` imports from `src/game/models.ts`.
 
-**Implementation prompt**
+**Acceptance:** both study files and `deriveShardTiming` are gone, the shipped encounter values are unchanged apart from the recorded sub-1e-16 rounding, the kernel geometry functions keep their coverage, and all five gates pass. No JSON, no archetypes, no spawning.
 
-Propose original typed local player/head/shard vertices from the measured common scale/proportions, with explicit center anchors/orientation and visible head-occlusion uncertainty. Reuse vector/config conventions; introduce a pure geometry configuration module only as a genuine shared owner. Keep the playable preset/renderer unchanged. Generate a common-scale comparison and collision-overlay review from the same proposed vertices, not independent approximate art. Review artifacts are not runtime assets or a tuning screen.
+**Execution and verification - 2026-10-26**
 
-Derive the 10%-head-width emission offset, exact reversal/lifetime from farthest-vertex contact, spawn fit and silhouette-derived pursuit separation. Show the 19.2-tile construction with head at arena center, not its near-edge play spawn. Recalculate the live bound from exact lifetime/group period: nominally 88, not unconditional. Present any extra stopping gap explicitly. Obtain and record approval of actual silhouettes/anchors and necessary unspecified choices; finalize these v2 mechanics entries. Do not retain nominal glyph-centroid timing at the expense of exact edge contact.
+- Dependency 14.3 verified complete in [the v2 archive](docs/implementation-plan-v2.md). Environment: Node v22.21.1 against a pinned `.node-version` of 24.22.1 - a disclosed limitation, not a substitute for a pinned final gate run. `npm ci` installed 116 packages; Playwright needed `npx playwright install chromium` because the cached build was 1187 against the required 1248.
+- Pre-change baseline on this machine: lint, typecheck, build clean, 327 unit/component tests, 34 Chromium cases.
+- TDD: asserted the explicit literal vertices while the old derivation was still in place; `config.test.ts` failed as predicted. Measured the actual deviation per body before implementing - player `0.0`, shard `0.0`, head `5.5511e-17` tiles. Only the head body moves, well inside the predicted 6e-17 and about 250 times below the kernel's own `64 * Number.EPSILON` budget. Recorded as the G06 approved deviation.
+- Deleted `app/src/game/config/geometry-candidate.ts`, `app/scripts/review-geometry.mjs` (and the now-empty `app/scripts/`), `deriveShardTiming` from `geometry.ts`, and `SessionSnapshot` from `models.ts` (G07). `maximumBodyCenterDistance` and `convexContactDistance` are retained; `constrainBodyToArena` and `pursueBody` depend on them. Verified absent from `app/src` and `app/tests`: `deriveShardTiming`, `sourcePixelsPerTile`, `dimensionToleranceSourcePixels`, `conservativeLiveShardBound`, `shardsPerGroup`, `maximumShardCenterDistanceTiles`, `V2_GEOMETRY_CANDIDATE`, `SessionSnapshot`. The one surviving `groupPeriodSeconds` is a config-derived local in `simulation.test.ts`, not the retired literal; step 15.4 promotes that formula into the config.
+- `encounter.ts` now owns `ARENA_RADIUS_TILES` 19.2, `ENEMY_CENTER_WALL_MARGIN_TILES` 3 producing spawn `(0, -16.2)`, and the two 1x1-normalized outlines, each with units and a `docs/mechanics.md` citation.
+- **Approved deviation from this step's own prompt.** The prompt said to retarget "the two kernel tests that merely used candidate bodies as fixtures". Inspection found six usages, and several assert constants that are properties of the larger unscaled shapes - `radius(player) + radius(shard) > 2` would become 1.4539 with the shipped 1.25 x 1.25 bodies, and the pinned contact distances 1.9415422942741967 / 2.0932846919542065 belong to the 36x33 and 42x55 silhouettes. Retargeting all of them would have silently destroyed real assertions. Those shapes are therefore declared as explicit local fixtures in `geometry.test.ts`, built by the same arithmetic so every pinned constant still holds, and labelled as test-local fixture construction. Only "fits the approved north spawn and constrains both approved upright bodies" moved to `ENCOUNTER_CONFIG`, where boolean fit assertions are more meaningful against the real encounter. The pursuit test's east separation is now computed inline with `convexContactDistance`, keeping its meaning without the retired module. No assertion was weakened.
+- Second recorded correction: deriving the Playwright `Inspection` type from `SimulationState` failed typecheck, because `tests/**/*.ts` is checked under `tsconfig.node.json`'s `nodenext` resolution, which rejects `simulation.ts`'s extensionless internal imports. `Inspection` is instead described from `models.ts` primitives (`PlayerState`, `EnemyState`, `ShardState`, `SessionPhase`), which is appropriate for a diagnostic payload and keeps production modules out of the Node type project.
+- All five gates pass after the change: typecheck, lint, 318 unit/component tests across nine files, production build, and 34 Chromium cases in 2.7 minutes. The test count drops by exactly nine - four config study tests, the four-case `test.each` leading-edge timing block, and one reach-derivation rejection test. No gameplay value changed beyond the recorded head-vertex rounding.
 
-**Focused checks:** finite ordered convex vertices, nonzero area, 3-8 sides, shard central symmetry, documented dimension/aspect tolerances reflecting source uncertainty, shared transforms, exact edge contact/just-beyond failure, spawn fit, positive reversal within lifetime. Use existing Node tests and common-scale visual review.
+### Step 15.2 - Introduce The Validated JSON Data Boundary
 
-**Acceptance:** exact geometry and derived values have actual approval evidence; data/math/comparison checks pass; runtime remains v1. Missing approval is recorded as a blocker, not assumed acceptance.
-
-**Candidate preparation and approval blocker - 2026-10-25**
-
-- Verified step 8.1 complete and read its approved v2 contract and Q/R decision provenance. Added a disconnected, Node-only [typed geometry candidate](app/src/game/config/geometry-candidate.ts), reusing `Vector2`, and four tests in the existing config suite. Proposed upright beveled player/head octagons, a centrally symmetric firing-axis shard hexagon, body-center anchors, source-informed dimension/aspect review tolerances and zero extra pursuit gap. None of these new geometry choices is recorded as user-approved.
-- Added [a reproducible review generator](app/scripts/review-geometry.mjs). Run `node app/scripts/review-geometry.mjs` from the root to create ignored `app/test-results/geometry-review/index.html` and `values.json`. Review figures use identical candidate vertices/transforms for the physical fill/collision overlay, and show common-scale proportions, centered-head edge contact, min/default/max zoom and actual near-edge spawn. No reference artwork or generated review image is committed or bundled.
-- Recorded exact vertices, uncertainty, tolerances, derivation and [approval questions G01-G04](docs/mechanics.md#approval-questions). Conditional candidate outputs: emitter 0.185329037181 tile, center reach 17.951764808627 tiles, reversal 2.220804471431 seconds, lifetime 4.441608942861 seconds, conservative live bound 88, north spawn `(0,-16.2)` fitting within radius 19.2. Axial pursuit contact is 1.720912488107/1.941542294274 tiles and diagonal contact 2.093284691954 tiles, with proposed zero extra gap; the direction-dependent movement helper remains step 9.2 work.
-- TDD: focused config test first failed because the candidate module was absent, then passed all four new cases after the smallest data implementation. Checks cover finite ordered convex nonzero-area 3-8-vertex bodies, exact common-scale dimensions/aspects, shard central symmetry, fixed orientation policy, exact contact and just-beyond failure across firing phases, spawn fit, positive reversal/lifetime, dynamic live bound and unchanged v1 values. Under pinned Node 24.22.1, all 198 unit/component tests across six files, typecheck, lint and production build passed. The existing large Phaser bundle warning remains unchanged.
-- Isolated Chromium review checks at 1440x1000 and 390x1000 passed: four nonblank figures, body/overlay vertex equality, colored-body pixels, no clipping/overflow or page errors. Visual inspection found comparison/zoom-row overlaps missed by the first clipping check; a focused pairwise-overlap assertion reproduced them, then passed at both widths after a layout-only repair. Screenshots remain ignored in the review artifact directory. This is automated/agent visual review, not user geometry acceptance or a fresh full gameplay end-to-end run.
-- Documentation checks passed against generated numeric/aspect values and local links; the original image SHA-256 remains `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`. No live v1 config, simulation, renderer, history, dependency, lockfile, gameplay rules identity, commit, push or deployment changed. Preserved the pre-existing local Vite formatting and step 8.1 documentation work.
-- **Blocker:** actual user approval of G01-G04 is required before finalizing these v2 geometry entries or completing step 8.2. Review the generated local page and answer the four questions together in the mechanics document or conversation. No approval is inferred from technical checks; steps 9-14 remain pending and unstarted.
-
-**User approval and completion - 2026-10-25**
-
-- In response to the combined G01-G04 review request, the user replied "approved". Recorded actual approval of the exact original silhouettes, body-center anchors/orientations, dimension/aspect review tolerances and derived offset/timing/live-bound/spawn/pursuit values with zero extra gap in [the finalized mechanics entries](docs/mechanics.md#step-82-geometry-candidate---approved). This resolves the historical handoff blocker above; no approval is inferred from test success or delegated acceptance.
-- Updated candidate approval/provenance metadata and the existing config assertion, plus generated-review labels. Preserved all reviewed vertices and physical values exactly, verified by deep comparison of regenerated data against the pre-approval review artifact. Source-informed uncertainty remains documented; approval is not client-fidelity certification or a newly observed playtest.
-- Approval-state TDD check failed as expected (`proposed` versus required `approved`), then all four focused geometry cases passed after the metadata change. All 50 config tests, typecheck and lint passed on this follow-up; approved-artifact and documentation assertions passed. The prior candidate-preparation record retains the full 198-test/build and desktop/narrow visual evidence; those broader gameplay gates were not rerun or misrepresented as fresh here.
-- Acceptance: exact geometry/derived values have explicit user approval and passing data/math/common-scale review evidence. Step 8.2 is complete with no remaining blocker or deviation. Runtime configuration, simulation, renderer, comparison identity and history remain v1; geometry is still disconnected until the coordinated step 10.1 activation. Step 9.1 and all later steps remain pending and unstarted. No commit, push or deployment was performed.
-
-## Phase 9: Pure Geometry Rules
-
-### Step 9.1 - Implement Continuous Convex Hit Detection
-
-Status: complete. Dependencies: 8.2.
+Status: complete. Dependencies: 15.1.
 
 **Implementation prompt**
 
-Implement minimal shared vertex transforms and continuous translating-convex overlap. Check installed geometry APIs first and reuse suitable operations. Where unsupported, use the reviewed swept separating-axis overlap intervals with axes from both shapes and relative player/shard displacement. Document tangency and numerical tolerance separately from gameplay tuning. Circles/AABBs can reject candidates but never accept final hits. Keep helpers disconnected from playable collision until step 10.1; no new physics framework.
+Create the data layer for the arena and shared shapes (G02). Add `app/src/game/data/shapes.json` holding the two normalized outlines keyed by name, and `app/src/game/data/arena.json` holding the circular arena's center and radius in tiles. Enable `resolveJsonModule` in `tsconfig.app.json`; it is currently unset.
 
-**Focused checks:** newborn/initial overlap, stationary/equal motion, axial/diagonal high-speed crossing, miss, tangency/just-separation, circle false positive rejected, rotated equivalence, reverse crossing and invalid geometry. Extend nearby tests; add one focused geometry test only if ownership warrants it. Verify Node-only imports.
+Add `app/src/game/config/data.ts` as the single boundary that imports the JSON and validates it into typed authored data. `strict` is off in this project, so the compiler will not reject a missing or mistyped field: validate every value at runtime in the same defensive style as `isAttemptRecord` in the storage adapter. Reject nonfinite numbers, absent keys, wrong types, empty shape tables, outlines outside the 3-to-8 vertex contract and any shape whose extents are not a 1x1 box. Throw a `RangeError` naming the offending path; a malformed data file is a build-time programming error, not a recoverable user condition, so do not add a silent fallback.
 
-**Acceptance:** approved fixed-orientation shapes pass continuous-relative-motion tests; no endpoint-only shortcut, runtime branch or additional clock/framework is introduced.
+`encounter.ts` consumes the validated authored data instead of its own literals and keeps deriving `ENCOUNTER_CONFIG` exactly as now. Keep all derivation - outline scaling, degree-to-radian conversion - in the loader path, never in the JSON. Shipped values must not change.
 
-**Execution and verification - 2026-10-25**
+Do not move enemy, weapon, player, camera or session values yet; step 15.3 owns those. Do not add a schema library - hand-written guards match the existing idiom and avoid a dependency for one call site.
 
-- Confirmed step 8.2 completion and explicit G01-G04 approval before implementation. Inspected installed `@flatten-js/core` 1.6.14 declarations: static polygon intersection and affine transforms are available, but no continuous translating-convex query. The new pure [geometry adapter](app/src/game/simulation/geometry.ts) reuses `Matrix` for rotation-then-translation and implements the reviewed swept overlap intervals on normalized edge normals from both bodies, with relative displacement over one shared motion segment. No dependency or physics framework was added.
-- Added one focused [Node geometry test file](app/src/game/simulation/geometry.test.ts) beside the simulation owner. TDD first failed on the absent module; implementation passed 36 cases and exposed a malformed one-component test vector. Correcting that fixture made all 37 pass. Strengthened coverage to 41 passing cases, including initial/newborn and endpoint-only contact, equal/stationary motion, high-speed axial/diagonal/return crossings, both bodies moving, disjoint axis-time intervals, edge/corner tangency versus just-separation, enclosing-circle and world-AABB false positives, either winding, approved-body rotation equivalence, scale variation, nonmutation and invalid geometry. Motion fixtures now require typed two-component tuples.
-- Documented the [collision and numerical contract](docs/mechanics.md#step-91-continuous-convex-geometry): touching counts as contact; a coordinate-scaled `64 * Number.EPSILON` allowance is numerical roundoff, not source uncertainty, invisible collider tuning or a velocity cutoff. Finite ordered strictly convex 3-8-vertex bodies and finite transforms/displacements are required; degenerate, concave, self-crossing or numerically unresolvable inputs throw `RangeError`. Projections use a shared origin and no broad-phase overlap can accept a hit.
-- Under pinned Node 24.22.1, all 239 unit/component tests across seven files, typecheck, lint and production build passed. The existing approximately 1.70 MB Phaser chunk warning remains. Editor diagnostics are clear. The Node-only suite and import inspection confirm no React, Phaser, DOM or storage integration; only the new test imports the geometry adapter. The production bundle retains the existing v1 asset identities.
-- Local Playwright initially passed 19/20 cases; the production desktop retry assertion observed `2.0` seconds after a pixel readback against its existing strict `< 2` bound. The affected production desktop case passed on an isolated rerun (1/1). This scheduling-sensitive result is recorded rather than claimed as a clean full-suite pass; no runtime/test assertion was weakened or unrelated failure repaired. Development and production narrow-screen scenarios passed in the initial run. No hosted check or fresh human playtest was performed.
-- Acceptance met with no design deviation or remaining step 9.1 blocker: approved fixed-orientation polygons pass continuous-relative-motion checks without an endpoint-only shortcut or another runtime branch/clock. Live v1 configuration, simulation, renderer, hit/lifetime behavior, rules identity, history and dependencies remain unchanged; helpers stay disconnected until 10.1. Preserved the pre-existing Vite formatting edit. Step 9.2 and later steps remain pending and unstarted; no commit, push or deployment was performed.
+**Focused checks:** focused failing loader test first, then valid data, each rejection case, and the resulting `ENCOUNTER_CONFIG.arena` and body vertices identical to step 15.1's literals. Typecheck proves the JSON import resolves; build proves the JSON is bundled, not fetched. Full unit suite, lint, build.
 
-### Step 9.2 - Implement Body-Aware Arena And Pursuit Geometry
+**Acceptance:** arena and shapes are authored in JSON behind one validating loader, every rejection case is covered, shipped geometry is byte-identical to 15.1, and all five gates pass.
 
-Status: complete. Dependencies: 9.1.
+**Execution and verification - 2026-10-26**
 
-**Implementation prompt**
+- Enabled `resolveJsonModule` in `tsconfig.app.json`; it was unset. Added `app/src/game/data/arena.json` and `app/src/game/data/shapes.json`, holding the circular arena and the two outlines normalized to a 1x1 tile box.
+- Added `app/src/game/config/data.ts` as the single validating boundary. TDD: wrote `data.test.ts` first against the absent module and confirmed the red, then implemented. Validation rejects non-objects, absent keys, wrong types, nonfinite values, nonpositive radius, outlines outside the 3-to-8 vertex contract, and any outline not spanning exactly 1 tile per axis before scaling; every rejection names the offending path and throws `RangeError` at module load rather than falling back, since malformed authored data is a programming error.
+- `encounter.ts` now derives from `AUTHORED_ARENA` and `loadOutline(...)` rather than its own literals. All derivation - outline scaling, degree-to-radian conversion - stays on the loader path; the JSON holds authored values only.
+- Confirmed the data is bundled, not fetched: the production build emits no separate JSON asset and the arena radius appears inside the JS bundle.
+- All five gates pass: typecheck, lint, 324 unit/component tests across ten files (318 plus six new loader cases), production build, and 34 Chromium cases in 2.8 minutes. Shipped geometry is unchanged from 15.1 - the existing literal-vertex assertions still hold.
 
-Extend the same pure geometry slice with transformed-vertex circular containment/contact, a tested movement constraint preserving existing tangential edge movement, and silhouette-derived enemy stopping separation. Reuse radial/pursuit semantics where suitable; no polygon-wall replacement, body blocking or contact damage. Validate actual vertices, not bounding-circle overlap as proof of fit. Share exact reach derivation with config validation instead of copying timing formulas into drawing. Do not activate these rules yet.
+### Step 15.3 - Move The Enemy And Weapon Into A Keyed Archetype
 
-**Focused checks:** interior/edge/outside placements, rotated corner contact, outward rejection/tangential movement, repeated containment, approved spawn, coincident/near pursuit without overshoot/division by zero/jitter, zero emitter offset accepted and negative/nonfinite rejected, exact leading-edge contact across firing phases.
-
-**Acceptance:** shared physical shapes move/stop under approved semantics and fit where required; arena containment never becomes projectile confinement. Helpers remain disconnected from live v1 rules.
-
-**Execution and verification - 2026-10-25**
-
-- Verified step 9.1 complete with its 41-case continuous-geometry record and the actual G01-G04 approvals, including zero extra pursuit gap. Extended the existing pure [geometry adapter](app/src/game/simulation/geometry.ts); no new module, test harness, dependency, physics framework or clock was added. Reused the existing validator, normalized edge axes, projections, numerical roundoff policy and installed `Matrix` transform.
-- Added actual-vertex circular containment and exact direction-dependent center limits, then a radial candidate constraint preserving the existing arena projection/tangential movement semantics. Translated arena centers, rotated corner contact, approved north spawn and upright player/head shapes are supported. Neither center-only fit nor an enclosing circle proves physical fit. The constraint operates only on supplied movement candidates; no shard confinement, wall despawn or contact response was introduced.
-- Added support-plane silhouette contact and pursuit capped by the remaining distance to contact. Tests confirm the approved 1.720912488107/1.941542294274-tile axial and 2.093284691954-tile diagonal separations, bounded travel, no overshoot, stable repeated stopping, coincident/near/overlapping placements and invalid-input rejection. Zero extra gap remains unchanged; there is no push-apart correction, player blocking or contact damage.
-- Added shared exact leading-edge timing and reused it in the disconnected [candidate config](app/src/game/config/geometry-candidate.ts), which also reuses axial contact derivation. Replaced the [review generator](app/scripts/review-geometry.mjs)'s duplicate diagonal-contact math with the shared helper. Direct Node execution/regeneration passed; review JSON comparison retained every other value and vertex exactly, with only a one-unit-in-last-place diagonal rounding difference. Approved emitter/reach/reversal/lifetime/spawn/live-bound values remain unchanged; no nominal timing was restored or rounded to ticks. Documented the [helper and numerical contracts](docs/mechanics.md#step-92-body-aware-arena-and-pursuit-geometry).
-- TDD: six new arena tests failed on missing helpers, then all 47 geometry cases passed after implementation. Twelve subsequent pursuit/timing cases failed on their missing helpers, then all 59 passed. Eighteen new cases cover interior/edge/outside fit, enclosing-circle overconstraint rejected, rotated corner contact, radial/outward/tangential behavior over 240 consecutive moves, repeated containment, approved spawn, pursuit stability and no division by zero, valid zero emitter offset versus negative/nonfinite input, and exact contact/just-beyond failure across firing rotations. Existing independent config assertions also pass: 109 focused geometry/config checks total.
-- Under pinned Node 24.22.1, all 257 unit/component tests across seven files, typecheck, lint and production build passed. Production retains the v1 JS/CSS asset identities and the existing approximately 1.70 MB Phaser chunk warning. Node-only import inspection confirms that only preparatory config, tests and the review generator use these helpers; no React, Phaser, DOM or storage dependency was introduced. Browser/hosted suites and fresh human visual/play acceptance were not rerun or claimed for this disconnected pure-code step; generated figures/layout were not redesigned.
-- Acceptance met with no remaining blocker or design/tuning deviation. Live v1 encounter configuration, simulation, drawing, shard lifecycle, comparison identity, history, dependencies and lockfile remain unchanged. Preserved the unrelated local Vite formatting edit and prior step records. Step 10.1 and later remain pending and unstarted; no commit, push, deployment or coordinated runtime activation was performed.
-
-## Phase 10: Coordinated Playable V2
-
-### Step 10.1 - Activate The Revised Encounter Atomically
-
-Status: complete. Dependencies: 9.2.
+Status: complete. Dependencies: 15.2.
 
 **Implementation prompt**
 
-Wire reviewed geometry/config/drawing into the existing encounter together under `crystal-worm-child-head-paladin-v2`: cadence, emitter offset, exact shard timing, arena/spawns, pursuit and polygon hits. Physical drawing and collision consume identical vertices/transforms; decorations stay nonphysical. Replace obsolete positive-circle validation with polygon validation and nonnegative emitter radius. Retain firing-axis shape orientation on reversal using only minimal necessary state, never a stored firing origin.
+Restructure the encounter config so the enemy becomes one entry in a keyed archetype collection (G04), still with exactly one archetype and one instance. Add `app/src/game/data/enemies.json` with `crystal-worm-child-head` holding its body (shape name plus width and height in tiles), `speedTilesPerSecond`, `contactDamageHp`, `blocksPlayer` and a `weapon` containing the current `emitters`, `burst` and `shard` values. Add `app/src/game/data/encounter.json` with `rulesVersion`, `simulation`, `player`, `camera` and `session`. Per G08 the player's body carries its own authored `widthTiles` and `heightTiles`, both `1.25`, rather than borrowing the enemy's dimensions; shipped geometry is unchanged because the values match. Extend the loader and its validation to cover both.
 
-Reuse simulation entry points, `updateAttacks`, reversal/expiry segment splitting, player interpolation, stable shard order, `hasHitPlayer`, health rules and the sole Phaser driver. Replace the local circle hit-test with the tested sweep, including newborn overlap. Existing shards ignore later head movement. Update affected regression expectations deliberately; no zoom/audio/modal work in this step.
+Change `EncounterConfig` from singular `enemy`/`emitters`/`burst`/`shard` to `archetypes: Readonly<Record<string, EnemyArchetype>>` using the shape in the target architecture above, and update all 68 production read sites across `simulation.ts`, `encounter.ts`, `debug.ts` and `phaser/encounter.ts`. `validateEncounterConfig` validates every archetype rather than a single enemy: per-archetype positive values, reversal strictly inside lifetime, pursuit slower than the Paladin, and body fit inside the arena at its spawn position.
 
-**Focused checks:** eleven shots per phase/44 per group; initial/last/next-group boundaries; moving-head origins/rotation; fractional reversal/expiry inside ticks; swept outward/return hits, independent once-only shards/lethal stop; lifetime-only expiry outside arena; schedule equivalence; spawn/edge constraints and final live bound. Browser checks prove nonblank polygons, matching outlines and repeated-practice lifecycle at desktop/narrow sizes.
+Replace the literal-pinned `contactDamageHp: 0`, `blocksPlayer: false`, `expiration: "lifetime-only"` and `hitPolicy: "once-per-shard"` field types with `number`, `boolean` and unions, and assert the approved values in `validateEncounterConfig` instead. The approved rule is then enforced at runtime, in the module that owns rules, rather than by a type that forbids the variation it appears to model.
 
-**Acceptance:** all five app gates pass; v2 activates as one coherent preset without hidden circle hits, a second clock or weakened resource/lifetime assertions. Record exact geometry/timing/bounds; later visual acceptance remains pending.
+Keep exactly one archetype and one live enemy. Do not add spawning, a spawn rule, or any second archetype. Gameplay must be unchanged: same cadence, same positions, same death times.
 
-**Execution and verification - 2026-10-25**
+**Focused checks:** focused failing test on the archetype-shaped config first; then archetype validation accept/reject cases, each approved-rule assertion, and an equivalence check that the derived runtime values match step 15.2 field for field. Full unit suite, typecheck, lint, build, and `npm run test:e2e` for the renderer and inspection paths.
 
-- Activated approved shared octagons/hexagon, actual-vertex arena/pursuit, relative swept polygon hits and drawing atomically as `crystal-worm-child-head-paladin-v2`. Shards retain firing-axis orientation on reversal; existing fractional reversal/expiry segmentation, once-only hit state, stable lethal ordering and one Phaser clock remain. A conservative relative swept-AABB rejection avoids unnecessary SAT work; it never accepts collisions or confines shards.
-- Arena radius 19.2 tiles, north head center -16.2 tiles, emitter offset 0.18532903718071878 tile; speed 8 tiles/s, reversal 2.2208044714307382 s, lifetime 4.4416089428614765 s. Four emitters times eleven shots, 0.15 s apart, 1 s after last shot, two-second initial cooldown. Conservative live bound `44 * ceil(lifetime / 2.5) = 88`. No timing was rounded to ticks or nominal screenshot values.
-- Focused activation test failed v1 identity then passed. Updated obsolete v1 radius/spawn/cadence fixtures without weakening once-only, lifetime, schedule or resource tests. Five-minute schedules at 30/60/120 Hz agree, 1313 volleys, resource bound 88. Browser fixtures now wait for the near-edge head to be visible and use an atomic time/pixel cooldown observation with 50 ms sampling, repairing the previously observed poll/readback race without weakening the two-second rule.
-- Final pinned-toolchain gates: 258 unit/component tests, typecheck, lint, production build and all 20 Chromium browser cases passed. Desktop/narrow screenshots and pixels are generated, actual deaths and persistence exercised, 60-second play plus 25 retries retain one canvas/listener set. Existing large Phaser chunk warning remains nonblocking. Earlier failing browser runs exposed obsolete v1 assertions and the cooldown observation race; neither was treated as a pass.
-- No zoom/audio/modal behavior, tuning, migration, artwork distribution, fresh human geometry approval or hosted verification claimed. Step 10.2 owns comparison/technical visual acceptance. Batch publication is explicitly authorized above; unrelated Vite formatting remains excluded.
+**Acceptance:** the enemy and its weapon are authored data behind the keyed archetype collection, singular config fields are gone, approved rules are asserted at runtime, observable gameplay is unchanged, and all five gates pass.
 
-### Step 10.2 - Verify Geometry And Comparison Isolation
+**Execution and verification - 2026-10-26**
 
-Status: complete. Dependencies: 10.1.
+- Added `enemies.json` with the `crystal-worm-child-head` archetype (body, movement, weapon) and `encounter.json` with `rulesVersion`, `primaryArchetype`, `simulation`, `player`, `camera` and `session`. Per G08 the player body carries its own authored `widthTiles`/`heightTiles` of 1.25, so it no longer borrows the enemy's dimensions; the values match, so no shipped geometry changed. `fixedStepHz: 60` is authored and `fixedStepSeconds` derived, verified exact against `1 / 60`.
+- `EncounterConfig` now carries `primaryArchetypeId` and `archetypes`, replacing singular `enemy`/`emitters`/`burst`/`shard`. Added `archetypeOf` and `primaryArchetype` resolvers. Converted all 68 production read sites across `simulation.ts`, `encounter.ts`, `debug.ts` and `phaser/encounter.ts`, plus the test suites. `SELECTED_ENCOUNTER_VALUES` now derives from the authored data instead of being a second hand-maintained copy.
+- Literal-pinned field types are gone: `contactDamageHp` is `number`, `blocksPlayer` and `rotateDuringCooldown` are `boolean`, and `expiration`/`hitPolicy` are `string`. The approved values are asserted in validation instead, so the type no longer forbids the variation it appeared to model.
+- Scope correction during execution: an initial edit had the renderer resolve bodies through `enemy.archetypeId` and `shard.archetypeId`, which are 16.1 and 16.2 model fields. Reverted to `primaryArchetype(config)` so this step changes configuration only and leaves the model untouched.
+- **Finding, and the first real consequence of closing the F3 gap.** Adding `validateEncounterConfig` to `debugEncounterConfig` immediately failed 11 tests, because the debug sliders have always permitted values the production validator forbids. Two distinct causes, both resolved without weakening an assertion:
+  1. Five invariants were over-strict rather than genuinely positive. Zero is a supported, meaningful value for enemy speed (stationary), initial cooldown (fire at once), shard damage (harmless) and shard speed (frozen), and each is a slider minimum; rotation is signed, where negative is counter-clockwise and zero is no rotation. The validator now separates strictly-positive values - emitter count, shots per emitter, shot interval, cooldown, reversal age, lifetime - from nonnegative and signed ones, each group commented with why. Production values are all positive, so the shipped config is unaffected, and negatives, `NaN` and infinities are still rejected.
+  2. The spawn sliders reach past the arena wall. `debugEncounterConfig` now clamps the spawn with `constrainBodyToArena`, making the debug config valid by construction instead of relying on the simulation to correct it afterwards.
+- **Second finding: one approved rule is deliberately violable in debug.** The enemy-speed slider reaches 12 tiles/second while the Paladin derives 7.0613, so "pursuit must be slower than the Paladin" cannot hold for every debug state - that is the point of the slider, and why a debug attempt already carries `DEBUG_RULES_VERSION` and is excluded from saved history. That rule moved into a new `validateShippedEncounter`, which wraps structural validation and is called on `ENCOUNTER_CONFIG` at module load. The immutable approved rules that debug cannot vary - contact damage, blocking, rotate-during-cooldown, lifetime-only expiry, once-per-shard hits - stay in shared archetype validation, where they also guard against a bad data file. A new focused test asserts both halves: structural validation permits a faster enemy, `validateShippedEncounter` rejects it.
+- All five gates pass: typecheck, lint, 325 unit/component tests across ten files, production build, and 34 Chromium cases in 2.7 minutes. Exactly one archetype and one live enemy; cadence, positions, damage and death times unchanged, with the existing literal-vertex and approved-tuning assertions still holding.
 
-**Implementation prompt**
+### Step 15.4 - Unify The Tuning Registry
 
-Reuse existing history/storage and production-safe browser helpers to prove v1 records remain readable/labeled and excluded from v2 bests, while real v2 deaths save once and R/aborts save nothing. Do not migrate/delete/relabel old records or add a schema without need. If current code already satisfies this, add only missing tests/evidence.
-
-Review actual desktop/narrow practice and shared outlines at currently available min/default/max zoom, including sustained play and 25 retries using the derived resource bound. Verify edge contact in the controlled centered-head condition, not a pursuing-head frame. Obtain user geometry/pattern acceptance; screenshots are not human approval. Repair integration defects only; tuning changes require approval/version review.
-
-**Focused checks:** mixed-version best/history, corrupt/future-record handling, one canvas/driver, resets/cleanup, geometry pixels/overlays, actual hits and resource bounds. Run relevant gates, all five if runtime changes.
-
-**Acceptance:** comparison/practice checks and actual geometry/pattern approval are recorded; no v1 death-time/pixel-radius target or new deployment is claimed.
-
-**Execution and verification - 2026-10-25**
-
-- Step 10.1 published and remote verified at `6422656be044548372d6f52b109707cff8777322`. Existing exact-version history comparison already isolates v2; no runtime/storage/schema change was needed. Replaced generic incompatible fixtures with actual v1 identities; browser assertions prove v1 metrics/version survive R/abort unchanged, remain labeled Other rules and are excluded from the v2 best. Existing real-death production tests, result-once tests and corrupt/future-storage preservation continue to apply unchanged.
-- Extended existing desktop/narrow pixel workflows with current 0.75/1/1.5 min/default/max zoom screenshots, then restore default. All three focused history/responsive browser cases passed. Reviewed generated min/max and active-pattern captures at 1440x1000 and 390x844: original shared polygons, nonblank play, no HUD overlap; head/shards can be offscreen at tighter views by design. Controlled centered-head leading-edge contact is proved by the shared geometry/config tests, not inferred from a chasing-head screenshot.
-- 258 unit/component tests, typecheck, lint and production build passed. Unchanged runtime's immediately preceding full 20-case browser gate includes real v2 deaths, 60-second play, 25 retries, one canvas/listener and conservative shard bound 88. No claims of a new sustained run or hosted verification for this evidence-only step.
-- Geometry/pattern accepted technically under the explicit no-further-confirmation batch delegation, building on actual G01-G04 shape approvals. No fresh human play/visual approval, fidelity claim or tuning is invented. Broader zoom and health/Controls presentation remain later steps. Preserved unrelated Vite edit and local reference art.
-
-## Phase 11: Persisted Camera Zoom
-
-### Step 11.1 - Add The Defensive Zoom Preference Boundary
-
-Status: complete. Dependencies: 10.2.
+Status: complete. Dependencies: 15.3.
 
 **Implementation prompt**
 
-Set typed camera limits to 0.25-3.0/default 1/step 0.125 without changing world geometry or comparison identity. Add one dedicated zoom storage adapter/key, reusing attempt storage interfaces/safe-access patterns where suitable. Do not generalize history into a settings framework. Specify a stable encoding; accept finite in-range values including valid fractional O/P sequences, default invalid data without an unapproved snapping policy. Keep visit-local fallback on unavailable/corrupt/blocked/quota storage, write only actual changes, and never overwrite/remove history.
+Collapse the duplicated authored-value-to-config mapping before phase 17 multiplies it. Today a single tunable is maintained in five places: `SELECTED_ENCOUNTER_VALUES`, the `EncounterConfig` type, the `ENCOUNTER_CONFIG` mapping, `validateEncounterConfig`'s bounds, and both `DEBUG_PARAMETERS` and `debugEncounterConfig`. `debugEncounterConfig` re-implements the whole builder and, unlike the default path, never calls `validateEncounterConfig` - so debug configs can reach the simulation in states the production config is forbidden to take.
 
-**Focused checks:** absent/valid/boundary/fractional values, malformed/wrong-type/nonfinite/out-of-range data, throwing getter/read/write, quota failure, unchanged-write deduplication and history independence. Reuse neighboring tests or one adapter-specific test where warranted.
+Make `DEBUG_PARAMETERS` the single registry. Give each entry its `label`, `unit`, `group`, `min`, `max`, `step` and a typed way to apply a value to a config (an `apply(config, value)` or a typed path), then build both the default and the debug config by folding the registry over the authored base. `debugEncounterConfig` becomes that fold plus `validateEncounterConfig`, not a parallel builder. Fold the three boolean toggles - `godMode`, `chaseArenaCenter`, `matchPlayerToHead` - into the same registry so `DebugPanel` stops hand-coding three near-identical blocks, and derive the panel's group list from the registry instead of the hardcoded `["Enemy", "Emitters", "Burst", "Projectiles"]` literal.
 
-**Acceptance:** config/storage tests and relevant regression/type/build checks pass; history is unchanged and persistence rules remain outside simulation. Camera binding/reload restoration is not claimed yet.
+While here, remove the duplicated derivations the registry exposes: the collision bounding-radius formula written twice in `simulation.ts` (module constant and again inside `setDebugSettings`), `extent()` in `debug.ts` recomputing the span `scaleBody` already computes, and the four open-coded degree-to-radian conversions. Add a derived live-shard bound to the config - `emitterCount * shotsPerEmitter * ceil(lifetimeSeconds / burstGroupSeconds)` where `burstGroupSeconds = (shotsPerEmitter - 1) * shotIntervalSeconds + cooldownAfterLastShotSeconds` - giving the deleted `conservativeLiveShardBound` a correct home with a real consumer. For v3 this is 66, not the retired literal 88.
 
-**Execution and verification - 2026-10-25**
+Per G08, rename `enemyWidth`/`enemyHeight` to `headWidth`/`headHeight` and stop them sizing the player. The player's size comes from its own authored values added in step 15.3, and `matchPlayerToHead` becomes an explicit override that copies head size onto the player. Both default to 1.25 x 1.25, so no shipped value changes; add the player's own size sliders to the registry.
 
-- Dependency 10.2 pushed and remote verified at `38f0699d792edf4fc92ce266e3ccdcdb8f0fa373`. Added dedicated `ZoomPreference` adapter, key `dodge-hell-training.zoom`, stable JSON-number encoding. Reuses the existing injected storage port; history/schema/data are untouched. Valid finite values in [0.25, 3] retain exact fractional values with no snapping. Missing data defaults to 1; malformed/blocked/read/getter/quota failures retain visit-local operation, preserve invalid saved data and stop failed writes. Only actual changes write.
-- Approved camera limits now 0.25-3, default 1, increment 0.125, 32 CSS pixels/tile unchanged; rules identity stays v2. The existing live camera automatically consumes these limits; updated keyboard clamp evidence without binding persistence early.
-- TDD: adapter suite failed missing module, then 97 focused storage/config/history cases passed. All five gates passed: 280 unit/component cases across eight files, typecheck, lint, build and 20 Chromium cases including sustained/25 retries and desktop/narrow extended-zoom captures. Existing Phaser bundle warning remains. Camera reload restoration remains solely step 11.2; no claim of a bound preference or hosted verification.
+Debug defaults, slider ranges and every shipped gameplay value must be unchanged.
 
-### Step 11.2 - Wire Reload-Safe Camera Restoration
+**Focused checks:** focused failing test proving one registry drives both configs; then every parameter round-trips authored value to config, `debugEncounterConfig` output equals the default config at default settings, the debug path now rejects configs that violate encounter invariants, the derived shard bound equals 66 for v3, and the panel renders the same groups and controls. Full unit suite, React tests, typecheck, lint, build, `npm run test:e2e`.
 
-Status: complete. Dependencies: 11.1.
+**Acceptance:** one registry maps authored values to config for both paths, the debug path validates encounter invariants, duplicated derivations are gone, the derived live-shard bound replaces the retired literal, and all five gates pass with unchanged shipped values.
 
-**Implementation prompt**
+**Execution and verification - 2026-10-26**
 
-Connect the adapter to the existing React zoom ref and Phaser camera boundary. Read safely at initialization, restore before first encounter rendering, and persist only actual O/P changes. Preserve R/Home/Start continuity and visit-local fallback. No writes per HUD/frame update or per-projectile React state; zoom cannot alter units, collisions, survival time or rules identity.
+- Replaced the two parallel builders with one. `encounter.ts` now exposes a flat `TuningValues` surface, `AUTHORED_TUNING` projected from the authored JSON, and a single `buildEncounterConfig(values, { rulesVersion, matchPlayerToHead })`. Both paths go through it: `ENCOUNTER_CONFIG = buildEncounterConfig(AUTHORED_TUNING, ...)` and `debugEncounterConfig` is now 11 lines - validate settings, call the shared builder, validate the result - down from about 52 lines of duplicated mapping.
+- Chose a shared mapping function over per-parameter `apply(config, value)` callbacks. The registry stays metadata only, which achieves the single-source goal the step asked for without a mutable config draft or a mini framework, and keeps the change YAGNI-consistent. Recorded as a deliberate deviation from the step prompt's suggested mechanism, not its intent.
+- G08 applied: `headWidth`/`headHeight` renamed from `enemyWidth`/`enemyHeight` and no longer size the player; the player has its own authored size and its own two sliders in a new "Player" group. `matchPlayerToHead` is now an explicit override rather than the default coupling, and `ENCOUNTER_CONFIG` is built with it off. Both default to 1.25 x 1.25, so no shipped value changed.
+- Duplications removed, each verified by grep afterwards: one `buildEncounterConfig`, one `boundingRadiusTiles` (the second copy went in 15.3), one `degreesToRadians`, and `extent()` deleted in favour of the shared `bodyExtentTiles` that `scaleBody` already needed. `radiansToDegrees` was written and then deleted unused - the debug panel reads authored degrees directly, so that conversion is gone rather than merely shared.
+- Added `liveShardBoundPerEnemy(archetype)`, giving the retired study's `conservativeLiveShardBound` a correct home with a real consumer. Recorded deviation: implemented as a derived function rather than a config field, so it cannot go stale. A test pins 66 for the shipped v3 cadence - `6 * 11 * ceil(3 / 4.9)` - against the retired literal 88.
+- `DEBUG_TOGGLES` and `DEBUG_GROUPS` are now data. `DebugPanel` maps over them instead of hand-coding three near-identical checkbox blocks and a hardcoded `["Enemy", "Emitters", "Burst", "Projectiles"]` list, so a new group or toggle renders itself.
+- **Caught a behavioural regression I introduced.** Setting `SELECTED_ENCOUNTER_VALUES = AUTHORED_TUNING` made "Load selected values" also overwrite enemy speed, spawn position and player size, which the preset had deliberately omitted; the existing "without changing omitted settings" test failed and was right to. The preset is now an explicit 16-key projection of `AUTHORED_TUNING` - still one copy of each number, but a subset by design.
+- One e2e assertion updated rather than weakened: the debug slider count moved from 19 to 21 because G08 adds the two player-size sliders. The assertion carries a comment tying it to `DEBUG_PARAMETERS`; importing the registry into the spec is not possible, since `debug.ts` reaches JSON imports that `tsconfig.node.json`'s nodenext resolution rejects.
+- Four new focused tests: the debug path at default settings reproduces the shipped config field for field apart from rules version; `buildEncounterConfig` maps every tuning value through; the live shard bound derives from configuration; groups and toggles come from the registry.
+- All five gates pass: typecheck, lint, 331 unit/component tests across ten files, production build, and 34 Chromium cases in 2.6 minutes. No shipped gameplay value changed.
 
-**Focused checks:** actual O/P -> reload -> rendered restored scale, min/max clamp, R/Home preservation, resize, write counts, blocked/quota fallback, untouched history and comparable simulation outcomes across zoom. Reuse pixel helpers without old circle assumptions.
+## Phase 16: Generalize To Many Enemies
 
-**Acceptance:** all five gates pass; desktop/narrow min/default/max views are nonblank/layout-safe; same-origin persistence works and storage failures do not prevent practice.
+### Step 16.1 - Make Enemy State A Collection With Its Own Attack Clock
 
-**Execution and verification - 2026-10-25**
-
-- Step 11.1 remote verified at `80882ee9c44716c45b62822fed3dbb9835b4232d`. React initializes the dedicated preference once and supplies its value before Phaser's first render. Retains existing zoom ref across R/Home/Start. An explicit camera-change callback writes only actual O/P changes, never HUD/frame publication; disposed callbacks are ignored. No simulation, history, comparison or clock change.
-- Focused React test failed initial 1 versus saved 2.375, then all 34 React/storage cases passed. Covers exact restoration, no HUD writes, deduplication, Home/Start continuity and untouched history. Existing storage-failure tests and adapter cases retain nonfatal visit-local operation.
-- Production-safe desktop/narrow tests now verify rendered player area after real O/P, reload and Start, without diagnostic source imports/injected outcomes; both passed. Final gates: 281 unit/component tests, typecheck, lint, build and all 20 Chromium cases passed, including 0.25/1/3 captures, resize/world-speed/camera invariance, storage failures, real deaths, sustained play and 25 retries. Nonblocking Phaser chunk warning unchanged; no hosted or human play approval claimed.
-
-## Phase 12: Health And Accepted-Hit Feedback
-
-### Step 12.1 - Expose Ephemeral Accepted-Hit Data
-
-Status: complete. Dependencies: 11.2.
+Status: pending. Dependencies: 15.4.
 
 **Implementation prompt**
 
-Extend existing simulation/session advancement with narrow accepted-hit output using the existing damage calculation's result, not a duplicated formula, HUD/HP delta or raw overlap. Report post-defense amount independently of lethal HP clamping; distinguish simultaneous hits and include the lethal hit. Output is ephemeral/bounded to the current advance, including multi-tick advances. Preserve session result-once behavior or adapt callers narrowly; no persistent event log/event bus or framework dependency.
+Generalize the simulation from one enemy to a collection, still spawning exactly one at `t = 0`. This step is behavior-identical refactoring; no observable gameplay value may change.
 
-**Focused checks:** nonlethal, same-tick independent hits/regeneration, spent-return suppression, lethal amount despite HP clamp, no hits after death, multiple ticks per advance, paused/no-step advances and no replay after Retry/Home.
+Replace `SimulationState.enemy` with `enemies: EnemyState[]` and add `nextEnemyId`. Move the six global attack-clock fields - `attackEpochSeconds`, `volleysAtEpoch`, `attackInitialDelaySeconds`, `rotationEpochSeconds`, `rotationPhaseAtEpoch`, `volleysFired` - out of `SimulationState` and into each `EnemyState`, alongside `id`, `archetypeId` and `spawnedAtSeconds`. They were always one enemy's state; they only looked global because there was one enemy. Add `enemies` to `SessionSnapshot` if that type survived step 15.1.
 
-**Acceptance:** each accepted event reaches the runtime once, including lethal data before result handling, without changing damage/time/history. Focused health/simulation/session tests, typecheck and relevant integration gates pass.
+Rework `updateMovement` and `updateAttacks` to iterate enemies, each pursuing the player and firing on its own clock resolved from its own archetype's weapon. Iterate in a stable order so a fixed input sequence stays reproducible; a seeded or insertion-ordered list is required, not object-key order. Keep the per-tick phase order unchanged - player movement, enemy movement, shard advance and hit resolution, firing, regeneration - so existing timing tests stay valid.
 
-**Execution and verification - 2026-10-25**
+Update `setDebugSettings` to reconcile every enemy's rotation and attack epochs rather than one, preserving the current semantics: a rotation or phase change re-epochs rotation, a burst change re-epochs the attack clock, and live shards are re-timed and re-filtered. Update `phaser/encounter.ts` to draw every enemy and `inspect()` to expose `enemies`, and update the Playwright `Inspection` type and its roughly 30 `enemy` assertions plus the 55 in `simulation.test.ts`.
 
-- Step 11.2 pushed/remote verified at `78c84f7c5bb39119152e2c19e8705d69dc4c4714`. Existing health rule now returns its already-calculated post-defense amount (or null for dead player). Each simulation advance returns only its own `acceptedHits`: shard identity, damage and copied player position. No stored log, duplicated damage formula, HUD-delta inference, event bus or clock.
-- Session forwards individual hits through an optional narrow callback before its unchanged once-only death-result handoff. Newborn/existing hits use the same registration, stable lethal stop and spent-state rules. Output is bounded by accepted shards in the capped current advance; no cross-advance accumulation/truncation or resource policy changes.
-- TDD: four new simulation/session tests failed absent output/delivery, then 117 focused health/simulation/session cases passed. Covers simultaneous 128-HP events despite regeneration, multiple fixed ticks, lethal 128 with only 1 HP remaining, suppression after lethal/spent/zero-step/pause/end/Retry/Home and delivery before result creation.
-- All five gates passed: 285 unit/component cases, typecheck, lint, build and 20 Chromium cases, including real deaths/history/sustained/25 retries. No visual/audio changes or hosted/human approval claimed. Existing Phaser bundle warning remains.
+Do not add spawning, placement, concurrency caps or enemy-to-enemy interaction. Do not change cadence, positions, damage or death times.
 
-### Step 12.2 - Draw The Always-Visible Health Bar
+**Focused checks:** focused failing test on the collection shape first. Then: a single enemy at `t = 0` with the current spawn and phase; identical volley times, shard ids, positions and accepted hits to the pre-refactor run over a fixed multi-second input sequence; debug re-epoching still correct; stable iteration order across repeated runs. Reuse `simulation.test.ts` rather than adding a harness. Full unit suite, typecheck, lint, build, `npm run test:e2e`.
 
-Status: complete. Dependencies: 12.1.
+**Acceptance:** enemies are a collection with per-enemy clocks, exactly one enemy still exists at `t = 0`, a fixed input sequence reproduces the previous run's shard and hit timeline exactly, and all five gates pass.
 
-**Implementation prompt**
+### Step 16.2 - Capture Shard Damage And Body At Fire Time
 
-Extend existing Phaser drawing with a below-player bar from authoritative HP/max HP; retain HUD. Propose/review unspecified dimensions, spacing/colors and encode named unit-aware presentation constants. Reuse drawing/cleanup primitives; no React entity overlay, collider extent, timer or independent health state. Keep it readable at approved zoom limits without hiding the physical outline.
-
-**Focused checks:** full/partial/zero health, min/default/max zoom, resize/anchor/draw order, Retry/Home/results cleanup, unchanged physical body and HUD agreement. Reuse pixel/screenshots rather than canvas-existence assertions.
-
-**Acceptance:** presentation values/review and all five app gates pass; no gameplay/version change.
-
-**Execution and verification - 2026-10-25**
-
-- Step 12.1 remote verified at `9d4f7b03cdb188cc59e93683ca864a2c0eedb9fe`. Added one reusable Phaser Graphics below the physical player outline, above projectiles. Draws authoritative HP/max HP, retaining HUD; no independent HP state, collider change, entity React overlay or clock.
-- Delegated presentation policy: 48x6 CSS-pixel track, 1 px dark border, 6 px screen-space gap from transformed player bottom, green `#55d6a0` fill and muted red `#592e39` missing health. Inverse camera scaling keeps these dimensions readable at 0.25-3 zoom; O/P redraws immediately. These are original trainer presentation choices, not ROTMG fidelity claims.
-- TDD: browser extreme-zoom bar assertion failed at zero pixels, then desktop/narrow min/default/max cases passed. Production-safe actual-death flows verify full/partial/zero bar pixels against HUD, including empty track at death and restored-scale play. Reviewed min-zoom narrow and max-zoom desktop captures: bar remains separated below the body and nonblank; countdown overlay remains existing UI until pause/Controls work.
-- All five gates passed: 285 unit/component cases, typecheck, lint, build, 20 Chromium cases including sustained/25 retries/cleanup. Existing chunk warning unchanged. Technical visual acceptance delegated by batch; no fresh human approval, tuning, audio or hosted claim.
-
-### Step 12.3 - Render Individual Floating Hit Amounts
-
-Status: complete. Dependencies: 12.2.
+Status: pending. Dependencies: 16.1.
 
 **Implementation prompt**
 
-Consume accepted-hit output in the runtime for one post-defense number per hit, including independent same-update events. Review missing placement/duration/concurrency values; use named constants and the existing runtime's elapsed/pause policy, not another simulation clock/timer framework. Bound visual resources without changing accepted-hit data. Make lethal feedback observable during the immediate result transition, using a narrow presentation handoff if needed; propose that treatment explicitly. Do not delay death/results or destroy the only lethal display before it is visible.
+Make each shard carry the weapon facts it was fired with. Add `damageHp` and `archetypeId` to `ShardState`, set from the firing enemy's archetype in `updateAttacks`, and have `registerShardHit` use `shard.damageHp` instead of reading `state.config.shard.damageHp` at hit time. Resolve each shard's drawing body and the collision bounding radius from `shard.archetypeId`.
 
-**Focused checks:** exact amounts, independent numbers, no regeneration/spent-return false events, resource bound/cleanup, visible lethal feedback, pause and no stale Retry/Home effects; unchanged health/time/records.
+This removes an existing inconsistency: reversal age and lifetime are already copied per shard, while damage was read globally at hit time, so a damage slider change retroactively altered shards already in flight.
 
-**Acceptance:** approved numbers are observable once including at death without delaying results; all five gates and desktop/narrow review pass. Audio is not implemented yet.
+Implement G09. Treat `damageHp`, `reversalAgeSeconds` and `lifetimeSeconds` as one category - values a shard was fired with - governed by one rule. Extract the re-stamping that currently sits inline inside `setDebugSettings` into a single named operation owned by the simulation module, for example `restampLiveShards(shards, weapon)`, covering all three fields plus the existing `hasReversed` and expiry reconciliation. `setDebugSettings` calls it instead of reaching into the shard array itself. Give that operation its own focused test. Net behavior is unchanged for reversal and lifetime and becomes consistent for damage, so no existing debug assertion should need weakening; if one does, report it rather than quietly updating it.
 
-**Execution and verification - 2026-10-25**
+Update the collision bounding radius to the maximum over archetypes rather than the single shard shape, so a future second archetype cannot under-bound the broadphase.
 
-- Step 12.2 remote verified at `48ed6ca19440a2e3e6e93d1eb14b66943a8ed101`. Runtime consumes each accepted-hit callback, creates an individual Phaser text and ages it only by actual advanced simulation seconds. Paused/ended state freezes effects; Retry/Home destroys all owned texts. No HUD/HP-delta inference, gameplay change, second clock or persistent event log.
-- Delegated presentation: 18 px Consolas text, pink `#ff8fa3`/3 px dark stroke, 0.9 active-second life, 28 CSS px rise, 12 px gap above physical body, seven 54 px lanes based on shard identity, cap 16 active text objects (oldest evicted if saturated). Text dimensions/offsets stay screen-sized at all camera scales. Accepted-hit data is never truncated or merged.
-- Explicit lethal treatment: immediate results are unchanged and never delayed. Only final-advance amounts pass through the existing result view into an individually rendered accessible Final hit amounts group, remaining visible until Retry/Home; no extra timer. This prevents the results panel from hiding the only lethal feedback. These are delegated technical presentation choices, not a fresh human visual approval.
-- TDD: final-results React test failed missing group, then all 13 React cases passed. Real Phaser test verifies exact -128 text, individual hit data, frozen paused age and empty Retry state; its first historical-hit sampling assertion was repaired to observe a live effect, not cumulative history. Production-safe desktop/narrow pixels prove floating text and final groups during real damage/death. Reviewed narrow active feedback and desktop lethal results captures; amounts are readable and separated.
-- All five gates passed: 286 unit/component tests, typecheck, lint, build and 20 Chromium cases. Sustained run asserts <=16 effects as well as <=88 shards, one canvas/listener and 25 reset cleanups. Existing chunk warning unchanged. No audio or hosted verification yet.
+**Focused checks:** focused failing test that a shard fired before a damage change still applies its captured damage, or the recorded re-stamp behavior; per-archetype body resolution for drawing and broadphase; bounding radius equals the max across archetypes; existing once-per-shard, reversal and lifetime-only tests unchanged. Full unit suite, typecheck, lint, build, `npm run test:e2e`.
 
-### Step 12.4 - Add Quiet Hit Audio And Mute
+**Acceptance:** shards carry their own damage and archetype, hit resolution no longer reads global config, the broadphase bound is archetype-safe, the re-stamp decision is recorded, and all five gates pass.
 
-Status: complete. Dependencies: 12.3.
+### Step 16.3 - Prove Many Enemies Work Without Spawning Them
+
+Status: pending. Dependencies: 16.2.
 
 **Implementation prompt**
 
-Use the same hit output for an original quiet synthesized cue with visible accessible mute. Prefer the existing Phaser audio lifecycle where suitable; add only the smallest owned synthesis adapter needed. Obtain audible review/approval of gain, cue duration and voice cap. Bound mixing without stale catch-up sounds, dropping visual numbers or changing accepted hits. Keep mute visit-local unless persistence is separately approved; lethal cue must survive the immediate result handoff appropriately.
+Verify the generalization carries real load before any spawn rule exists. Add tests only - no new production feature - that construct a simulation with several enemies of the one archetype at distinct positions and assert the properties phase 17 will depend on.
 
-Unlock/resume from supported user gestures. Unavailable/blocked/suspended/rejected audio must not block practice. Dispose owned voices/listeners/resources and clear stale playback on lifecycle changes. No copied sounds, soundtrack, generic audio system or simulation audio imports.
+Cover: each enemy fires on its own clock from its own `spawnedAtSeconds`, so staggered creation produces staggered volleys; each pursues the player independently and stops at its own silhouette contact distance; shard ids stay unique across enemies; every enemy stays inside the arena under `constrainBodyToArena`; accepted hits remain once-per-shard with several enemies firing into the same player; and the live shard count stays within the derived bound times the enemy count. Add a focused rendering check that `drawEntities` draws one body per enemy.
 
-**Focused checks:** cue request per accepted event, simultaneous voice cap, lethal cue, mute/unmute, gesture unlock, unavailable/rejected audio, pause policy, no stale Resume/Retry/Home playback and repeated-session cleanup. Automation does not replace audible approval.
+If the only way to construct a multi-enemy state is to reach past the public surface, add the narrowest seam needed - a `createSimulation` parameter or an explicit test helper in the test file - rather than exporting internals or widening the production API for tests.
 
-**Acceptance:** numerical audio policy/audible approval and all five gates pass; mute/fallback work without changing gameplay, history or result timing.
+Also record the open questions phase 17 must answer before implementation: whether enemies overlap each other or collide, the placement tie-break when two enemies would spawn at the same ring point, and whether the player starting at the arena center leaves the "farthest from player" direction undefined. Do not answer them here.
 
-**Execution and verification - 2026-10-25**
+**Focused checks:** the new multi-enemy tests, all passing, plus the full unit suite, typecheck, lint, build and `npm run test:e2e` to confirm no regression. Report the measured peak live shard count for the multi-enemy cases.
 
-- Step 12.3 remote verified at `a75ca16c3a835fa11e8f060d1915f0aa66907954`. Added a small synthesis boundary borrowing Phaser's WebAudio context, not another audio context/engine, dependency, soundtrack or copied sound. The same individual accepted-hit callback requests cue and number. Original sine sweep 440 -> 220 Hz, peak gain 0.018, 5 ms attack, 55 ms total, at most four concurrent voices; saturated/muted/suspended requests are dropped, never queued. Numeric choices accepted technically under batch delegation; automation is not fresh human audible/comfort approval.
-- Visible accessible Mute checkbox on Home and play is visit-local across Home/Start; no persistence policy/key added. Live updates do not recreate the scene. Supported create/keyboard/pointer/Resume/retry gestures attempt unlock; unavailable/closed/throwing contexts and rejected resume remain nonfatal. Pause stops voices, retry resets requests/voices, disposal disconnects owned nodes/listeners while Phaser owns context disposal. Ended-state focus changes do not stop the lethal cue, which can finish during immediate results without delaying them.
-- TDD: synthesis suite failed missing module, then its cap/envelope/release/mute/suspension/no-catchup/rejected/unavailable/closed/disposal cases passed. React mute test failed missing checkbox then all 17 focused audio/React cases passed. Real Chromium verifies hit requests match accepted hit count, actual cue scheduling, muted play then unmute, unavailable AudioContext real damage/death/results/retry and no stale voices. Sustained test now checks <=4 voices alongside <=16 effects and <=88 shards. Production-safe tests exercise checkbox and visit-local reload default.
-- All five gates passed: 290 unit/component cases across nine files, typecheck, lint, build and 22 Chromium cases. No gameplay/history/version/timing change or human listening/cross-browser/hosted claim. Nonblocking Phaser chunk warning remains.
+**Acceptance:** multi-enemy behavior is proven by tests with one archetype and no spawn rule, the derived shard bound holds, phase 17's open questions are written down, and all five gates pass.
 
-## Phase 13: Controls And Paused-Session Safety
+## Phase 17: Timed Spawning
 
-### Step 13.1 - Build The Accessible Controls Dialog
+### Step 17.1 - Verify And Record The Approved Spawn Rules
 
-Status: complete. Dependencies: 12.4.
+Status: pending. Dependencies: 16.3.
 
 **Implementation prompt**
 
-Add a minimal reusable React dialog with native semantics where suitable, existing CSS Modules/button patterns, labeled title/close action, focus containment/restoration and responsive content. List actual WASD/R/O/P/Escape, mute/Resume and UI actions, distinguishing standard browser keyboard activation from custom bindings. No UI framework, rebinding, tutorial page or touch controls. Expose Home access now; defer gameplay access until step 13.2 so incomplete pause/input isolation cannot leak into play.
+The spawn rules are approved in G10-G20. This step changes no runtime code: it verifies the arithmetic holds and records the decisions and their deviations additively in [the mechanics contract](docs/mechanics.md). Do not reopen an approved choice, and do not substitute a different value.
 
-**Focused checks:** accessible naming, keyboard open/close/Tab/Shift+Tab/focus return, Escape once, repeated opens, unchanged Home/session state, desktop/narrow clipping. Reuse React/browser tests, not another modal harness.
+Verify, showing the arithmetic:
 
-**Acceptance:** Home dialog passes relevant interaction/type/lint/build/browser checks and reflects current controls; no unguarded gameplay entry point.
+1. **Ring fit.** `ringRadiusFraction` `0.84375` gives `0.84375 * 19.2 = 16.2` tiles, matching the current spawn distance exactly. Confirm with `convexBodyFitsCircle` that the 1.25 x 1.25 head body fits inside the arena at that distance in every direction - its farthest vertex sits `hypot(0.625, 0.375) = 0.7289` tiles from its center, so the check is `16.2 + 0.7289 < 19.2`.
+2. **Golden-angle spread.** Confirm 137.5-degree offsets keep four concurrent enemies at distinct positions, and that the offset is applied per concurrent spawn index rather than accumulated across the whole run.
+3. **Cadence.** Confirm the cap is reached at 30 seconds with `firstSpawnSeconds` 10 and `everySeconds` 10, and state the expected enemy count at the recorded v2 death times near 8 seconds.
+4. **Shard budget.** Confirm the derived per-enemy bound is 66 for v3 - `6 * 11 * ceil(3 / 4.9)` where `4.9 = (11 - 1) * 0.19 + 3` - and therefore 264 at the cap of 4. Compare against the current browser assertion of 88 and state the increase step 17.4 must re-measure.
+5. **Determinism.** Confirm the injected seeded generator (G13) leaves the fixed-step catch-up path reproducible: the same elapsed time and input must produce the same result regardless of how many steps execute in one update.
 
-**Execution and verification - 2026-10-25**
+Record as explicit approved deviations:
 
-- Step 12.4 remote verified at `8604f032f122ec112757511db78ca9243382e440`. Added one reusable native React dialog within existing App/CSS Modules, Home entry only. Labels/title/Close, native Escape cancel, explicit opener restoration, constrained responsive dimensions and actual WASD/R/O/P/Escape/Mute/Resume/screen actions plus standard Tab/Enter/Space activation; no framework/tutorial/rebinding/touch controls.
-- TDD: Home Controls React test failed absent button, then 15 React cases passed. jsdom stubs only unavailable native dialog methods; production Chromium owns real keyboard evidence. First browser checks exposed native Tab leaving the single-focusable dialog for browser chrome; a narrow Tab/Shift+Tab handler now retains Close, while native modality/cancel remain intact.
-- All five gates passed: 291 unit/component tests, typecheck, lint, build and 22 Chromium cases. Production-safe desktop/narrow tests repeat Escape/button closing, Tab/Shift+Tab, focus return, no canvas/session creation and no clipping. Narrow dialog screenshot reviewed; clear bindings/wrapping and visible close. Existing chunk warning unchanged. No HUD entry or unfinished gameplay/modal input path exposed; 13.2 owns that integration.
+- **G14**, the opening enemy's bearing is now random rather than fixed north. The 16.2-tile distance is unchanged. This supersedes the v2 statement that the enemy starts north at `(0, -16.2)`, which the mechanics contract and the v2 archive both record; note the supersession without rewriting the archive.
+- **G10**, the `fixes.md` request for an arena at double the enemy's reach is superseded by v3 tuning, with shipped reach at 12.35 tiles against a 19.2-tile radius.
+- **G19**, the move to `crystal-worm-child-swarm-paladin-v4` and the exclusion of v1, v2 and v3 records from the new retained best.
 
-### Step 13.2 - Integrate Controls With Pause And Input Isolation
+Also confirm death remains the only session end condition, with no win or timeout state introduced.
 
-Status: complete. Dependencies: 13.1.
+**Focused checks:** document structural checks, the five verifications above with their arithmetic shown, body-fit math, link integrity, and confirmation that no runtime file changed.
 
-**Implementation prompt**
+**Acceptance:** every approved value is verified or reported as a blocker with the failing arithmetic, the three deviations are recorded additively without rewriting history, and no runtime change is made.
 
-Expose the same dialog from HUD through existing runtime/session boundaries. Opening during play/countdown freezes state and clears held input; closing leaves an explicit Resume requirement, preserving countdown remainder/prior phase and focus-loss safety. Draw centered Paused using existing countdown-overlay conventions, not another state machine.
+### Step 17.2 - Implement Timed Spawning
 
-Block WASD/R/O/P behind the dialog. Escape closes once without also toggling background pause. Preserve existing keyboard event-identity deduplication rather than removing queue safeguards. Clear held inputs, skip stale delta and require deliberate Resume. Home closure cannot start play; results/ended state cannot resurrect a session.
-
-**Focused checks:** countdown/play/already-paused open, frozen state, blocked keys, Escape dedupe, held-key release, explicit Resume/focus return, blur/visibility, no first-frame catch-up, R/Home cleanup and one canvas/listener set. Use actual browser actions and focused session/React tests.
-
-**Acceptance:** all five gates and desktop/narrow keyboard review pass; modal actions cannot move/reset/resume background play and Paused matches authoritative state.
-
-**Execution and verification - 2026-10-25**
-
-- Step 13.1 remote verified at `3473cd253ef628ba2960797a8b5694a3001ee59b`. HUD opens the same dialog through a synchronous runtime modal gate before focus changes. Gate pauses countdown/play, clears movement/held controls, blocks update/Resume/retry and ignores gameplay keydowns; event objects are still recorded in the existing WeakSet before rejection so retained Phaser queue entries cannot replay after closure. Closing clears stale held input but never resumes. Existing phase-before-pause/countdown and stale-delta policy are preserved.
-- Added centered authoritative Paused overlay, retaining countdown conventions with dark text edging for contrast over the physical body. Results hide/inert HUD actions; Home dialog has no runtime. No second state machine/clock, gameplay, version or persistence change.
-- TDD: HUD React test failed absent Controls, then all 16 React cases passed. Three real Chromium cases cover countdown/playing/already-paused modal opening, frozen body/shards/ticks/countdown/zoom/attempt, blocked WASD/R/O/P, single Escape close with focus return, explicit Resume, pre-held movement release, no catch-up, reused canvas and one listener. Existing focus/visibility/queue regressions remain intact.
-- All five gates passed: 292 unit/component cases, typecheck, lint, build, 25 Chromium cases. Production-safe desktop/narrow flows exercise HUD modal, blocked keys, frozen time/scale, centered Paused and Resume; reviewed narrow capture with nonoverlapping HUD and legible label. Existing chunk warning remains. Technical review is delegated, not fresh human acceptance or hosted verification.
-
-## Phase 14: Regression, Handoff And Authorized Live Verification
-
-### Step 14.1 - Run The Full Repeated-Practice Acceptance Matrix
-
-Status: complete. Dependencies: 13.2.
+Status: pending. Dependencies: 17.1.
 
 **Implementation prompt**
 
-Run all five app gates under the pinned toolchain. Reuse sustained-play/25-retry and desktop/narrow production-safe tests with explicit projectile/effect/audio bounds, one clock/canvas and once-only records. Add only missing coverage for cadence, calibrated edge condition/shared polygons, restored zoom extremes, bar, independent/lethal feedback, mute/audio failure, Controls/pause/focus and mixed versions. Preserve diagnostic versus production-safe separation: no hosted source imports or injected successful outcomes.
+Implement the spawn rule using the values approved in G10-G20 and verified in 17.1. If 17.1 reported a blocker, stop.
 
-Review min/default/max zoom screenshots for nonblank correctly framed play, readable bar/numbers/dialog/results and no overlap/clipping. Exercise real deaths/Retry/R/Home/reload and storage/audio failures. Verify production assets exclude reference screenshots/crops. Fix only task regressions; record unrelated blockers without broad cleanup. Automated checks do not supply audible/human feel approval.
+Add the `spawns` block to `encounter.json`: `archetype` `crystal-worm-child-head`, `firstSpawnSeconds` 10, `everySeconds` 10, `maxConcurrent` 4, and `placement` with `ringRadiusFraction` 0.84375, rule `farthest-from-player` and a `goldenAngleDegrees` spread of 137.5. Set `rulesVersion` to `crystal-worm-child-swarm-paladin-v4`. Extend the loader's validation: the archetype must exist in `enemies.json`, intervals must be positive and finite, `maxConcurrent` must be a positive safe integer, the ring fraction must be within `(0, 1)`, and the ring must keep the archetype's body inside the arena.
 
-**Focused checks:** current unit/type/lint/build/browser outputs, actual run counts/bounds, screenshots and repeatability. Historical v1 release evidence is not evidence for this build.
+Add the seeded generator required by G13. It is a small named module - not a dependency - injected into `createSimulation` with a production default, in the same style as `HitAudio(getContext)` and `AttemptHistory(getStorage)`. The simulation must never call `Math.random` directly. Advance it from simulation state so the fixed-step catch-up path stays reproducible. Tests inject a fixed sequence. Do not add the seed to `AttemptRecord`; no storage schema change.
 
-**Acceptance:** all five gates/current visual checks pass and prior geometry/audio approvals are recorded with honest limitations. No publication/live verification implied.
+Add spawn scheduling to the fixed-step simulation. Track the next spawn time in `SimulationState` and resolve spawns at one well-defined point in the tick order, after movement and before firing, so a newly spawned enemy cannot fire during its spawn tick and instead serves its archetype's initial cooldown from its own `spawnedAtSeconds`. The cap suppresses a spawn without consuming or re-ordering the schedule; define and test whether a suppressed spawn is skipped or deferred. Per G17 enemies never despawn, so there is no expiry path. Per G18 the first enemy is the schedule's `t = 0` entry with no special case.
 
-**Execution and verification - 2026-10-25**
+Implement placement per G12: the point on the ring diametrically opposite the player's bearing from the arena center, offset by the golden angle per concurrent spawn index. At `t = 0` the player is exactly at the center, so that bearing is undefined and the direction is drawn from the injected generator among the candidate directions - this is the default opening, not a rare case, so test it directly.
 
-- Dependency 13.2 remote verified at `c9a929d0c4ebb11bcf0b74729cb1d6a66e0d8214`. Added only missing actual-feedback 0.25/1/3 zoom evidence for 1440x1000 and 390x844, diagnostic rendered text dimensions and observed effect/voice metrics in the existing sustained report. Real damage, exact -128, screen-sized text bounds and antialiased pink pixels are required; reviewed captures at extremes/default. An initially over-narrow exact-color classifier rejected visibly correct antialiasing; screenshots disconfirmed a rendering defect and the classifier now uses exclusive pink hue, retaining visible-pixel requirements.
-- Full current gates under Node 24.22.1/npm 12.2.1: 292 unit/component cases across nine files, typecheck, lint, production build and all 27 Chromium cases passed. Coverage includes shared polygons/centered-head reach, 11-shot cadence, one reversal/lifetime-only/once-only hits, mixed history, zoom/restoration/extremes, authoritative bar, independent/lethal numbers, original audio/mute/failure, Home/HUD Controls, keyboard/focus/countdown/pause, real deaths/Retry/R/Home/reload, corrupt/blocked/quota storage and cleanup. Production-safe tests remain isolated from source diagnostics and injected successful outcomes.
-- Actual 60-second browser report: 58.95 simulated seconds across three real deaths, 208 progress samples, peak 88 shards/5 texts/1 sampled voice, 25 retries, 3597 measured animation frames, median/p95 16.7 ms and max 33.3 ms gap. Bounds are 88/16/4; sample peaks are observations, not proof of a tighter cap or cross-device performance guarantee. One canvas/listener retained; all reset/cleanup assertions pass. Pure five-minute 30/60/120 Hz schedules remain equivalent.
-- Production files are only index HTML, favicon SVG, JS/CSS assets `index-Cf1kUIzF.js`/`index-COWqyGib.css`; no reference images/crops or generated reports are tracked/bundled. Original reference SHA-256 remains `f1c9b0715e8d2b91f1eac60ea3ad9e5adc694e4e2bcbd3fc65f9426b5f9cc86b`. Existing ~1.72 MB Phaser bundle warning remains nonblocking.
-- Technical acceptance delegated by the batch authorization, with actual earlier G01-G04 geometry approval preserved. No fresh human play/feel/audible comfort approval, non-Chromium certification or live deployment claim. No gameplay tuning, rule identity or artwork-distribution change. Local handoff and actual hosted evidence remain steps 14.2/14.3.
+Determinism requirement, independent of the deliberate randomness: given the same seed, the same elapsed time and the same input must produce the same enemies at the same positions, including across a catch-up update that executes several fixed steps at once. No wall-clock, and no dependence on the iteration order of an unordered structure.
 
-### Step 14.2 - Finish The Local V2 Handoff
+Confirm v1, v2 and v3 records still load, display as "Other rules" and are excluded from the new retained best, with no storage schema change.
 
-Status: complete. Dependencies: 14.1.
+**Focused checks:** focused failing test on the first timed spawn first. Then: spawn times across a long run; the cap holding with the recorded skip-or-defer semantics; placement including the `t = 0` random bearing with an injected fixed sequence and the golden-angle spread at four concurrent enemies; bodies inside the arena at every spawn and in every drawn direction; each new enemy's independent cooldown and cadence; same-seed reproducibility across identical runs and across multi-step catch-up; the full unit suite; and history compatibility for mixed v1/v2/v3 and v4 records. Typecheck, lint, build, `npm run test:e2e`.
 
-**Implementation prompt**
+**Acceptance:** enemies spawn on the approved schedule within the cap and placement rule, randomness enters only through the injected generator, same-seed runs are reproducible including under catch-up, v4 is in effect with older history retained and excluded from bests, and all five gates pass.
 
-Update README/changelog/mechanics links for implemented behavior, controls, zoom, feedback/mute, versioned history and known fidelity/browser limits. Preserve v1 history and nominal-versus-final geometry provenance. Review scoped changes for duplicate rules/helpers, unused task-owned artifacts, accidental reference artwork, generated output and secrets; preserve user notes/images and avoid unrelated refactoring. Record final config/shape values, gate evidence and a short manual practice checklist.
+### Step 17.3 - Expose Spawn Controls In The Debug Panel
 
-Obtain actual completed-feature repeated-practice acceptance. Record any explicit technical-acceptance delegation and its limits, not invented human playtesting. List local reference files excluded from publication pending permission. Commit/push require separate authorization; live verification belongs to step 14.3.
-
-**Focused checks:** links/document structure, config-to-doc correspondence, scope/artifact exclusion and acceptance evidence. Runtime repairs require relevant gates again rather than stale step 14.1 evidence.
-
-**Acceptance:** local handoff/acceptance are recorded, publishing boundaries clear, and no new deployment is claimed. Step 14.3 remains pending until external prerequisites exist.
-
-**Execution and verification - 2026-10-25**
-
-- Dependency 14.1 remote verified at `b09762e0c18dd19ba57ef4ee105e4cc828a81a50`. README now leads with the implemented v2 contract, exact configuration, actual controls/feedback/persistence, delegated technical acceptance and a five-item manual practice checklist. Original v1 implementation/acceptance is preserved in a labeled historical section; old setup/release evidence is explicitly not v2 evidence. Added the mechanics Implemented V2 Handoff and dated Home changelog while preserving its v1 entry.
-- Final canonical shapes/scale, eleven-shot cadence, exact non-tick-rounded reversal/lifetime/leading-edge calibration, bound 88, v2 comparison isolation, independent zoom storage and presentation policies are documented with code links. No gameplay tuning, rules identity, dependency, audio policy, artwork permission or new human approval change.
-- Removed only the task-owned unused player-outline/enemy-core palette constants. Formatted task-owned additions to existing style; formatter-canonical comparison against HEAD confirms no other semantic source changes. An initial whitespace-only comparison incorrectly flagged harmless JSX parentheses; canonical comparison resolves that probe failure, with all runtime gates clean.
-- Current build gates rerun after handoff/cleanup: 292 unit/component tests across nine files, typecheck, lint, build and 27 Chromium cases passed. Editor diagnostics clean. Checked 69 local links/18 anchors, exact geometry/config-to-doc timing/offset correspondence, whitespace, obvious secret patterns, tracked/generated/reference exclusions and original image SHA-256. Artifact is only index HTML, favicon SVG, `index-DRHTVvPH.js` and `index-BFA9crZS.css`; existing ~1.72 MB chunk warning remains nonblocking.
-- Reference `image.png`, `docs/fixes-player-candidate.png`, `docs/fixes-head-candidate.png`, `docs/fixes-shard-candidate.png`, `docs/fixes-calibration-reference.png`, generated review/browser/metrics output remain ignored/local-only and absent from runtime/build/tracked artifacts. Preserved/excluded unrelated `app/vite.config.ts` formatting and new user `debugging-tools.md`.
-- Completed-feature technical repeated-practice acceptance is delegated by the user's explicit batch request, preserving actual G01-G04 approval. No fresh human feel/listening approval, non-Chromium certification, screen-reader/axe result or live deployment claimed. Separate per-step commit/push is authorized by that same batch request; step 14.3 must verify actual external deployment and hosted checks next.
-
-### Step 14.3 - Verify The Authorized Deployed V2
-
-Status: complete. Dependencies: 14.2; publication separately authorized by the explicit batch request and successful Actions/deployment evidence verified for the v2 commit.
+Status: pending. Dependencies: 17.2.
 
 **Implementation prompt**
 
-Check external publication prerequisites first; if absent, record blocker and stop without committing/pushing/deploying or completing them automatically. Verify deployed commit, actual six-job Actions success, artifact/deployment identity and emitted Pages URL. Run existing opt-in hosted production-safe Chromium checks against that URL with isolated contexts/prefixed assets, not localhost/diagnostics or the user's profile.
+Extend the unified registry from 15.4 with the spawn rule's controls (G05). Add a "Spawns" group covering `firstSpawnSeconds`, `everySeconds` and `maxConcurrent`, plus the approved placement control. Replace the obsolete per-instance `spawnX` and `spawnY` sliders with the placement controls; with rule-driven spawning there is no single enemy spawn point to edit. Record this as a deliberate debug-UI change.
 
-Verify Start/cooldown/pattern, real damage/death/retry, zoom/reload, bar/hit feedback, mute/Controls/Resume, v2 records and compatible bests. Record asset/build parity where practical, network/page errors and actual browser/viewport scope. Public image exposure still requires separate permission. A live defect requires separately scoped local repair; never accept a failed deployment.
+Confirm the archetype-level semantics: a body, speed, emitter, burst or projectile edit applies to the archetype and therefore to every live and future instance. Reconcile live state the way `setDebugSettings` already does - re-epoch clocks, re-time live shards, re-constrain positions - and extend that reconciliation to a `maxConcurrent` decrease. Per G20 a lowered cap despawns the newest enemies until the count is within it; implement and test that rather than deferring enforcement to future spawns.
 
-**Focused checks:** hosted suite, asset responses/version identity, screenshots and actual run/commit/deployment evidence. Audio automation is not fresh audible approval.
+Keep `isDefaultDebugSettings` and the `DEBUG_RULES_VERSION` badge correct so debug attempts stay out of saved history and out of best comparisons.
 
-**Acceptance:** the authorized deployed v2 passes hosted checks with evidence/limitations; only then record v2 live-verified. No implied cross-browser certification or further feature work.
+**Focused checks:** focused failing React test on the new group first. Then: each new slider's range and application; placement edits reflected in the next spawn; a lowered cap handled by the recorded rule; archetype edits applying to all live instances; `isDefaultDebugSettings` true only at defaults; the debug badge and unsaved-attempt behavior intact. React tests, full unit suite, typecheck, lint, build, `npm run test:e2e` including a desktop and narrow panel capture for clipping.
 
-**Execution and verification - 2026-10-25**
+**Acceptance:** spawn and placement are debuggable at archetype level, cap reduction follows a recorded rule, debug attempts remain excluded from history and bests, and all five gates pass.
 
-- Dependency 14.2 commit/push remote verified at `e12f3fe4742cb9d02374f07563192dcc5a727b72`. The user's earlier explicit batch authorization supplies separate publication authority; no workflow/settings change, manual deployment trigger or unapproved reference image exposure. Verified public API identity/status, not historical v1 evidence. A bounded prerequisite check initially timed out while Browser Tests was still running; targeted job inspection then confirmed its actual success, and a subsequent exact six-name/status check confirmed completed success for the full run. No failed deployment was accepted.
-- [Actions run 40193885409](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40193885409) completed successfully at runtime commit `e12f3fe4742cb9d02374f07563192dcc5a727b72`: Build, Typecheck, Unit Tests, Lint, Browser Tests and Deploy Pages all success. Browser step ran 12:37:59Z-12:44:20Z. Pages deployment `7313260767` has matching SHA, success status at `2026-10-25T12:44:41Z` and emitted environment URL `https://raphaelbp12.github.io/dodge-hell-training/`.
-- Actual artifacts: production-build `12598573722` (`sha256:560c4d728f857efcdf0f8dd016b977115e71439d097e83ce13fee838ca8f4221`); github-pages `12598734411` (`sha256:d5c535ad535c29626d7c5cea97d80e07b1dc8e2c080383d910cf40e155452e0c`); browser-results-40193885409-1 `12598843841` (`sha256:ce6bb4dbf5785697f85f2a9f7bb70a36f86555dd8cf21a3be31479aec4ccb646`). Artifacts were nonexpired at verification; retention is finite, so IDs are evidence references, not permanent archive guarantees.
-- Ran the existing opt-in hosted production-safe suite with `PLAYWRIGHT_LIVE_URL` at the emitted Pages URL, project live-chromium, one worker, fresh isolated 1440x1000/390x844 contexts, output `app/test-results/live-release`. Both passed in 57.6 seconds; environment variable removed afterward. No localhost server/diagnostic source imports/injected successful outcomes/user browser storage. Start/countdown/cooldown/pattern, real damage/death/retry, WASD/O/P/Escape, exact zoom reload, rendered bar/numbers/final amounts, mute/default reset, Home/HUD Controls/focus/paused Resume, record/best/reload/abort dedup passed. Two real v2 deaths per width, seven accepted hits each, 8.183333333333334 seconds in this run; observations are not universal survival/performance claims.
-- Hosted reports show only same-origin prefixed static GETs and no page errors. Every emitted file returned HTTP 200 with correct content type and exact local byte parity: index HTML 513 bytes, favicon 9522, JS `index-DRHTVvPH.js` 1716342, CSS `index-BFA9crZS.css` 7145. SHA-256 respectively `bd8af29c6b54fce7d2432677319c3fc440ecc4e9808f6fe5dd522014054b87c5`, `61bc9a161de58248288e6905425d7180f0624c2865007b97d763fdac12043a66`, `9c5e4ef520cf2ea4516ca640014f539c8c975ec593729b103a8a87110db25f05`, `97d605ad0a49cdedcf60e706b15a1a7a0d9d3417dc5318ad8e6ba39ba268f76b`. Reference screenshots/crops are absent from the emitted artifact.
-- Reviewed actual hosted narrow Controls/results and desktop feedback screenshots: nonblank polygons, readable bar/-128 feedback, focus-visible dialog/results, no overlapping HUD/dialog/result content. Earlier step 14.1 supplies min/default/max local feedback captures; hosted checks do not imply every zoom/browser/hardware combination. Original audio remains synthesized, nonfatal and muted by a visit-local control; automation does not supply human listening/feel approval. Firefox/WebKit, touch/mobile input, screen readers and axe remain unverified. No gameplay tuning/version change or live defect repair was needed.
-- README now identifies the verified runtime, local preview and exact current evidence, preserving historical v1 release material. Technical live acceptance is delegated by the batch request. This final completion record is documentation-only; it will be committed/pushed as a separate authorized step. The verified runtime/deployment identities above are immutable evidence, not advance success claims for a later documentation-only run. Unrelated Vite formatting/user notes/reference art and existing servers remain untouched. All requested steps are complete.
+### Step 17.4 - Re-Establish Performance And Resource Bounds
+
+Status: pending. Dependencies: 17.3.
+
+**Implementation prompt**
+
+Re-derive and re-measure the runtime bounds that multiple enemies invalidate. The existing sustained-play browser test asserts peak bounds of 88 shards, 16 hit texts and 4 audio voices; the 88 came from the retired v2 literal and is no longer derived from configuration.
+
+Compute the expected worst case from config - the derived per-enemy live-shard bound times `maxConcurrent` - and assert against that derived value rather than a new hand-picked literal. Extend the 60-second sustained-play and 25-retry browser test to run with spawning active to the approved cap, and report the actual measured peaks for live shards, enemies, hit texts, audio voices and frame timing. Confirm retry and Home fully reset enemies, shards, spawn schedule and hit numbers, leaving one canvas and one effective keyboard handler.
+
+Raise a bound only when the derived calculation justifies it, and never lower an assertion to make a run pass. If measured frame timing regresses materially against the recorded single-enemy baseline - median 16.7 ms, p95 16.7 ms, max 33.3 ms over 3597 frames - report it as a blocker with the measurements instead of relaxing the budget. Treat all measurements as observations on this machine, not cross-device guarantees.
+
+**Focused checks:** derived-bound unit test; extended sustained browser run with actual peaks and frame statistics; retry and Home cleanup assertions; one canvas and one listener; existing pixel and layout checks. Full unit suite, typecheck, lint, build, `npm run test:e2e`.
+
+**Acceptance:** bounds derive from configuration, the sustained run reports measured peaks within them, cleanup is proven across retries, frame timing is reported honestly against the recorded baseline, and all five gates pass.
+
+## Phase 18: Regression, Compatibility And Handoff
+
+### Step 18.1 - Run The Full Acceptance Matrix
+
+Status: pending. Dependencies: 17.4.
+
+**Implementation prompt**
+
+Run all five gates on the pinned toolchain - Node 24.22.1 and npm 12.2.1 - and verify the complete feature set end to end. Cover the data layer's rejection paths, archetype validation, multi-enemy cadence and pursuit, deterministic spawning and cap, archetype-level debug, derived bounds, and mixed-version history across v1, v2, v3 and the new version.
+
+Verify desktop (1440x1000) and narrow (390x844) production-safe runs with real deaths, retries, zoom reload, health bar, hit feedback, mute, Controls, Resume and versioned records and bests. Review captures for readable nonblank gameplay with several enemies on screen, unclipped text, viewport-contained results and a debug panel that still fits.
+
+Fix only regressions owned by this follow-up. Record unrelated findings - including the open items in [the principles review](principles-review.md) that these phases did not address, such as the `EncounterScene` responsibility split, the test-only `inspect()` instrumentation shipped in the bundle, the duplicated storage protocol, the duplicated palette and the unused `index.css` token system - without broad cleanup. Automated checks do not substitute for human visual or audible acceptance; say so plainly.
+
+**Focused checks:** current unit, type, lint, build and browser outputs with actual counts; measured spawn, shard and frame figures; screenshots; repeatability. Historical v2 and v3 release evidence is not evidence for this build.
+
+**Acceptance:** all five gates pass on the pinned toolchain with recorded counts and measurements, mixed-version history behaves correctly, and limitations are stated honestly. No publication implied.
+
+### Step 18.2 - Update The Handoff Documentation
+
+Status: pending. Dependencies: 18.1.
+
+**Implementation prompt**
+
+Update `README.md`, the Home changelog and [the mechanics contract](docs/mechanics.md) for the delivered behavior: the JSON data layer and where authored values live, the archetype model, timed spawning with its approved values, the new rules version and its history compatibility, and the retirement of the geometry study. Preserve v1, v2 and v3 provenance and approval history rather than rewriting it; the study's conclusions stay recorded even though its code is gone.
+
+State clearly which values are approved ROTMG-derived facts, which are trainer-specific approximations, and which are tuning choices recorded under 17.1. Document how to author a new arena or enemy archetype by editing JSON, and that no second archetype's gameplay values are approved. Do not claim a deployment; publication is a separate authorized step.
+
+**Focused checks:** documentation structural checks, link integrity, version and value accuracy against the shipped data files, and confirmation that no runtime file changed.
+
+**Acceptance:** documentation matches the shipped runtime and data, provenance is preserved, authoring a new archetype is documented, and no deployment or approval is claimed that was not granted.
 
 ## Customization Choice
 
-Use `.github/copilot-instructions.md` for shared engineering rules and `.github/prompts/implement-step.prompt.md` for the single-step command. No custom agent or skill is necessary yet. Consider a reusable encounter-authoring skill only when a second encounter exposes a genuinely repeated workflow; keep this enemy's facts in the mechanics document rather than duplicating them into a skill.
+Use `.github/copilot-instructions.md` for shared engineering rules and `.github/prompts/implement-step.prompt.md` for the single-step command, mirrored for Claude Code by `CLAUDE.md` and `.claude/commands/implement-step.md`. Keep the mirrored pairs in sync in the same commit. No custom agent or skill is necessary yet; consider a reusable encounter-authoring skill only once a second archetype exposes a genuinely repeated workflow.

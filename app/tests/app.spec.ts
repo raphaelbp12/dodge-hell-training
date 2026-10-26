@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
-import type { SessionSnapshot, Vector2 } from "../src/game/models.ts";
+import type {
+  EnemyState,
+  PlayerState,
+  SessionPhase,
+  ShardState,
+  Vector2,
+} from "../src/game/models.ts";
 
 const controlledFrameMilliseconds = 250;
 
@@ -15,12 +21,22 @@ test.beforeEach(async ({ page }) => {
   await session.send("Emulation.setCPUThrottlingRate", { rate });
 });
 
-type Inspection = SessionSnapshot & {
-  debugSettings: Record<string, number | boolean>;
+// Shape of the diagnostic payload returned by inspectEncounter. Described from
+// model primitives rather than importing SimulationState, because this spec is
+// type-checked under tsconfig.node.json's nodenext resolution.
+type Inspection = {
+  rulesVersion: string;
+  phase: "playing" | "ended";
+  elapsedSeconds: number;
+  hitsTaken: number;
+  player: PlayerState;
+  enemy: EnemyState;
+  shards: ShardState[];
   volleysFired: number;
   ticksElapsed: number;
   accumulatorSeconds: number;
-  sessionPhase: "home" | "countdown" | "playing" | "paused" | "ended";
+  debugSettings: Record<string, number | boolean>;
+  sessionPhase: SessionPhase;
   countdownRemainingSeconds: number;
   attemptId: number;
   result: {
@@ -182,8 +198,8 @@ test("selected values are the scored defaults without opening Debug", async ({
   const state = await inspect(page);
   expect(state.rulesVersion).toBe("crystal-worm-child-head-paladin-v3");
   expect(state.debugSettings).toMatchObject({
-    enemyWidth: 1.25,
-    enemyHeight: 1.25,
+    headWidth: 1.25,
+    headHeight: 1.25,
     emitterCount: 6,
     emitterRadiusTiles: 0.35,
     initialPhaseDegrees: 0,
@@ -237,13 +253,15 @@ for (const width of [1440, 390]) {
         }, value);
     };
     const sliders = page.getByRole("slider");
-    await expect(sliders).toHaveCount(19);
+    // Tracks DEBUG_PARAMETERS: 19 tuning sliders plus the two player-size
+    // sliders added when the player body became independently authored (G08).
+    await expect(sliders).toHaveCount(21);
     await page.getByRole("button", { name: "Load selected values" }).click();
     await expect
       .poll(async () => (await inspect(page)).debugSettings)
       .toMatchObject({
-        enemyWidth: 1.25,
-        enemyHeight: 1.25,
+        headWidth: 1.25,
+        headHeight: 1.25,
         emitterCount: 6,
         emitterRadiusTiles: 0.35,
         initialPhaseDegrees: 0,

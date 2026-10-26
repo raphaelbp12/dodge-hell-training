@@ -1,20 +1,13 @@
 import {
-  ENCOUNTER_CONFIG,
+  AUTHORED_TUNING,
+  buildEncounterConfig,
   SELECTED_ENCOUNTER_VALUES,
-  scaleBody,
   type EncounterConfig,
+  validateEncounterConfig,
 } from "./encounter";
-import type { Vector2 } from "../models";
 
 export const DEBUG_RULES_VERSION = "crystal-worm-child-head-debug";
 const minimumTimingGapSeconds = 0.05;
-
-function extent(vertices: readonly Vector2[], axis: "x" | "y"): number {
-  return (
-    Math.max(...vertices.map((vertex) => vertex[axis])) -
-    Math.min(...vertices.map((vertex) => vertex[axis]))
-  );
-}
 
 export const DEBUG_PARAMETERS = [
   {
@@ -25,7 +18,7 @@ export const DEBUG_PARAMETERS = [
     min: 0,
     max: 12,
     step: 0.1,
-    defaultValue: ENCOUNTER_CONFIG.enemy.speedTilesPerSecond,
+    defaultValue: AUTHORED_TUNING.enemySpeedTilesPerSecond,
   },
   {
     key: "spawnX",
@@ -35,7 +28,7 @@ export const DEBUG_PARAMETERS = [
     min: -18,
     max: 18,
     step: 0.1,
-    defaultValue: ENCOUNTER_CONFIG.enemy.spawnTiles.x,
+    defaultValue: AUTHORED_TUNING.spawnX,
   },
   {
     key: "spawnY",
@@ -45,27 +38,47 @@ export const DEBUG_PARAMETERS = [
     min: -18,
     max: 18,
     step: 0.1,
-    defaultValue: ENCOUNTER_CONFIG.enemy.spawnTiles.y,
+    defaultValue: AUTHORED_TUNING.spawnY,
   },
   {
-    key: "enemyWidth",
+    key: "headWidth",
     label: "Head width",
     unit: "tiles",
     group: "Enemy",
     min: 0.5,
     max: 5,
     step: 0.05,
-    defaultValue: extent(ENCOUNTER_CONFIG.enemy.verticesTiles, "x"),
+    defaultValue: AUTHORED_TUNING.headWidth,
   },
   {
-    key: "enemyHeight",
+    key: "headHeight",
     label: "Head height",
     unit: "tiles",
     group: "Enemy",
     min: 0.5,
     max: 5,
     step: 0.05,
-    defaultValue: extent(ENCOUNTER_CONFIG.enemy.verticesTiles, "y"),
+    defaultValue: AUTHORED_TUNING.headHeight,
+  },
+  {
+    key: "playerWidth",
+    label: "Player width",
+    unit: "tiles",
+    group: "Player",
+    min: 0.5,
+    max: 5,
+    step: 0.05,
+    defaultValue: AUTHORED_TUNING.playerWidth,
+  },
+  {
+    key: "playerHeight",
+    label: "Player height",
+    unit: "tiles",
+    group: "Player",
+    min: 0.5,
+    max: 5,
+    step: 0.05,
+    defaultValue: AUTHORED_TUNING.playerHeight,
   },
   {
     key: "emitterCount",
@@ -75,7 +88,7 @@ export const DEBUG_PARAMETERS = [
     min: 1,
     max: 8,
     step: 1,
-    defaultValue: ENCOUNTER_CONFIG.emitters.count,
+    defaultValue: AUTHORED_TUNING.emitterCount,
   },
   {
     key: "emitterRadiusTiles",
@@ -85,7 +98,7 @@ export const DEBUG_PARAMETERS = [
     min: 0,
     max: 3,
     step: 0.01,
-    defaultValue: ENCOUNTER_CONFIG.emitters.radiusTiles,
+    defaultValue: AUTHORED_TUNING.emitterRadiusTiles,
   },
   {
     key: "initialPhaseDegrees",
@@ -95,8 +108,7 @@ export const DEBUG_PARAMETERS = [
     min: 0,
     max: 360,
     step: 1,
-    defaultValue:
-      (ENCOUNTER_CONFIG.emitters.initialPhaseRadians * 180) / Math.PI,
+    defaultValue: AUTHORED_TUNING.initialPhaseDegrees,
   },
   {
     key: "rotationDegreesPerSecond",
@@ -106,7 +118,7 @@ export const DEBUG_PARAMETERS = [
     min: -360,
     max: 360,
     step: 1,
-    defaultValue: ENCOUNTER_CONFIG.emitters.clockwiseDegreesPerSecond,
+    defaultValue: AUTHORED_TUNING.rotationDegreesPerSecond,
   },
   {
     key: "shotsPerEmitter",
@@ -116,7 +128,7 @@ export const DEBUG_PARAMETERS = [
     min: 1,
     max: 24,
     step: 1,
-    defaultValue: ENCOUNTER_CONFIG.burst.shotsPerEmitter,
+    defaultValue: AUTHORED_TUNING.shotsPerEmitter,
   },
   {
     key: "shotIntervalSeconds",
@@ -126,7 +138,7 @@ export const DEBUG_PARAMETERS = [
     min: 0.05,
     max: 1,
     step: 0.01,
-    defaultValue: ENCOUNTER_CONFIG.burst.shotIntervalSeconds,
+    defaultValue: AUTHORED_TUNING.shotIntervalSeconds,
   },
   {
     key: "cooldownSeconds",
@@ -136,7 +148,7 @@ export const DEBUG_PARAMETERS = [
     min: 0.05,
     max: 5,
     step: 0.05,
-    defaultValue: ENCOUNTER_CONFIG.burst.cooldownAfterLastShotSeconds,
+    defaultValue: AUTHORED_TUNING.cooldownSeconds,
   },
   {
     key: "initialCooldownSeconds",
@@ -146,7 +158,7 @@ export const DEBUG_PARAMETERS = [
     min: 0,
     max: 5,
     step: 0.05,
-    defaultValue: ENCOUNTER_CONFIG.burst.initialCooldownSeconds,
+    defaultValue: AUTHORED_TUNING.initialCooldownSeconds,
   },
   {
     key: "projectileDamageHp",
@@ -156,7 +168,7 @@ export const DEBUG_PARAMETERS = [
     min: 0,
     max: 1000,
     step: 1,
-    defaultValue: ENCOUNTER_CONFIG.shard.damageHp,
+    defaultValue: AUTHORED_TUNING.projectileDamageHp,
   },
   {
     key: "projectileSpeedTilesPerSecond",
@@ -166,7 +178,7 @@ export const DEBUG_PARAMETERS = [
     min: 0,
     max: 32,
     step: 0.1,
-    defaultValue: ENCOUNTER_CONFIG.shard.speedTilesPerSecond,
+    defaultValue: AUTHORED_TUNING.projectileSpeedTilesPerSecond,
   },
   {
     key: "reversalSeconds",
@@ -176,7 +188,7 @@ export const DEBUG_PARAMETERS = [
     min: 0.05,
     max: 11.95,
     step: 0.05,
-    defaultValue: ENCOUNTER_CONFIG.shard.reversalAgeSeconds,
+    defaultValue: AUTHORED_TUNING.reversalSeconds,
   },
   {
     key: "lifetimeSeconds",
@@ -186,7 +198,7 @@ export const DEBUG_PARAMETERS = [
     min: 0.1,
     max: 12,
     step: 0.05,
-    defaultValue: ENCOUNTER_CONFIG.shard.lifetimeSeconds,
+    defaultValue: AUTHORED_TUNING.lifetimeSeconds,
   },
   {
     key: "projectileWidth",
@@ -196,7 +208,7 @@ export const DEBUG_PARAMETERS = [
     min: 0.1,
     max: 4,
     step: 0.05,
-    defaultValue: extent(ENCOUNTER_CONFIG.shard.verticesTiles, "x"),
+    defaultValue: AUTHORED_TUNING.projectileWidth,
   },
   {
     key: "projectileHeight",
@@ -206,9 +218,22 @@ export const DEBUG_PARAMETERS = [
     min: 0.1,
     max: 4,
     step: 0.05,
-    defaultValue: extent(ENCOUNTER_CONFIG.shard.verticesTiles, "y"),
+    defaultValue: AUTHORED_TUNING.projectileHeight,
   },
 ] as const;
+
+export const DEBUG_TOGGLES = [
+  { key: "godMode", label: "God mode" },
+  { key: "chaseArenaCenter", label: "Chase arena center" },
+  { key: "matchPlayerToHead", label: "Match player to head" },
+] as const satisfies readonly { key: string; label: string }[];
+
+export type DebugToggleKey = (typeof DEBUG_TOGGLES)[number]["key"];
+
+/** Parameter groups, in registry order, so a new group renders itself. */
+export const DEBUG_GROUPS: readonly string[] = [
+  ...new Set(DEBUG_PARAMETERS.map((parameter) => parameter.group)),
+];
 
 export type DebugParameterKey = (typeof DEBUG_PARAMETERS)[number]["key"];
 export const SELECTED_DEBUG_VALUES =
@@ -217,11 +242,7 @@ export const SELECTED_DEBUG_VALUES =
   >;
 
 export type DebugSettings = Readonly<
-  Record<DebugParameterKey, number> & {
-    godMode: boolean;
-    chaseArenaCenter: boolean;
-    matchPlayerToHead: boolean;
-  }
+  Record<DebugParameterKey, number> & Record<DebugToggleKey, boolean>
 >;
 export const DEFAULT_DEBUG_SETTINGS: DebugSettings = Object.freeze({
   ...Object.fromEntries(
@@ -294,53 +315,12 @@ export function updateDebugParameter(
 
 export function debugEncounterConfig(settings: DebugSettings): EncounterConfig {
   validateDebugSettings(settings);
-  return {
-    ...ENCOUNTER_CONFIG,
+  const config = buildEncounterConfig(settings, {
     rulesVersion: DEBUG_RULES_VERSION,
-    player: {
-      ...ENCOUNTER_CONFIG.player,
-      verticesTiles: settings.matchPlayerToHead
-        ? scaleBody(
-            ENCOUNTER_CONFIG.player.verticesTiles,
-            settings.enemyWidth,
-            settings.enemyHeight,
-          )
-        : ENCOUNTER_CONFIG.player.verticesTiles,
-    },
-    enemy: {
-      ...ENCOUNTER_CONFIG.enemy,
-      speedTilesPerSecond: settings.enemySpeedTilesPerSecond,
-      spawnTiles: { x: settings.spawnX, y: settings.spawnY },
-      verticesTiles: scaleBody(
-        ENCOUNTER_CONFIG.enemy.verticesTiles,
-        settings.enemyWidth,
-        settings.enemyHeight,
-      ),
-    },
-    emitters: {
-      ...ENCOUNTER_CONFIG.emitters,
-      count: settings.emitterCount,
-      radiusTiles: settings.emitterRadiusTiles,
-      initialPhaseRadians: (settings.initialPhaseDegrees * Math.PI) / 180,
-      clockwiseDegreesPerSecond: settings.rotationDegreesPerSecond,
-    },
-    burst: {
-      shotsPerEmitter: settings.shotsPerEmitter,
-      shotIntervalSeconds: settings.shotIntervalSeconds,
-      cooldownAfterLastShotSeconds: settings.cooldownSeconds,
-      initialCooldownSeconds: settings.initialCooldownSeconds,
-    },
-    shard: {
-      ...ENCOUNTER_CONFIG.shard,
-      damageHp: settings.projectileDamageHp,
-      speedTilesPerSecond: settings.projectileSpeedTilesPerSecond,
-      reversalAgeSeconds: settings.reversalSeconds,
-      lifetimeSeconds: settings.lifetimeSeconds,
-      verticesTiles: scaleBody(
-        ENCOUNTER_CONFIG.shard.verticesTiles,
-        settings.projectileWidth,
-        settings.projectileHeight,
-      ),
-    },
-  };
+    matchPlayerToHead: settings.matchPlayerToHead,
+  });
+  // The shipped path validates at module load; the debug path must too, so a
+  // slider cannot reach the simulation in a state the config forbids (G: F3).
+  validateEncounterConfig(config);
+  return config;
 }
