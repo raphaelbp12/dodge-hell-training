@@ -9,6 +9,17 @@ import type {
 } from "../src/game/models.ts";
 
 const controlledFrameMilliseconds = 250;
+// Spawn geometry (G11-G15), kept in step with app/src/game/data/encounter.json.
+const SPAWN_RING_TILES = 0.84375 * 19.2;
+// Pins spawn placement so the opening bearing is deterministic. This seed
+// reproduces the historical north opening at (0, -16.2) to six decimals.
+const NORTH_SEED = 229521;
+const seededUrl = (path = "./") =>
+  `${path}${path.includes("?") ? "&" : "?"}seed=${NORTH_SEED}`;
+const MAX_CONCURRENT_ENEMIES = 4;
+const LIVE_SHARD_BOUND_PER_ENEMY = 6 * 11 * Math.ceil(3 / 4.9);
+/** Distance of a position from the arena centre, in tiles. */
+const centreDistance = (point: Vector2) => Math.hypot(point.x, point.y);
 
 test.beforeEach(async ({ page }) => {
   await page.clock.install();
@@ -32,6 +43,8 @@ type Inspection = {
   player: PlayerState;
   enemies: EnemyState[];
   nextEnemyId: number;
+  nextSpawnSeconds: number;
+  randomSeed: number;
   shards: ShardState[];
   volleysFired: number;
   ticksElapsed: number;
@@ -94,7 +107,7 @@ async function finishCountdown(page: Page, resumeClock = true) {
 }
 
 async function launch(page: Page, resumeClock = true) {
-  await page.goto("./");
+  await page.goto(seededUrl());
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page, resumeClock);
   await expect
@@ -197,7 +210,7 @@ test("selected values are the scored defaults without opening Debug", async ({
 }) => {
   await launch(page);
   const state = await inspect(page);
-  expect(state.rulesVersion).toBe("crystal-worm-child-head-paladin-v3");
+  expect(state.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v4");
   expect(state.debugSettings).toMatchObject({
     headWidth: 1.25,
     headHeight: 1.25,
@@ -222,7 +235,7 @@ test("selected values are the scored defaults without opening Debug", async ({
   await page.getByRole("button", { name: "Debug", exact: true }).click();
   await page.getByRole("button", { name: "Load selected values" }).click();
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-head-paladin-v3",
+    "crystal-worm-child-swarm-paladin-v4",
   );
   await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
 });
@@ -232,7 +245,7 @@ for (const width of [1440, 390]) {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
-    await page.goto("./");
+    await page.goto(seededUrl());
     await page.getByRole("button", { name: "Debug", exact: true }).click();
     await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
     await page.getByRole("checkbox", { name: "Chase arena center" }).check();
@@ -254,9 +267,9 @@ for (const width of [1440, 390]) {
         }, value);
     };
     const sliders = page.getByRole("slider");
-    // Tracks DEBUG_PARAMETERS: 19 tuning sliders plus the two player-size
-    // sliders added when the player body became independently authored (G08).
-    await expect(sliders).toHaveCount(21);
+    // Tracks DEBUG_PARAMETERS: 17 tuning sliders after Spawn X/Y retired
+    // (G05), plus two player-size sliders (G08) and four spawn-rule sliders.
+    await expect(sliders).toHaveCount(23);
     await page.getByRole("button", { name: "Load selected values" }).click();
     await expect
       .poll(async () => (await inspect(page)).debugSettings)
@@ -285,11 +298,49 @@ for (const width of [1440, 390]) {
       page.getByRole("checkbox", { name: "Match player to head" }),
     ).toBeChecked();
     await setRange("Chase speed", 0);
-    await setRange("Spawn X", 4);
-    await setRange("Spawn Y", 0);
+    // Chase arena center is on, so raise the chase speed and wait for the
+    // enemy to reach the centred player; its opening bearing is seeded (G14).
+    // One enemy, parked a few tiles north of the player: enemies draw before
+    // the player, so one sitting on it would be occluded. Spawn X/Y is retired
+    // (G05), so the chase does the placing.
+    // Reproduce the horizontal separation the retired Spawn X/Y sliders used
+    // to set up (G05): park one enemy at the arena centre, then walk the player
+    // east. The canvas is only ~8 tiles tall at 1440 and far less at 390, so
+    // vertical separation would put a body off-screen. Shards draw above
+    // bodies, so shrink and expire them first to leave clean silhouettes.
+    await setRange("Max concurrent", 1);
+    await setRange("Emitter count", 1);
+    await setRange("Projectile lifetime", 0.1);
+    await setRange("Projectile width", 0.1);
+    await setRange("Projectile height", 0.1);
+    await setRange("Chase speed", 12);
     await expect
-      .poll(async () => (await inspect(page)).enemies[0].positionTiles)
-      .toEqual({ x: 4, y: 0 });
+      .poll(async () => (await inspect(page)).enemies.length)
+      .toBe(1);
+    await expect
+      .poll(
+        async () =>
+          centreDistance((await inspect(page)).enemies[0].positionTiles),
+        { timeout: 20000 },
+      )
+      .toBeLessThan(0.5);
+    await setRange("Chase speed", 0);
+    // Movement keys are only sampled while the arena itself holds focus.
+    await page
+      .getByRole("region", { name: "Encounter", exact: true })
+      .evaluate((element) => (element as HTMLElement).focus());
+    await page.keyboard.down("d");
+    // Release early: poll latency carries the player about 2.7 tiles further
+    // at 7.06 tiles/second, and the 390px canvas is only ~6 tiles half-wide,
+    // so overshooting clips the enemy against the left edge.
+    await expect
+      .poll(async () => (await inspect(page)).player.positionTiles.x, {
+        timeout: 10000,
+      })
+      .toBeGreaterThan(1.5);
+    await page.keyboard.up("d");
+    const separation = await inspect(page);
+    expect(separation.player.positionTiles.x).toBeLessThan(5.2);
     const matchingBodies = await page.locator("canvas").evaluate((canvas) => {
       const image = document.createElement("canvas");
       image.width = (canvas as HTMLCanvasElement).width;
@@ -352,9 +403,12 @@ for (const width of [1440, 390]) {
         Number(await slider.inputValue()),
       );
     }
-    await setRange("Spawn X", 0);
-    await setRange("Spawn Y", 0);
+    // Restore the real projectile settings that the body measurement
+    // suppressed, then make the next hit lethal. Spawn X/Y are retired (G05),
+    // so the chase brings the enemy back onto the player.
+    await page.getByRole("button", { name: "Load selected values" }).click();
     await setRange("Projectile damage", 1000);
+    await setRange("Chase speed", 12);
     await expect
       .poll(async () => (await inspect(page)).elapsedSeconds)
       .toBeGreaterThan(before.elapsedSeconds + 1);
@@ -387,7 +441,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Reset defaults" }).click();
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     expect((await inspect(page)).rulesVersion).toBe(
-      "crystal-worm-child-head-paladin-v3",
+      "crystal-worm-child-swarm-paladin-v4",
     );
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page
@@ -442,7 +496,7 @@ for (const width of [1440, 390]) {
         type: request.resourceType(),
       }),
     );
-    const response = await page.goto("./");
+    const response = await page.goto(seededUrl());
     expect(response?.ok()).toBe(true);
     expect(new URL(page.url()).pathname).toBe("/dodge-hell-training/");
     await expect(
@@ -722,7 +776,7 @@ for (const width of [1440, 390]) {
       const record = saved.records[0];
       expect(record).toEqual({
         id: expect.any(String),
-        rulesVersion: "crystal-worm-child-head-paladin-v3",
+        rulesVersion: "crystal-worm-child-swarm-paladin-v4",
         outcome: "death",
         elapsedSeconds: expect.any(Number),
         hitsTaken: expect.any(Number),
@@ -830,7 +884,7 @@ for (const width of [1440, 390]) {
 test("Start countdown freezes world, focus pause preserves it, and R skips countdown", async ({
   page,
 }) => {
-  await page.goto("./");
+  await page.goto(seededUrl());
   await page.keyboard.press("r");
   await expect(page.locator("canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "Start", exact: true }).click();
@@ -848,7 +902,10 @@ test("Start countdown freezes world, focus pause preserves it, and R skips count
   expect(paused.elapsedSeconds).toBe(0);
   expect(paused.volleysFired).toBe(0);
   expect(paused.player.positionTiles).toEqual({ x: 0, y: 0 });
-  expect(paused.enemies[0].positionTiles).toEqual({ x: 0, y: -16.2 });
+  expect(centreDistance(paused.enemies[0].positionTiles)).toBeCloseTo(
+    SPAWN_RING_TILES,
+    9,
+  );
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect
     .poll(async () => (await inspect(page)).sessionPhase)
@@ -884,21 +941,25 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     healthHp: 775,
     combatRemainingSeconds: 0,
   });
-  expect(reset.enemies).toEqual([
-    {
-      id: 1,
-      archetypeId: "crystal-worm-child-head",
-      positionTiles: { x: 0, y: -16.2 },
-      emitterPhaseRadians: 0,
-      spawnedAtSeconds: 0,
-      attackEpochSeconds: 0,
-      volleysAtEpoch: 0,
-      attackInitialDelaySeconds: 2,
-      rotationEpochSeconds: 0,
-      rotationPhaseAtEpoch: 0,
-      volleysFired: 0,
-    },
-  ]);
+  expect(reset.enemies).toHaveLength(1);
+  expect(reset.enemies[0]).toEqual({
+    id: 1,
+    archetypeId: "crystal-worm-child-head",
+    positionTiles: reset.enemies[0].positionTiles,
+    emitterPhaseRadians: 0,
+    spawnedAtSeconds: 0,
+    attackEpochSeconds: 0,
+    volleysAtEpoch: 0,
+    attackInitialDelaySeconds: 2,
+    rotationEpochSeconds: 0,
+    rotationPhaseAtEpoch: 0,
+    volleysFired: 0,
+  });
+  // A retry re-randomises the opening bearing, so pin the ring distance.
+  expect(centreDistance(reset.enemies[0].positionTiles)).toBeCloseTo(
+    SPAWN_RING_TILES,
+    9,
+  );
   expect(reset.shards).toEqual([]);
   expect(reset.volleysFired).toBe(0);
   expect(reset.ticksElapsed).toBe(0);
@@ -1136,7 +1197,7 @@ for (const width of [1440, 390]) {
 test("loaded history compares only compatible retained records", async ({
   page,
 }) => {
-  await page.goto("./");
+  await page.goto(seededUrl());
   await page.evaluate(async () => {
     const storagePath = new URL("src/storage/attempts.ts", document.baseURI)
       .href;
@@ -1289,19 +1350,23 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
   let peakShards = 0;
   let peakHitNumbers = 0;
   let peakAudioVoices = 0;
+  let peakEnemies = 0;
   let deaths = 0;
   let progressSamples = 0;
   let lastProgress = Date.now();
   while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
     let state = await inspect(page);
     peakShards = Math.max(peakShards, state.shards.length);
+    peakEnemies = Math.max(peakEnemies, state.enemies.length);
     peakHitNumbers = Math.max(peakHitNumbers, state.hitNumbers.length);
     peakAudioVoices = Math.max(peakAudioVoices, state.audio.activeVoices);
     expect(state.hitNumbers.length).toBeLessThanOrEqual(16);
     expect(state.audio.activeVoices).toBeLessThanOrEqual(4);
     expect(state.audio.requests).toBe(state.hitsTaken);
+    // Spawning is active, so the bound scales with the concurrency cap.
+    expect(state.enemies.length).toBeLessThanOrEqual(MAX_CONCURRENT_ENEMIES);
     expect(state.shards.length).toBeLessThanOrEqual(
-      6 * 11 * Math.ceil(3 / 4.9),
+      LIVE_SHARD_BOUND_PER_ENEMY * MAX_CONCURRENT_ENEMIES,
     );
     expect(
       state.shards.every((shard) => shard.ageSeconds < shard.lifetimeSeconds),
@@ -1351,6 +1416,11 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
     expect(reset.elapsedSeconds).toBe(0);
     expect(reset.hitsTaken).toBe(0);
     expect(reset.volleysFired).toBe(0);
+    // Retry resets the spawn schedule, not just the enemies already in play.
+    expect(reset.enemies).toHaveLength(1);
+    expect(reset.enemies[0].spawnedAtSeconds).toBe(0);
+    expect(reset.nextEnemyId).toBe(2);
+    expect(reset.nextSpawnSeconds).toBeCloseTo(10, 6);
     expect(reset.shards).toEqual([]);
     expect(reset.player.healthHp).toBe(775);
     expect(reset.keydownListeners).toBe(1);
@@ -1371,6 +1441,10 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
         simulatedSeconds,
         deaths,
         peakShards,
+        peakEnemies,
+        shardBound: LIVE_SHARD_BOUND_PER_ENEMY * MAX_CONCURRENT_ENEMIES,
+        shardBoundPerEnemy: LIVE_SHARD_BOUND_PER_ENEMY,
+        enemyBound: MAX_CONCURRENT_ENEMIES,
         peakHitNumbers,
         peakAudioVoices,
         progressSamples,
@@ -1399,7 +1473,7 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("./");
+  await page.goto(seededUrl());
   await expect(
     page.getByRole("heading", { name: "Crystal Worm Child", level: 1 }),
   ).toBeVisible();
@@ -1417,7 +1491,18 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
 test("WASD uses world speed and camera stays centered at the arena edge through zoom", async ({
   page,
 }) => {
-  await launch(page);
+  // Reaching the far wall takes longer than survival now that enemies arrive
+  // over time, and this test is about movement, camera and zoom. God mode
+  // isolates those from survival.
+  await page.goto(seededUrl());
+  await page.getByRole("button", { name: "Debug", exact: true }).click();
+  await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
+  await page.getByRole("button", { name: "Close debug" }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page);
+  await expect
+    .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
+    .toBeGreaterThan(0);
   await page.keyboard.down("d");
   await expect
     .poll(async () => (await inspect(page)).player.positionTiles.x)
@@ -1541,8 +1626,8 @@ test("real Phaser ticks pursue, fire, reverse, register hits and reduce health",
     .poll(async () => (await inspect(page)).volleysFired, { timeout: 6000 })
     .toBeGreaterThanOrEqual(4);
   const burst = await inspect(page);
-  expect(burst.enemies[0].positionTiles.y).toBeGreaterThan(
-    initial.enemies[0].positionTiles.y,
+  expect(centreDistance(burst.enemies[0].positionTiles)).toBeLessThan(
+    centreDistance(initial.enemies[0].positionTiles),
   );
   expect(burst.shards.length).toBeGreaterThanOrEqual(16);
   await expect
@@ -1634,7 +1719,7 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
   test(`Controls isolates ${phase} and requires explicit Resume without catch-up`, async ({
     page,
   }) => {
-    await page.goto("./");
+    await page.goto(seededUrl());
     await page.getByRole("button", { name: "Start", exact: true }).click();
     await expect
       .poll(async () => (await inspect(page))?.sessionPhase)
@@ -1827,7 +1912,7 @@ for (const viewport of [
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
-    await page.goto("./");
+    await page.goto(seededUrl());
     await expect(
       page.getByRole("button", { name: "Start", exact: true }),
     ).toBeFocused();
@@ -1921,7 +2006,19 @@ for (const viewport of [
         })
         .toBeGreaterThan(10);
     expect(pixels.player).toBeGreaterThan(10);
-    expect(pixels.shards).toBeGreaterThan(5);
+    // Pursuit brings the enemy into a viewport only ~11 tiles tall, and
+    // shards cover bodies, so wait for one sample that shows both.
+    await expect
+      .poll(
+        async () => {
+          pixels = await renderedPixels(page);
+          return viewport.width > 600
+            ? Math.min(pixels.shards, pixels.enemy)
+            : pixels.shards;
+        },
+        { timeout: 25000 },
+      )
+      .toBeGreaterThan(10);
     expect(pixels.ground).toBeGreaterThan(1000);
     if (viewport.width > 600) expect(pixels.enemy).toBeGreaterThan(10);
     const boxes = await page.evaluate(() => {

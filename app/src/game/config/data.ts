@@ -294,9 +294,22 @@ export function validateArchetypes(
   );
 }
 
+export type AuthoredSpawns = Readonly<{
+  archetype: string;
+  firstSpawnSeconds: number;
+  everySeconds: number;
+  maxConcurrent: number;
+  placement: Readonly<{
+    ringRadiusFraction: number;
+    rule: string;
+    goldenAngleDegrees: number;
+  }>;
+}>;
+
 export type AuthoredEncounter = Readonly<{
   rulesVersion: string;
   primaryArchetype: string;
+  spawns: AuthoredSpawns;
   simulation: Readonly<{ fixedStepSeconds: number; maxStepsPerUpdate: number }>;
   player: Readonly<{ spawnTiles: Vector2; body: AuthoredBody }>;
   camera: Readonly<{
@@ -327,8 +340,47 @@ export function validateEncounterData(value: unknown): AuthoredEncounter {
   );
   if (minZoom > maxZoom || defaultZoom < minZoom || defaultZoom > maxZoom)
     reject("encounter.camera.defaultZoom", "must be within ordered zoom bounds");
+  const spawns = record(data.spawns, "encounter.spawns");
+  const placement = record(spawns.placement, "encounter.spawns.placement");
+  const ringRadiusFraction = positiveNumber(
+    placement.ringRadiusFraction,
+    "encounter.spawns.placement.ringRadiusFraction",
+  );
+  if (ringRadiusFraction >= 1)
+    reject(
+      "encounter.spawns.placement.ringRadiusFraction",
+      "must be inside the arena, below 1",
+    );
+  if (placement.rule !== "farthest-from-player")
+    reject(
+      "encounter.spawns.placement.rule",
+      "must be the approved farthest-from-player rule",
+    );
   return Object.freeze({
     rulesVersion: text(data.rulesVersion, "encounter.rulesVersion"),
+    spawns: Object.freeze({
+      archetype: text(spawns.archetype, "encounter.spawns.archetype"),
+      firstSpawnSeconds: nonnegativeNumber(
+        spawns.firstSpawnSeconds,
+        "encounter.spawns.firstSpawnSeconds",
+      ),
+      everySeconds: positiveNumber(
+        spawns.everySeconds,
+        "encounter.spawns.everySeconds",
+      ),
+      maxConcurrent: safeCount(
+        spawns.maxConcurrent,
+        "encounter.spawns.maxConcurrent",
+      ),
+      placement: Object.freeze({
+        ringRadiusFraction,
+        rule: text(placement.rule, "encounter.spawns.placement.rule"),
+        goldenAngleDegrees: finiteNumber(
+          placement.goldenAngleDegrees,
+          "encounter.spawns.placement.goldenAngleDegrees",
+        ),
+      }),
+    }),
     primaryArchetype: text(
       data.primaryArchetype,
       "encounter.primaryArchetype",
@@ -378,5 +430,11 @@ export const AUTHORED_ENCOUNTER = validateEncounterData(encounterData);
 if (!AUTHORED_ARCHETYPES[AUTHORED_ENCOUNTER.primaryArchetype])
   reject(
     "encounter.primaryArchetype",
+    "must name an archetype defined in enemies.json",
+  );
+
+if (!AUTHORED_ARCHETYPES[AUTHORED_ENCOUNTER.spawns.archetype])
+  reject(
+    "encounter.spawns.archetype",
     "must name an archetype defined in enemies.json",
   );

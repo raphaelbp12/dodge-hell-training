@@ -13,6 +13,7 @@ import {
   createSimulation,
   restampLiveShards,
   setDebugSettings,
+  spawnEnemy,
 } from "./simulation.ts";
 import {
   DEFAULT_DEBUG_SETTINGS,
@@ -35,6 +36,15 @@ const idle: SimulationInput = {
 const east: SimulationInput = { ...idle, east: true };
 const stepSeconds = 1 / 60;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
+// Spawn placement draws from the seeded generator, so these tests pin a seed.
+const TEST_SEED = 20261026;
+const freshSimulation = () => createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+/** Distance of an enemy from the arena centre, in tiles. */
+const ringDistance = (state: ReturnType<typeof createSimulation>): number =>
+  Math.hypot(
+    state.enemies[0].positionTiles.x - state.config.arena.centerTiles.x,
+    state.enemies[0].positionTiles.y - state.config.arena.centerTiles.y,
+  );
 const horizontalContactTiles =
   Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.x)) +
   Math.max(...PRIMARY.weapon.shard.verticesTiles.map((vertex) => vertex.x));
@@ -43,7 +53,7 @@ const verticalContactTiles =
   Math.max(...PRIMARY.weapon.shard.verticesTiles.map((vertex) => vertex.y));
 
 test("matched player size controls shard collision instead of the old larger preset body", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   setDebugSettings(state, {
     ...loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
     enemySpeedTilesPerSecond: 0,
@@ -67,7 +77,7 @@ test("matched player size controls shard collision instead of the old larger pre
 });
 
 test("matched player size controls movement and immediate live-resize wall containment", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const selected = {
     ...loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
     godMode: true,
@@ -89,7 +99,7 @@ test("matched player size controls movement and immediate live-resize wall conta
 });
 
 test("live debug settings suppress accepted hits, stop pursuit and target the arena center", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   setDebugSettings(state, {
     ...DEFAULT_DEBUG_SETTINGS,
     godMode: true,
@@ -120,14 +130,20 @@ test("live debug settings suppress accepted hits, stop pursuit and target the ar
     godMode: true,
     chaseArenaCenter: true,
   });
+  const startDistance = Math.hypot(enemyStart.x, enemyStart.y);
   runTicks(state, 60);
-  expect(state.enemies[0].positionTiles.x).toBeCloseTo(0, 12);
-  expect(state.enemies[0].positionTiles.y).toBeGreaterThan(enemyStart.y);
+  // Chasing the centre closes one second of travel, from whatever bearing the
+  // seeded opening used, and ignores the player who stands away from it.
+  expect(ringDistance(state)).toBeCloseTo(
+    startDistance - state.debugSettings.enemySpeedTilesPerSecond,
+    9,
+  );
+  expect(ringDistance(state)).toBeLessThan(startDistance);
   expect(state.rulesVersion).not.toBe(ENCOUNTER_CONFIG.rulesVersion);
 });
 
 test("live projectile edits preserve IDs and once-only reversal, and lifetime reductions expire existing shards", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   let settings = {
     ...DEFAULT_DEBUG_SETTINGS,
     godMode: true,
@@ -168,7 +184,7 @@ test("live projectile edits preserve IDs and once-only reversal, and lifetime re
 });
 
 test("live burst edits re-anchor scheduling without a catch-up avalanche and rotation can stop", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
   runTicks(state, 600);
   const count = state.enemies[0].volleysFired;
@@ -189,7 +205,7 @@ test("live burst edits re-anchor scheduling without a catch-up avalanche and rot
 });
 
 test("arena-center chase reaches the exact center and ignores the player silhouette", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.positionTiles = { x: 10, y: 0 };
   setDebugSettings(state, {
     ...DEFAULT_DEBUG_SETTINGS,
@@ -203,11 +219,11 @@ test("arena-center chase reaches the exact center and ignores the player silhoue
 
 test("activates the selected v3 preset and eleven-volley first group atomically", () => {
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(
-    "crystal-worm-child-head-paladin-v3",
+    "crystal-worm-child-swarm-paladin-v4",
   );
   expect(ENCOUNTER_CONFIG.arena.radiusTiles).toBe(19.2);
   expect(PRIMARY.spawnTiles).toEqual({ x: 0, y: -16.2 });
-  const state = createSimulation();
+  const state = freshSimulation();
   for (let tick = 0; tick < 234; tick++) {
     state.player.healthHp = PALADIN_STATS.healthHp;
     advanceSimulation(state, stepSeconds, idle);
@@ -229,12 +245,18 @@ function runTicks(
 }
 
 test("initializes independent deterministic state from the approved preset", () => {
-  const first = createSimulation();
-  const second = createSimulation();
+  const first = freshSimulation();
+  const second = freshSimulation();
   expect(first).toEqual(second);
   expect(first.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion);
   expect(first.player.positionTiles).toEqual({ x: 0, y: 0 });
-  expect(first.enemies[0].positionTiles).toEqual({ x: 0, y: -16.2 });
+  expect(ringDistance(first)).toBeCloseTo(
+    ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    9,
+  );
+  expect(first.enemies[0].positionTiles).toEqual(
+    second.enemies[0].positionTiles,
+  );
   expect(first.enemies[0].emitterPhaseRadians).toBe(
     PRIMARY.weapon.emitters.initialPhaseRadians,
   );
@@ -258,7 +280,7 @@ test("uses the delegated 60 Hz, eight-step catch-up policy", () => {
 });
 
 test("does not advance movement or survival time without a full tick", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   expect(advanceSimulation(state, 0, east)).toEqual({
     stepsExecuted: 0,
     discardedSeconds: 0,
@@ -266,7 +288,10 @@ test("does not advance movement or survival time without a full tick", () => {
   });
   advanceSimulation(state, stepSeconds / 4, east);
   expect(state.player.positionTiles).toEqual({ x: 0, y: 0 });
-  expect(state.enemies[0].positionTiles).toEqual({ x: 0, y: -16.2 });
+  expect(ringDistance(state)).toBeCloseTo(
+    ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    9,
+  );
   expect(state.elapsedSeconds).toBe(0);
   expect(state.accumulatorSeconds).toBeCloseTo(stepSeconds / 4, 12);
   expect(
@@ -281,11 +306,16 @@ test.each([
   { ...idle, north: true, south: true },
   { ...idle, east: true, west: true },
 ])("no input or opposing inputs leave the player stationary: %j", (input) => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 60, input);
   expect(state.player.positionTiles).toEqual({ x: 0, y: 0 });
   expect(state.elapsedSeconds).toBe(1);
-  expect(state.enemies[0].positionTiles.y).toBeCloseTo(-14.7, 9);
+  // One second of pursuit closes 1.5 tiles toward the centred player,
+  // whatever bearing the seeded opening used.
+  expect(ringDistance(state)).toBeCloseTo(
+    ENCOUNTER_CONFIG.spawns.ringRadiusTiles - PRIMARY.speedTilesPerSecond,
+    9,
+  );
 });
 
 test.each([
@@ -294,7 +324,7 @@ test.each([
   ["east", 1, 0],
   ["west", -1, 0],
 ] as const)("maps %s into world axes", (direction, expectedX, expectedY) => {
-  const state = createSimulation();
+  const state = freshSimulation();
   advanceSimulation(state, stepSeconds, { ...idle, [direction]: true });
   const movementTiles = PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
   expect(state.player.positionTiles.x).toBeCloseTo(
@@ -308,9 +338,9 @@ test.each([
 });
 
 test("normalizes diagonals and cancels opposing inputs independently per axis", () => {
-  const axial = createSimulation();
-  const diagonal = createSimulation();
-  const cancelled = createSimulation();
+  const axial = freshSimulation();
+  const diagonal = freshSimulation();
+  const cancelled = freshSimulation();
   runTicks(axial, 60, east);
   runTicks(diagonal, 60, { ...east, north: true });
   runTicks(cancelled, 60, { ...east, north: true, south: true });
@@ -330,7 +360,7 @@ test("normalizes diagonals and cancels opposing inputs independently per axis", 
 });
 
 test("moves the configured distance over 120 ticks and counts only simulated seconds", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 120, east);
   expect(state.player.positionTiles.x).toBeCloseTo(
     PALADIN_DERIVED_STATS.speedTilesPerSecond * 2,
@@ -341,7 +371,7 @@ test("moves the configured distance over 120 ticks and counts only simulated sec
 });
 
 test("pursues the updated player position at the configured slower speed", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const initialEnemy = state.enemies[0].positionTiles;
   advanceSimulation(state, stepSeconds, east);
   expect(state.enemies[0].positionTiles.x).toBeGreaterThan(0);
@@ -360,7 +390,7 @@ test("pursues the updated player position at the configured slower speed", () =>
 test.each([-1.01, -1, -0.5, 0])(
   "stops without overshoot or division by zero from enemy y=%s",
   (enemyY) => {
-    const state = createSimulation();
+    const state = freshSimulation();
     state.enemies[0].positionTiles = { x: 0, y: enemyY };
     runTicks(state, 20);
     expect(state.enemies[0].positionTiles.x).toBe(0);
@@ -369,7 +399,7 @@ test.each([-1.01, -1, -0.5, 0])(
 );
 
 test("body overlap neither damages nor blocks the player", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.positionTiles = { x: -0.01, y: 0 };
   state.enemies[0].positionTiles = { x: 0, y: 0 };
   advanceSimulation(state, stepSeconds, east);
@@ -382,7 +412,7 @@ test("body overlap neither damages nor blocks the player", () => {
 });
 
 test("constrains the player collider at the wall while permitting tangential movement", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const limitTiles = maximumBodyCenterDistance(
     ENCOUNTER_CONFIG.player.verticesTiles,
     { x: 1, y: 0 },
@@ -407,7 +437,7 @@ test("constrains the player collider at the wall while permitting tangential mov
 });
 
 test("keeps both collision extents inside the arena over repeated edge movement", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.enemies[0].positionTiles = { x: 15.4, y: 0 };
   for (let tick = 0; tick < 600; tick++) {
     advanceSimulation(state, stepSeconds, { ...east, south: true });
@@ -445,10 +475,10 @@ test("equivalent elapsed time and constant input yield equivalent state across f
       stepSeconds * 2.5,
     ]).flat(),
   ];
-  const reference = createSimulation();
+  const reference = freshSimulation();
   runTicks(reference, 60, east);
   for (const schedule of schedules) {
-    const state = createSimulation();
+    const state = freshSimulation();
     for (const elapsedSeconds of schedule) {
       expect(
         advanceSimulation(state, elapsedSeconds, east).discardedSeconds,
@@ -477,7 +507,7 @@ test("equivalent elapsed time and constant input yield equivalent state across f
 });
 
 test("caps catch-up, discards excess whole ticks, and never awards discarded survival time", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const maximum = ENCOUNTER_CONFIG.simulation.maxStepsPerUpdate;
   const result = advanceSimulation(state, 1, east);
   expect(result.stepsExecuted).toBe(maximum);
@@ -491,7 +521,7 @@ test("caps catch-up, discards excess whole ticks, and never awards discarded sur
 });
 
 test("retains a fractional remainder after dropping whole ticks without a delayed backlog", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const maximum = ENCOUNTER_CONFIG.simulation.maxStepsPerUpdate;
   const result = advanceSimulation(state, (maximum + 3.5) * stepSeconds, east);
   expect(result.stepsExecuted).toBe(maximum);
@@ -504,7 +534,7 @@ test("retains a fractional remainder after dropping whole ticks without a delaye
 test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
   "rejects invalid elapsed time %s without changing simulation state",
   (elapsedSeconds) => {
-    const state = createSimulation();
+    const state = freshSimulation();
     const before = structuredClone(state);
     expect(() => advanceSimulation(state, elapsedSeconds, east)).toThrow(
       RangeError,
@@ -514,7 +544,7 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("bounds work even for a very large finite supplied duration", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const result = advanceSimulation(state, Number.MAX_VALUE, east);
   expect(result.stepsExecuted).toBe(8);
   expect(Number.isFinite(result.discardedSeconds)).toBe(true);
@@ -548,9 +578,9 @@ test.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
 );
 
 test("starts with independent empty shards and no shots before initial cooldown ends", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   expect(state.shards).toEqual([]);
-  expect(state.shards).not.toBe(createSimulation().shards);
+  expect(state.shards).not.toBe(freshSimulation().shards);
   expect(state.enemies[0].volleysFired).toBe(0);
   runTicks(state, 119);
   expect(state.shards).toEqual([]);
@@ -562,7 +592,7 @@ test("starts with independent empty shards and no shots before initial cooldown 
 });
 
 test("rotates clockwise from east toward south even during cooldown", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 60);
   expect(state.enemies[0].emitterPhaseRadians).toBeCloseTo(Math.PI / 4, 12);
   expect(Math.cos(state.enemies[0].emitterPhaseRadians)).toBeGreaterThan(0);
@@ -577,7 +607,7 @@ test("rotates clockwise from east toward south even during cooldown", () => {
 test.each([0, 1, 2, 3, 4, 5])(
   "samples emitter %s at sixth-turn offsets from the current enemy",
   (emitter) => {
-    const state = createSimulation();
+    const state = freshSimulation();
     runTicks(state, 120);
     const shard = state.shards[emitter];
     const angle = Math.PI / 2 + (emitter * Math.PI) / 3;
@@ -610,7 +640,7 @@ test.each([0, 1, 2, 3, 4, 5])(
 );
 
 test("fires 66 shards on the first fixed tick at each scheduled shot, then waits three seconds", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
   runTicks(state, 120);
   for (let volley = 1; volley < 11; volley++) {
@@ -638,7 +668,7 @@ test("fires 66 shards on the first fixed tick at each scheduled shot, then waits
 });
 
 test("resamples the moving enemy and rotated direction for later shots", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 120);
   const firstVelocity = { ...state.shards[0].velocityTilesPerSecond };
   const firstEnemy = { ...state.enemies[0].positionTiles };
@@ -678,7 +708,7 @@ function makeShard(overrides: Partial<ShardState> = {}): ShardState {
 }
 
 test("accepted-hit output separates simultaneous hits from regeneration and spent returns", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.shards.push(makeShard({ id: 1 }), makeShard({ id: 2 }));
   const result = advanceSimulation(state, stepSeconds * 3, idle);
   expect(result.acceptedHits).toEqual([
@@ -691,7 +721,7 @@ test("accepted-hit output separates simultaneous hits from regeneration and spen
 });
 
 test("lethal output reports post-defense damage, not clamped HP, and stops later hits", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.healthHp = 1;
   state.shards.push(makeShard({ id: 1 }), makeShard({ id: 2 }));
   const result = advanceSimulation(state, stepSeconds * 8, idle);
@@ -704,7 +734,7 @@ test("lethal output reports post-defense damage, not clamped HP, and stops later
 });
 
 test("one advance collects accepted hits from later fixed ticks without a persistent log", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.shards.push(
     makeShard({ id: 1 }),
     makeShard({
@@ -724,7 +754,7 @@ test("one advance collects accepted hits from later fixed ticks without a persis
 });
 
 test("moves outbound, reverses exactly at its boundary, and never reverses again", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard();
   state.shards.push(shard);
   runTicks(state, 71);
@@ -741,7 +771,7 @@ test("moves outbound, reverses exactly at its boundary, and never reverses again
 });
 
 test("splits a tick spanning reversal into outbound and return segments", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const outboundSeconds = stepSeconds / 4;
   const shard = makeShard({ ageSeconds: 1.2 - outboundSeconds });
   state.shards.push(shard);
@@ -755,7 +785,7 @@ test("splits a tick spanning reversal into outbound and return segments", () => 
 });
 
 test("splits movement at expiry, removes only then, and does not move an expired shard further", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard({
     ageSeconds: 2.4 - stepSeconds / 4,
     velocityTilesPerSecond: { x: -8, y: 0 },
@@ -772,7 +802,7 @@ test("splits movement at expiry, removes only then, and does not move an expired
 });
 
 test("handles reversal and expiry within the same tick", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard({
     reversalAgeSeconds: stepSeconds / 4,
     lifetimeSeconds: (stepSeconds * 3) / 4,
@@ -788,7 +818,7 @@ test("handles reversal and expiry within the same tick", () => {
 test.each([false, true])(
   "keeps shards outside the arena and at the player regardless of hit flag %s",
   (hasHitPlayer) => {
-    const state = createSimulation();
+    const state = freshSimulation();
     const outside = makeShard({
       positionTiles: { x: 1000, y: 0 },
       hasHitPlayer,
@@ -815,7 +845,7 @@ test.each([false, true])(
 );
 
 test("returns to its emission point without an origin field or following later enemy movement", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 120);
   const shard = state.shards[0];
   const emissionPoint = { ...shard.positionTiles };
@@ -854,11 +884,11 @@ test("shot times and shard state agree across render-frame schedules over severa
       stepSeconds * 2.5,
     ]).flat(),
   ];
-  const reference = createSimulation();
+  const reference = freshSimulation();
   runTicks(reference, 600, east);
   expect(reference.enemies[0].volleysFired).toBe(22);
   for (const schedule of schedules) {
-    const state = createSimulation();
+    const state = freshSimulation();
     const observedShotTimes = new Map<number, number>();
     for (const elapsedSeconds of schedule) {
       advanceSimulation(state, elapsedSeconds, east);
@@ -893,17 +923,12 @@ test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () 
     { ...idle, west: true },
     { ...idle, north: true },
   ];
-  const groupPeriodSeconds =
-    (PRIMARY.weapon.burst.shotsPerEmitter - 1) *
-      PRIMARY.weapon.burst.shotIntervalSeconds +
-    PRIMARY.weapon.burst.cooldownAfterLastShotSeconds;
+  // Spawning is active over five minutes, so the bound scales with the cap.
   const shardBound =
-    PRIMARY.weapon.emitters.count *
-    PRIMARY.weapon.burst.shotsPerEmitter *
-    Math.ceil(PRIMARY.weapon.shard.lifetimeSeconds / groupPeriodSeconds);
+    liveShardBoundPerEnemy(PRIMARY) * ENCOUNTER_CONFIG.spawns.maxConcurrent;
   let reference: ReturnType<typeof createSimulation> | undefined;
   for (const frameRate of [60, 30, 120]) {
-    const state = createSimulation();
+    const state = freshSimulation();
     let peakShards = 0;
     let maximumAgeSeconds = 0;
     let discardedSeconds = 0;
@@ -929,9 +954,14 @@ test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () 
     expect(state.phase).toBe("playing");
     expect(state.elapsedSeconds).toBe(validationSeconds);
     expect(state.ticksElapsed).toBe(validationSeconds / stepSeconds);
+    expect(state.enemies).toHaveLength(ENCOUNTER_CONFIG.spawns.maxConcurrent);
     expect(state.enemies[0].volleysFired).toBe(671);
+    const totalVolleys = state.enemies.reduce(
+      (total, enemy) => total + enemy.volleysFired,
+      0,
+    );
     expect(observedShardIds.size).toBe(
-      state.enemies[0].volleysFired * PRIMARY.weapon.emitters.count,
+      totalVolleys * PRIMARY.weapon.emitters.count,
     );
     expect(peakShards).toBeLessThanOrEqual(shardBound);
     expect(peakShards).toBeGreaterThan(44);
@@ -945,7 +975,7 @@ test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () 
 }, 60000);
 
 test("discarded time advances neither rotation nor the attack scheduler", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard();
   state.shards.push(shard);
   advanceSimulation(state, 20, idle);
@@ -960,13 +990,13 @@ test("discarded time advances neither rotation nor the attack scheduler", () => 
 });
 
 test("initializes a live simulation with no registered hits", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   expect(state.phase).toBe("playing");
   expect(state.hitsTaken).toBe(0);
 });
 
 test("applies one defense-reduced hit before fractional in-combat regeneration without removing the shard", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard();
   state.shards.push(shard);
   runTicks(state, 1);
@@ -984,7 +1014,7 @@ test("applies one defense-reduced hit before fractional in-combat regeneration w
 });
 
 test("repeated overlap never reapplies damage or refreshes combat for the same shard", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard({ velocityTilesPerSecond: { x: 0, y: 0 } });
   state.shards.push(shard);
   runTicks(state, 60);
@@ -995,7 +1025,7 @@ test("repeated overlap never reapplies damage or refreshes combat for the same s
 });
 
 test("independent shards can each hit in one tick without global invulnerability", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.shards.push(makeShard({ id: 1 }), makeShard({ id: 2 }));
   runTicks(state, 1);
   expect(state.hitsTaken).toBe(2);
@@ -1014,7 +1044,7 @@ test.each([
 ] as const)(
   "sweeps a fast shard at y=%s against actual polygon extents",
   (offsetY, expectedHit) => {
-    const state = createSimulation();
+    const state = freshSimulation();
     const shard = makeShard({
       positionTiles: { x: -2, y: offsetY },
       velocityTilesPerSecond: { x: 240, y: 0 },
@@ -1028,7 +1058,7 @@ test.each([
 );
 
 test("detects a stationary shard during player movement", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const travelTiles = PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
   state.player.positionTiles = { x: -travelTiles / 2, y: 0 };
   const shard = makeShard({
@@ -1047,7 +1077,7 @@ test("detects a stationary shard during player movement", () => {
 });
 
 test("does not confuse crossing world paths at different times with a relative-motion hit", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const travelTiles = PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
   state.player.positionTiles = { x: -horizontalContactTiles - 0.05, y: 0 };
   const shard = makeShard({
@@ -1060,7 +1090,7 @@ test("does not confuse crossing world paths at different times with a relative-m
 });
 
 test("detects the outbound excursion of a reversal tick even when the endpoints coincide", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard({
     positionTiles: { x: -1, y: 0 },
     velocityTilesPerSecond: { x: 240, y: 0 },
@@ -1075,7 +1105,7 @@ test("detects the outbound excursion of a reversal tick even when the endpoints 
 });
 
 test("detects a return-only crossing within a reversal tick", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard({
     positionTiles: { x: 1, y: 0 },
     velocityTilesPerSecond: { x: 240, y: 0 },
@@ -1088,7 +1118,7 @@ test("detects a return-only crossing within a reversal tick", () => {
 });
 
 test("never hits again when a previously consumed shard returns through the player", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   const shard = makeShard();
   state.shards.push(shard);
   runTicks(state, 144);
@@ -1104,7 +1134,7 @@ test.each([
 ] as const)(
   "checks only the live part of an expiring shard path from x=%s",
   (startX, expectedHit) => {
-    const state = createSimulation();
+    const state = freshSimulation();
     const shard = makeShard({
       positionTiles: { x: startX, y: 0 },
       velocityTilesPerSecond: { x: 120, y: 0 },
@@ -1120,7 +1150,7 @@ test.each([
 );
 
 test("does not extend the player's sweep past a shard's expiry", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.positionTiles = { x: -horizontalContactTiles - 0.08, y: 0 };
   state.shards.push(
     makeShard({
@@ -1135,7 +1165,7 @@ test("does not extend the player's sweep past a shard's expiry", () => {
 });
 
 test("uses the matching portion of player movement for each reversal segment", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.positionTiles = { x: -horizontalContactTiles - 0.1, y: 0 };
   state.shards.push(
     makeShard({
@@ -1148,7 +1178,7 @@ test("uses the matching portion of player movement for each reversal segment", (
 });
 
 test("regenerates fractionally at the normal rate and caps health", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.healthHp = 700;
   runTicks(state, 60);
   expect(state.player.healthHp).toBeCloseTo(712.1094, 9);
@@ -1158,7 +1188,7 @@ test("regenerates fractionally at the normal rate and caps health", () => {
 });
 
 test("splits regeneration when combat expires partway through a tick", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.healthHp = 700;
   state.player.combatRemainingSeconds = stepSeconds / 4;
   runTicks(state, 1);
@@ -1170,7 +1200,7 @@ test("splits regeneration when combat expires partway through a tick", () => {
 });
 
 test("a fresh qualifying hit refreshes combat before regeneration spans the old expiry", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.combatRemainingSeconds = stepSeconds / 4;
   state.shards.push(makeShard());
   runTicks(state, 1);
@@ -1182,7 +1212,7 @@ test("a fresh qualifying hit refreshes combat before regeneration spans the old 
 });
 
 test("stops on lethal damage in stable spawn order before later hits or regeneration", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   state.player.healthHp = 128;
   const first = makeShard({ id: 1 });
   const later = makeShard({ id: 2 });
@@ -1201,7 +1231,7 @@ test("stops on lethal damage in stable spawn order before later hits or regenera
 });
 
 test("includes the lethal tick in survival time and freezes all state after death", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 5);
   state.player.healthHp = 1;
   state.shards.push(makeShard());
@@ -1216,7 +1246,7 @@ test("includes the lethal tick in survival time and freezes all state after deat
 });
 
 test("checks newborn overlap at the exact firing boundary", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 119);
   state.enemies[0].positionTiles = { x: 0, y: 0 };
   state.player.positionTiles = { x: 0, y: 0.75 };
@@ -1233,7 +1263,7 @@ test("checks newborn overlap at the exact firing boundary", () => {
 });
 
 test("a lethal boundary-spawn hit prevents later newborn hits and regeneration", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 119);
   state.enemies[0].positionTiles = { x: 0, y: 0 };
   state.player.positionTiles = { x: 0, y: 0.75 };
@@ -1248,7 +1278,7 @@ test("a lethal boundary-spawn hit prevents later newborn hits and regeneration",
 });
 
 test("does not sweep a newborn shard against player movement before its firing time", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 119);
   state.enemies[0].positionTiles = { x: 0, y: 0 };
   state.player.positionTiles = {
@@ -1266,7 +1296,7 @@ test("does not sweep a newborn shard against player movement before its firing t
 });
 
 test("starts with exactly one enemy whose clock is anchored at its spawn", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   expect(state.enemies).toHaveLength(1);
   const [enemy] = state.enemies;
   expect(enemy.id).toBe(1);
@@ -1289,7 +1319,7 @@ test("starts with exactly one enemy whose clock is anchored at its spawn", () =>
 
 test("a fixed input sequence reproduces the same timeline every run", () => {
   const timeline = () => {
-    const state = createSimulation();
+    const state = freshSimulation();
     const samples: string[] = [];
     for (let tick = 0; tick < 600; tick++) {
       advanceSimulation(state, stepSeconds, tick % 120 < 60 ? east : idle);
@@ -1314,7 +1344,7 @@ test("a fixed input sequence reproduces the same timeline every run", () => {
 });
 
 test("restampLiveShards re-applies every fired-with value to shards in flight", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 150);
   expect(state.shards.length).toBeGreaterThan(0);
   const before = state.shards.map((shard) => shard.id);
@@ -1346,7 +1376,7 @@ test("restampLiveShards re-applies every fired-with value to shards in flight", 
 });
 
 test("a live damage edit applies to shards already in flight", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 150);
   expect(state.shards.length).toBeGreaterThan(0);
   setDebugSettings(state, {
@@ -1387,7 +1417,7 @@ const ringPositions: readonly Vector2[] = [
 ];
 
 test("each enemy fires on its own clock from its own spawn time", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   runTicks(state, 60);
   withEnemies(state, [{ x: 16.2, y: 0 }], state.elapsedSeconds);
   const [first, late] = state.enemies;
@@ -1404,7 +1434,7 @@ test("each enemy fires on its own clock from its own spawn time", () => {
 });
 
 test("every enemy pursues independently and stops at its own contact distance", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   withEnemies(state, ringPositions);
   const archetype = primaryArchetype(state.config);
   const stopDistance = convexContactDistance(
@@ -1429,7 +1459,7 @@ test("every enemy pursues independently and stops at its own contact distance", 
 });
 
 test("shard ids stay unique across enemies and every enemy stays in the arena", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   withEnemies(state, ringPositions);
   runTicks(state, 900);
   const ids = state.shards.map((shard) => shard.id);
@@ -1447,7 +1477,7 @@ test("shard ids stay unique across enemies and every enemy stays in the arena", 
 });
 
 test("hits stay once-per-shard with several enemies firing at one player", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   withEnemies(state, ringPositions);
   const seen = new Map<number, number>();
   for (let tick = 0; tick < 1800; tick++) {
@@ -1461,7 +1491,7 @@ test("hits stay once-per-shard with several enemies firing at one player", () =>
 });
 
 test("live shards stay within the derived bound times the enemy count", () => {
-  const state = createSimulation();
+  const state = freshSimulation();
   withEnemies(state, ringPositions);
   setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
   const bound =
@@ -1478,4 +1508,187 @@ test("live shards stay within the derived bound times the enemy count", () => {
   console.info(
     `multi-enemy peak live shards: ${peak} of ${bound} (${state.enemies.length} enemies)`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// Step 17.2: timed spawning.
+// ---------------------------------------------------------------------------
+
+test("enemies arrive on the approved schedule and stop at the cap", () => {
+  const state = freshSimulation();
+  const { firstSpawnSeconds, everySeconds, maxConcurrent } =
+    ENCOUNTER_CONFIG.spawns;
+  expect(state.enemies).toHaveLength(1);
+  expect(state.enemies[0].spawnedAtSeconds).toBe(0);
+  const arrivals: number[] = [0];
+  let seen = 1;
+  for (let tick = 0; tick < 60 * 60; tick++) {
+    advanceSimulation(state, stepSeconds, idle);
+    state.player.healthHp = PALADIN_STATS.healthHp;
+    if (state.enemies.length > seen) {
+      seen = state.enemies.length;
+      arrivals.push(state.enemies.at(-1)!.spawnedAtSeconds);
+    }
+  }
+  expect(arrivals).toHaveLength(maxConcurrent);
+  arrivals.slice(1).forEach((at, index) => {
+    expect(at).toBeCloseTo(firstSpawnSeconds + index * everySeconds, 6);
+  });
+  // Cap holds for the rest of the minute, and a suppressed spawn is skipped
+  // rather than banked.
+  expect(state.enemies).toHaveLength(maxConcurrent);
+  expect(state.nextSpawnSeconds).toBeGreaterThan(state.elapsedSeconds);
+});
+
+test("every spawn lands on the ring and keeps its body inside the arena", () => {
+  const archetype = primaryArchetype(ENCOUNTER_CONFIG);
+  for (const seed of [1, 7, 1234, 98765, 20261026]) {
+    const state = createSimulation(ENCOUNTER_CONFIG, seed);
+    for (let tick = 0; tick < 60 * 35; tick++) {
+      advanceSimulation(state, stepSeconds, idle);
+      state.player.healthHp = PALADIN_STATS.healthHp;
+    }
+    expect(state.enemies).toHaveLength(ENCOUNTER_CONFIG.spawns.maxConcurrent);
+    for (const enemy of state.enemies) {
+      expect(
+        convexBodyFitsCircle(
+          transformBodyVertices(archetype.verticesTiles, enemy.positionTiles),
+          ENCOUNTER_CONFIG.arena,
+        ),
+      ).toBe(true);
+    }
+  }
+});
+
+test("the opening bearing is drawn from the seed and spreads by golden angle", () => {
+  // The player stands exactly at the arena centre at t = 0, so the
+  // farthest-from-player bearing is undefined and comes from the seed (G14).
+  const bearings = [11, 22, 33, 44].map((seed) => {
+    const state = createSimulation(ENCOUNTER_CONFIG, seed);
+    const [enemy] = state.enemies;
+    return Math.atan2(enemy.positionTiles.y, enemy.positionTiles.x);
+  });
+  expect(new Set(bearings.map((b) => b.toFixed(6))).size).toBeGreaterThan(1);
+  for (const bearing of bearings) expect(Number.isFinite(bearing)).toBe(true);
+
+  // Concurrent spawns are offset by the golden angle per index.
+  const state = createSimulation(ENCOUNTER_CONFIG, 11);
+  state.player.positionTiles = { x: 5, y: 0 };
+  const before = state.enemies.length;
+  spawnEnemy(state);
+  expect(state.enemies).toHaveLength(before + 1);
+  const added = state.enemies.at(-1)!;
+  const expected =
+    Math.atan2(0, 5) +
+    Math.PI +
+    before * ENCOUNTER_CONFIG.spawns.goldenAngleRadians;
+  expect(added.positionTiles.x).toBeCloseTo(
+    Math.cos(expected) * ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    9,
+  );
+  expect(added.positionTiles.y).toBeCloseTo(
+    Math.sin(expected) * ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    9,
+  );
+});
+
+test("a later arrival serves its own initial cooldown", () => {
+  const state = freshSimulation();
+  for (let tick = 0; tick < 60 * 11; tick++) {
+    advanceSimulation(state, stepSeconds, idle);
+    state.player.healthHp = PALADIN_STATS.healthHp;
+  }
+  expect(state.enemies.length).toBeGreaterThan(1);
+  const late = state.enemies[1];
+  expect(late.spawnedAtSeconds).toBeCloseTo(
+    ENCOUNTER_CONFIG.spawns.firstSpawnSeconds,
+    6,
+  );
+  expect(late.attackEpochSeconds).toBe(late.spawnedAtSeconds);
+  expect(late.volleysFired).toBe(0);
+  expect(state.enemies[0].volleysFired).toBeGreaterThan(0);
+});
+
+test("spawning is reproducible for a seed, including under catch-up", () => {
+  const timeline = (stepsPerUpdate: number) => {
+    const state = createSimulation(ENCOUNTER_CONFIG, 555);
+    // God mode, so the player cannot die partway through a multi-step update
+    // and truncate the loop - that would be a property of the test, not of
+    // spawning. Both runs reconcile identically.
+    setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
+    const seconds = 40;
+    const updates = (seconds / stepSeconds) / stepsPerUpdate;
+    for (let update = 0; update < updates; update++) {
+      advanceSimulation(state, stepSeconds * stepsPerUpdate, idle);
+    }
+    return state.enemies.map(
+      (enemy) =>
+        `${enemy.id}@${enemy.spawnedAtSeconds.toFixed(6)}:` +
+        `${enemy.positionTiles.x.toFixed(9)},${enemy.positionTiles.y.toFixed(9)}`,
+    );
+  };
+  const single = timeline(1);
+  expect(single).toHaveLength(ENCOUNTER_CONFIG.spawns.maxConcurrent);
+  // One step per update, and eight at once, must agree.
+  expect(timeline(8)).toEqual(single);
+  expect(timeline(1)).toEqual(single);
+});
+
+test("a different seed opens from a different place but the same schedule", () => {
+  const openings = [101, 202].map((seed) => {
+    const state = createSimulation(ENCOUNTER_CONFIG, seed);
+    return { ...state.enemies[0].positionTiles };
+  });
+  expect(openings[0]).not.toEqual(openings[1]);
+  for (const opening of openings) {
+    expect(Math.hypot(opening.x, opening.y)).toBeCloseTo(
+      ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+      9,
+    );
+  }
+});
+
+test("lowering the concurrency cap despawns the newest enemies at once", () => {
+  const state = freshSimulation();
+  for (let tick = 0; tick < 60 * 35; tick++) {
+    advanceSimulation(state, stepSeconds, idle);
+    state.player.healthHp = PALADIN_STATS.healthHp;
+  }
+  expect(state.enemies).toHaveLength(4);
+  const keptIds = state.enemies.slice(0, 2).map((enemy) => enemy.id);
+  setDebugSettings(state, {
+    ...DEFAULT_DEBUG_SETTINGS,
+    maxConcurrentEnemies: 2,
+  });
+  expect(state.enemies.map((enemy) => enemy.id)).toEqual(keptIds);
+  // The cap keeps holding as time advances.
+  for (let tick = 0; tick < 60 * 30; tick++) {
+    advanceSimulation(state, stepSeconds, idle);
+    state.player.healthHp = PALADIN_STATS.healthHp;
+  }
+  expect(state.enemies.length).toBeLessThanOrEqual(2);
+});
+
+test("an archetype edit applies to every live enemy", () => {
+  const state = freshSimulation();
+  for (let tick = 0; tick < 60 * 25; tick++) {
+    advanceSimulation(state, stepSeconds, idle);
+    state.player.healthHp = PALADIN_STATS.healthHp;
+  }
+  expect(state.enemies.length).toBeGreaterThan(1);
+  setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, headWidth: 2 });
+  const archetype = primaryArchetype(state.config);
+  expect(
+    Math.max(...archetype.verticesTiles.map((vertex) => vertex.x)) -
+      Math.min(...archetype.verticesTiles.map((vertex) => vertex.x)),
+  ).toBeCloseTo(2, 9);
+  for (const enemy of state.enemies) {
+    expect(enemy.archetypeId).toBe(state.config.primaryArchetypeId);
+    expect(
+      convexBodyFitsCircle(
+        transformBodyVertices(archetype.verticesTiles, enemy.positionTiles),
+        state.config.arena,
+      ),
+    ).toBe(true);
+  }
 });

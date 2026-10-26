@@ -559,3 +559,46 @@ Visit-local settings flow React -> existing Phaser handle -> session -> pure sim
 Any nondefault setting or debug flag taints the current attempt as `crystal-worm-child-head-debug` until the next fresh attempt. Debug results are displayed but not saved/compared; resetting defaults cannot launder an existing attempt. Retry/Home retain visit-local settings, result-screen edits apply on Retry without mutating frozen results, and reset plus fresh Retry/Start restores normal v2 eligibility. No history schema/migration/persistence/deployment claim is added by this local follow-up. Bounds are trainer exploration/resource choices, not measured game-client limits.
 
 The user's later 2026-10-25 screenshot replaces the saved debug preset's cooldown with 3 seconds and projectile dimensions with 1.45x0.65 tiles; other visible values are unchanged. The user additionally requested player dimensions matching the 1.25x1.25-tile head. Loading the selected preset now enables the explicit Match player to head flag, coupling only the player's body dimensions to subsequent head-width/height edits. Both keep their original convex silhouettes. Active vertices own player drawing, swept collision, pursuit separation, immediate live-resize containment, movement and feedback placement. Turning off the flag restores the original player body; Reset defaults and a fresh attempt restore normal v2 eligibility. This is a debug-only approved size override, not a normal v2 retune or approval to replace the scored preset.
+
+## Approved V4 Swarm Contract - Step 17.1
+
+Additive record of the user's 2026-10-26 decisions (G01-G22 in [the active plan](../implementation-plan.md)) and their verification. This supersedes nothing in the v2 or v3 record except where stated. These are user-defined trainer decisions, not new independent ROTMG verification.
+
+### Data Layer
+
+Arena, enemy archetypes and encounter-wide values are authored in JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`. The pixel-measurement geometry study is retired; the surviving approved facts are the 19.2-tile arena radius, the 3-tile enemy center-to-wall margin and the two body outlines, now normalized to a 1x1 tile box and scaled by authored dimensions. Because scaling normalizes by source extents, the retired study's source pixel sizes never affected a shipped vertex.
+
+### Spawn Rule
+
+| Value | Setting | Verification |
+| --- | --- | --- |
+| Archetype | `crystal-worm-child-head` | The only archetype; spawning adds instances, not kinds |
+| Opening enemy | `t = 0` | Schedule index 0, created through the same routine as later spawns |
+| `firstSpawnSeconds` | 10 | First additional spawn |
+| `everySeconds` | 10 | Spawns at 10, 20, 30 seconds |
+| `maxConcurrent` | 4 | Cap reached at `t = 30` seconds |
+| `ringRadiusFraction` | 0.84375 | `0.84375 * 19.2 = 16.2` tiles exactly, reproducing the current spawn distance |
+| Placement | Farthest from the player | Point diametrically opposite the player's bearing from the arena center |
+| Undefined bearing | Seeded random among candidates | The player is exactly at the center at `t = 0`, so this is the default opening |
+| Tie-break | Golden angle, 137.5 degrees | Per concurrent spawn index |
+| Enemy interaction | Pass through each other | Consistent with `blocksPlayer: false`; per-tick cost stays O(shards) |
+| Despawn | Never | Enemies accumulate to the cap and remain |
+| Session end | Death only | No win or timeout state |
+
+Verified arithmetic:
+
+- **Ring fit.** The head body's farthest vertex sits 0.728869 tiles from its center, so `16.2 + 0.728869 = 16.928869 < 19.2`. `convexBodyFitsCircle` confirms the body fits at every one-degree bearing on the ring.
+- **Golden-angle spread.** Four concurrent spawns land at 0, 137.5, 275.0 and 52.5 degrees, with a minimum pairwise separation of 14.3301 tiles against a 1.25-tile body. The offset is applied per concurrent spawn index, not accumulated across the run.
+- **Shard budget.** `burstGroupSeconds = (11 - 1) * 0.19 + 3 = 4.9`, so the live bound per enemy is `6 * 11 * ceil(3 / 4.9) = 66`, and `264` at the cap of four. A four-enemy simulation measured a peak of exactly 264, so the bound is tight rather than loose. The existing browser assertion of 88 is a single-enemy v2-era literal and step 17.4 re-derives it.
+- **Cadence against real play.** Recorded v2 deaths occur near 8 seconds, so a typical attempt meets only the opening enemy and a strong attempt meets more. The cap is reached at 30 seconds.
+
+### Randomness And Determinism
+
+Spawn placement is the only source of randomness, and it enters through a seeded generator injected into the simulation, in the same style as the existing audio and storage boundaries. The simulation never calls `Math.random`. Given a seed, the same elapsed time and input reproduce the same enemies at the same positions, including across a catch-up update that executes several fixed steps at once. The seed is not recorded in attempt history, so attempts are not reproducible across runs; no storage schema change is made.
+
+### Recorded Deviations
+
+- **The opening enemy's bearing is no longer fixed north.** Because the player stands exactly at the arena center at `t = 0`, the undefined-bearing case is the default opening rather than a rare edge case, so every attempt opens from a random direction at an unchanged distance of 16.2 tiles. This supersedes the v2 statement that the enemy starts north at `(0, -16.2)`; the v2 record is retained as history.
+- **The arena stays 19.2 tiles.** The `fixes.md` request for an arena at double the enemy's reach is superseded by the v3 tuning: shipped reach is `0.35 + 8 * 1.5 = 12.35` tiles. More dodging room matters more once several enemies fire.
+- **New comparison identity `crystal-worm-child-swarm-paladin-v4`.** v1, v2 and v3 records are retained, displayed as "Other rules" and excluded from the new retained best. No history schema change.
+- **Approved rules are split by enforcement point.** Immutable rules - no contact damage, no body blocking, rotation during cooldown, lifetime-only expiry, once-per-shard hits - are asserted for any config. "Pursuit slower than the Paladin" is asserted only for the shipped encounter, because the debug speed slider reaches 12 tiles/second against the Paladin's 7.0613 and is meant to.

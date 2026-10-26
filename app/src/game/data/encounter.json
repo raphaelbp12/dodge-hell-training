@@ -1,6 +1,6 @@
 {
   "comment": "Encounter-wide authored values. The player body is sized independently of any enemy (G08).",
-  "rulesVersion": "crystal-worm-child-head-paladin-v3",
+  "rulesVersion": "crystal-worm-child-swarm-paladin-v4",
   "primaryArchetype": "crystal-worm-child-head",
   "simulation": {
     "fixedStepHz": 60,
@@ -20,6 +20,18 @@
     "minZoom": 0.25,
     "maxZoom": 3,
     "zoomStep": 0.125
+  },
+  "spawns": {
+    "comment": "Opening enemy at t=0 is schedule index 0; firstSpawnSeconds is the first additional spawn, so spawns land at 0, 10, 20 and 30 seconds. ringRadiusFraction 0.84375 is exactly 16.2/19.2, the approved spawn distance.",
+    "archetype": "crystal-worm-child-head",
+    "firstSpawnSeconds": 10,
+    "everySeconds": 10,
+    "maxConcurrent": 4,
+    "placement": {
+      "ringRadiusFraction": 0.84375,
+      "rule": "farthest-from-player",
+      "goldenAngleDegrees": 137.5
+    }
   },
   "session": {
     "startCountdownSeconds": 3,

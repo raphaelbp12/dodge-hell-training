@@ -33,6 +33,8 @@ export type EncounterHandle = {
 };
 
 type EncounterOptions = {
+  /** Pins spawn placement so a run can be reproduced; omitted means varied. */
+  seed?: number;
   initialZoom?: number;
   initialMuted?: boolean;
   initialDebugSettings?: DebugSettings;
@@ -77,7 +79,7 @@ const pixelsPerTile = ENCOUNTER_CONFIG.camera.cssPixelsPerTile;
 const encounters = new WeakMap<HTMLElement, EncounterScene>();
 
 class EncounterScene extends Phaser.Scene {
-  private session = new SessionController();
+  private session: SessionController;
   private get state() {
     return this.session.simulation;
   }
@@ -120,6 +122,10 @@ class EncounterScene extends Phaser.Scene {
     options: EncounterOptions,
   ) {
     super("Encounter");
+    this.session =
+      options.seed === undefined
+        ? new SessionController()
+        : new SessionController(() => options.seed!);
     this.host = host;
     this.publish = publish;
     this.zoom = options.initialZoom ?? ENCOUNTER_CONFIG.camera.defaultZoom;

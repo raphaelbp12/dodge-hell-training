@@ -24,6 +24,17 @@ import {
   type DebugSettings,
 } from "./game/config/debug";
 
+/**
+ * Optional `?seed=<integer>` pins spawn placement, so a run can be reproduced
+ * or shared. Omitted or invalid means a varied opening.
+ */
+function readSeedFromLocation(): number | undefined {
+  const raw = new URLSearchParams(window.location.search).get("seed");
+  if (raw === null) return undefined;
+  const seed = Number(raw);
+  return Number.isFinite(seed) ? Math.trunc(seed) : undefined;
+}
+
 function DebugPanel({
   settings,
   onChange,
@@ -252,6 +263,7 @@ function Encounter({
         setView(nextView);
       },
       {
+        seed: readSeedFromLocation(),
         initialZoom: zoomPreference.current,
         initialMuted: initialMuted.current,
         initialDebugSettings: initialDebugSettings.current,

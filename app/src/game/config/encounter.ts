@@ -51,8 +51,18 @@ export type EnemyArchetype = Readonly<{
   }>;
 }>;
 
+export type SpawnRule = Readonly<{
+  archetypeId: string;
+  firstSpawnSeconds: number;
+  everySeconds: number;
+  maxConcurrent: number;
+  ringRadiusTiles: number;
+  goldenAngleRadians: number;
+}>;
+
 export type EncounterConfig = Readonly<{
   rulesVersion: string;
+  spawns: SpawnRule;
   simulation: Readonly<{
     fixedStepSeconds: number;
     maxStepsPerUpdate: number;
@@ -140,6 +150,10 @@ export type TuningValues = Readonly<{
   lifetimeSeconds: number;
   projectileWidth: number;
   projectileHeight: number;
+  firstSpawnSeconds: number;
+  spawnEverySeconds: number;
+  maxConcurrentEnemies: number;
+  spawnRingFraction: number;
 }>;
 
 export const AUTHORED_TUNING: TuningValues = Object.freeze({
@@ -166,6 +180,10 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   lifetimeSeconds: authoredPrimary.weapon.shard.lifetimeSeconds,
   projectileWidth: authoredPrimary.weapon.shard.body.widthTiles,
   projectileHeight: authoredPrimary.weapon.shard.body.heightTiles,
+  firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
+  spawnEverySeconds: AUTHORED_ENCOUNTER.spawns.everySeconds,
+  maxConcurrentEnemies: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
+  spawnRingFraction: AUTHORED_ENCOUNTER.spawns.placement.ringRadiusFraction,
 });
 
 /**
@@ -266,6 +284,16 @@ export function buildEncounterConfig(
   });
   return {
     rulesVersion: options.rulesVersion,
+    spawns: {
+      archetypeId: AUTHORED_ENCOUNTER.spawns.archetype,
+      firstSpawnSeconds: values.firstSpawnSeconds,
+      everySeconds: values.spawnEverySeconds,
+      maxConcurrent: values.maxConcurrentEnemies,
+      ringRadiusTiles: values.spawnRingFraction * ARENA.radiusTiles,
+      goldenAngleRadians: degreesToRadians(
+        AUTHORED_ENCOUNTER.spawns.placement.goldenAngleDegrees,
+      ),
+    },
     simulation: AUTHORED_ENCOUNTER.simulation,
     arena: ARENA,
     player: {
@@ -383,6 +411,26 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   ) {
     throw new RangeError("Entity collision extent must spawn inside the arena");
   }
+  const spawns = config.spawns;
+  assertNonnegative(spawns.firstSpawnSeconds, "firstSpawnSeconds");
+  assertPositive(spawns.everySeconds, "spawnEverySeconds");
+  assertPositive(spawns.maxConcurrent, "maxConcurrentEnemies");
+  if (!Number.isSafeInteger(spawns.maxConcurrent))
+    throw new RangeError("maxConcurrentEnemies must be a safe integer");
+  assertPositive(spawns.ringRadiusTiles, "spawnRingRadiusTiles");
+  if (spawns.ringRadiusTiles >= config.arena.radiusTiles)
+    throw new RangeError("Spawn ring must lie inside the arena");
+  if (!Number.isFinite(spawns.goldenAngleRadians))
+    throw new RangeError("goldenAngleRadians must be finite");
+  if (!config.archetypes[spawns.archetypeId])
+    throw new RangeError("spawns.archetypeId must name a defined archetype");
+  const spawnBody = config.archetypes[spawns.archetypeId].verticesTiles;
+  const farthestVertexTiles = Math.max(
+    ...spawnBody.map((vertex) => Math.hypot(vertex.x, vertex.y)),
+  );
+  if (spawns.ringRadiusTiles + farthestVertexTiles > config.arena.radiusTiles)
+    throw new RangeError("Spawn ring must keep the body inside the arena");
+
   const ids = Object.keys(config.archetypes);
   if (ids.length === 0)
     throw new RangeError("At least one enemy archetype is required");

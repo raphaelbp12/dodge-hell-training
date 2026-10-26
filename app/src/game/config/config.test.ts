@@ -84,7 +84,7 @@ const SHARD_BODY_TILES = [
 ];
 
 test("selected values are the normal scoring-eligible defaults", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v4");
   expect(DEFAULT_DEBUG_SETTINGS).toMatchObject(SELECTED_DEBUG_VALUES);
   expect(DEFAULT_DEBUG_SETTINGS.matchPlayerToHead).toBe(true);
   expect(
@@ -347,7 +347,7 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("encodes approved tuning and independent reversal/lifetime values with explicit units", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-head-paladin-v3");
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v4");
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION);
   expect(ENCOUNTER_CONFIG.arena).toEqual({
     centerTiles: { x: 0, y: 0 },
@@ -548,6 +548,7 @@ test("the live shard bound derives from configuration, not a literal", () => {
 test("debug parameter groups and toggles are derived from the registry", () => {
   expect(DEBUG_GROUPS).toEqual([
     "Enemy",
+    "Spawns",
     "Player",
     "Emitters",
     "Burst",
@@ -562,4 +563,43 @@ test("debug parameter groups and toggles are derived from the registry", () => {
     expect(
       DEBUG_PARAMETERS.some((parameter) => parameter.group === group),
     ).toBe(true);
+});
+
+test("the Spawns group exposes the rule and replaces the spawn-point sliders", () => {
+  expect(DEBUG_GROUPS).toContain("Spawns");
+  const spawnKeys = DEBUG_PARAMETERS.filter(
+    (parameter) => parameter.group === "Spawns",
+  ).map((parameter) => parameter.key);
+  expect(spawnKeys).toEqual([
+    "firstSpawnSeconds",
+    "spawnEverySeconds",
+    "maxConcurrentEnemies",
+    "spawnRingFraction",
+  ]);
+  // Rule-driven placement means there is no single spawn point to edit (G05).
+  const keys = DEBUG_PARAMETERS.map((parameter) => parameter.key);
+  expect(keys).not.toContain("spawnX");
+  expect(keys).not.toContain("spawnY");
+});
+
+test("spawn sliders reach the config and stay inside the arena at both ends", () => {
+  for (const parameter of DEBUG_PARAMETERS.filter((p) => p.group === "Spawns")) {
+    for (const value of [parameter.min, parameter.max]) {
+      const settings = updateDebugParameter(
+        DEFAULT_DEBUG_SETTINGS,
+        parameter.key,
+        value,
+      );
+      const config = debugEncounterConfig(settings);
+      expect(config.spawns.ringRadiusTiles).toBeLessThan(
+        config.arena.radiusTiles,
+      );
+      if (parameter.key === "maxConcurrentEnemies")
+        expect(config.spawns.maxConcurrent).toBe(value);
+      if (parameter.key === "spawnEverySeconds")
+        expect(config.spawns.everySeconds).toBe(value);
+      if (parameter.key === "firstSpawnSeconds")
+        expect(config.spawns.firstSpawnSeconds).toBe(value);
+    }
+  }
 });

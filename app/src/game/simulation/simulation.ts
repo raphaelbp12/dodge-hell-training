@@ -31,6 +31,7 @@ import type {
   Vector2,
 } from "../models";
 import { applyPlayerHit, regeneratePlayer } from "./health";
+import { arbitrarySeed, assertSeed, nextSeed, unitFromSeed } from "./random";
 
 export type SimulationState = {
   config: EncounterConfig;
@@ -38,6 +39,10 @@ export type SimulationState = {
   collisionBoundingRadiusTiles: number;
   nextShardId: number;
   nextEnemyId: number;
+  /** Elapsed time of the next scheduled spawn. */
+  nextSpawnSeconds: number;
+  /** Generator cursor. Plain data, so the state stays structuredClone-able. */
+  randomSeed: number;
   rulesVersion: string;
   phase: "playing" | "ended";
   hitsTaken: number;
@@ -101,34 +106,94 @@ export function createEnemy(
   };
 }
 
-export function createSimulation(): SimulationState {
-  return {
-    config: ENCOUNTER_CONFIG,
+export function createSimulation(
+  config: EncounterConfig = ENCOUNTER_CONFIG,
+  seed: number = arbitrarySeed(),
+): SimulationState {
+  const state: SimulationState = {
+    config,
     debugSettings: DEFAULT_DEBUG_SETTINGS,
     collisionBoundingRadiusTiles: combinedBoundingRadiusTiles,
     nextShardId: 1,
-    nextEnemyId: 2,
-    rulesVersion: ENCOUNTER_CONFIG.rulesVersion,
+    nextEnemyId: 1,
+    nextSpawnSeconds: config.spawns.firstSpawnSeconds,
+    randomSeed: assertSeed(seed),
+    rulesVersion: config.rulesVersion,
     phase: "playing",
     hitsTaken: 0,
     player: {
-      positionTiles: { ...ENCOUNTER_CONFIG.player.spawnTiles },
+      positionTiles: { ...config.player.spawnTiles },
       healthHp: PALADIN_STATS.healthHp,
       combatRemainingSeconds: 0,
     },
-    enemies: [
-      createEnemy(
-        ENCOUNTER_CONFIG,
-        ENCOUNTER_CONFIG.primaryArchetypeId,
-        1,
-        0,
-      ),
-    ],
+    enemies: [],
     shards: [],
     ticksElapsed: 0,
     elapsedSeconds: 0,
     accumulatorSeconds: 0,
   };
+  // The opening enemy is schedule index 0, created through the same routine as
+  // every later spawn, so there is no special-cased initial enemy (G18).
+  spawnEnemy(state);
+  return state;
+}
+
+/**
+ * Places and appends one enemy on the spawn ring.
+ *
+ * The chosen bearing is the one diametrically opposite the player's bearing
+ * from the arena centre, offset by the golden angle per concurrent spawn so two
+ * enemies never land on the same point (G12, G15). When the player stands
+ * exactly at the centre that bearing is undefined - which is the case at t = 0,
+ * the default opening - so the bearing is drawn from the injected generator
+ * (G13, G14).
+ */
+/** Advances the simulation's generator cursor and returns a value in [0, 1). */
+function nextUnitRandom(state: SimulationState): number {
+  state.randomSeed = nextSeed(state.randomSeed);
+  return unitFromSeed(state.randomSeed);
+}
+
+export function spawnEnemy(state: SimulationState): EnemyState | null {
+  const { spawns, arena } = state.config;
+  if (state.enemies.length >= spawns.maxConcurrent) return null;
+  const offsetX = state.player.positionTiles.x - arena.centerTiles.x;
+  const offsetY = state.player.positionTiles.y - arena.centerTiles.y;
+  const distanceTiles = Math.hypot(offsetX, offsetY);
+  const awayBearing =
+    distanceTiles === 0
+      ? nextUnitRandom(state) * fullTurnRadians
+      : Math.atan2(offsetY, offsetX) + Math.PI;
+  const bearing =
+    awayBearing + state.enemies.length * spawns.goldenAngleRadians;
+  const enemy = createEnemy(
+    state.config,
+    spawns.archetypeId,
+    state.nextEnemyId++,
+    state.elapsedSeconds,
+    {
+      x: arena.centerTiles.x + Math.cos(bearing) * spawns.ringRadiusTiles,
+      y: arena.centerTiles.y + Math.sin(bearing) * spawns.ringRadiusTiles,
+    },
+  );
+  state.enemies.push(enemy);
+  return enemy;
+}
+
+/**
+ * Resolves due spawns. A suppressed spawn is skipped rather than deferred: the
+ * schedule keeps advancing, so lowering the cap does not bank arrivals.
+ */
+function updateSpawns(state: SimulationState): void {
+  const { everySeconds } = state.config.spawns;
+  const toleranceSeconds =
+    Math.max(state.elapsedSeconds, state.nextSpawnSeconds) *
+    Number.EPSILON *
+    16;
+  while (state.elapsedSeconds + toleranceSeconds >= state.nextSpawnSeconds) {
+    spawnEnemy(state);
+    state.nextSpawnSeconds += everySeconds;
+  }
 }
 
 export function setDebugSettings(
@@ -155,8 +220,6 @@ export function setDebugSettings(
     settings.shotIntervalSeconds !== previous.shotIntervalSeconds ||
     settings.cooldownSeconds !== previous.cooldownSeconds ||
     settings.initialCooldownSeconds !== previous.initialCooldownSeconds;
-  const spawnChanged =
-    settings.spawnX !== previous.spawnX || settings.spawnY !== previous.spawnY;
   for (const enemy of state.enemies) {
     const archetype = archetypeOf(config, enemy.archetypeId);
     if (rotationChanged) {
@@ -175,12 +238,18 @@ export function setDebugSettings(
           ? settings.initialCooldownSeconds
           : settings.shotIntervalSeconds;
     }
-    if (spawnChanged) enemy.positionTiles = { ...archetype.spawnTiles };
     enemy.positionTiles = constrainToArena(
       enemy.positionTiles,
       archetype.verticesTiles,
     );
   }
+  // G20: a lowered cap takes effect at once by dropping the newest arrivals.
+  // A changed ring fraction applies to future spawns; enemies already in play
+  // have moved off the ring regardless.
+  if (state.enemies.length > config.spawns.maxConcurrent)
+    state.enemies.length = config.spawns.maxConcurrent;
+  if (state.nextSpawnSeconds < state.elapsedSeconds)
+    state.nextSpawnSeconds = state.elapsedSeconds;
   state.player.positionTiles = constrainToArena(
     state.player.positionTiles,
     config.player.verticesTiles,
@@ -554,6 +623,7 @@ export function advanceSimulation(
       return result.alive;
     });
     if (state.player.healthHp > 0) {
+      updateSpawns(state);
       const existingCount = state.shards.length;
       updateAttacks(state);
       for (const shard of state.shards.slice(existingCount)) {

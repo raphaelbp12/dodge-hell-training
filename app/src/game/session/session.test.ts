@@ -13,6 +13,12 @@ const idle: SimulationInput = {
 };
 const east: SimulationInput = { ...idle, east: true };
 const tick = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
+// Spawn placement draws from the injected generator, so these tests pin a seed
+// and compare against a simulation built from the same seed. Without this, two
+// fresh attempts legitimately differ in the opening enemy's bearing (G14).
+const seed = 20261026;
+const seededSession = () => new SessionController(() => seed);
+const seededSimulation = () => createSimulation(ENCOUNTER_CONFIG, seed);
 
 test("session delivers accepted hits once before lethal result, never while paused or after Retry/Home", () => {
   const session = running();
@@ -50,7 +56,7 @@ test("session delivers accepted hits once before lethal result, never while paus
 });
 
 function running(): SessionController {
-  const session = new SessionController();
+  const session = seededSession();
   session.start();
   session.retry();
   return session;
@@ -95,7 +101,7 @@ test("debug eligibility stays tainted until retry and result-screen settings app
 });
 
 test("home ignores retry, pause and elapsed time until Start", () => {
-  const session = new SessionController();
+  const session = seededSession();
   expect(session.phase).toBe("home");
   expect(session.retry()).toBe(false);
   session.pause();
@@ -103,11 +109,11 @@ test("home ignores retry, pause and elapsed time until Start", () => {
   expect(session.advance(100, east)).toBeNull();
   expect(session.attemptId).toBe(0);
   expect(session.phase).toBe("home");
-  expect(session.simulation).toEqual(createSimulation());
+  expect(session.simulation).toEqual(seededSimulation());
 });
 
 test("Start counts down for three active seconds without advancing gameplay", () => {
-  const session = new SessionController();
+  const session = seededSession();
   expect(session.start()).toBe(true);
   expect(session.start()).toBe(false);
   expect(session.phase).toBe("countdown");
@@ -125,7 +131,7 @@ test("Start counts down for three active seconds without advancing gameplay", ()
 });
 
 test("only time beyond a countdown boundary can advance gameplay", () => {
-  const session = new SessionController();
+  const session = seededSession();
   session.start();
   session.advance(3 + tick, east);
   expect(session.phase).toBe("playing");
@@ -133,7 +139,7 @@ test("only time beyond a countdown boundary can advance gameplay", () => {
 });
 
 test("normal frame-sized countdown updates finish without a floating-point extra frame", () => {
-  const session = new SessionController();
+  const session = seededSession();
   session.start();
   for (let frame = 0; frame < 180; frame++) session.advance(tick, idle);
   expect(session.phase).toBe("playing");
@@ -144,7 +150,7 @@ test("normal frame-sized countdown updates finish without a floating-point extra
 test.each(["countdown", "playing", "paused", "ended"] as const)(
   "retry from %s immediately uses the shared fresh initialization",
   (phase) => {
-    const session = new SessionController();
+    const session = seededSession();
     session.start();
     if (phase !== "countdown") session.advance(3, idle);
     if (phase === "paused") session.pause();
@@ -163,14 +169,14 @@ test.each(["countdown", "playing", "paused", "ended"] as const)(
     expect(session.countdownRemainingSeconds).toBe(0);
     expect(session.result).toBeNull();
     expect(session.simulation).not.toBe(old);
-    expect(session.simulation).toEqual(createSimulation());
+    expect(session.simulation).toEqual(seededSimulation());
   },
 );
 
 test.each(["countdown", "playing"] as const)(
   "focus pause preserves %s until explicit resume without crediting paused time",
   (phase) => {
-    const session = new SessionController();
+    const session = seededSession();
     session.start();
     session.advance(phase === "playing" ? 3 : 1, idle);
     const remaining = session.countdownRemainingSeconds;
@@ -225,16 +231,26 @@ test("Home discards unfinished attempts and a later Start uses countdown again",
   expect(session.retry()).toBe(false);
   session.start();
   expect(session.phase).toBe("countdown");
-  expect(session.simulation).toEqual(createSimulation());
+  expect(session.simulation).toEqual(seededSimulation());
+});
+
+// Snapshot the observable state explicitly: the controller holds an injected
+// seed supplier, which structuredClone cannot copy.
+const snapshot = (session: SessionController) => ({
+  simulation: structuredClone(session.simulation),
+  phase: session.phase,
+  attemptId: session.attemptId,
+  countdownRemainingSeconds: session.countdownRemainingSeconds,
+  result: session.result,
 });
 
 test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
   "rejects invalid active elapsed time %s without changing state",
   (elapsedSeconds) => {
     const session = running();
-    const before = structuredClone(session);
+    const before = snapshot(session);
     expect(() => session.advance(elapsedSeconds, idle)).toThrow(RangeError);
-    expect(structuredClone(session)).toEqual(before);
+    expect(snapshot(session)).toEqual(before);
   },
 );
 

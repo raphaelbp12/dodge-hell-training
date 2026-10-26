@@ -21,26 +21,6 @@ export const DEBUG_PARAMETERS = [
     defaultValue: AUTHORED_TUNING.enemySpeedTilesPerSecond,
   },
   {
-    key: "spawnX",
-    label: "Spawn X",
-    unit: "tiles",
-    group: "Enemy",
-    min: -18,
-    max: 18,
-    step: 0.1,
-    defaultValue: AUTHORED_TUNING.spawnX,
-  },
-  {
-    key: "spawnY",
-    label: "Spawn Y",
-    unit: "tiles",
-    group: "Enemy",
-    min: -18,
-    max: 18,
-    step: 0.1,
-    defaultValue: AUTHORED_TUNING.spawnY,
-  },
-  {
     key: "headWidth",
     label: "Head width",
     unit: "tiles",
@@ -59,6 +39,46 @@ export const DEBUG_PARAMETERS = [
     max: 5,
     step: 0.05,
     defaultValue: AUTHORED_TUNING.headHeight,
+  },
+  {
+    key: "firstSpawnSeconds",
+    label: "First spawn",
+    unit: "s",
+    group: "Spawns",
+    min: 0,
+    max: 60,
+    step: 1,
+    defaultValue: AUTHORED_TUNING.firstSpawnSeconds,
+  },
+  {
+    key: "spawnEverySeconds",
+    label: "Spawn interval",
+    unit: "s",
+    group: "Spawns",
+    min: 1,
+    max: 60,
+    step: 1,
+    defaultValue: AUTHORED_TUNING.spawnEverySeconds,
+  },
+  {
+    key: "maxConcurrentEnemies",
+    label: "Max concurrent",
+    unit: "",
+    group: "Spawns",
+    min: 1,
+    max: 8,
+    step: 1,
+    defaultValue: AUTHORED_TUNING.maxConcurrentEnemies,
+  },
+  {
+    key: "spawnRingFraction",
+    label: "Spawn ring",
+    unit: "of radius",
+    group: "Spawns",
+    min: 0.1,
+    max: 0.95,
+    step: 0.00125,
+    defaultValue: AUTHORED_TUNING.spawnRingFraction,
   },
   {
     key: "playerWidth",
@@ -315,10 +335,13 @@ export function updateDebugParameter(
 
 export function debugEncounterConfig(settings: DebugSettings): EncounterConfig {
   validateDebugSettings(settings);
-  const config = buildEncounterConfig(settings, {
-    rulesVersion: DEBUG_RULES_VERSION,
-    matchPlayerToHead: settings.matchPlayerToHead,
-  });
+  const config = buildEncounterConfig(
+    { spawnX: AUTHORED_TUNING.spawnX, spawnY: AUTHORED_TUNING.spawnY, ...settings },
+    {
+      rulesVersion: DEBUG_RULES_VERSION,
+      matchPlayerToHead: settings.matchPlayerToHead,
+    },
+  );
   // The shipped path validates at module load; the debug path must too, so a
   // slider cannot reach the simulation in a state the config forbids (G: F3).
   validateEncounterConfig(config);

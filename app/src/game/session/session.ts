@@ -1,11 +1,13 @@
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { assertNonnegative } from "../config/stats";
 import type { AcceptedHit, SessionPhase, SimulationInput } from "../models";
+import type { SimulationState } from "../simulation/simulation";
 import {
   advanceSimulation,
   createSimulation,
   setDebugSettings,
 } from "../simulation/simulation";
+import { arbitrarySeed } from "../simulation/random";
 import {
   DEFAULT_DEBUG_SETTINGS,
   validateDebugSettings,
@@ -25,12 +27,19 @@ const countdownRoundingToleranceSeconds =
 
 export class SessionController {
   phase: SessionPhase = "home";
-  simulation = createSimulation();
+  simulation: SimulationState;
   countdownRemainingSeconds = 0;
   attemptId = 0;
   result: AttemptResult | null = null;
   private phaseBeforePause: "countdown" | "playing" = "playing";
   private debugSettings = DEFAULT_DEBUG_SETTINGS;
+  /** Supplies each attempt's seed; injected so a test can pin placement. */
+  private nextSeed: () => number;
+
+  constructor(nextSeed: () => number = arbitrarySeed) {
+    this.nextSeed = nextSeed;
+    this.simulation = createSimulation(ENCOUNTER_CONFIG, this.nextSeed());
+  }
 
   start(): boolean {
     if (this.phase !== "home") return false;
@@ -45,7 +54,7 @@ export class SessionController {
   }
 
   private initialize(countdownSeconds: number): void {
-    this.simulation = createSimulation();
+    this.simulation = createSimulation(ENCOUNTER_CONFIG, this.nextSeed());
     setDebugSettings(this.simulation, this.debugSettings);
     this.attemptId++;
     this.result = null;
