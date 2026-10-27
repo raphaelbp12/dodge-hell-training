@@ -165,8 +165,8 @@ test.each(["countdown", "playing", "paused", "ended"] as const)(
     const old = session.simulation;
     old.player.healthHp = 10;
     old.player.combatRemainingSeconds = 5;
-    old.enemies[0].emitterPhaseRadians = 1;
-    old.enemies[0].volleysFired = 20;
+    old.enemies[0].attackClocks[0].ringPhaseRadians = 1;
+    old.enemies[0].attackClocks[0].volleysFired = 20;
     old.hitsTaken = 4;
     old.accumulatorSeconds = tick / 2;
     expect(session.retry()).toBe(true);

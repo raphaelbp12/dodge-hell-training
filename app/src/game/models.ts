@@ -33,21 +33,30 @@ export type PlayerState = {
   combatRemainingSeconds: number;
 };
 
+/**
+ * Clock state for one attack of one enemy. These were global `SimulationState`
+ * fields while there was only ever one enemy with one attack; they have
+ * always been per-enemy, and are now per-attack within that enemy, state.
+ */
+export type AttackClockState = {
+  attackId: string;
+  epochSeconds: number;
+  volleysAtEpoch: number;
+  initialDelaySeconds: number;
+  rotationEpochSeconds: number;
+  rotationPhaseAtEpoch: number;
+  ringPhaseRadians: number;
+  volleysFired: number;
+};
+
 export type EnemyState = {
   /** Instance identity, distinct from the archetype it was built from. */
   id: number;
   archetypeId: string;
   positionTiles: Vector2;
-  emitterPhaseRadians: number;
   spawnedAtSeconds: number;
-  // Attack and rotation clock. These were global SimulationState fields while
-  // there was only ever one enemy; they have always been per-enemy state.
-  attackEpochSeconds: number;
-  volleysAtEpoch: number;
-  attackInitialDelaySeconds: number;
-  rotationEpochSeconds: number;
-  rotationPhaseAtEpoch: number;
-  volleysFired: number;
+  /** One per authored attack of the archetype, in authored order. */
+  attackClocks: AttackClockState[];
 };
 
 export type AcceptedHit = Readonly<{

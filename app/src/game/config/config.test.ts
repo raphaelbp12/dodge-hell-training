@@ -40,13 +40,23 @@ import {
 } from "./stats";
 
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
+const PRIMARY_ATTACK = PRIMARY.attacks[0];
 const PRIMARY_PROJECTILE = projectileOf(
   ENCOUNTER_CONFIG,
-  PRIMARY.weapon.projectileId,
+  PRIMARY_ATTACK.projectileId,
 );
 if (PRIMARY_PROJECTILE.motion.kind !== "boomerang")
   throw new Error("test fixture assumes the shipped shard is boomerang-kind");
 const PRIMARY_MOTION = PRIMARY_PROJECTILE.motion;
+if (PRIMARY_ATTACK.pattern.kind !== "ring")
+  throw new Error("test fixture assumes the shipped attack is ring-kind");
+const PRIMARY_PATTERN = PRIMARY_ATTACK.pattern;
+/** Narrows a debug-built config's pattern, which is always ring-kind. */
+function asRingPattern(pattern: EnemyArchetype["attacks"][number]["pattern"]) {
+  if (pattern.kind !== "ring")
+    throw new Error("debug-built configs only ever produce a ring pattern");
+  return pattern;
+}
 
 /** ENCOUNTER_CONFIG with the primary archetype partially overridden. */
 const withArchetype = (
@@ -56,16 +66,18 @@ const withArchetype = (
   archetypes: { [PRIMARY.id]: { ...PRIMARY, ...overrides } },
 });
 
-/** ENCOUNTER_CONFIG with one weapon section of the primary archetype overridden. */
-const withWeapon = (
-  section: "emitters" | "burst",
+/** ENCOUNTER_CONFIG with one section of the primary attack overridden. */
+const withAttackSection = (
+  section: "pattern" | "cadence",
   overrides: Record<string, unknown>,
 ): EncounterConfig =>
   withArchetype({
-    weapon: {
-      ...PRIMARY.weapon,
-      [section]: { ...PRIMARY.weapon[section], ...overrides },
-    } as EnemyArchetype["weapon"],
+    attacks: [
+      {
+        ...PRIMARY_ATTACK,
+        [section]: { ...PRIMARY_ATTACK[section], ...overrides },
+      },
+    ],
   });
 
 /** ENCOUNTER_CONFIG with the primary projectile's motion overridden. */
@@ -155,9 +167,11 @@ test("loads all screenshot-selected values without changing omitted settings", (
   expect(previous.headWidth).toBe(DEFAULT_DEBUG_SETTINGS.headWidth);
   expect(() => validateDebugSettings(selected)).not.toThrow();
   expect(
-    primaryArchetype(debugEncounterConfig(selected)).weapon.emitters.count,
+    asRingPattern(
+      primaryArchetype(debugEncounterConfig(selected)).attacks[0].pattern,
+    ).arms,
   ).toBe(6);
-  expect(PRIMARY.weapon.emitters.count).toBe(6);
+  expect(PRIMARY_PATTERN.arms).toBe(6);
   expect(DEFAULT_DEBUG_SETTINGS.cooldownSeconds).toBe(3);
 });
 
@@ -389,22 +403,26 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
     speedTilesPerSecond: 1.5,
     contactDamageHp: 0,
     blocksPlayer: false,
-    weapon: {
-      emitters: {
-        count: 6,
-        radiusTiles: 0.35,
-        initialPhaseRadians: 0,
-        clockwiseDegreesPerSecond: 45,
-        rotateDuringCooldown: true,
+    attacks: [
+      {
+        id: "spiral-shards",
+        projectileId: "crystal-worm-child-shard",
+        tuningSource: "approved-v3",
+        pattern: {
+          kind: "ring",
+          arms: 6,
+          emitterRadiusTiles: 0.35,
+          initialPhaseRadians: 0,
+          clockwiseDegreesPerSecond: 45,
+        },
+        cadence: {
+          shotsPerBurst: 11,
+          shotIntervalSeconds: 0.19,
+          cooldownAfterLastShotSeconds: 3,
+          initialDelaySeconds: 2,
+        },
       },
-      burst: {
-        shotsPerEmitter: 11,
-        shotIntervalSeconds: 0.19,
-        cooldownAfterLastShotSeconds: 3,
-        initialCooldownSeconds: 2,
-      },
-      projectileId: "crystal-worm-child-shard",
-    },
+    ],
   });
   expect(ENCOUNTER_CONFIG.projectiles).toEqual({
     "crystal-worm-child-shard": {
@@ -502,11 +520,11 @@ test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursu
     },
     withArchetype({ spawnTiles: { x: Number.NaN, y: 0 } }),
     withArchetype({ spawnTiles: { x: 19.2, y: 0 } }),
-    withWeapon("emitters", { count: 0 }),
-    withWeapon("emitters", { count: 1.5 }),
-    withWeapon("burst", { shotsPerEmitter: 1.5 }),
-    withWeapon("burst", { shotIntervalSeconds: 0 }),
-    withWeapon("burst", { cooldownAfterLastShotSeconds: -1 }),
+    withAttackSection("pattern", { arms: 0 }),
+    withAttackSection("pattern", { arms: 1.5 }),
+    withAttackSection("cadence", { shotsPerBurst: 1.5 }),
+    withAttackSection("cadence", { shotIntervalSeconds: 0 }),
+    withAttackSection("cadence", { cooldownAfterLastShotSeconds: -1 }),
     { ...ENCOUNTER_CONFIG, camera: { ...ENCOUNTER_CONFIG.camera, minZoom: 2 } },
     {
       ...ENCOUNTER_CONFIG,
@@ -571,7 +589,9 @@ test("buildEncounterConfig maps every tuning value into the config", () => {
   );
   const archetype = primaryArchetype(config);
   expect(bodyExtentTiles(archetype.verticesTiles, "x")).toBeCloseTo(2, 12);
-  expect(projectileOf(config, archetype.weapon.projectileId).damageHp).toBe(7);
+  expect(
+    projectileOf(config, archetype.attacks[0].projectileId).damageHp,
+  ).toBe(7);
   expect(archetype.spawnTiles.x).toBeCloseTo(1, 12);
   expect(config.rulesVersion).toBe("probe");
 });

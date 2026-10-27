@@ -55,6 +55,65 @@ export type ProjectileSpec = Readonly<{
   motion: ProjectileMotion;
 }>;
 
+export type RingPattern = Readonly<{
+  kind: "ring";
+  arms: number;
+  emitterRadiusTiles: number;
+  initialPhaseRadians: number;
+  clockwiseDegreesPerSecond: number;
+}>;
+
+export type SpreadPattern =
+  | Readonly<{
+      kind: "spread";
+      shots: number;
+      arcDegrees: number;
+      aim: "player";
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "spread";
+      shots: number;
+      arcDegrees: number;
+      aim: "fixed";
+      fixedBearingDegrees: number;
+      emitterRadiusTiles: number;
+    }>;
+
+export type ScatterPattern =
+  | Readonly<{
+      kind: "scatter";
+      shots: number;
+      coneDegrees: number;
+      aim: "player";
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "scatter";
+      shots: number;
+      coneDegrees: number;
+      aim: "fixed";
+      fixedBearingDegrees: number;
+      emitterRadiusTiles: number;
+    }>;
+
+export type AttackPattern = RingPattern | SpreadPattern | ScatterPattern;
+
+export type AttackCadence = Readonly<{
+  shotsPerBurst: number;
+  shotIntervalSeconds: number;
+  cooldownAfterLastShotSeconds: number;
+  initialDelaySeconds: number;
+}>;
+
+export type AttackSpec = Readonly<{
+  id: string;
+  projectileId: string;
+  tuningSource: string;
+  pattern: AttackPattern;
+  cadence: AttackCadence;
+}>;
+
 export type EnemyArchetype = Readonly<{
   id: string;
   spawnTiles: Vector2;
@@ -62,22 +121,7 @@ export type EnemyArchetype = Readonly<{
   speedTilesPerSecond: number;
   contactDamageHp: number;
   blocksPlayer: boolean;
-  weapon: Readonly<{
-    emitters: Readonly<{
-      count: number;
-      radiusTiles: number;
-      initialPhaseRadians: number;
-      clockwiseDegreesPerSecond: number;
-      rotateDuringCooldown: boolean;
-    }>;
-    burst: Readonly<{
-      shotsPerEmitter: number;
-      shotIntervalSeconds: number;
-      cooldownAfterLastShotSeconds: number;
-      initialCooldownSeconds: number;
-    }>;
-    projectileId: string;
-  }>;
+  attacks: readonly AttackSpec[];
 }>;
 
 export type SpawnRule = Readonly<{
@@ -120,7 +164,15 @@ export const RULES_VERSION = AUTHORED_ENCOUNTER.rulesVersion;
 export const PRIMARY_ARCHETYPE_ID = AUTHORED_ENCOUNTER.primaryArchetype;
 
 const authoredPrimary = AUTHORED_ARCHETYPES[PRIMARY_ARCHETYPE_ID];
-const AUTHORED_PROJECTILE_ID = authoredPrimary.weapon.projectile;
+// The debug panel tunes exactly one attack; later steps that add a second
+// attack to any archetype must not route sliders through this index.
+const authoredPrimaryAttack = authoredPrimary.attacks[0];
+// The debug panel only ever tunes a ring-kind attack (the shipped Crystal
+// Worm spiral); a `spread` attack is additive and not yet debug-tunable.
+if (authoredPrimaryAttack.pattern.kind !== "ring")
+  throw new RangeError("The debug-tunable attack must use a ring pattern");
+const authoredPrimaryPattern = authoredPrimaryAttack.pattern;
+const AUTHORED_PROJECTILE_ID = authoredPrimaryAttack.projectile;
 const authoredProjectile = AUTHORED_PROJECTILES[AUTHORED_PROJECTILE_ID];
 // The debug panel only ever tunes the shipped, boomerang-kind shard (G: 19.3
 // adds `linear` to the catalog type, but not to any debug-tunable projectile).
@@ -202,15 +254,15 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   enemySpeedTilesPerSecond: authoredPrimary.speedTilesPerSecond,
   spawnX: authoredPrimary.spawnTiles.x,
   spawnY: authoredPrimary.spawnTiles.y,
-  emitterCount: authoredPrimary.weapon.emitters.count,
-  emitterRadiusTiles: authoredPrimary.weapon.emitters.radiusTiles,
-  initialPhaseDegrees: authoredPrimary.weapon.emitters.initialPhaseDegrees,
+  emitterCount: authoredPrimaryPattern.arms,
+  emitterRadiusTiles: authoredPrimaryPattern.emitterRadiusTiles,
+  initialPhaseDegrees: authoredPrimaryPattern.initialPhaseDegrees,
   rotationDegreesPerSecond:
-    authoredPrimary.weapon.emitters.clockwiseDegreesPerSecond,
-  shotsPerEmitter: authoredPrimary.weapon.burst.shotsPerEmitter,
-  shotIntervalSeconds: authoredPrimary.weapon.burst.shotIntervalSeconds,
-  cooldownSeconds: authoredPrimary.weapon.burst.cooldownAfterLastShotSeconds,
-  initialCooldownSeconds: authoredPrimary.weapon.burst.initialCooldownSeconds,
+    authoredPrimaryPattern.clockwiseDegreesPerSecond,
+  shotsPerEmitter: authoredPrimaryAttack.cadence.shotsPerBurst,
+  shotIntervalSeconds: authoredPrimaryAttack.cadence.shotIntervalSeconds,
+  cooldownSeconds: authoredPrimaryAttack.cadence.cooldownAfterLastShotSeconds,
+  initialCooldownSeconds: authoredPrimaryAttack.cadence.initialDelaySeconds,
   projectileDamageHp: authoredProjectile.damageHp,
   projectileSpeedTilesPerSecond: authoredProjectile.speedTilesPerSecond,
   reversalSeconds: authoredBoomerangMotion.reversalAgeSeconds,
@@ -289,23 +341,26 @@ export function buildEncounterConfig(
     speedTilesPerSecond: values.enemySpeedTilesPerSecond,
     contactDamageHp: authoredPrimary.contactDamageHp,
     blocksPlayer: authoredPrimary.blocksPlayer,
-    weapon: Object.freeze({
-      emitters: Object.freeze({
-        count: values.emitterCount,
-        radiusTiles: values.emitterRadiusTiles,
-        initialPhaseRadians: degreesToRadians(values.initialPhaseDegrees),
-        clockwiseDegreesPerSecond: values.rotationDegreesPerSecond,
-        rotateDuringCooldown:
-          authoredPrimary.weapon.emitters.rotateDuringCooldown,
+    attacks: Object.freeze([
+      Object.freeze({
+        id: authoredPrimaryAttack.id,
+        projectileId: AUTHORED_PROJECTILE_ID,
+        tuningSource: authoredPrimaryAttack.tuningSource,
+        pattern: Object.freeze({
+          kind: "ring",
+          arms: values.emitterCount,
+          emitterRadiusTiles: values.emitterRadiusTiles,
+          initialPhaseRadians: degreesToRadians(values.initialPhaseDegrees),
+          clockwiseDegreesPerSecond: values.rotationDegreesPerSecond,
+        }),
+        cadence: Object.freeze({
+          shotsPerBurst: values.shotsPerEmitter,
+          shotIntervalSeconds: values.shotIntervalSeconds,
+          cooldownAfterLastShotSeconds: values.cooldownSeconds,
+          initialDelaySeconds: values.initialCooldownSeconds,
+        }),
       }),
-      burst: Object.freeze({
-        shotsPerEmitter: values.shotsPerEmitter,
-        shotIntervalSeconds: values.shotIntervalSeconds,
-        cooldownAfterLastShotSeconds: values.cooldownSeconds,
-        initialCooldownSeconds: values.initialCooldownSeconds,
-      }),
-      projectileId: AUTHORED_PROJECTILE_ID,
-    }),
+    ]),
   });
   const projectile: ProjectileSpec = Object.freeze({
     id: AUTHORED_PROJECTILE_ID,
@@ -376,20 +431,35 @@ function lifetimeSecondsOf(projectile: ProjectileSpec): number {
   return motion.rangeTiles / projectile.speedTilesPerSecond;
 }
 
+/**
+ * Worst case across every attack of this archetype, summed: each attack
+ * fires on its own clock, so an enemy's shard bound is the sum of its
+ * attacks' individual bounds, not just the first attack's (G: step 20.1
+ * keeps exactly one attack per archetype; this sum already generalises
+ * correctly once step 20.2 allows more).
+ */
+/** Shots one volley of this pattern fires at once. */
+function shotsPerVolley(pattern: AttackPattern): number {
+  return pattern.kind === "ring" ? pattern.arms : pattern.shots;
+}
+
 export function liveShardBoundPerEnemy(
   config: EncounterConfig,
   archetype: EnemyArchetype,
 ): number {
-  const { emitters, burst } = archetype.weapon;
-  const projectile = projectileOf(config, archetype.weapon.projectileId);
-  const groupSeconds =
-    (burst.shotsPerEmitter - 1) * burst.shotIntervalSeconds +
-    burst.cooldownAfterLastShotSeconds;
-  return (
-    emitters.count *
-    burst.shotsPerEmitter *
-    Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
-  );
+  return archetype.attacks.reduce((total, attack) => {
+    const { pattern, cadence } = attack;
+    const projectile = projectileOf(config, attack.projectileId);
+    const groupSeconds =
+      (cadence.shotsPerBurst - 1) * cadence.shotIntervalSeconds +
+      cadence.cooldownAfterLastShotSeconds;
+    return (
+      total +
+      shotsPerVolley(pattern) *
+        cadence.shotsPerBurst *
+        Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
+    );
+  }, 0);
 }
 
 /** Resolves an archetype by id, rejecting an unknown one. */
@@ -532,49 +602,65 @@ function validateProjectileSpec(projectile: ProjectileSpec): void {
     throw new RangeError("Shards must hit the player at most once");
 }
 
+function validateAttackSpec(
+  config: EncounterConfig,
+  attack: AttackSpec,
+): void {
+  validateProjectileSpec(projectileOf(config, attack.projectileId));
+  const { pattern, cadence } = attack;
+  // Strictly positive: a zero here would make the attack degenerate (an
+  // infinite fire rate or no shots).
+  const positiveValues = {
+    shotsPerVolley: shotsPerVolley(pattern),
+    shotsPerEmitter: cadence.shotsPerBurst,
+    shotIntervalSeconds: cadence.shotIntervalSeconds,
+    cooldownAfterLastShotSeconds: cadence.cooldownAfterLastShotSeconds,
+  };
+  for (const [name, value] of Object.entries(positiveValues))
+    assertPositive(value, name);
+  assertNonnegative(cadence.initialDelaySeconds, "initialCooldownSeconds");
+  for (const count of [shotsPerVolley(pattern), cadence.shotsPerBurst]) {
+    if (!Number.isSafeInteger(count))
+      throw new RangeError("Counts must be safe integers");
+  }
+  if (pattern.kind === "ring") {
+    // Nonnegative: zero is a meaningful, supported value - an idle emitter.
+    assertNonnegative(pattern.emitterRadiusTiles, "emitterRadiusTiles");
+    // Signed: negative rotation is counter-clockwise, zero is no rotation.
+    if (!Number.isFinite(pattern.clockwiseDegreesPerSecond))
+      throw new RangeError("clockwiseDegreesPerSecond must be finite");
+    if (!Number.isFinite(pattern.initialPhaseRadians))
+      throw new RangeError("initialPhaseRadians must be finite");
+  } else if (pattern.kind === "spread") {
+    assertNonnegative(pattern.emitterRadiusTiles, "emitterRadiusTiles");
+    assertNonnegative(pattern.arcDegrees, "arcDegrees");
+    if (pattern.arcDegrees >= 360)
+      throw new RangeError("A spread's arcDegrees must be below 360 degrees");
+    if (pattern.aim === "fixed" && !Number.isFinite(pattern.fixedBearingDegrees))
+      throw new RangeError("fixedBearingDegrees must be finite");
+  } else {
+    assertNonnegative(pattern.emitterRadiusTiles, "emitterRadiusTiles");
+    assertPositive(pattern.coneDegrees, "coneDegrees");
+    if (pattern.coneDegrees > 360)
+      throw new RangeError("A scatter's coneDegrees must be at most 360 degrees");
+    if (pattern.aim === "fixed" && !Number.isFinite(pattern.fixedBearingDegrees))
+      throw new RangeError("fixedBearingDegrees must be finite");
+  }
+}
+
 function validateArchetype(
   config: EncounterConfig,
   archetype: EnemyArchetype,
 ): void {
-  const { emitters, burst } = archetype.weapon;
-  validateProjectileSpec(projectileOf(config, archetype.weapon.projectileId));
-  // Strictly positive: a zero here would make the weapon degenerate (an
-  // infinite fire rate or no emitters).
-  const positiveValues = {
-    emitterCount: emitters.count,
-    shotsPerEmitter: burst.shotsPerEmitter,
-    shotIntervalSeconds: burst.shotIntervalSeconds,
-    cooldownAfterLastShotSeconds: burst.cooldownAfterLastShotSeconds,
-  };
-  for (const [name, value] of Object.entries(positiveValues))
-    assertPositive(value, name);
-  // Nonnegative: zero is a meaningful, supported value - a stationary enemy,
-  // immediate first volley or an idle emitter. The debug panel exposes each
-  // of these at its slider minimum.
-  const nonnegativeValues = {
-    enemySpeedTilesPerSecond: archetype.speedTilesPerSecond,
-    initialCooldownSeconds: burst.initialCooldownSeconds,
-    emitterRadiusTiles: emitters.radiusTiles,
-  };
-  for (const [name, value] of Object.entries(nonnegativeValues))
-    assertNonnegative(value, name);
-  // Signed: negative rotation is counter-clockwise, zero is no rotation.
-  if (!Number.isFinite(emitters.clockwiseDegreesPerSecond))
-    throw new RangeError("clockwiseDegreesPerSecond must be finite");
-  for (const count of [emitters.count, burst.shotsPerEmitter]) {
-    if (!Number.isSafeInteger(count))
-      throw new RangeError("Counts must be safe integers");
-  }
-  if (!Number.isFinite(emitters.initialPhaseRadians))
-    throw new RangeError("initialPhaseRadians must be finite");
+  if (archetype.attacks.length === 0)
+    throw new RangeError("An archetype requires at least one attack");
+  for (const attack of archetype.attacks) validateAttackSpec(config, attack);
   // Approved rules, asserted here rather than pinned in the structural type so
   // the type does not forbid the variation it appears to model (G: F10).
   if (archetype.contactDamageHp !== 0)
     throw new RangeError("Contact damage is not approved for this encounter");
   if (archetype.blocksPlayer !== false)
     throw new RangeError("Enemy body blocking is not approved");
-  if (!emitters.rotateDuringCooldown)
-    throw new RangeError("Emitters must rotate during cooldown");
 
   validatePoint(archetype.spawnTiles);
   if (

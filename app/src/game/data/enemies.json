@@ -12,22 +12,26 @@
       "speedTilesPerSecond": 1.5,
       "contactDamageHp": 0,
       "blocksPlayer": false,
-      "weapon": {
-        "emitters": {
-          "count": 6,
-          "radiusTiles": 0.35,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 45,
-          "rotateDuringCooldown": true
-        },
-        "burst": {
-          "shotsPerEmitter": 11,
-          "shotIntervalSeconds": 0.19,
-          "cooldownAfterLastShotSeconds": 3,
-          "initialCooldownSeconds": 2
-        },
-        "projectile": "crystal-worm-child-shard"
-      }
+      "attacks": [
+        {
+          "id": "spiral-shards",
+          "projectile": "crystal-worm-child-shard",
+          "tuningSource": "approved-v3",
+          "pattern": {
+            "kind": "ring",
+            "arms": 6,
+            "emitterRadiusTiles": 0.35,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": 45
+          },
+          "cadence": {
+            "shotsPerBurst": 11,
+            "shotIntervalSeconds": 0.19,
+            "cooldownAfterLastShotSeconds": 3,
+            "initialDelaySeconds": 2
+          }
+        }
+      ]
     }
   }
 }

@@ -6,6 +6,7 @@ import {
   AUTHORED_SHAPES,
   turningDeviationTiles,
   validateArchetypes,
+  validateAttack,
   validateOutline,
   validateArena,
   validateProjectile,
@@ -13,6 +14,27 @@ import {
   wavyDeviationTiles,
   loadOutline,
 } from "./data";
+
+const CATALOG_IDS = new Set(["crystal-worm-child-shard"]);
+
+const VALID_ATTACK = {
+  id: "spiral-shards",
+  projectile: "crystal-worm-child-shard",
+  tuningSource: "approved-v3",
+  pattern: {
+    kind: "ring",
+    arms: 6,
+    emitterRadiusTiles: 0.35,
+    initialPhaseDegrees: 0,
+    clockwiseDegreesPerSecond: 45,
+  },
+  cadence: {
+    shotsPerBurst: 11,
+    shotIntervalSeconds: 0.19,
+    cooldownAfterLastShotSeconds: 3,
+    initialDelaySeconds: 2,
+  },
+};
 
 const TEST_STEP_SECONDS = 1 / 60;
 
@@ -112,7 +134,7 @@ test("authored data names the offending path when it rejects", () => {
 test("the projectile catalog contains the shipped crystal worm shard", () => {
   expect(AUTHORED_PROJECTILES["crystal-worm-child-shard"]).toBeDefined();
   expect(
-    AUTHORED_ARCHETYPES["crystal-worm-child-head"].weapon.projectile,
+    AUTHORED_ARCHETYPES["crystal-worm-child-head"].attacks[0].projectile,
   ).toBe("crystal-worm-child-shard");
 });
 
@@ -260,26 +282,120 @@ test("validateArchetypes rejects a weapon naming a projectile absent from the ca
             speedTilesPerSecond: 1.5,
             contactDamageHp: 0,
             blocksPlayer: false,
-            weapon: {
-              emitters: {
-                count: 6,
-                radiusTiles: 0.35,
-                initialPhaseDegrees: 0,
-                clockwiseDegreesPerSecond: 45,
-                rotateDuringCooldown: true,
+            attacks: [
+              {
+                id: "spiral-shards",
+                projectile: "no-such-projectile",
+                tuningSource: "approved-v3",
+                pattern: {
+                  kind: "ring",
+                  arms: 6,
+                  emitterRadiusTiles: 0.35,
+                  initialPhaseDegrees: 0,
+                  clockwiseDegreesPerSecond: 45,
+                },
+                cadence: {
+                  shotsPerBurst: 11,
+                  shotIntervalSeconds: 0.19,
+                  cooldownAfterLastShotSeconds: 3,
+                  initialDelaySeconds: 2,
+                },
               },
-              burst: {
-                shotsPerEmitter: 11,
-                shotIntervalSeconds: 0.19,
-                cooldownAfterLastShotSeconds: 3,
-                initialCooldownSeconds: 2,
-              },
-              projectile: "no-such-projectile",
-            },
+            ],
           },
         },
       },
       catalogIds,
     ),
+  ).toThrow(RangeError);
+});
+
+test("validateAttack accepts the authored spiral-shards attack", () => {
+  expect(() =>
+    validateAttack(VALID_ATTACK, "attacks[0]", CATALOG_IDS, new Set()),
+  ).not.toThrow();
+});
+
+test("validateAttack rejects a duplicate id within the same archetype", () => {
+  const seenIds = new Set(["spiral-shards"]);
+  expect(() =>
+    validateAttack(VALID_ATTACK, "attacks[1]", CATALOG_IDS, seenIds),
+  ).toThrow(RangeError);
+});
+
+test.each([
+  ["an unknown projectile", { ...VALID_ATTACK, projectile: "no-such-projectile" }],
+  ["an absent tuningSource", { ...VALID_ATTACK, tuningSource: undefined }],
+  ["an unapproved tuningSource", { ...VALID_ATTACK, tuningSource: "guessed" }],
+  ["an unknown pattern kind", { ...VALID_ATTACK, pattern: { ...VALID_ATTACK.pattern, kind: "scatter" } }],
+  ["a nonpositive arms count", { ...VALID_ATTACK, pattern: { ...VALID_ATTACK.pattern, arms: 0 } }],
+  ["a fractional arms count", { ...VALID_ATTACK, pattern: { ...VALID_ATTACK.pattern, arms: 1.5 } }],
+  ["a negative emitterRadiusTiles", { ...VALID_ATTACK, pattern: { ...VALID_ATTACK.pattern, emitterRadiusTiles: -1 } }],
+  ["a nonfinite initialPhaseDegrees", { ...VALID_ATTACK, pattern: { ...VALID_ATTACK.pattern, initialPhaseDegrees: Number.NaN } }],
+  ["a nonfinite clockwiseDegreesPerSecond", { ...VALID_ATTACK, pattern: { ...VALID_ATTACK.pattern, clockwiseDegreesPerSecond: Number.NaN } }],
+  ["a fractional shotsPerBurst", { ...VALID_ATTACK, cadence: { ...VALID_ATTACK.cadence, shotsPerBurst: 1.5 } }],
+  ["a nonpositive shotIntervalSeconds", { ...VALID_ATTACK, cadence: { ...VALID_ATTACK.cadence, shotIntervalSeconds: 0 } }],
+  ["a nonpositive cooldownAfterLastShotSeconds", { ...VALID_ATTACK, cadence: { ...VALID_ATTACK.cadence, cooldownAfterLastShotSeconds: 0 } }],
+  ["a negative initialDelaySeconds", { ...VALID_ATTACK, cadence: { ...VALID_ATTACK.cadence, initialDelaySeconds: -1 } }],
+] as const)("validateAttack rejects %s", (_name, bad) => {
+  expect(() =>
+    validateAttack(bad, "attacks[0]", CATALOG_IDS, new Set()),
+  ).toThrow(RangeError);
+});
+
+const VALID_SPREAD_ATTACK = {
+  id: "red-stinger-spread",
+  projectile: "crystal-worm-child-shard",
+  tuningSource: "trainer-authored",
+  pattern: {
+    kind: "spread",
+    shots: 3,
+    arcDegrees: 24,
+    aim: "player",
+    emitterRadiusTiles: 0.6,
+  },
+  cadence: {
+    shotsPerBurst: 1,
+    shotIntervalSeconds: 0.2,
+    cooldownAfterLastShotSeconds: 1.4,
+    initialDelaySeconds: 0,
+  },
+};
+
+test("validateAttack accepts a valid player-aimed spread attack", () => {
+  expect(() =>
+    validateAttack(VALID_SPREAD_ATTACK, "attacks[0]", CATALOG_IDS, new Set()),
+  ).not.toThrow();
+});
+
+test("validateAttack accepts a valid fixed-aimed spread attack", () => {
+  const fixed = {
+    ...VALID_SPREAD_ATTACK,
+    pattern: {
+      kind: "spread",
+      shots: 3,
+      arcDegrees: 24,
+      aim: "fixed",
+      fixedBearingDegrees: 90,
+      emitterRadiusTiles: 0.6,
+    },
+  };
+  expect(() =>
+    validateAttack(fixed, "attacks[0]", CATALOG_IDS, new Set()),
+  ).not.toThrow();
+});
+
+test.each([
+  ["a zero shots count", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, shots: 0 } }],
+  ["a fractional shots count", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, shots: 1.5 } }],
+  ["an arcDegrees of 360", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, arcDegrees: 360 } }],
+  ["a negative arcDegrees", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, arcDegrees: -1 } }],
+  ["an unknown aim", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, aim: "homing" } }],
+  ["fixedBearingDegrees present with aim player", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, fixedBearingDegrees: 90 } }],
+  ["fixedBearingDegrees absent with aim fixed", { ...VALID_SPREAD_ATTACK, pattern: { kind: "spread", shots: 3, arcDegrees: 24, aim: "fixed", emitterRadiusTiles: 0.6 } }],
+  ["a negative emitterRadiusTiles", { ...VALID_SPREAD_ATTACK, pattern: { ...VALID_SPREAD_ATTACK.pattern, emitterRadiusTiles: -1 } }],
+] as const)("validateAttack rejects a spread with %s", (_name, bad) => {
+  expect(() =>
+    validateAttack(bad, "attacks[0]", CATALOG_IDS, new Set()),
   ).toThrow(RangeError);
 });

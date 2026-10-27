@@ -375,6 +375,222 @@ export function validateProjectiles(
   );
 }
 
+export type AuthoredRingPattern = Readonly<{
+  kind: "ring";
+  arms: number;
+  emitterRadiusTiles: number;
+  initialPhaseDegrees: number;
+  clockwiseDegreesPerSecond: number;
+}>;
+
+export type AuthoredSpreadPattern =
+  | Readonly<{
+      kind: "spread";
+      shots: number;
+      arcDegrees: number;
+      aim: "player";
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "spread";
+      shots: number;
+      arcDegrees: number;
+      aim: "fixed";
+      fixedBearingDegrees: number;
+      emitterRadiusTiles: number;
+    }>;
+
+export type AuthoredScatterPattern =
+  | Readonly<{
+      kind: "scatter";
+      shots: number;
+      coneDegrees: number;
+      aim: "player";
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "scatter";
+      shots: number;
+      coneDegrees: number;
+      aim: "fixed";
+      fixedBearingDegrees: number;
+      emitterRadiusTiles: number;
+    }>;
+
+export type AuthoredAttackPattern =
+  | AuthoredRingPattern
+  | AuthoredSpreadPattern
+  | AuthoredScatterPattern;
+
+export type AuthoredAttackCadence = Readonly<{
+  shotsPerBurst: number;
+  shotIntervalSeconds: number;
+  cooldownAfterLastShotSeconds: number;
+  initialDelaySeconds: number;
+}>;
+
+const validTuningSources = [
+  "approved-v3",
+  "wiki-prose",
+  "trainer-authored",
+] as const;
+
+export type AuthoredAttack = Readonly<{
+  id: string;
+  projectile: string;
+  tuningSource: (typeof validTuningSources)[number];
+  pattern: AuthoredAttackPattern;
+  cadence: AuthoredAttackCadence;
+}>;
+
+/** Validates the shared `aim`/`fixedBearingDegrees` pair for `spread`/`scatter`. */
+function validateAim(
+  pattern: Record<string, unknown>,
+  path: string,
+):
+  | Readonly<{ aim: "player" }>
+  | Readonly<{ aim: "fixed"; fixedBearingDegrees: number }> {
+  if (pattern.aim === "fixed") {
+    return {
+      aim: "fixed",
+      fixedBearingDegrees: finiteNumber(
+        pattern.fixedBearingDegrees,
+        `${path}.fixedBearingDegrees`,
+      ),
+    };
+  }
+  if (pattern.aim === "player") {
+    if ("fixedBearingDegrees" in pattern)
+      reject(
+        `${path}.fixedBearingDegrees`,
+        "must not be authored when aim is player",
+      );
+    return { aim: "player" };
+  }
+  reject(`${path}.aim`, 'must be "player" or "fixed"');
+}
+
+function validateAttackPattern(
+  value: unknown,
+  path: string,
+): AuthoredAttackPattern {
+  const pattern = record(value, path);
+  if (pattern.kind === "ring") {
+    return Object.freeze({
+      kind: "ring",
+      arms: safeCount(pattern.arms, `${path}.arms`),
+      emitterRadiusTiles: nonnegativeNumber(
+        pattern.emitterRadiusTiles,
+        `${path}.emitterRadiusTiles`,
+      ),
+      initialPhaseDegrees: finiteNumber(
+        pattern.initialPhaseDegrees,
+        `${path}.initialPhaseDegrees`,
+      ),
+      clockwiseDegreesPerSecond: finiteNumber(
+        pattern.clockwiseDegreesPerSecond,
+        `${path}.clockwiseDegreesPerSecond`,
+      ),
+    });
+  }
+  if (pattern.kind === "spread") {
+    const shots = safeCount(pattern.shots, `${path}.shots`);
+    const arcDegrees = nonnegativeNumber(
+      pattern.arcDegrees,
+      `${path}.arcDegrees`,
+    );
+    if (arcDegrees >= 360)
+      reject(
+        `${path}.arcDegrees`,
+        "must be below 360 degrees; a full circle is a ring, not a spread",
+      );
+    const emitterRadiusTiles = nonnegativeNumber(
+      pattern.emitterRadiusTiles,
+      `${path}.emitterRadiusTiles`,
+    );
+    return Object.freeze({
+      kind: "spread",
+      shots,
+      arcDegrees,
+      emitterRadiusTiles,
+      ...validateAim(pattern, path),
+    });
+  }
+  if (pattern.kind === "scatter") {
+    const shots = safeCount(pattern.shots, `${path}.shots`);
+    const coneDegrees = positiveNumber(
+      pattern.coneDegrees,
+      `${path}.coneDegrees`,
+    );
+    if (coneDegrees > 360)
+      reject(`${path}.coneDegrees`, "must be at most 360 degrees");
+    const emitterRadiusTiles = nonnegativeNumber(
+      pattern.emitterRadiusTiles,
+      `${path}.emitterRadiusTiles`,
+    );
+    return Object.freeze({
+      kind: "scatter",
+      shots,
+      coneDegrees,
+      emitterRadiusTiles,
+      ...validateAim(pattern, path),
+    });
+  }
+  reject(`${path}.kind`, 'must be "ring", "spread" or "scatter"');
+}
+
+function validateAttackCadence(
+  value: unknown,
+  path: string,
+): AuthoredAttackCadence {
+  const cadence = record(value, path);
+  return Object.freeze({
+    shotsPerBurst: safeCount(cadence.shotsPerBurst, `${path}.shotsPerBurst`),
+    shotIntervalSeconds: positiveNumber(
+      cadence.shotIntervalSeconds,
+      `${path}.shotIntervalSeconds`,
+    ),
+    cooldownAfterLastShotSeconds: positiveNumber(
+      cadence.cooldownAfterLastShotSeconds,
+      `${path}.cooldownAfterLastShotSeconds`,
+    ),
+    initialDelaySeconds: nonnegativeNumber(
+      cadence.initialDelaySeconds,
+      `${path}.initialDelaySeconds`,
+    ),
+  });
+}
+
+export function validateAttack(
+  value: unknown,
+  path: string,
+  projectileIds: ReadonlySet<string>,
+  seenIds: Set<string>,
+): AuthoredAttack {
+  const attack = record(value, path);
+  const id = text(attack.id, `${path}.id`);
+  if (seenIds.has(id)) reject(`${path}.id`, "must be unique within the archetype");
+  seenIds.add(id);
+  const projectile = text(attack.projectile, `${path}.projectile`);
+  if (!projectileIds.has(projectile))
+    reject(
+      `${path}.projectile`,
+      "must name a projectile defined in projectiles.json",
+    );
+  if (!validTuningSources.includes(attack.tuningSource as never))
+    reject(
+      `${path}.tuningSource`,
+      'must be "approved-v3", "wiki-prose" or "trainer-authored"',
+    );
+  return Object.freeze({
+    id,
+    projectile,
+    tuningSource: attack.tuningSource as (typeof validTuningSources)[number],
+    pattern: validateAttackPattern(attack.pattern, `${path}.pattern`),
+    cadence: validateAttackCadence(attack.cadence, `${path}.cadence`),
+  });
+}
+
 export type AuthoredArchetype = Readonly<{
   id: string;
   spawnTiles: Vector2;
@@ -382,22 +598,7 @@ export type AuthoredArchetype = Readonly<{
   speedTilesPerSecond: number;
   contactDamageHp: number;
   blocksPlayer: boolean;
-  weapon: Readonly<{
-    emitters: Readonly<{
-      count: number;
-      radiusTiles: number;
-      initialPhaseDegrees: number;
-      clockwiseDegreesPerSecond: number;
-      rotateDuringCooldown: boolean;
-    }>;
-    burst: Readonly<{
-      shotsPerEmitter: number;
-      shotIntervalSeconds: number;
-      cooldownAfterLastShotSeconds: number;
-      initialCooldownSeconds: number;
-    }>;
-    projectile: string;
-  }>;
+  attacks: readonly AuthoredAttack[];
 }>;
 
 function validateArchetype(
@@ -407,15 +608,11 @@ function validateArchetype(
 ): AuthoredArchetype {
   const path = `enemies.archetypes.${id}`;
   const archetype = record(value, path);
-  const weapon = record(archetype.weapon, `${path}.weapon`);
-  const emitters = record(weapon.emitters, `${path}.weapon.emitters`);
-  const burst = record(weapon.burst, `${path}.weapon.burst`);
-  const projectile = text(weapon.projectile, `${path}.weapon.projectile`);
-  if (!projectileIds.has(projectile))
-    reject(
-      `${path}.weapon.projectile`,
-      "must name a projectile defined in projectiles.json",
-    );
+  if (!Array.isArray(archetype.attacks))
+    reject(`${path}.attacks`, "must be an array of attacks");
+  if (archetype.attacks.length === 0)
+    reject(`${path}.attacks`, "must define at least one attack");
+  const seenIds = new Set<string>();
   return Object.freeze({
     id,
     spawnTiles: readPoint(archetype.spawnTiles, `${path}.spawnTiles`),
@@ -429,46 +626,16 @@ function validateArchetype(
       `${path}.contactDamageHp`,
     ),
     blocksPlayer: boolean(archetype.blocksPlayer, `${path}.blocksPlayer`),
-    weapon: Object.freeze({
-      emitters: Object.freeze({
-        count: safeCount(emitters.count, `${path}.weapon.emitters.count`),
-        radiusTiles: nonnegativeNumber(
-          emitters.radiusTiles,
-          `${path}.weapon.emitters.radiusTiles`,
+    attacks: Object.freeze(
+      archetype.attacks.map((attack, index) =>
+        validateAttack(
+          attack,
+          `${path}.attacks[${index}]`,
+          projectileIds,
+          seenIds,
         ),
-        initialPhaseDegrees: finiteNumber(
-          emitters.initialPhaseDegrees,
-          `${path}.weapon.emitters.initialPhaseDegrees`,
-        ),
-        clockwiseDegreesPerSecond: finiteNumber(
-          emitters.clockwiseDegreesPerSecond,
-          `${path}.weapon.emitters.clockwiseDegreesPerSecond`,
-        ),
-        rotateDuringCooldown: boolean(
-          emitters.rotateDuringCooldown,
-          `${path}.weapon.emitters.rotateDuringCooldown`,
-        ),
-      }),
-      burst: Object.freeze({
-        shotsPerEmitter: safeCount(
-          burst.shotsPerEmitter,
-          `${path}.weapon.burst.shotsPerEmitter`,
-        ),
-        shotIntervalSeconds: positiveNumber(
-          burst.shotIntervalSeconds,
-          `${path}.weapon.burst.shotIntervalSeconds`,
-        ),
-        cooldownAfterLastShotSeconds: positiveNumber(
-          burst.cooldownAfterLastShotSeconds,
-          `${path}.weapon.burst.cooldownAfterLastShotSeconds`,
-        ),
-        initialCooldownSeconds: positiveNumber(
-          burst.initialCooldownSeconds,
-          `${path}.weapon.burst.initialCooldownSeconds`,
-        ),
-      }),
-      projectile,
-    }),
+      ),
+    ),
   });
 }
 

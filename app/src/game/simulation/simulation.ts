@@ -3,6 +3,7 @@ import {
   archetypeOf,
   ENCOUNTER_CONFIG,
   projectileOf,
+  type AttackSpec,
   type EncounterConfig,
 } from "../config/encounter";
 import {
@@ -11,6 +12,7 @@ import {
   restampLiveShards,
   shardOverlapsPlayer,
 } from "./projectiles";
+import { resolveBearings } from "./patterns";
 import {
   DEFAULT_DEBUG_SETTINGS,
   DEBUG_RULES_VERSION,
@@ -25,6 +27,7 @@ import {
 } from "../config/stats";
 import type {
   AcceptedHit,
+  AttackClockState,
   EnemyState,
   PlayerState,
   ShardState,
@@ -81,8 +84,10 @@ function boundingRadiusTiles(config: EncounterConfig): number {
   );
 }
 /**
- * Builds one enemy instance with its own attack and rotation clock anchored at
- * its spawn time, so a later arrival serves its own initial cooldown.
+ * Builds one enemy instance with one attack clock per authored attack, each
+ * anchored at the enemy's spawn time, so a later arrival serves its own
+ * initial cooldown. Clocks are built in authored order, which is also the
+ * order shards are pushed in, so a fixed input sequence stays reproducible.
  */
 export function createEnemy(
   config: EncounterConfig,
@@ -96,14 +101,23 @@ export function createEnemy(
     id,
     archetypeId,
     positionTiles: { ...(positionTiles ?? archetype.spawnTiles) },
-    emitterPhaseRadians: archetype.weapon.emitters.initialPhaseRadians,
     spawnedAtSeconds,
-    attackEpochSeconds: spawnedAtSeconds,
-    volleysAtEpoch: 0,
-    attackInitialDelaySeconds: archetype.weapon.burst.initialCooldownSeconds,
-    rotationEpochSeconds: spawnedAtSeconds,
-    rotationPhaseAtEpoch: archetype.weapon.emitters.initialPhaseRadians,
-    volleysFired: 0,
+    // ringPhaseRadians/rotationPhaseAtEpoch are ring-specific; a non-ring
+    // pattern never rotates one, so it starts and stays at 0 - a fixed,
+    // deterministic fallback bearing for a pattern like `spread`'s degenerate
+    // aim case, not a value that pattern ever advances.
+    attackClocks: archetype.attacks.map((attack) => ({
+      attackId: attack.id,
+      epochSeconds: spawnedAtSeconds,
+      volleysAtEpoch: 0,
+      initialDelaySeconds: attack.cadence.initialDelaySeconds,
+      rotationEpochSeconds: spawnedAtSeconds,
+      rotationPhaseAtEpoch:
+        attack.pattern.kind === "ring" ? attack.pattern.initialPhaseRadians : 0,
+      ringPhaseRadians:
+        attack.pattern.kind === "ring" ? attack.pattern.initialPhaseRadians : 0,
+      volleysFired: 0,
+    })),
   };
 }
 
@@ -223,21 +237,25 @@ export function setDebugSettings(
     settings.initialCooldownSeconds !== previous.initialCooldownSeconds;
   for (const enemy of state.enemies) {
     const archetype = archetypeOf(config, enemy.archetypeId);
-    if (rotationChanged) {
-      enemy.rotationEpochSeconds = state.elapsedSeconds;
-      enemy.rotationPhaseAtEpoch =
-        settings.initialPhaseDegrees !== previous.initialPhaseDegrees
-          ? archetype.weapon.emitters.initialPhaseRadians
-          : enemy.emitterPhaseRadians;
-      enemy.emitterPhaseRadians = enemy.rotationPhaseAtEpoch;
-    }
-    if (burstChanged) {
-      enemy.attackEpochSeconds = state.elapsedSeconds;
-      enemy.volleysAtEpoch = enemy.volleysFired;
-      enemy.attackInitialDelaySeconds =
-        enemy.volleysFired === 0
-          ? settings.initialCooldownSeconds
-          : settings.shotIntervalSeconds;
+    for (let index = 0; index < enemy.attackClocks.length; index++) {
+      const clock = enemy.attackClocks[index];
+      const attack = archetype.attacks[index];
+      if (rotationChanged && attack.pattern.kind === "ring") {
+        clock.rotationEpochSeconds = state.elapsedSeconds;
+        clock.rotationPhaseAtEpoch =
+          settings.initialPhaseDegrees !== previous.initialPhaseDegrees
+            ? attack.pattern.initialPhaseRadians
+            : clock.ringPhaseRadians;
+        clock.ringPhaseRadians = clock.rotationPhaseAtEpoch;
+      }
+      if (burstChanged) {
+        clock.epochSeconds = state.elapsedSeconds;
+        clock.volleysAtEpoch = clock.volleysFired;
+        clock.initialDelaySeconds =
+          clock.volleysFired === 0
+            ? settings.initialCooldownSeconds
+            : settings.shotIntervalSeconds;
+      }
     }
     enemy.positionTiles = constrainToArena(
       enemy.positionTiles,
@@ -260,7 +278,7 @@ export function setDebugSettings(
     state.shards,
     projectileOf(
       config,
-      archetypeOf(config, config.primaryArchetypeId).weapon.projectileId,
+      archetypeOf(config, config.primaryArchetypeId).attacks[0].projectileId,
     ),
   );
 }
@@ -347,59 +365,97 @@ function registerShardHit(
   if (state.player.healthHp === 0) state.phase = "ended";
 }
 
+/**
+ * Advances every enemy's attack clocks and fires each one's volley when due.
+ * Iterates enemies, then each enemy's attacks in authored order, so shard ids
+ * stay stable and a fixed input sequence stays reproducible (G: step 20.2).
+ */
 function updateAttacks(state: SimulationState): void {
   const config = state.config;
-  for (const enemy of state.enemies) updateEnemyAttacks(state, config, enemy);
+  for (const enemy of state.enemies) {
+    const archetype = archetypeOf(config, enemy.archetypeId);
+    for (let index = 0; index < archetype.attacks.length; index++) {
+      updateAttackClock(
+        state,
+        enemy,
+        archetype.attacks[index],
+        enemy.attackClocks[index],
+      );
+    }
+  }
 }
 
-/** Advances one enemy's rotation and fires its volley when its clock is due. */
-function updateEnemyAttacks(
+/** Advances one attack's rotation and fires its volley when its clock is due. */
+function updateAttackClock(
   state: SimulationState,
-  config: EncounterConfig,
   enemy: EnemyState,
+  attack: AttackSpec,
+  clock: AttackClockState,
 ): void {
-  const weapon = archetypeOf(config, enemy.archetypeId).weapon;
-  const projectile = projectileOf(config, weapon.projectileId);
-  enemy.emitterPhaseRadians =
-    (enemy.rotationPhaseAtEpoch +
-      ((state.elapsedSeconds - enemy.rotationEpochSeconds) *
-        weapon.emitters.clockwiseDegreesPerSecond *
-        Math.PI) /
-        180) %
-    fullTurnRadians;
-  const { shotsPerEmitter, shotIntervalSeconds } = weapon.burst;
+  const projectile = projectileOf(state.config, attack.projectileId);
+  const { pattern, cadence } = attack;
+  // Only a `ring` pattern rotates; every other kind leaves ringPhaseRadians
+  // at its fixed, deterministic starting value (see createEnemy).
+  if (pattern.kind === "ring") {
+    clock.ringPhaseRadians =
+      (clock.rotationPhaseAtEpoch +
+        ((state.elapsedSeconds - clock.rotationEpochSeconds) *
+          pattern.clockwiseDegreesPerSecond *
+          Math.PI) /
+          180) %
+      fullTurnRadians;
+  }
+  const { shotsPerBurst, shotIntervalSeconds } = cadence;
   const burstGroupSeconds =
-    (shotsPerEmitter - 1) * shotIntervalSeconds +
-    weapon.burst.cooldownAfterLastShotSeconds;
-  const volleysSinceEpoch = enemy.volleysFired - enemy.volleysAtEpoch;
-  const groupIndex = Math.floor(volleysSinceEpoch / shotsPerEmitter);
-  const shotIndex = volleysSinceEpoch % shotsPerEmitter;
+    (shotsPerBurst - 1) * shotIntervalSeconds +
+    cadence.cooldownAfterLastShotSeconds;
+  const volleysSinceEpoch = clock.volleysFired - clock.volleysAtEpoch;
+  const groupIndex = Math.floor(volleysSinceEpoch / shotsPerBurst);
+  const shotIndex = volleysSinceEpoch % shotsPerBurst;
   const nextShotSeconds =
-    enemy.attackEpochSeconds +
-    enemy.attackInitialDelaySeconds +
+    clock.epochSeconds +
+    clock.initialDelaySeconds +
     groupIndex * burstGroupSeconds +
     shotIndex * shotIntervalSeconds;
   const shotToleranceSeconds =
     Math.max(state.elapsedSeconds, nextShotSeconds) * Number.EPSILON * 16;
   if (state.elapsedSeconds + shotToleranceSeconds < nextShotSeconds) return;
 
-  const { count, radiusTiles } = weapon.emitters;
-  for (let emitter = 0; emitter < count; emitter++) {
-    const angleRadians =
-      enemy.emitterPhaseRadians + (emitter * fullTurnRadians) / count;
+  // A `scatter` volley draws one unit-random value per shot, in shot order,
+  // advancing the shared generator cursor - the only place this attack's
+  // randomness enters, so draw order across attacks and enemies stays fixed
+  // by the authored/enemy-insertion order the caller already iterates in
+  // (K11). `resolveBearings` itself never draws; it only consumes these.
+  const drawnUnitRandoms =
+    pattern.kind === "scatter"
+      ? Array.from({ length: pattern.shots }, () => nextUnitRandom(state))
+      : undefined;
+  const bearings = resolveBearings(pattern, {
+    enemyPositionTiles: enemy.positionTiles,
+    playerPositionTiles: state.player.positionTiles,
+    ringPhaseRadians: clock.ringPhaseRadians,
+    volleyIndexInBurst: shotIndex,
+    burstsFired: groupIndex,
+    drawnUnitRandoms,
+  });
+  for (const bearing of bearings) {
     state.shards.push(
       createShard(
         projectile,
         state.nextShardId++,
         {
-          x: enemy.positionTiles.x + Math.cos(angleRadians) * radiusTiles,
-          y: enemy.positionTiles.y + Math.sin(angleRadians) * radiusTiles,
+          x:
+            enemy.positionTiles.x +
+            Math.cos(bearing.bearingRadians) * bearing.emitterRadiusTiles,
+          y:
+            enemy.positionTiles.y +
+            Math.sin(bearing.bearingRadians) * bearing.emitterRadiusTiles,
         },
-        angleRadians,
+        bearing.bearingRadians,
       ),
     );
   }
-  enemy.volleysFired++;
+  clock.volleysFired++;
 }
 
 export function advanceSimulation(

@@ -600,7 +600,12 @@ class EncounterScene extends Phaser.Scene {
     return {
       ...structuredClone(this.state),
       volleysFired: this.state.enemies.reduce(
-        (total, enemy) => total + enemy.volleysFired,
+        (total, enemy) =>
+          total +
+          enemy.attackClocks.reduce(
+            (clockTotal, clock) => clockTotal + clock.volleysFired,
+            0,
+          ),
         0,
       ),
       paused: this.session.phase === "paused",

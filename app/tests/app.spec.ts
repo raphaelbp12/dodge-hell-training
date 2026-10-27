@@ -947,14 +947,19 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     id: 1,
     archetypeId: "crystal-worm-child-head",
     positionTiles: reset.enemies[0].positionTiles,
-    emitterPhaseRadians: 0,
     spawnedAtSeconds: 0,
-    attackEpochSeconds: 0,
-    volleysAtEpoch: 0,
-    attackInitialDelaySeconds: 2,
-    rotationEpochSeconds: 0,
-    rotationPhaseAtEpoch: 0,
-    volleysFired: 0,
+    attackClocks: [
+      {
+        attackId: "spiral-shards",
+        ringPhaseRadians: 0,
+        epochSeconds: 0,
+        volleysAtEpoch: 0,
+        initialDelaySeconds: 2,
+        rotationEpochSeconds: 0,
+        rotationPhaseAtEpoch: 0,
+        volleysFired: 0,
+      },
+    ],
   });
   // A retry re-randomises the opening bearing, so pin the ring distance.
   expect(centreDistance(reset.enemies[0].positionTiles)).toBeCloseTo(
