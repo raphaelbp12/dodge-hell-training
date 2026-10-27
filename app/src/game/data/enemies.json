@@ -26,19 +26,7 @@
           "cooldownAfterLastShotSeconds": 3,
           "initialCooldownSeconds": 2
         },
-        "shard": {
-          "damageHp": 160,
-          "speedTilesPerSecond": 8,
-          "body": {
-            "shape": "shard-hexagon",
-            "widthTiles": 1.45,
-            "heightTiles": 0.65
-          },
-          "reversalAgeSeconds": 1.5,
-          "lifetimeSeconds": 3,
-          "expiration": "lifetime-only",
-          "hitPolicy": "once-per-shard"
-        }
+        "projectile": "crystal-worm-child-shard"
       }
     }
   }

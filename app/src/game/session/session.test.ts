@@ -25,7 +25,7 @@ test("session delivers accepted hits once before lethal result, never while paus
   session.simulation.player.healthHp = 1;
   session.simulation.shards.push({
     id: 1,
-    archetypeId: "crystal-worm-child-head",
+    projectileId: "crystal-worm-child-shard",
     damageHp: 160,
     orientationRadians: 0,
     positionTiles: { x: 0, y: 0 },
@@ -35,6 +35,9 @@ test("session delivers accepted hits once before lethal result, never while paus
     lifetimeSeconds: 2,
     hasReversed: false,
     hasHitPlayer: false,
+    spawnPositionTiles: { x: 0, y: 0 },
+    spawnOrientationRadians: 0,
+    detonationTargetTiles: null,
   });
   const delivered: number[] = [];
   const receive = (hit: { damageHp: number }) => {
@@ -66,7 +69,7 @@ function kill(session: SessionController) {
   session.simulation.player.healthHp = 1;
   session.simulation.shards.push({
     id: 100,
-    archetypeId: "crystal-worm-child-head",
+    projectileId: "crystal-worm-child-shard",
     damageHp: 160,
     orientationRadians: 0,
     positionTiles: { ...session.simulation.player.positionTiles },
@@ -76,6 +79,9 @@ function kill(session: SessionController) {
     lifetimeSeconds: 2.4,
     hasReversed: false,
     hasHitPlayer: false,
+    spawnPositionTiles: { ...session.simulation.player.positionTiles },
+    spawnOrientationRadians: 0,
+    detonationTargetTiles: null,
   });
   return session.advance(tick, idle);
 }

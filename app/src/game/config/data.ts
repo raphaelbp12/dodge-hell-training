@@ -3,6 +3,7 @@ import arenaData from "../data/arena.json";
 import shapesData from "../data/shapes.json";
 import enemiesData from "../data/enemies.json";
 import encounterData from "../data/encounter.json";
+import projectilesData from "../data/projectiles.json";
 
 // Boundary between authored JSON and the derived runtime configuration.
 //
@@ -153,6 +154,227 @@ export function validateBody(value: unknown, path: string): AuthoredBody {
   });
 }
 
+export type AuthoredProjectileMotion =
+  | Readonly<{
+      kind: "boomerang";
+      reversalAgeSeconds: number;
+      lifetimeSeconds: number;
+    }>
+  | Readonly<{ kind: "linear"; rangeTiles: number }>
+  | Readonly<{
+      kind: "turning";
+      rangeTiles: number;
+      turnRateDegreesPerSecond: number;
+    }>
+  | Readonly<{
+      kind: "wavy";
+      rangeTiles: number;
+      amplitudeTiles: number;
+      frequencyHz: number;
+    }>
+  | Readonly<{
+      kind: "lob";
+      travelSeconds: number;
+      detonationRadiusTiles: number;
+    }>;
+
+/**
+ * The maximum a curved path (`turning` or `wavy`) may deviate from the
+ * straight chord the collision test sweeps between a step's exact start and
+ * end positions. Validated per projectile at load time rather than assumed,
+ * because the collision test is a swept straight segment per fixed step and
+ * a curved path is not actually straight within a step (G: step 19.4). Both
+ * the source's most extreme authored turn rate (±70 deg/s at 8 tiles/s) and
+ * its wavy amplitude/frequency (0.8 tiles, 1 Hz) deviate by under a fifth of
+ * this bound, so no sub-stepping is needed at the fixed 60 Hz step.
+ */
+export const MAXIMUM_PATH_DEVIATION_TILES = 0.02;
+
+/** Sagitta of the circular arc traced in one fixed step, in tiles. */
+export function turningDeviationTiles(
+  speedTilesPerSecond: number,
+  turnRateDegreesPerSecond: number,
+  stepSeconds: number,
+): number {
+  const chordLengthTiles = speedTilesPerSecond * stepSeconds;
+  const headingChangeRadians =
+    ((turnRateDegreesPerSecond * Math.PI) / 180) * stepSeconds;
+  return Math.abs((chordLengthTiles * headingChangeRadians) / 8);
+}
+
+/** Maximum lateral deviation of the wave from its chord in one fixed step. */
+export function wavyDeviationTiles(
+  amplitudeTiles: number,
+  frequencyHz: number,
+  stepSeconds: number,
+): number {
+  const angularFrequency = 2 * Math.PI * frequencyHz;
+  const lateralAccelerationTilesPerSecondSquared =
+    amplitudeTiles * angularFrequency * angularFrequency;
+  return 0.5 * lateralAccelerationTilesPerSecondSquared * stepSeconds * stepSeconds;
+}
+
+export type AuthoredProjectile = Readonly<{
+  id: string;
+  source: string;
+  damageHp: number;
+  speedTilesPerSecond: number;
+  armorPiercing: boolean;
+  conditions: readonly unknown[];
+  body: AuthoredBody;
+  expiration: string;
+  hitPolicy: string;
+  motion: AuthoredProjectileMotion;
+}>;
+
+const rangeDerivedKinds = ["linear", "turning", "wavy"] as const;
+
+function rejectIfAuthored(
+  motion: Record<string, unknown>,
+  path: string,
+  field: "reversalAgeSeconds" | "lifetimeSeconds",
+  kindLabel: string,
+): void {
+  if (field in motion)
+    reject(`${path}.${field}`, `must not be authored on a ${kindLabel} projectile`);
+}
+
+function validateProjectileMotion(
+  value: unknown,
+  path: string,
+): AuthoredProjectileMotion {
+  const motion = record(value, path);
+  if (motion.kind === "boomerang") {
+    const reversalAgeSeconds = positiveNumber(
+      motion.reversalAgeSeconds,
+      `${path}.reversalAgeSeconds`,
+    );
+    const lifetimeSeconds = positiveNumber(
+      motion.lifetimeSeconds,
+      `${path}.lifetimeSeconds`,
+    );
+    if (reversalAgeSeconds >= lifetimeSeconds)
+      reject(
+        `${path}.reversalAgeSeconds`,
+        "must be strictly inside the shard lifetime",
+      );
+    return Object.freeze({ kind: "boomerang", reversalAgeSeconds, lifetimeSeconds });
+  }
+  if (rangeDerivedKinds.includes(motion.kind as never)) {
+    const kindLabel = motion.kind as (typeof rangeDerivedKinds)[number];
+    rejectIfAuthored(motion, path, "reversalAgeSeconds", kindLabel);
+    rejectIfAuthored(motion, path, "lifetimeSeconds", kindLabel);
+    const rangeTiles = positiveNumber(motion.rangeTiles, `${path}.rangeTiles`);
+    if (kindLabel === "linear") return Object.freeze({ kind: "linear", rangeTiles });
+    if (kindLabel === "turning") {
+      const turnRateDegreesPerSecond = finiteNumber(
+        motion.turnRateDegreesPerSecond,
+        `${path}.turnRateDegreesPerSecond`,
+      );
+      if (turnRateDegreesPerSecond === 0)
+        reject(`${path}.turnRateDegreesPerSecond`, "must be nonzero");
+      return Object.freeze({ kind: "turning", rangeTiles, turnRateDegreesPerSecond });
+    }
+    const amplitudeTiles = positiveNumber(
+      motion.amplitudeTiles,
+      `${path}.amplitudeTiles`,
+    );
+    const frequencyHz = positiveNumber(motion.frequencyHz, `${path}.frequencyHz`);
+    return Object.freeze({ kind: "wavy", rangeTiles, amplitudeTiles, frequencyHz });
+  }
+  if (motion.kind === "lob") {
+    rejectIfAuthored(motion, path, "reversalAgeSeconds", "lob");
+    rejectIfAuthored(motion, path, "lifetimeSeconds", "lob");
+    if ("rangeTiles" in motion)
+      reject(`${path}.rangeTiles`, "must not be authored on a lob projectile");
+    const travelSeconds = positiveNumber(
+      motion.travelSeconds,
+      `${path}.travelSeconds`,
+    );
+    const detonationRadiusTiles = positiveNumber(
+      motion.detonationRadiusTiles,
+      `${path}.detonationRadiusTiles`,
+    );
+    return Object.freeze({ kind: "lob", travelSeconds, detonationRadiusTiles });
+  }
+  reject(
+    `${path}.kind`,
+    'must be "boomerang", "linear", "turning", "wavy" or "lob"',
+  );
+}
+
+/** A single catalog entry, validated in isolation so a test can pass a literal. */
+export function validateProjectile(
+  value: unknown,
+  id: string,
+  stepSeconds: number,
+): AuthoredProjectile {
+  const path = `projectiles.projectiles.${id}`;
+  const projectile = record(value, path);
+  const motion = validateProjectileMotion(projectile.motion, `${path}.motion`);
+  if (!Array.isArray(projectile.conditions))
+    reject(`${path}.conditions`, "must be an array");
+  const speedTilesPerSecond = positiveNumber(
+    projectile.speedTilesPerSecond,
+    `${path}.speedTilesPerSecond`,
+  );
+  if (motion.kind === "turning") {
+    const deviationTiles = turningDeviationTiles(
+      speedTilesPerSecond,
+      motion.turnRateDegreesPerSecond,
+      stepSeconds,
+    );
+    if (deviationTiles > MAXIMUM_PATH_DEVIATION_TILES)
+      reject(
+        `${path}.motion.turnRateDegreesPerSecond`,
+        `would deviate ${deviationTiles} tiles from its chord per step, over the ${MAXIMUM_PATH_DEVIATION_TILES}-tile bound`,
+      );
+  }
+  if (motion.kind === "wavy") {
+    const deviationTiles = wavyDeviationTiles(
+      motion.amplitudeTiles,
+      motion.frequencyHz,
+      stepSeconds,
+    );
+    if (deviationTiles > MAXIMUM_PATH_DEVIATION_TILES)
+      reject(
+        `${path}.motion.amplitudeTiles`,
+        `would deviate ${deviationTiles} tiles from its chord per step, over the ${MAXIMUM_PATH_DEVIATION_TILES}-tile bound`,
+      );
+  }
+  return Object.freeze({
+    id,
+    source: text(projectile.source, `${path}.source`),
+    damageHp: nonnegativeNumber(projectile.damageHp, `${path}.damageHp`),
+    speedTilesPerSecond,
+    armorPiercing: boolean(
+      projectile.armorPiercing,
+      `${path}.armorPiercing`,
+    ),
+    conditions: Object.freeze([...projectile.conditions]),
+    body: validateBody(projectile.body, `${path}.body`),
+    expiration: text(projectile.expiration, `${path}.expiration`),
+    hitPolicy: text(projectile.hitPolicy, `${path}.hitPolicy`),
+    motion,
+  });
+}
+
+export function validateProjectiles(
+  value: unknown,
+  stepSeconds: number,
+): Readonly<Record<string, AuthoredProjectile>> {
+  const data = record(value, "projectiles");
+  const projectiles = record(data.projectiles, "projectiles.projectiles");
+  const ids = Object.keys(projectiles);
+  if (ids.length === 0)
+    reject("projectiles.projectiles", "must define at least one projectile");
+  return Object.freeze(
+    Object.fromEntries(
+      ids.map((id) => [id, validateProjectile(projectiles[id], id, stepSeconds)]),
+    ),
+  );
+}
+
 export type AuthoredArchetype = Readonly<{
   id: string;
   spawnTiles: Vector2;
@@ -174,37 +396,25 @@ export type AuthoredArchetype = Readonly<{
       cooldownAfterLastShotSeconds: number;
       initialCooldownSeconds: number;
     }>;
-    shard: Readonly<{
-      damageHp: number;
-      speedTilesPerSecond: number;
-      body: AuthoredBody;
-      reversalAgeSeconds: number;
-      lifetimeSeconds: number;
-      expiration: string;
-      hitPolicy: string;
-    }>;
+    projectile: string;
   }>;
 }>;
 
-function validateArchetype(value: unknown, id: string): AuthoredArchetype {
+function validateArchetype(
+  value: unknown,
+  id: string,
+  projectileIds: ReadonlySet<string>,
+): AuthoredArchetype {
   const path = `enemies.archetypes.${id}`;
   const archetype = record(value, path);
   const weapon = record(archetype.weapon, `${path}.weapon`);
   const emitters = record(weapon.emitters, `${path}.weapon.emitters`);
   const burst = record(weapon.burst, `${path}.weapon.burst`);
-  const shard = record(weapon.shard, `${path}.weapon.shard`);
-  const reversalAgeSeconds = positiveNumber(
-    shard.reversalAgeSeconds,
-    `${path}.weapon.shard.reversalAgeSeconds`,
-  );
-  const lifetimeSeconds = positiveNumber(
-    shard.lifetimeSeconds,
-    `${path}.weapon.shard.lifetimeSeconds`,
-  );
-  if (reversalAgeSeconds >= lifetimeSeconds)
+  const projectile = text(weapon.projectile, `${path}.weapon.projectile`);
+  if (!projectileIds.has(projectile))
     reject(
-      `${path}.weapon.shard.reversalAgeSeconds`,
-      "must be strictly inside the shard lifetime",
+      `${path}.weapon.projectile`,
+      "must name a projectile defined in projectiles.json",
     );
   return Object.freeze({
     id,
@@ -257,30 +467,14 @@ function validateArchetype(value: unknown, id: string): AuthoredArchetype {
           `${path}.weapon.burst.initialCooldownSeconds`,
         ),
       }),
-      shard: Object.freeze({
-        damageHp: nonnegativeNumber(
-          shard.damageHp,
-          `${path}.weapon.shard.damageHp`,
-        ),
-        speedTilesPerSecond: positiveNumber(
-          shard.speedTilesPerSecond,
-          `${path}.weapon.shard.speedTilesPerSecond`,
-        ),
-        body: validateBody(shard.body, `${path}.weapon.shard.body`),
-        reversalAgeSeconds,
-        lifetimeSeconds,
-        expiration: text(
-          shard.expiration,
-          `${path}.weapon.shard.expiration`,
-        ),
-        hitPolicy: text(shard.hitPolicy, `${path}.weapon.shard.hitPolicy`),
-      }),
+      projectile,
     }),
   });
 }
 
 export function validateArchetypes(
   value: unknown,
+  projectileIds: ReadonlySet<string>,
 ): Readonly<Record<string, AuthoredArchetype>> {
   const data = record(value, "enemies");
   const archetypes = record(data.archetypes, "enemies.archetypes");
@@ -289,7 +483,10 @@ export function validateArchetypes(
     reject("enemies.archetypes", "must define at least one archetype");
   return Object.freeze(
     Object.fromEntries(
-      ids.map((id) => [id, validateArchetype(archetypes[id], id)]),
+      ids.map((id) => [
+        id,
+        validateArchetype(archetypes[id], id, projectileIds),
+      ]),
     ),
   );
 }
@@ -324,6 +521,7 @@ export type AuthoredEncounter = Readonly<{
     retryCountdownSeconds: number;
     historyLimit: number;
   }>;
+  presentation: Readonly<{ lobTelegraphSeconds: number }>;
 }>;
 
 export function validateEncounterData(value: unknown): AuthoredEncounter {
@@ -332,6 +530,7 @@ export function validateEncounterData(value: unknown): AuthoredEncounter {
   const player = record(data.player, "encounter.player");
   const camera = record(data.camera, "encounter.camera");
   const session = record(data.session, "encounter.session");
+  const presentation = record(data.presentation, "encounter.presentation");
   const minZoom = positiveNumber(camera.minZoom, "encounter.camera.minZoom");
   const maxZoom = positiveNumber(camera.maxZoom, "encounter.camera.maxZoom");
   const defaultZoom = positiveNumber(
@@ -421,11 +620,24 @@ export function validateEncounterData(value: unknown): AuthoredEncounter {
         "encounter.session.historyLimit",
       ),
     }),
+    presentation: Object.freeze({
+      lobTelegraphSeconds: positiveNumber(
+        presentation.lobTelegraphSeconds,
+        "encounter.presentation.lobTelegraphSeconds",
+      ),
+    }),
   });
 }
 
-export const AUTHORED_ARCHETYPES = validateArchetypes(enemiesData);
 export const AUTHORED_ENCOUNTER = validateEncounterData(encounterData);
+export const AUTHORED_PROJECTILES = validateProjectiles(
+  projectilesData,
+  AUTHORED_ENCOUNTER.simulation.fixedStepSeconds,
+);
+export const AUTHORED_ARCHETYPES = validateArchetypes(
+  enemiesData,
+  new Set(Object.keys(AUTHORED_PROJECTILES)),
+);
 
 if (!AUTHORED_ARCHETYPES[AUTHORED_ENCOUNTER.primaryArchetype])
   reject(

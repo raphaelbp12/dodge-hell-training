@@ -203,6 +203,87 @@ export function convexBodyFitsCircle(
   );
 }
 
+function closestPointOnSegment(
+  point: Vector2,
+  segmentStart: Vector2,
+  segmentEnd: Vector2,
+): Vector2 {
+  const edgeX = segmentEnd.x - segmentStart.x;
+  const edgeY = segmentEnd.y - segmentStart.y;
+  const lengthSquared = edgeX * edgeX + edgeY * edgeY;
+  if (lengthSquared === 0) return segmentStart;
+  const fraction = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.x - segmentStart.x) * edgeX + (point.y - segmentStart.y) * edgeY) /
+        lengthSquared,
+    ),
+  );
+  return {
+    x: segmentStart.x + edgeX * fraction,
+    y: segmentStart.y + edgeY * fraction,
+  };
+}
+
+/**
+ * Whether a point lies on the inner side of every edge of a convex polygon.
+ * `axes[i]`, as `validatedAxes` derives it, is the *inward* normal of the
+ * edge starting at `vertices[i]` for this winding, so the inside test is a
+ * nonnegative projection against every edge.
+ */
+function pointInsideConvexBody(
+  point: Vector2,
+  verticesTiles: readonly Vector2[],
+  axes: readonly Vector2[],
+  toleranceTiles: number,
+): boolean {
+  return verticesTiles.every((vertex, index) => {
+    const axis = axes[index];
+    const projection =
+      (point.x - vertex.x) * axis.x + (point.y - vertex.y) * axis.y;
+    return projection >= -toleranceTiles;
+  });
+}
+
+/**
+ * Whether a circle overlaps a convex body - a bomb's detonation radius
+ * touching the player, for example - as opposed to `convexBodyFitsCircle`,
+ * which asks whether the body is entirely *inside* the circle.
+ */
+export function convexBodyOverlapsCircle(
+  worldVerticesTiles: readonly Vector2[],
+  circleCenterTiles: Vector2,
+  radiusTiles: number,
+): boolean {
+  const axes = validatedAxes(worldVerticesTiles);
+  assertFiniteVector(circleCenterTiles);
+  if (!Number.isFinite(radiusTiles) || radiusTiles <= 0) {
+    throw new RangeError("Circle radius must be positive finite tiles");
+  }
+  const toleranceTiles = Math.max(
+    coordinateTolerance([...worldVerticesTiles, circleCenterTiles]),
+    numericalRoundoffBudget * radiusTiles,
+  );
+  if (
+    pointInsideConvexBody(circleCenterTiles, worldVerticesTiles, axes, toleranceTiles)
+  )
+    return true;
+  let minimumDistanceSquaredTiles = Infinity;
+  for (let index = 0; index < worldVerticesTiles.length; index++) {
+    const start = worldVerticesTiles[index];
+    const end = worldVerticesTiles[(index + 1) % worldVerticesTiles.length];
+    const closest = closestPointOnSegment(circleCenterTiles, start, end);
+    const deltaX = circleCenterTiles.x - closest.x;
+    const deltaY = circleCenterTiles.y - closest.y;
+    minimumDistanceSquaredTiles = Math.min(
+      minimumDistanceSquaredTiles,
+      deltaX * deltaX + deltaY * deltaY,
+    );
+  }
+  return Math.sqrt(minimumDistanceSquaredTiles) <= radiusTiles + toleranceTiles;
+}
+
 export function maximumBodyCenterDistance(
   orientedLocalVerticesTiles: readonly Vector2[],
   direction: Vector2,

@@ -602,3 +602,85 @@ Spawn placement is the only source of randomness, and it enters through a seeded
 - **The arena stays 19.2 tiles.** The `fixes.md` request for an arena at double the enemy's reach is superseded by the v3 tuning: shipped reach is `0.35 + 8 * 1.5 = 12.35` tiles. More dodging room matters more once several enemies fire.
 - **New comparison identity `crystal-worm-child-swarm-paladin-v4`.** v1, v2 and v3 records are retained, displayed as "Other rules" and excluded from the new retained best. No history schema change.
 - **Approved rules are split by enforcement point.** Immutable rules - no contact damage, no body blocking, rotation during cooldown, lifetime-only expiry, once-per-shard hits - are asserted for any config. "Pursuit slower than the Paladin" is asserted only for the shipped encounter, because the debug speed slider reaches 12 tiles/second against the Paladin's 7.0613 and is meant to.
+
+## Approved V5 Boss Encounter Contract - Step 19.1
+
+Additive record of the user's 2026-10-27 decisions (K01-K18 in [the active plan](../implementation-plan.md)) for the Killer Bee Queen encounter, phases 19-24. This supersedes nothing in the v2 or v4 record except where stated.
+
+### Source Access
+
+[The Killer Bee Queen source extract](killer-bee-queen-source.md) is the verified transcription for this encounter, retrieved 2026-10-27 from `https://www.realmeye.com/wiki/killer-bee-queen` (secondarily `https://www.realmeye.com/wiki/status-effects`) at Exalt version 5.14.0.0. `WebFetch` returns an empty document for RealmEye pages - it renders the client shell with no content - so the access method is `curl` with a desktop user agent, followed by stripping script/style tags, converting block-level closing tags to newlines, dropping remaining inline tags and unescaping entities; a projectile's name must be read from its image `alt` attribute, not from visible text. Added to the Source Access Log below as S13.
+
+| ID  | Attempted URL                                      | Intended evidence                                      | Result on 2026-10-27                                                        |
+| --- | --------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| S13 | https://www.realmeye.com/wiki/killer-bee-queen (+ status-effects) | Stats, projectile table, phase/behaviour prose, status magnitudes | `curl` succeeded where `WebFetch` returned empty; transcribed into the source extract |
+
+### Decisions
+
+- **K01.** Phase progression is a simulated raid DPS of 375 HP/second (K15), plus a drill mode that starts at and loops a single chosen phase; the player has no attack, so an authored `progression` rule substitutes for raid damage.
+- **K02.** Every motion kind the fight requires is implemented: `linear`, `boomerang`, `turning`, `wavy` and `lob`. This supersedes the prior rule that a projectile always reverses once and expires only by lifetime; that rule now describes the `boomerang` kind specifically.
+- **K03.** Only the seven conditions that change dodging or survival are active - Paralyzed, Slowed, Confused, Armor Broken, Exposed, Curse, Sick. The remaining six - Dazed, Silenced, Quiet, Weak, Unstable, Pet Stasis - are authored and tracked but inert, because they affect attacking, abilities, mana or pets, none of which exist here.
+- **K04.** Pattern cadences are trainer-authored, not wiki facts, each marked with an explicit `tuningSource`, and tuned for trainability only after every mechanic is implemented (step 24.2).
+- **K05.** The arena stays static; Killer Honey flooding and tile hardening are deferred as D01, and phases 2 and 5 are practised on the full arena with that fidelity gap documented.
+- **K06.** Killer Bee Nests are not destructible; phase 6 always runs its full authored duration and always produces the default one-of-each Beehemoth outcome (D03).
+- **K07.** The Plagued Nest is not authored yet; only the 30 non-`Plagued Nest only` projectile rows enter `projectiles.json`, only when a phase actually fires them (D02).
+- **K08.** Invulnerability pauses progression: while an enemy is invulnerable, the simulated-DPS driver drains no HP, matching the source's statement that the Queen is invulnerable between attacks and throughout phase 6.
+- **K09.** A phase exits on an HP fraction or on an authored duration. Phase 6 is the only duration-exit phase. Phase order is monotonic and a phase is never re-entered except in drill mode.
+- **K10.** The Killer Bee Queen ships as a second encounter, `killer-bee-queen-nest-paladin-v5`, alongside the still-playable Crystal Worm swarm. Attempt history and comparisons are recorded per encounter, never across them.
+- **K11.** Randomness extends to projectile angles (`scatter`) and `wander` movement through the same injected seeded generator; `Math.random` remains absent from the simulation and determinism across step rates remains absolute.
+- **K12.** The debug panel gains only encounter-level controls - jump to phase/sub-phase, pause progression, show active phase and conditions - and no per-attack sliders; Killer Bee Queen cadence tuning is done by editing `enemies.json`.
+- **K13.** Every authored value carries provenance: a projectile cites its source-extract row, and an attack carries `tuningSource` of `"wiki-prose"` or `"trainer-authored"`; the loader rejects an attack with neither.
+
+### Fidelity Limits
+
+The encounter ships with five known gaps between this trainer and the live fight:
+
+- **No arena mutation (D01).** Killer Honey flooding and tile hardening are omitted; phases 2 and 5 are easier here than live, because the player keeps the whole 19.2-tile arena instead of losing most of it.
+- **No Plagued Nest (D02).** Only The Nest location ships; the harder green variant is deferred entirely.
+- **No Nest destruction (D03).** Phase 6 always runs its full duration and always yields the default Beehemoth mix, rather than letting the player choose which Nests to destroy.
+- **No player attacks, and therefore no Stun or Daze vulnerability windows (D04, D05).** Phases 1, 3 and 8 are harder here than live, because a real group suppresses those attacks by stunning the Queen during her vulnerability windows; this trainer has no mechanism to suppress anything.
+- **No adaptive HP scaling (D06).** The authored 112,500 HP is a single-player tuning input, not a group-scaled figure.
+
+In short: this trainer is easier than live play during phases 2 and 5, and harder during phases 1, 3 and 8.
+
+### Interpretations Not Sourced
+
+- **Phase-to-projectile-variant bindings.** The wiki's attack table does not say which phase fires which variant of a repeated sprite (for example, which stinger size appears in which phase); each phase's step authors this binding as a `trainer-authored` interpretation rather than a sourced fact.
+- **Curse ordering against the minimum-damage floor.** The source states only that Curse is calculated "after defense and defense modifiers," and says nothing about this project's minimum-damage floor. The approved formula below applies Curse after the floor; this is this project's interpretation, not a sourced fact.
+
+### The Damage Formula
+
+Implemented exactly as written in step 21.3:
+
+```ts
+const EXPOSED_DEFENSE_PENALTY = 20;
+const CURSE_DAMAGE_MULTIPLIER = 1.25;
+
+function effectiveDefenseFor(player, armorPiercing): number {
+  let defense =
+    armorPiercing || hasCondition(player, "armorBroken")
+      ? 0
+      : PALADIN_STATS.defense;
+  if (hasCondition(player, "exposed")) defense -= EXPOSED_DEFENSE_PENALTY;
+  return defense;
+}
+
+// config/stats.ts
+damage = Math.max(rawDamageHp - defense, rawDamageHp * minimumFraction);
+if (cursed) damage *= CURSE_DAMAGE_MULTIPLIER;
+return Math.ceil(damage);
+```
+
+Defence is resolved first and may go negative (Exposed stacked on armour-piercing or Armor Broken); Curse is applied last, after the minimum-damage floor. Seven worked cases for a raw 100-damage shot against the Paladin's 32 defence:
+
+| Case | Effective defence | Damage |
+| ---- | ------------------ | ------ |
+| none | 32 | 68 |
+| armour-piercing | 0 | 100 |
+| Armor Broken | 0 | 100 |
+| Exposed | 12 | 88 |
+| armour-piercing + Exposed | -20 | 120 |
+| Armor Broken + Exposed | -20 | 120 |
+| Curse only | 32 | 85 |
+
+The source's statement about Armor Broken against an already-negative defence cannot hold in this linear formula below a defence of 20; the only player preset has 32 defence, so that sub-20 case is explicitly not modelled.

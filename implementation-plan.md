@@ -342,7 +342,7 @@ Read this section before your first step.
 
 ### Step 19.1 - Record The V5 Contract And Sources
 
-Status: pending. Dependencies: 18.2.
+Status: complete. Dependencies: 18.2.
 
 **Implementation prompt**
 
@@ -364,9 +364,15 @@ Do not change any JSON, TypeScript or test file in this step.
 
 **Acceptance:** the V5 contract is recorded additively in the mechanics document, both instruction files reflect K02 and are identical in content, all links resolve, no earlier contract section is altered, and no runtime file changed.
 
+**Execution and verification - 2026-10-27**
+
+Added `## Approved V5 Boss Encounter Contract - Step 19.1` to the end of `docs/mechanics.md`: Source Access (with S13 appended to the Source Access Log), Decisions (K01-K13), Fidelity Limits (D01-D06), the two unsourced interpretations, and the damage formula with its seven worked cases. Updated the shard-reversal bullet in both `CLAUDE.md` and `.github/copilot-instructions.md` to describe `boomerang` specifically (K02), and added one bullet each for the deferred register and the RealmEye `curl` access method. No v1-v4 section of `mechanics.md` was edited (`git diff` shows only additions, zero deletions); the two instruction files diverge only in relative link depth (`../` prefixes in the Copilot file), confirmed by diffing both bodies with that prefix normalized. All referenced links (`docs/deferred-work.md`, `docs/killer-bee-queen-source.md`, `docs/mechanics.md`) resolve on disk.
+
+Checks run from `app/`: `npm run lint` (pass), `npm run typecheck` (pass), `npm run test` - 357/357 passed across 11 files. No runtime file changed in this step, matching its own focused-checks list (build was not required for a docs-only step).
+
 ### Step 19.2 - Extract Projectiles Into A Keyed Catalog
 
-Status: pending. Dependencies: 19.1.
+Status: complete. Dependencies: 19.1.
 
 **Implementation prompt**
 
@@ -386,9 +392,21 @@ Do not add any second projectile, any other motion kind, or any new pattern. Do 
 
 **Acceptance:** projectiles are a keyed catalog behind the existing validating loader, `weapon.shard` is gone in favour of `weapon.projectileId`, shards carry `projectileId`, the broadphase bound comes from the catalog, every pre-existing timeline assertion passes unchanged, and all four gates pass.
 
+**Execution and verification - 2026-10-27**
+
+Added `app/src/game/data/projectiles.json` with the single `crystal-worm-child-shard` entry carrying the exact pre-refactor `weapon.shard` values (damage 160, speed 8, body 1.45x0.65, reversal 1.5s, lifetime 3s), plus `armorPiercing: false`, `conditions: []` and a `source` string. Replaced `enemies.json`'s `weapon.shard` block with `"projectile": "crystal-worm-child-shard"`.
+
+`config/data.ts`: added `validateProjectile`/`validateProjectiles` (exported `AUTHORED_PROJECTILES`), rejecting any `motion.kind` other than `"boomerang"` and any reversal not strictly inside the lifetime. `validateArchetypes`/`validateArchetype` now take the catalog's id set and reject a `weapon.projectile` absent from it. `config/encounter.ts`: added `ProjectileSpec`, `EncounterConfig.projectiles`, and `projectileOf`; `EnemyArchetype.weapon` lost `shard` in favour of `projectileId`; `buildEncounterConfig` now builds one catalog entry from `TuningValues` (unchanged debug-slider routing) instead of a nested shard object; `liveShardBoundPerEnemy` takes `(config, archetype)` and resolves the projectile's lifetime through `projectileOf`; `validateArchetype`'s shard-shaped checks moved into a new `validateProjectileSpec`.
+
+`models.ts`: renamed `ShardState.archetypeId` to `projectileId`. `simulation.ts`: `boundingRadiusTiles` now maxes over `config.projectiles`; `restampLiveShards` takes a `ProjectileSpec` instead of a weapon; `updateEnemyAttacks` resolves the firing projectile via `projectileOf` and stamps `projectileId` on each new shard; `shardOverlapsPlayer` and `setDebugSettings`'s restamp call resolve the shard/primary body the same way. `phaser/encounter.ts` draws each shard's body via `projectileOf(config, shard.projectileId)`.
+
+Tests: added a focused failing-first set in `config/data.test.ts` (`AUTHORED_PROJECTILES` existence, 12 `validateProjectile` rejection cases, empty-catalog rejection, and `validateArchetypes` rejecting a weapon naming an unknown projectile) and updated every existing shard-shaped literal and `PRIMARY.weapon.shard.*` read across `config.test.ts` and `simulation.test.ts` to the new `projectileId`/`projectileOf` shape, including the `restampLiveShards` and `liveShardBoundPerEnemy` call sites (now `(config, archetype)`). No pre-existing assertion was weakened or deleted - the exact pre-refactor numeric values (66, 671 volleys, SHARD_BODY_TILES, etc.) are still pinned, now read through the catalog.
+
+Checks run from `app/`: `npm run lint` (pass, no findings), `npm run typecheck` (pass), `npm run test` - 373/373 passed across 11 files (357 pre-existing + 16 new, zero removed or weakened), including the 671-volley assertion (`five-minute moving encounters stay bounded and agree at 30/60/120 Hz`), the 30/60/120 Hz equivalence test, and the fixed-input reproducibility test, all unchanged. `npm run build` (pass). `npm run test:e2e -- --grep "pursue, fire, reverse, register hits"` (1 passed) - the Playwright spec has no test titled with "shard"; this is the test that exercises the live Phaser shard-inspection path (`Inspection.shards: ShardState[]`, which now carries `projectileId`) end to end, so it was run in its place.
+
 ### Step 19.3 - Add The Linear Motion Kind
 
-Status: pending. Dependencies: 19.2.
+Status: complete. Dependencies: 19.2.
 
 **Implementation prompt**
 
@@ -411,9 +429,23 @@ Do not author any Killer Bee Queen projectile into `projectiles.json` in this st
 
 **Acceptance:** `projectiles.ts` owns projectile motion, the `linear` kind works and derives its lifetime from the published range, the `boomerang` kind is byte-identical after the move, every pre-existing timeline assertion passes unchanged, and all four gates pass.
 
+**Execution and verification - 2026-10-27**
+
+Created `app/src/game/simulation/projectiles.ts`, moving `restampLiveShards`, `shardOverlapsPlayer`, `moveShard`/`interpolatePosition` and `advanceShard` out of `simulation.ts` verbatim (pure move for `boomerang`), plus a new `createShard(projectile, id, positionTiles, orientationRadians)` factory that replaces the inline shard-literal construction in `updateEnemyAttacks`. The three collision functions take a narrow `ShardCollisionContext` (`{ config, collisionBoundingRadiusTiles }`) rather than the full `SimulationState`, so `projectiles.ts` has no dependency on `simulation.ts` and there is no circular import; `simulation.ts` still passes its `SimulationState` directly since it structurally satisfies the narrower type.
+
+Added a private `resolveShardLifetime(projectile)` dispatcher inside `projectiles.ts`: `boomerang` returns its authored `reversalAgeSeconds`/`lifetimeSeconds` unchanged; `linear` returns `rangeTiles / speedTilesPerSecond` for the lifetime and `Infinity` for the reversal age, so `advanceShard`'s existing reversal branch (`!shard.hasReversed && targetAgeSeconds >= shard.reversalAgeSeconds`) can structurally never fire for a `linear` shard - no second motion branch was added. `restampLiveShards` now calls the same dispatcher instead of reading `.motion.reversalAgeSeconds`/`.lifetimeSeconds` directly, so it now also restamps correctly for a (currently nonexistent) live `linear` shard.
+
+`config/data.ts`: split `validateProjectileMotion` out of `validateProjectile`, dispatching on `motion.kind`; added the `linear` case requiring a positive `rangeTiles` and explicitly rejecting an authored `reversalAgeSeconds` or `lifetimeSeconds` on it; kept rejecting any kind other than `boomerang`/`linear`. `config/encounter.ts`: widened `ProjectileSpec`/`AuthoredProjectileMotion`'s `motion` to the two-member discriminated union; `validateProjectileSpec` now checks the `boomerang`-only reversal/lifetime invariant only for that kind and a positive `rangeTiles` for `linear`; added `lifetimeSecondsOf` (a one-line, intentionally independent copy of the same kind-dispatch, since `config/` cannot depend on `simulation/`) so `liveShardBoundPerEnemy` still works if a future archetype ever ships a `linear` primary weapon; `AUTHORED_TUNING`'s debug-slider routing narrows `authoredProjectile.motion` to `boomerang` once at module load (the debug panel only ever tunes the shipped boomerang shard) and throws if that ever stops holding.
+
+Did not author any Killer Bee Queen projectile; `projectiles.json` still has exactly the one `crystal-worm-child-shard` entry.
+
+Tests: added `app/src/game/simulation/projectiles.test.ts` with a focused failing-first test on `createShard`'s derived linear lifetime (asserts the exact division `9.5 / 8.5`, then `toBeCloseTo(1.117647, 6)`), a never-reverses test driving `advanceShard` for 200 ticks, and an exact-boundary expiry test (ticks until `alive` is false, asserts `ageSeconds === lifetimeSeconds`, not a tick early/late) and a boomerang-shape regression check. Added 5 new `validateProjectile` cases to `config/data.test.ts` for the `linear` kind (valid entry, nonpositive/missing `rangeTiles`, authored `lifetimeSeconds`/`reversalAgeSeconds` rejected, unknown kind rejected). Updated existing `PRIMARY.weapon.shard`-derived reads in `config.test.ts`/`simulation.test.ts` to resolve through `projectileOf` and narrow the union to `boomerang` once per file (a thrown fixture guard, not a silent cast) since those tests assume the shipped shard's kind.
+
+Checks run from `app/`: `npm run lint` (pass), `npm run typecheck` (pass), `npm run test` - 383/383 passed across 12 files (373 pre-existing + 10 new, zero removed or weakened), including the 671-volley, 30/60/120 Hz equivalence and fixed-input reproducibility assertions unchanged. `npm run build` (pass). `npm run test:e2e -- --grep "pursue, fire, reverse, register hits"` (1 passed) - same substitute test as 19.2, since no Playwright test title contains "linear" or "shard" and this is the one exercising the moved motion/collision path live.
+
 ### Step 19.4 - Add The Turning And Wavy Motion Kinds
 
-Status: pending. Dependencies: 19.3.
+Status: complete. Dependencies: 19.3.
 
 **Implementation prompt**
 
@@ -441,9 +473,21 @@ Do not author a Killer Bee Queen projectile here. Do not add sub-stepping machin
 
 **Acceptance:** `turning` and `wavy` motion are implemented as closed-form functions of age, the path-deviation tolerance is a validated loader invariant with the derivation tested, determinism holds across step rates, no sub-stepping was added, every pre-existing assertion passes unchanged, and all four gates pass.
 
+**Execution and verification - 2026-10-27**
+
+Added `spawnPositionTiles`/`spawnOrientationRadians` to `ShardState`, set by `createShard` for every motion kind. In `simulation/projectiles.ts`: added `curvedShardPositionAtAge`/`curvedShardOrientationAtAge` as exact closed-form functions of age (standard circular-arc parametrisation for `turning` - position `spawn + (v/ω)·(sinφ(t)−sinθ0, −(cosφ(t)−cosθ0))` with heading `φ(t)=θ0+ωt`; constant-forward-plus-perpendicular-sine for `wavy`) and an `isCurvedMotion` type guard. `moveShard` now resolves the firing projectile via `projectileOf` and branches: `boomerang`/`linear` keep the exact pre-existing velocity-integration code path untouched; `turning`/`wavy` evaluate the closed form directly at the segment's start and end ages and sweep a straight chord between them, per the plan's collision-correctness rule. Because `turning`/`wavy` never reverse (`resolveShardLifetime` gives them `reversalAgeSeconds: Infinity`, same mechanism as `linear`), `advanceShard`'s reversal branch still structurally cannot fire for them, so `moveSegment` is called exactly once per fixed step for a curved shard - consistent with "sweep straight between the step's exact start and end positions."
+
+`config/data.ts`: added the named `MAXIMUM_PATH_DEVIATION_TILES` constant (0.02 tiles) and two derivation functions, `turningDeviationTiles` (sagitta of the per-step arc: `chordLength * headingChangeRadians / 8`) and `wavyDeviationTiles` (`0.5 * amplitude * (2πf)² * stepSeconds²`), both exported for direct testing. `validateProjectileMotion` gained `turning` (nonzero finite `turnRateDegreesPerSecond`, positive `rangeTiles`) and `wavy` (positive `amplitudeTiles`/`frequencyHz`, positive `rangeTiles`) cases, generalising the existing "no authored `lifetimeSeconds`/`reversalAgeSeconds`" rejection to all three range-derived kinds via a small `rangeDerivedKinds` dispatch. `validateProjectile` now computes each kind's deviation after `speedTilesPerSecond` is known and rejects any entry whose derived deviation exceeds the bound. Threading the fixed-step duration into this check required reordering the module's three `AUTHORED_*` exports so `AUTHORED_ENCOUNTER` (which doesn't depend on the catalog) is validated first, then `AUTHORED_PROJECTILES` and `AUTHORED_ARCHETYPES` are built from its `fixedStepSeconds` - no raw/duplicate read of the JSON was needed. `config/encounter.ts`'s `ProjectileMotion`/`AuthoredProjectileMotion` widened to the four-kind union; `validateProjectileSpec`'s existing `else` branch already generalised to all three range-derived kinds via the shared `rangeTiles` field, so no change was needed there.
+
+Did not add any sub-stepping machinery; did not author a Killer Bee Queen projectile.
+
+Tests: added 14 tests to `simulation/projectiles.test.ts` covering a quarter turn at the source's extreme turn rate completing in exactly `90/70` seconds (single closed-form call, exact), constant instantaneous speed at four sampled ages (confirming path length accumulates as `speed * elapsed` without literally integrating a polyline), wavy's zero-at-whole-periods and peak-at-quarter-period lateral offset, expiry exactness at 30/60/120 Hz, and cross-rate position agreement at a shared 0.5s boundary for both kinds. Picked a 16-tile (2-second) test range rather than a very long one, after discovering that a 1000-tile/125-second test fixture accumulates enough fixed-step floating-point drift over 7500+ ticks to itself exceed the loader's own boundary tolerance - a test-authoring pitfall, not a defect in the production code, and not a realistic range for this trainer. Added 14 cases to `config/data.test.ts`: accepting the source's exact extreme values for both kinds, a direct numeric check that the derived deviations match the plan's stated ~0.00034 and ~0.0044 tile figures, and rejection cases for a zero/nonfinite turn rate, nonpositive amplitude/frequency, and values that exceed the 0.02-tile tolerance.
+
+Checks run from `app/`: `npm run lint` (pass), `npm run typecheck` (pass), `npm run test` - 402/402 passed across 12 files (392 pre-existing + 10 net new, zero removed or weakened), including the 671-volley, 30/60/120 Hz equivalence and fixed-input reproducibility assertions unchanged (the `toEqual` shard-shape assertion in `simulation.test.ts` was extended with the two new fields, not weakened). `npm run build` (pass). `npm run test:e2e -- --grep "pursue, fire, reverse, register hits"` (1 passed) - same substitute as 19.2/19.3.
+
 ### Step 19.5 - Add The Lob Motion Kind And Area Detonation
 
-Status: pending. Dependencies: 19.4.
+Status: complete. Dependencies: 19.4.
 
 **Implementation prompt**
 
@@ -465,6 +509,24 @@ Extend `validateProjectile` to accept `kind: "lob"` with a positive `travelSecon
 **Focused checks:** focused failing test that a lob shard reaches its destination exactly at `travelSeconds` first. Then: arrival is exact for a near and a far destination; a targeted destination beyond the maximum distance is clamped to it; a lob shard passing directly through the player's body in flight registers no hit; a detonation whose circle overlaps the player applies damage once through `registerShardHit` and produces one `AcceptedHit`; a detonation whose circle does not reach the player applies nothing; a detonating shard expires in the same step; the body-against-circle overlap helper is correct at the boundary, just inside and just outside; and the telegraph duration is authored configuration, proven by a test that reads it from the config rather than the renderer. All four routine gates, plus `npm run test:e2e -- --grep "<the renderer test you touched>"` if you changed a Playwright pixel check.
 
 **Acceptance:** the `lob` kind travels to a resolved destination and arrives exactly on time, does not collide in flight, detonates once into an area through the shared hit path, is telegraphed from authored configuration, every pre-existing assertion passes unchanged, and all four gates pass.
+
+**Execution and verification - 2026-10-27**
+
+Added `ShardState.detonationTargetTiles: Vector2 | null`. In `simulation/geometry.ts`, added the narrowest new primitive, `convexBodyOverlapsCircle` (distinct from the existing `convexBodyFitsCircle`, which asks "is the body entirely inside"), with its own 7-case focused test (center inside, exact boundary contact, just inside, just outside, far outside, and the two radius-validation rejections). Discovered and fixed a latent sign bug while writing that test: `validatedAxes`' per-edge axis is the polygon's *inward* normal for this project's winding (confirmed algebraically from the existing convexity-winding check), so the new point-in-polygon helper's inequality had to be `projection >= -tolerance`, not `<= tolerance`.
+
+In `config/data.ts`: added the `lob` case to `AuthoredProjectileMotion` and `validateProjectileMotion` (positive `travelSeconds` and `detonationRadiusTiles`; rejects authored `rangeTiles`, `lifetimeSeconds` or `reversalAgeSeconds`). Added a `presentation` block to `AuthoredEncounter`/`validateEncounterData` carrying `lobTelegraphSeconds` (authored in `encounter.json` as `0.3`, explicitly marked `trainer-authored` in its comment since the source gives no telegraph timing). `config/encounter.ts`: widened `ProjectileMotion`, `EncounterConfig.presentation`, `lifetimeSecondsOf` (lob's lifetime is `travelSeconds` directly) and `validateProjectileSpec`'s dispatch; `validateEncounterConfig` now asserts `lobTelegraphSeconds` positive alongside the other presentation/session values.
+
+In `simulation/projectiles.ts`: `resolveShardLifetime` gained the `lob` case (`reversalAgeSeconds: Infinity`, same mechanism as every other non-reversing kind). Added `resolveLobDestination` (the two cases from the prompt: player-aimed and clamped, or direction-based from `speedTilesPerSecond * travelSeconds`) and widened `createShard` with an optional fifth `aimPlayerPositionTiles` parameter that only a `lob` projectile reads; no existing call site passes it, so no shipped or future-authored attack aims yet - that capability is authored, not wired to any pattern, matching 19.1-19.4's "additive, not authored into an attack" precedent. A lob shard's velocity is set directly to `(target - start) / travelSeconds`, reusing the existing straight-line position-integration branch in `moveShard` unchanged - no third position-update code path was needed. `moveShard` gained one new branch: while a lob shard's age-at-segment-end is below its `lifetimeSeconds`, it skips `shardOverlapsPlayer` entirely (true "no collision in flight," not a zero-size body); at the exact tick its age reaches `lifetimeSeconds` - guaranteed exact by the existing boundary-snapping in `advanceShard`, which this code reuses verbatim - it instead tests `convexBodyOverlapsCircle` against the player's body at that step's (possibly sub-step-interpolated) position. Returning `hitPlayer` from that one new branch means detonation damage flows through `simulation.ts`'s existing `registerShardHit` call site unchanged - exactly one damage/feedback route for every projectile kind, as required.
+
+`phaser/encounter.ts` draws a lob shard's body identically to any other (no change needed to the existing per-shard draw loop) and additionally strokes the detonation circle's outline once `shard.ageSeconds >= shard.lifetimeSeconds - config.presentation.lobTelegraphSeconds`, reading the duration from config rather than a literal.
+
+Did not author a Killer Bee Queen bomb; did not add sub-stepping.
+
+Tests: `geometry.test.ts` +7 (`convexBodyOverlapsCircle`). `data.test.ts` +6 (`lob` accept/reject cases: missing/nonpositive `travelSeconds`/`detonationRadiusTiles`, authored `lifetimeSeconds`/`reversalAgeSeconds`/`rangeTiles` rejected). `config.test.ts` +1 (the telegraph duration is read from `ENCOUNTER_CONFIG.presentation`, and a zero value is rejected by `validateEncounterConfig` - proving it is configuration, not a renderer literal). `projectiles.test.ts` +9: exact arrival for a near (player-aimed, unclamped) and far (clamped) destination, a direct-line shard passing through the player in flight registering no hit, a detonation that overlaps the player registering exactly one hit and expiring, a detonation that misses applying nothing, and a shard near the player mid-flight (before `travelSeconds`) still not detonating. `simulation.test.ts` +2: a full `advanceSimulation` integration proving a lob shard's detonation produces exactly one `AcceptedHit` and reduces `player.healthHp` (the shared `registerShardHit` path), with zero hits throughout its flight, and a second case where the detonation misses and nothing is applied.
+
+Checks run from `app/`: `npm run lint` (pass), `npm run typecheck` (pass), `npm run test` - 420/420 passed across 12 files (402 pre-existing + 18 net new, zero removed or weakened), including the 671-volley, 30/60/120 Hz equivalence and fixed-input reproducibility assertions unchanged. `npm run build` (pass). `npm run test:e2e -- --grep "pursue, fire, reverse, register hits"` (1 passed) - no Playwright test exercises a lob visually (none ships yet) and no existing pixel check was touched, so this is the same substitute live-shard-path test used for 19.2-19.4.
+
+**Phase 19 complete.** The projectile catalog and all five motion kinds (`boomerang`, `linear`, `turning`, `wavy`, `lob`) are implemented, validated at load time with provenance and the path-deviation invariant, and proven behaviour-identical for the shipped Crystal Worm encounter throughout.
 
 ## Phase 20: Emission Patterns And Concurrent Attacks
 

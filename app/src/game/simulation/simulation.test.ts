@@ -3,6 +3,7 @@ import {
   ENCOUNTER_CONFIG,
   liveShardBoundPerEnemy,
   primaryArchetype,
+  projectileOf,
   validateEncounterConfig,
 } from "../config/encounter";
 import { PALADIN_DERIVED_STATS, PALADIN_STATS } from "../config/stats";
@@ -11,10 +12,10 @@ import {
   advanceSimulation,
   createEnemy,
   createSimulation,
-  restampLiveShards,
   setDebugSettings,
   spawnEnemy,
 } from "./simulation.ts";
+import { createShard, restampLiveShards } from "./projectiles.ts";
 import {
   DEFAULT_DEBUG_SETTINGS,
   updateDebugParameter,
@@ -36,6 +37,13 @@ const idle: SimulationInput = {
 const east: SimulationInput = { ...idle, east: true };
 const stepSeconds = 1 / 60;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
+const PRIMARY_PROJECTILE = projectileOf(
+  ENCOUNTER_CONFIG,
+  PRIMARY.weapon.projectileId,
+);
+if (PRIMARY_PROJECTILE.motion.kind !== "boomerang")
+  throw new Error("test fixture assumes the shipped shard is boomerang-kind");
+const PRIMARY_MOTION = PRIMARY_PROJECTILE.motion;
 // Spawn placement draws from the seeded generator, so these tests pin a seed.
 const TEST_SEED = 20261026;
 const freshSimulation = () => createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
@@ -47,10 +55,18 @@ const ringDistance = (state: ReturnType<typeof createSimulation>): number =>
   );
 const horizontalContactTiles =
   Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.x)) +
-  Math.max(...PRIMARY.weapon.shard.verticesTiles.map((vertex) => vertex.x));
+  Math.max(
+    ...PRIMARY_PROJECTILE.verticesTiles.map(
+      (vertex: { x: number }) => vertex.x,
+    ),
+  );
 const verticalContactTiles =
   Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.y)) +
-  Math.max(...PRIMARY.weapon.shard.verticesTiles.map((vertex) => vertex.y));
+  Math.max(
+    ...PRIMARY_PROJECTILE.verticesTiles.map(
+      (vertex: { y: number }) => vertex.y,
+    ),
+  );
 
 test("matched player size controls shard collision instead of the old larger preset body", () => {
   const state = freshSimulation();
@@ -61,7 +77,7 @@ test("matched player size controls shard collision instead of the old larger pre
   });
   state.shards.push({
     id: 999,
-    archetypeId: "crystal-worm-child-head",
+    projectileId: "crystal-worm-child-shard",
     damageHp: 160,
     positionTiles: { x: 1.45, y: 0 },
     velocityTilesPerSecond: { x: 0, y: 0 },
@@ -71,6 +87,9 @@ test("matched player size controls shard collision instead of the old larger pre
     lifetimeSeconds: 3,
     hasReversed: false,
     hasHitPlayer: false,
+    spawnPositionTiles: { x: 1.45, y: 0 },
+    spawnOrientationRadians: 0,
+    detonationTargetTiles: null,
   });
   expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toEqual([]);
   expect(state.hitsTaken).toBe(0);
@@ -108,7 +127,7 @@ test("live debug settings suppress accepted hits, stop pursuit and target the ar
   const enemyStart = { ...state.enemies[0].positionTiles };
   state.shards.push({
     id: 1,
-    archetypeId: "crystal-worm-child-head",
+    projectileId: "crystal-worm-child-shard",
     damageHp: 160,
     positionTiles: { x: 0, y: 0 },
     velocityTilesPerSecond: { x: 0, y: 0 },
@@ -118,6 +137,9 @@ test("live debug settings suppress accepted hits, stop pursuit and target the ar
     lifetimeSeconds: 2,
     hasReversed: false,
     hasHitPlayer: false,
+    spawnPositionTiles: { x: 0, y: 0 },
+    spawnOrientationRadians: 0,
+    detonationTargetTiles: null,
   });
   expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toEqual([]);
   expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
@@ -625,16 +647,19 @@ test.each([0, 1, 2, 3, 4, 5])(
     expect(shard.velocityTilesPerSecond.y).toBeCloseTo(Math.sin(angle) * 8, 9);
     expect(shard).toEqual({
       id: emitter + 1,
-      archetypeId: "crystal-worm-child-head",
-      damageHp: PRIMARY.weapon.shard.damageHp,
+      projectileId: "crystal-worm-child-shard",
+      damageHp: PRIMARY_PROJECTILE.damageHp,
       orientationRadians: angle,
       positionTiles: shard.positionTiles,
       velocityTilesPerSecond: shard.velocityTilesPerSecond,
       ageSeconds: 0,
-      reversalAgeSeconds: PRIMARY.weapon.shard.reversalAgeSeconds,
-      lifetimeSeconds: PRIMARY.weapon.shard.lifetimeSeconds,
+      reversalAgeSeconds: PRIMARY_MOTION.reversalAgeSeconds,
+      lifetimeSeconds: PRIMARY_MOTION.lifetimeSeconds,
       hasReversed: false,
       hasHitPlayer: false,
+      spawnPositionTiles: shard.spawnPositionTiles,
+      spawnOrientationRadians: angle,
+      detonationTargetTiles: null,
     });
   },
 );
@@ -693,8 +718,8 @@ test("resamples the moving enemy and rotated direction for later shots", () => {
 function makeShard(overrides: Partial<ShardState> = {}): ShardState {
   return {
     id: 100,
-    archetypeId: ENCOUNTER_CONFIG.primaryArchetypeId,
-    damageHp: PRIMARY.weapon.shard.damageHp,
+    projectileId: PRIMARY.weapon.projectileId,
+    damageHp: PRIMARY_PROJECTILE.damageHp,
     orientationRadians: 0,
     positionTiles: { x: 0, y: 0 },
     velocityTilesPerSecond: { x: 8, y: 0 },
@@ -703,6 +728,9 @@ function makeShard(overrides: Partial<ShardState> = {}): ShardState {
     lifetimeSeconds: 2.4,
     hasReversed: false,
     hasHitPlayer: false,
+    spawnPositionTiles: { x: 0, y: 0 },
+    spawnOrientationRadians: 0,
+    detonationTargetTiles: null,
     ...overrides,
   };
 }
@@ -739,7 +767,7 @@ test("one advance collects accepted hits from later fixed ticks without a persis
     makeShard({ id: 1 }),
     makeShard({
       id: 2,
-      archetypeId: "crystal-worm-child-head",
+      projectileId: "crystal-worm-child-shard",
       damageHp: 160,
       positionTiles: { x: -(horizontalContactTiles + 0.9), y: 0 },
       velocityTilesPerSecond: { x: 20, y: 0 },
@@ -825,7 +853,7 @@ test.each([false, true])(
     });
     const overlap = makeShard({
       id: 101,
-      archetypeId: "crystal-worm-child-head",
+      projectileId: "crystal-worm-child-shard",
       damageHp: 160,
       positionTiles: { ...state.player.positionTiles },
       hasHitPlayer,
@@ -925,7 +953,8 @@ test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () 
   ];
   // Spawning is active over five minutes, so the bound scales with the cap.
   const shardBound =
-    liveShardBoundPerEnemy(PRIMARY) * ENCOUNTER_CONFIG.spawns.maxConcurrent;
+    liveShardBoundPerEnemy(ENCOUNTER_CONFIG, PRIMARY) *
+    ENCOUNTER_CONFIG.spawns.maxConcurrent;
   let reference: ReturnType<typeof createSimulation> | undefined;
   for (const frameRate of [60, 30, 120]) {
     const state = freshSimulation();
@@ -966,7 +995,7 @@ test("five-minute moving encounters stay bounded and agree at 30/60/120 Hz", () 
     expect(peakShards).toBeLessThanOrEqual(shardBound);
     expect(peakShards).toBeGreaterThan(44);
     expect(maximumAgeSeconds).toBeLessThan(
-      PRIMARY.weapon.shard.lifetimeSeconds,
+      PRIMARY_MOTION.lifetimeSeconds,
     );
     expect(discardedSeconds).toBe(0);
     if (reference) expect(state).toEqual(reference);
@@ -1348,17 +1377,17 @@ test("restampLiveShards re-applies every fired-with value to shards in flight", 
   runTicks(state, 150);
   expect(state.shards.length).toBeGreaterThan(0);
   const before = state.shards.map((shard) => shard.id);
-  const weapon = {
-    ...PRIMARY.weapon,
-    shard: {
-      ...PRIMARY.weapon.shard,
-      damageHp: 7,
-      speedTilesPerSecond: 3,
+  const projectile = {
+    ...PRIMARY_PROJECTILE,
+    damageHp: 7,
+    speedTilesPerSecond: 3,
+    motion: {
+      ...PRIMARY_MOTION,
       reversalAgeSeconds: 0.4,
       lifetimeSeconds: 0.9,
     },
   };
-  state.shards = restampLiveShards(state.shards, weapon);
+  state.shards = restampLiveShards(state.shards, projectile);
   // Same identities, and all three fired-with values follow one rule (G09).
   expect(state.shards.map((shard) => shard.id)).toEqual(
     before.filter((_, index) => state.shards[index] !== undefined),
@@ -1495,7 +1524,7 @@ test("live shards stay within the derived bound times the enemy count", () => {
   withEnemies(state, ringPositions);
   setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
   const bound =
-    liveShardBoundPerEnemy(primaryArchetype(state.config)) *
+    liveShardBoundPerEnemy(state.config, primaryArchetype(state.config)) *
     state.enemies.length;
   let peak = 0;
   for (let tick = 0; tick < 2400; tick++) {
@@ -1691,4 +1720,85 @@ test("an archetype edit applies to every live enemy", () => {
       ),
     ).toBe(true);
   }
+});
+
+test("a lob shard's detonation goes through the shared registerShardHit path, producing one AcceptedHit and no in-flight hit", () => {
+  const LOB_PROJECTILE_ID = "test-lob-bomb";
+  const state = freshSimulation();
+  state.config = {
+    ...state.config,
+    projectiles: {
+      ...state.config.projectiles,
+      [LOB_PROJECTILE_ID]: {
+        id: LOB_PROJECTILE_ID,
+        damageHp: 200,
+        speedTilesPerSecond: 5,
+        armorPiercing: false,
+        conditions: [],
+        verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
+        expiration: "lifetime-only",
+        hitPolicy: "once-per-shard",
+        motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
+      },
+    },
+  };
+  state.enemies = [];
+  state.shards = [];
+  state.player.positionTiles = { x: 10.5, y: 0 };
+  const lobProjectile = state.config.projectiles[LOB_PROJECTILE_ID];
+  state.shards.push(createShard(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
+
+  // Mid-flight: the lob passes near the player's path but must not collide.
+  for (let tick = 0; tick < 60; tick++) {
+    const result = advanceSimulation(state, stepSeconds, idle);
+    expect(result.acceptedHits).toEqual([]);
+  }
+  expect(state.shards).toHaveLength(1);
+
+  // The remaining second brings the shard to its detonation at (10, 0),
+  // 0.5 tiles from the player at (10.5, 0) - within the 1.5-tile radius.
+  const healthBefore = state.player.healthHp;
+  let detonationHits: unknown[] = [];
+  for (let tick = 0; tick < 60; tick++) {
+    const result = advanceSimulation(state, stepSeconds, idle);
+    detonationHits = detonationHits.concat(result.acceptedHits);
+  }
+  expect(detonationHits).toHaveLength(1);
+  expect(state.player.healthHp).toBeLessThan(healthBefore);
+  expect(state.shards).toEqual([]);
+});
+
+test("a lob shard whose detonation misses the player applies nothing", () => {
+  const LOB_PROJECTILE_ID = "test-lob-bomb-miss";
+  const state = freshSimulation();
+  state.config = {
+    ...state.config,
+    projectiles: {
+      ...state.config.projectiles,
+      [LOB_PROJECTILE_ID]: {
+        id: LOB_PROJECTILE_ID,
+        damageHp: 200,
+        speedTilesPerSecond: 5,
+        armorPiercing: false,
+        conditions: [],
+        verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
+        expiration: "lifetime-only",
+        hitPolicy: "once-per-shard",
+        motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
+      },
+    },
+  };
+  state.enemies = [];
+  state.shards = [];
+  state.player.positionTiles = { x: 20, y: 0 };
+  const lobProjectile = state.config.projectiles[LOB_PROJECTILE_ID];
+  state.shards.push(createShard(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
+
+  const healthBefore = state.player.healthHp;
+  for (let tick = 0; tick < 120; tick++) {
+    const result = advanceSimulation(state, stepSeconds, idle);
+    expect(result.acceptedHits).toEqual([]);
+  }
+  expect(state.player.healthHp).toBe(healthBefore);
+  expect(state.shards).toEqual([]);
 });

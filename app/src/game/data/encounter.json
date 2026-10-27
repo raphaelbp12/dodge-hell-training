@@ -37,5 +37,9 @@
     "startCountdownSeconds": 3,
     "retryCountdownSeconds": 0,
     "historyLimit": 100
+  },
+  "presentation": {
+    "comment": "Trainer-authored, not sourced: how long a lob's detonation circle is telegraphed before it goes off.",
+    "lobTelegraphSeconds": 0.3
   }
 }

@@ -3,6 +3,7 @@ import {
   AUTHORED_ARCHETYPES,
   AUTHORED_ARENA,
   AUTHORED_ENCOUNTER,
+  AUTHORED_PROJECTILES,
   loadOutline,
   type AuthoredBody,
 } from "./data";
@@ -17,6 +18,42 @@ import {
 // validated at the boundary by `./data`; this module only derives runtime
 // configuration from them. Provenance: docs/mechanics.md step 8.2.
 const ARENA = AUTHORED_ARENA;
+
+export type ProjectileMotion =
+  | Readonly<{
+      kind: "boomerang";
+      reversalAgeSeconds: number;
+      lifetimeSeconds: number;
+    }>
+  | Readonly<{ kind: "linear"; rangeTiles: number }>
+  | Readonly<{
+      kind: "turning";
+      rangeTiles: number;
+      turnRateDegreesPerSecond: number;
+    }>
+  | Readonly<{
+      kind: "wavy";
+      rangeTiles: number;
+      amplitudeTiles: number;
+      frequencyHz: number;
+    }>
+  | Readonly<{
+      kind: "lob";
+      travelSeconds: number;
+      detonationRadiusTiles: number;
+    }>;
+
+export type ProjectileSpec = Readonly<{
+  id: string;
+  damageHp: number;
+  speedTilesPerSecond: number;
+  armorPiercing: boolean;
+  conditions: readonly unknown[];
+  verticesTiles: readonly Vector2[];
+  expiration: string;
+  hitPolicy: string;
+  motion: ProjectileMotion;
+}>;
 
 export type EnemyArchetype = Readonly<{
   id: string;
@@ -39,15 +76,7 @@ export type EnemyArchetype = Readonly<{
       cooldownAfterLastShotSeconds: number;
       initialCooldownSeconds: number;
     }>;
-    shard: Readonly<{
-      damageHp: number;
-      speedTilesPerSecond: number;
-      verticesTiles: readonly Vector2[];
-      reversalAgeSeconds: number;
-      lifetimeSeconds: number;
-      expiration: string;
-      hitPolicy: string;
-    }>;
+    projectileId: string;
   }>;
 }>;
 
@@ -71,6 +100,7 @@ export type EncounterConfig = Readonly<{
   player: Readonly<{ spawnTiles: Vector2; verticesTiles: readonly Vector2[] }>;
   primaryArchetypeId: string;
   archetypes: Readonly<Record<string, EnemyArchetype>>;
+  projectiles: Readonly<Record<string, ProjectileSpec>>;
   camera: Readonly<{
     cssPixelsPerTile: number;
     defaultZoom: number;
@@ -83,12 +113,20 @@ export type EncounterConfig = Readonly<{
     retryCountdownSeconds: number;
     historyLimit: number;
   }>;
+  presentation: Readonly<{ lobTelegraphSeconds: number }>;
 }>;
 
 export const RULES_VERSION = AUTHORED_ENCOUNTER.rulesVersion;
 export const PRIMARY_ARCHETYPE_ID = AUTHORED_ENCOUNTER.primaryArchetype;
 
 const authoredPrimary = AUTHORED_ARCHETYPES[PRIMARY_ARCHETYPE_ID];
+const AUTHORED_PROJECTILE_ID = authoredPrimary.weapon.projectile;
+const authoredProjectile = AUTHORED_PROJECTILES[AUTHORED_PROJECTILE_ID];
+// The debug panel only ever tunes the shipped, boomerang-kind shard (G: 19.3
+// adds `linear` to the catalog type, but not to any debug-tunable projectile).
+if (authoredProjectile.motion.kind !== "boomerang")
+  throw new RangeError("The debug-tunable projectile must use boomerang motion");
+const authoredBoomerangMotion = authoredProjectile.motion;
 
 export function scaleBody(
   vertices: readonly Vector2[],
@@ -173,13 +211,12 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   shotIntervalSeconds: authoredPrimary.weapon.burst.shotIntervalSeconds,
   cooldownSeconds: authoredPrimary.weapon.burst.cooldownAfterLastShotSeconds,
   initialCooldownSeconds: authoredPrimary.weapon.burst.initialCooldownSeconds,
-  projectileDamageHp: authoredPrimary.weapon.shard.damageHp,
-  projectileSpeedTilesPerSecond:
-    authoredPrimary.weapon.shard.speedTilesPerSecond,
-  reversalSeconds: authoredPrimary.weapon.shard.reversalAgeSeconds,
-  lifetimeSeconds: authoredPrimary.weapon.shard.lifetimeSeconds,
-  projectileWidth: authoredPrimary.weapon.shard.body.widthTiles,
-  projectileHeight: authoredPrimary.weapon.shard.body.heightTiles,
+  projectileDamageHp: authoredProjectile.damageHp,
+  projectileSpeedTilesPerSecond: authoredProjectile.speedTilesPerSecond,
+  reversalSeconds: authoredBoomerangMotion.reversalAgeSeconds,
+  lifetimeSeconds: authoredBoomerangMotion.lifetimeSeconds,
+  projectileWidth: authoredProjectile.body.widthTiles,
+  projectileHeight: authoredProjectile.body.heightTiles,
   firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
   spawnEverySeconds: AUTHORED_ENCOUNTER.spawns.everySeconds,
   maxConcurrentEnemies: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
@@ -222,7 +259,7 @@ export const SELECTED_ENCOUNTER_VALUES: Readonly<
 
 const headOutline = loadOutline(authoredPrimary.body.shape);
 const playerOutline = loadOutline(AUTHORED_ENCOUNTER.player.body.shape);
-const shardOutline = loadOutline(authoredPrimary.weapon.shard.body.shape);
+const shardOutline = loadOutline(authoredProjectile.body.shape);
 
 export type BuildOptions = Readonly<{
   rulesVersion: string;
@@ -267,19 +304,26 @@ export function buildEncounterConfig(
         cooldownAfterLastShotSeconds: values.cooldownSeconds,
         initialCooldownSeconds: values.initialCooldownSeconds,
       }),
-      shard: Object.freeze({
-        damageHp: values.projectileDamageHp,
-        speedTilesPerSecond: values.projectileSpeedTilesPerSecond,
-        verticesTiles: scaleBody(
-          shardOutline,
-          values.projectileWidth,
-          values.projectileHeight,
-        ),
-        reversalAgeSeconds: values.reversalSeconds,
-        lifetimeSeconds: values.lifetimeSeconds,
-        expiration: authoredPrimary.weapon.shard.expiration,
-        hitPolicy: authoredPrimary.weapon.shard.hitPolicy,
-      }),
+      projectileId: AUTHORED_PROJECTILE_ID,
+    }),
+  });
+  const projectile: ProjectileSpec = Object.freeze({
+    id: AUTHORED_PROJECTILE_ID,
+    damageHp: values.projectileDamageHp,
+    speedTilesPerSecond: values.projectileSpeedTilesPerSecond,
+    armorPiercing: authoredProjectile.armorPiercing,
+    conditions: authoredProjectile.conditions,
+    verticesTiles: scaleBody(
+      shardOutline,
+      values.projectileWidth,
+      values.projectileHeight,
+    ),
+    expiration: authoredProjectile.expiration,
+    hitPolicy: authoredProjectile.hitPolicy,
+    motion: Object.freeze({
+      kind: "boomerang",
+      reversalAgeSeconds: values.reversalSeconds,
+      lifetimeSeconds: values.lifetimeSeconds,
     }),
   });
   return {
@@ -304,8 +348,10 @@ export function buildEncounterConfig(
     },
     primaryArchetypeId: PRIMARY_ARCHETYPE_ID,
     archetypes: Object.freeze({ [PRIMARY_ARCHETYPE_ID]: archetype }),
+    projectiles: Object.freeze({ [AUTHORED_PROJECTILE_ID]: projectile }),
     camera: AUTHORED_ENCOUNTER.camera,
     session: AUTHORED_ENCOUNTER.session,
+    presentation: AUTHORED_ENCOUNTER.presentation,
   };
 }
 
@@ -322,15 +368,27 @@ export const ENCOUNTER_CONFIG = buildEncounterConfig(AUTHORED_TUNING, {
  * step 17.4 asserts the browser bound against this rather than a hand-picked
  * number.
  */
-export function liveShardBoundPerEnemy(archetype: EnemyArchetype): number {
-  const { emitters, burst, shard } = archetype.weapon;
+/** A projectile's lifetime, however its motion kind derives it. */
+function lifetimeSecondsOf(projectile: ProjectileSpec): number {
+  const { motion } = projectile;
+  if (motion.kind === "boomerang") return motion.lifetimeSeconds;
+  if (motion.kind === "lob") return motion.travelSeconds;
+  return motion.rangeTiles / projectile.speedTilesPerSecond;
+}
+
+export function liveShardBoundPerEnemy(
+  config: EncounterConfig,
+  archetype: EnemyArchetype,
+): number {
+  const { emitters, burst } = archetype.weapon;
+  const projectile = projectileOf(config, archetype.weapon.projectileId);
   const groupSeconds =
     (burst.shotsPerEmitter - 1) * burst.shotIntervalSeconds +
     burst.cooldownAfterLastShotSeconds;
   return (
     emitters.count *
     burst.shotsPerEmitter *
-    Math.ceil(shard.lifetimeSeconds / groupSeconds)
+    Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
   );
 }
 
@@ -342,6 +400,16 @@ export function archetypeOf(
   const archetype = config.archetypes[id];
   if (!archetype) throw new RangeError(`Unknown enemy archetype: ${id}`);
   return archetype;
+}
+
+/** Resolves a catalog projectile by id, rejecting an unknown one. */
+export function projectileOf(
+  config: EncounterConfig,
+  id: string,
+): ProjectileSpec {
+  const projectile = config.projectiles[id];
+  if (!projectile) throw new RangeError(`Unknown projectile: ${id}`);
+  return projectile;
 }
 
 /** The single archetype this slice ships (G04). */
@@ -373,6 +441,7 @@ export function validateEncounterConfig(config: EncounterConfig): void {
     defaultZoom: config.camera.defaultZoom,
     zoomStep: config.camera.zoomStep,
     historyLimit: config.session.historyLimit,
+    lobTelegraphSeconds: config.presentation.lobTelegraphSeconds,
   };
   for (const [name, value] of Object.entries(positiveValues))
     assertPositive(value, name);
@@ -439,31 +508,52 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   for (const id of ids) validateArchetype(config, config.archetypes[id]);
 }
 
+function validateProjectileSpec(projectile: ProjectileSpec): void {
+  const { motion } = projectile;
+  assertNonnegative(projectile.damageHp, "shardDamageHp");
+  assertNonnegative(projectile.speedTilesPerSecond, "shardSpeedTilesPerSecond");
+  transformBodyVertices(projectile.verticesTiles, { x: 0, y: 0 });
+  if (motion.kind === "boomerang") {
+    assertPositive(motion.reversalAgeSeconds, "reversalAgeSeconds");
+    assertPositive(motion.lifetimeSeconds, "lifetimeSeconds");
+    if (motion.reversalAgeSeconds >= motion.lifetimeSeconds)
+      throw new RangeError(
+        "Shard reversal must be strictly within its lifetime",
+      );
+  } else if (motion.kind === "lob") {
+    assertPositive(motion.travelSeconds, "travelSeconds");
+    assertPositive(motion.detonationRadiusTiles, "detonationRadiusTiles");
+  } else {
+    assertPositive(motion.rangeTiles, "rangeTiles");
+  }
+  if (projectile.expiration !== "lifetime-only")
+    throw new RangeError("Shards must expire by lifetime only");
+  if (projectile.hitPolicy !== "once-per-shard")
+    throw new RangeError("Shards must hit the player at most once");
+}
+
 function validateArchetype(
   config: EncounterConfig,
   archetype: EnemyArchetype,
 ): void {
-  const { emitters, burst, shard } = archetype.weapon;
+  const { emitters, burst } = archetype.weapon;
+  validateProjectileSpec(projectileOf(config, archetype.weapon.projectileId));
   // Strictly positive: a zero here would make the weapon degenerate (an
-  // infinite fire rate, no emitters, or a reversal outside the lifetime).
+  // infinite fire rate or no emitters).
   const positiveValues = {
     emitterCount: emitters.count,
     shotsPerEmitter: burst.shotsPerEmitter,
     shotIntervalSeconds: burst.shotIntervalSeconds,
     cooldownAfterLastShotSeconds: burst.cooldownAfterLastShotSeconds,
-    reversalAgeSeconds: shard.reversalAgeSeconds,
-    lifetimeSeconds: shard.lifetimeSeconds,
   };
   for (const [name, value] of Object.entries(positiveValues))
     assertPositive(value, name);
   // Nonnegative: zero is a meaningful, supported value - a stationary enemy,
-  // immediate first volley, harmless shards or frozen shards. The debug panel
-  // exposes each of these at its slider minimum.
+  // immediate first volley or an idle emitter. The debug panel exposes each
+  // of these at its slider minimum.
   const nonnegativeValues = {
     enemySpeedTilesPerSecond: archetype.speedTilesPerSecond,
     initialCooldownSeconds: burst.initialCooldownSeconds,
-    shardDamageHp: shard.damageHp,
-    shardSpeedTilesPerSecond: shard.speedTilesPerSecond,
     emitterRadiusTiles: emitters.radiusTiles,
   };
   for (const [name, value] of Object.entries(nonnegativeValues))
@@ -471,15 +561,12 @@ function validateArchetype(
   // Signed: negative rotation is counter-clockwise, zero is no rotation.
   if (!Number.isFinite(emitters.clockwiseDegreesPerSecond))
     throw new RangeError("clockwiseDegreesPerSecond must be finite");
-  transformBodyVertices(shard.verticesTiles, { x: 0, y: 0 });
   for (const count of [emitters.count, burst.shotsPerEmitter]) {
     if (!Number.isSafeInteger(count))
       throw new RangeError("Counts must be safe integers");
   }
   if (!Number.isFinite(emitters.initialPhaseRadians))
     throw new RangeError("initialPhaseRadians must be finite");
-  if (shard.reversalAgeSeconds >= shard.lifetimeSeconds)
-    throw new RangeError("Shard reversal must be strictly within its lifetime");
   // Approved rules, asserted here rather than pinned in the structural type so
   // the type does not forbid the variation it appears to model (G: F10).
   if (archetype.contactDamageHp !== 0)
@@ -488,10 +575,6 @@ function validateArchetype(
     throw new RangeError("Enemy body blocking is not approved");
   if (!emitters.rotateDuringCooldown)
     throw new RangeError("Emitters must rotate during cooldown");
-  if (shard.expiration !== "lifetime-only")
-    throw new RangeError("Shards must expire by lifetime only");
-  if (shard.hitPolicy !== "once-per-shard")
-    throw new RangeError("Shards must hit the player at most once");
 
   validatePoint(archetype.spawnTiles);
   if (

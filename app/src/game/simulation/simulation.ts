@@ -1,15 +1,16 @@
-import {
-  constrainBodyToArena,
-  pursueBody,
-  sweptConvexOverlap,
-  transformBodyVertices,
-} from "./geometry";
+import { constrainBodyToArena, pursueBody } from "./geometry";
 import {
   archetypeOf,
   ENCOUNTER_CONFIG,
+  projectileOf,
   type EncounterConfig,
-  type EnemyArchetype,
 } from "../config/encounter";
+import {
+  advanceShard,
+  createShard,
+  restampLiveShards,
+  shardOverlapsPlayer,
+} from "./projectiles";
 import {
   DEFAULT_DEBUG_SETTINGS,
   DEBUG_RULES_VERSION,
@@ -66,15 +67,15 @@ const timeRoundingToleranceSeconds =
 const fullTurnRadians = 2 * Math.PI;
 const combinedBoundingRadiusTiles = boundingRadiusTiles(ENCOUNTER_CONFIG);
 
-/** Broadphase bound: player body plus the largest shard body across archetypes. */
+/** Broadphase bound: player body plus the largest body across the projectile catalog. */
 function boundingRadiusTiles(config: EncounterConfig): number {
   const radius = (vertices: readonly Vector2[]): number =>
     Math.max(...vertices.map((vertex) => Math.hypot(vertex.x, vertex.y)));
   return (
     radius(config.player.verticesTiles) +
     Math.max(
-      ...Object.values(config.archetypes).map((archetype) =>
-        radius(archetype.weapon.shard.verticesTiles),
+      ...Object.values(config.projectiles).map((projectile) =>
+        radius(projectile.verticesTiles),
       ),
     )
   );
@@ -257,36 +258,11 @@ export function setDebugSettings(
   state.collisionBoundingRadiusTiles = boundingRadiusTiles(config);
   state.shards = restampLiveShards(
     state.shards,
-    archetypeOf(config, config.primaryArchetypeId).weapon,
+    projectileOf(
+      config,
+      archetypeOf(config, config.primaryArchetypeId).weapon.projectileId,
+    ),
   );
-}
-
-/**
- * Re-applies a weapon's fired-with values to shards already in flight and drops
- * any that the new lifetime has already expired.
- *
- * Damage, reversal age and lifetime are one category - values a shard was fired
- * with - so one rule governs all three (G09). This is the single write site for
- * that category outside `updateEnemyAttacks`, which is why it is a named
- * operation here rather than inline in the debug setter.
- */
-export function restampLiveShards(
-  shards: readonly ShardState[],
-  weapon: EnemyArchetype["weapon"],
-): ShardState[] {
-  return shards.filter((shard) => {
-    shard.damageHp = weapon.shard.damageHp;
-    shard.reversalAgeSeconds = weapon.shard.reversalAgeSeconds;
-    shard.lifetimeSeconds = weapon.shard.lifetimeSeconds;
-    if (shard.ageSeconds >= shard.reversalAgeSeconds) shard.hasReversed = true;
-    const speed =
-      weapon.shard.speedTilesPerSecond * (shard.hasReversed ? -1 : 1);
-    shard.velocityTilesPerSecond = {
-      x: Math.cos(shard.orientationRadians) * speed,
-      y: Math.sin(shard.orientationRadians) * speed,
-    };
-    return shard.ageSeconds < shard.lifetimeSeconds;
-  });
 }
 
 function constrainToArena(
@@ -353,144 +329,6 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   }
 }
 
-function shardOverlapsPlayer(
-  state: SimulationState,
-  shardStart: Vector2,
-  shardEnd: Vector2,
-  playerStart: Vector2,
-  playerEnd: Vector2,
-  shard: ShardState,
-): boolean {
-  const relativeStart = {
-    x: shardStart.x - playerStart.x,
-    y: shardStart.y - playerStart.y,
-  };
-  const relativeEnd = {
-    x: shardEnd.x - playerEnd.x,
-    y: shardEnd.y - playerEnd.y,
-  };
-  const bound =
-    state.collisionBoundingRadiusTiles +
-    Number.EPSILON *
-      64 *
-      Math.max(
-        1,
-        Math.abs(shardStart.x),
-        Math.abs(shardStart.y),
-        Math.abs(playerStart.x),
-        Math.abs(playerStart.y),
-      );
-  if (
-    Math.min(relativeStart.x, relativeEnd.x) > bound ||
-    Math.max(relativeStart.x, relativeEnd.x) < -bound ||
-    Math.min(relativeStart.y, relativeEnd.y) > bound ||
-    Math.max(relativeStart.y, relativeEnd.y) < -bound
-  )
-    return false;
-  return sweptConvexOverlap(
-    transformBodyVertices(
-      archetypeOf(state.config, shard.archetypeId).weapon.shard.verticesTiles,
-      shardStart,
-      shard.orientationRadians,
-    ),
-    { x: shardEnd.x - shardStart.x, y: shardEnd.y - shardStart.y },
-    transformBodyVertices(state.config.player.verticesTiles, playerStart),
-    { x: playerEnd.x - playerStart.x, y: playerEnd.y - playerStart.y },
-  );
-}
-
-function interpolatePosition(
-  start: Vector2,
-  end: Vector2,
-  fraction: number,
-): Vector2 {
-  return {
-    x: start.x + (end.x - start.x) * fraction,
-    y: start.y + (end.y - start.y) * fraction,
-  };
-}
-
-function moveShard(
-  state: SimulationState,
-  shard: ShardState,
-  elapsedSeconds: number,
-  playerStart: Vector2,
-  playerEnd: Vector2,
-): boolean {
-  const shardStart = shard.positionTiles;
-  shard.positionTiles = {
-    x: shard.positionTiles.x + shard.velocityTilesPerSecond.x * elapsedSeconds,
-    y: shard.positionTiles.y + shard.velocityTilesPerSecond.y * elapsedSeconds,
-  };
-  return (
-    !shard.hasHitPlayer &&
-    shardOverlapsPlayer(
-      state,
-      shardStart,
-      shard.positionTiles,
-      playerStart,
-      playerEnd,
-      shard,
-    )
-  );
-}
-
-function advanceShard(
-  state: SimulationState,
-  shard: ShardState,
-  elapsedSeconds: number,
-  playerStart: Vector2,
-  playerEnd: Vector2,
-): { alive: boolean; hitPlayer: boolean } {
-  const initialAgeSeconds = shard.ageSeconds;
-  let hitPlayer = false;
-  let segmentPlayerStart = playerStart;
-  function moveSegment(segmentSeconds: number): void {
-    const endFraction =
-      (shard.ageSeconds - initialAgeSeconds + segmentSeconds) / elapsedSeconds;
-    const segmentPlayerEnd = interpolatePosition(
-      playerStart,
-      playerEnd,
-      endFraction,
-    );
-    const segmentHit = moveShard(
-      state,
-      shard,
-      segmentSeconds,
-      segmentPlayerStart,
-      segmentPlayerEnd,
-    );
-    hitPlayer = hitPlayer || segmentHit;
-    segmentPlayerStart = segmentPlayerEnd;
-  }
-  const boundaryToleranceSeconds = shard.lifetimeSeconds * Number.EPSILON * 16;
-  let targetAgeSeconds = Math.min(
-    shard.ageSeconds + elapsedSeconds,
-    shard.lifetimeSeconds,
-  );
-  for (const boundarySeconds of [
-    shard.reversalAgeSeconds,
-    shard.lifetimeSeconds,
-  ]) {
-    if (
-      Math.abs(targetAgeSeconds - boundarySeconds) <= boundaryToleranceSeconds
-    )
-      targetAgeSeconds = boundarySeconds;
-  }
-  if (!shard.hasReversed && targetAgeSeconds >= shard.reversalAgeSeconds) {
-    moveSegment(shard.reversalAgeSeconds - shard.ageSeconds);
-    shard.ageSeconds = shard.reversalAgeSeconds;
-    shard.velocityTilesPerSecond = {
-      x: -shard.velocityTilesPerSecond.x,
-      y: -shard.velocityTilesPerSecond.y,
-    };
-    shard.hasReversed = true;
-  }
-  moveSegment(targetAgeSeconds - shard.ageSeconds);
-  shard.ageSeconds = targetAgeSeconds;
-  return { alive: shard.ageSeconds < shard.lifetimeSeconds, hitPlayer };
-}
-
 function registerShardHit(
   state: SimulationState,
   shard: ShardState,
@@ -521,6 +359,7 @@ function updateEnemyAttacks(
   enemy: EnemyState,
 ): void {
   const weapon = archetypeOf(config, enemy.archetypeId).weapon;
+  const projectile = projectileOf(config, weapon.projectileId);
   enemy.emitterPhaseRadians =
     (enemy.rotationPhaseAtEpoch +
       ((state.elapsedSeconds - enemy.rotationEpochSeconds) *
@@ -548,27 +387,17 @@ function updateEnemyAttacks(
   for (let emitter = 0; emitter < count; emitter++) {
     const angleRadians =
       enemy.emitterPhaseRadians + (emitter * fullTurnRadians) / count;
-    const directionX = Math.cos(angleRadians);
-    const directionY = Math.sin(angleRadians);
-    state.shards.push({
-      id: state.nextShardId++,
-      archetypeId: enemy.archetypeId,
-      orientationRadians: angleRadians,
-      positionTiles: {
-        x: enemy.positionTiles.x + directionX * radiusTiles,
-        y: enemy.positionTiles.y + directionY * radiusTiles,
-      },
-      velocityTilesPerSecond: {
-        x: directionX * weapon.shard.speedTilesPerSecond,
-        y: directionY * weapon.shard.speedTilesPerSecond,
-      },
-      ageSeconds: 0,
-      damageHp: weapon.shard.damageHp,
-      reversalAgeSeconds: weapon.shard.reversalAgeSeconds,
-      lifetimeSeconds: weapon.shard.lifetimeSeconds,
-      hasReversed: false,
-      hasHitPlayer: false,
-    });
+    state.shards.push(
+      createShard(
+        projectile,
+        state.nextShardId++,
+        {
+          x: enemy.positionTiles.x + Math.cos(angleRadians) * radiusTiles,
+          y: enemy.positionTiles.y + Math.sin(angleRadians) * radiusTiles,
+        },
+        angleRadians,
+      ),
+    );
   }
   enemy.volleysFired++;
 }

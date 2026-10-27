@@ -1,5 +1,9 @@
 import Phaser from "phaser";
-import { archetypeOf, ENCOUNTER_CONFIG } from "../config/encounter";
+import {
+  archetypeOf,
+  ENCOUNTER_CONFIG,
+  projectileOf,
+} from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
   DEBUG_RULES_VERSION,
@@ -53,6 +57,10 @@ const presentation = {
   enemy: 0xea7969,
   shard: 0xffdf69,
   spentShard: 0xc9a948,
+  lobTelegraph: {
+    color: 0xff5f5f,
+    lineWidthCssPixels: 2,
+  },
   hitNumbers: {
     lifetimeSeconds: 0.9,
     riseCssPixels: 28,
@@ -515,15 +523,32 @@ class EncounterScene extends Phaser.Scene {
       presentation.player,
     );
     this.projectiles.clear();
+    const telegraphSeconds = this.state.config.presentation.lobTelegraphSeconds;
     for (const shard of shards) {
+      const projectile = projectileOf(this.state.config, shard.projectileId);
       draw(
         this.projectiles,
-        archetypeOf(this.state.config, shard.archetypeId).weapon.shard
-          .verticesTiles,
+        projectile.verticesTiles,
         shard.positionTiles,
         shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
         shard.orientationRadians,
       );
+      if (
+        projectile.motion.kind === "lob" &&
+        shard.detonationTargetTiles &&
+        shard.ageSeconds >= shard.lifetimeSeconds - telegraphSeconds
+      ) {
+        this.projectiles
+          .lineStyle(
+            presentation.lobTelegraph.lineWidthCssPixels,
+            presentation.lobTelegraph.color,
+          )
+          .strokeCircle(
+            shard.detonationTargetTiles.x * pixelsPerTile,
+            shard.detonationTargetTiles.y * pixelsPerTile,
+            projectile.motion.detonationRadiusTiles * pixelsPerTile,
+          );
+      }
     }
     const bar = presentation.healthBar;
     const width = bar.widthCssPixels / this.zoom;

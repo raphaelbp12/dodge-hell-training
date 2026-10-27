@@ -20,6 +20,7 @@ import {
   ENCOUNTER_CONFIG,
   liveShardBoundPerEnemy,
   primaryArchetype,
+  projectileOf,
   RULES_VERSION,
   validateEncounterConfig,
   validateShippedEncounter,
@@ -39,6 +40,13 @@ import {
 } from "./stats";
 
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
+const PRIMARY_PROJECTILE = projectileOf(
+  ENCOUNTER_CONFIG,
+  PRIMARY.weapon.projectileId,
+);
+if (PRIMARY_PROJECTILE.motion.kind !== "boomerang")
+  throw new Error("test fixture assumes the shipped shard is boomerang-kind");
+const PRIMARY_MOTION = PRIMARY_PROJECTILE.motion;
 
 /** ENCOUNTER_CONFIG with the primary archetype partially overridden. */
 const withArchetype = (
@@ -50,7 +58,7 @@ const withArchetype = (
 
 /** ENCOUNTER_CONFIG with one weapon section of the primary archetype overridden. */
 const withWeapon = (
-  section: "emitters" | "burst" | "shard",
+  section: "emitters" | "burst",
   overrides: Record<string, unknown>,
 ): EncounterConfig =>
   withArchetype({
@@ -59,6 +67,19 @@ const withWeapon = (
       [section]: { ...PRIMARY.weapon[section], ...overrides },
     } as EnemyArchetype["weapon"],
   });
+
+/** ENCOUNTER_CONFIG with the primary projectile's motion overridden. */
+const withProjectileMotion = (
+  overrides: Record<string, unknown>,
+): EncounterConfig => ({
+  ...ENCOUNTER_CONFIG,
+  projectiles: {
+    [PRIMARY_PROJECTILE.id]: {
+      ...PRIMARY_PROJECTILE,
+      motion: { ...PRIMARY_PROJECTILE.motion, ...overrides },
+    },
+  },
+});
 
 // Approved shipped geometry, in tiles. The player and head bodies are the same
 // beveled octagon at the same 1.25 x 1.25 size, so their vertices are identical.
@@ -201,7 +222,7 @@ test("debug timing remains ordered while lifetime and reversal sliders cross", (
   expect(longer.lifetimeSeconds).toBeGreaterThan(8);
   const shorter = updateDebugParameter(longer, "lifetimeSeconds", 0.1);
   expect(shorter.reversalSeconds).toBe(0.05);
-  expect(PRIMARY.weapon.shard.lifetimeSeconds).toBe(
+  expect(PRIMARY_MOTION.lifetimeSeconds).toBe(
     DEFAULT_DEBUG_SETTINGS.lifetimeSeconds,
   );
   expect(() =>
@@ -256,7 +277,7 @@ test("derives the approved speed, fractional regeneration, combat duration and t
   expect(PALADIN_DERIVED_STATS.combatDurationSeconds).toBeCloseTo(5.32);
   expect(PALADIN_DERIVED_STATS.combatTriggerHp).toBe(27);
   expect(
-    calculateDamageHp(PRIMARY.weapon.shard.damageHp, PALADIN_STATS.defense),
+    calculateDamageHp(PRIMARY_PROJECTILE.damageHp, PALADIN_STATS.defense),
   ).toBe(128);
 });
 
@@ -382,14 +403,23 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
         cooldownAfterLastShotSeconds: 3,
         initialCooldownSeconds: 2,
       },
-      shard: {
-        damageHp: 160,
-        speedTilesPerSecond: 8,
-        verticesTiles: SHARD_BODY_TILES,
+      projectileId: "crystal-worm-child-shard",
+    },
+  });
+  expect(ENCOUNTER_CONFIG.projectiles).toEqual({
+    "crystal-worm-child-shard": {
+      id: "crystal-worm-child-shard",
+      damageHp: 160,
+      speedTilesPerSecond: 8,
+      armorPiercing: false,
+      conditions: [],
+      verticesTiles: SHARD_BODY_TILES,
+      expiration: "lifetime-only",
+      hitPolicy: "once-per-shard",
+      motion: {
+        kind: "boomerang",
         reversalAgeSeconds: 1.5,
         lifetimeSeconds: 3,
-        expiration: "lifetime-only",
-        hitPolicy: "once-per-shard",
       },
     },
   });
@@ -407,6 +437,16 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   });
   expect(() => validateEncounterConfig(ENCOUNTER_CONFIG)).not.toThrow();
   expect(() => validateShippedEncounter(ENCOUNTER_CONFIG)).not.toThrow();
+});
+
+test("the lob telegraph duration is authored configuration, not a renderer literal", () => {
+  expect(ENCOUNTER_CONFIG.presentation).toEqual({ lobTelegraphSeconds: 0.3 });
+  expect(() =>
+    validateEncounterConfig({
+      ...ENCOUNTER_CONFIG,
+      presentation: { lobTelegraphSeconds: 0 },
+    }),
+  ).toThrow(RangeError);
 });
 
 test("the shipped encounter requires pursuit slower than the Paladin", () => {
@@ -427,7 +467,7 @@ test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
   "rejects invalid shard lifetime %s",
   (lifetimeSeconds) => {
     expect(() =>
-      validateEncounterConfig(withWeapon("shard", { lifetimeSeconds })),
+      validateEncounterConfig(withProjectileMotion({ lifetimeSeconds })),
     ).toThrow(RangeError);
   },
 );
@@ -435,13 +475,13 @@ test.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
 test.each([
   0,
   -1,
-  PRIMARY.weapon.shard.lifetimeSeconds,
+  PRIMARY_MOTION.lifetimeSeconds,
   5,
   Number.NaN,
   Number.POSITIVE_INFINITY,
 ])("rejects reversal outside the lifetime: %s", (reversalAgeSeconds) => {
   expect(() =>
-    validateEncounterConfig(withWeapon("shard", { reversalAgeSeconds })),
+    validateEncounterConfig(withProjectileMotion({ reversalAgeSeconds })),
   ).toThrow(RangeError);
 });
 
@@ -489,7 +529,7 @@ test("imports in Node and carries the comparison version in plain session snapsh
   expect(RULES_VERSION).toBe(ENCOUNTER_CONFIG.rulesVersion);
   const shard: ShardState = {
     id: 0,
-    archetypeId: "crystal-worm-child-head",
+    projectileId: "crystal-worm-child-shard",
     damageHp: 160,
     orientationRadians: 0,
     positionTiles: { x: 0, y: 0 },
@@ -499,6 +539,9 @@ test("imports in Node and carries the comparison version in plain session snapsh
     lifetimeSeconds: 2.4,
     hasReversed: false,
     hasHitPlayer: false,
+    spawnPositionTiles: { x: 0, y: 0 },
+    spawnOrientationRadians: 0,
+    detonationTargetTiles: null,
   };
   expect(shard).not.toHaveProperty("origin");
   expect(shard.hasHitPlayer).toBe(false);
@@ -528,21 +571,20 @@ test("buildEncounterConfig maps every tuning value into the config", () => {
   );
   const archetype = primaryArchetype(config);
   expect(bodyExtentTiles(archetype.verticesTiles, "x")).toBeCloseTo(2, 12);
-  expect(archetype.weapon.shard.damageHp).toBe(7);
+  expect(projectileOf(config, archetype.weapon.projectileId).damageHp).toBe(7);
   expect(archetype.spawnTiles.x).toBeCloseTo(1, 12);
   expect(config.rulesVersion).toBe("probe");
 });
 
 test("the live shard bound derives from configuration, not a literal", () => {
   // 6 emitters x 11 shots x ceil(3 / 4.9) = 66 for the shipped v3 cadence.
-  expect(liveShardBoundPerEnemy(PRIMARY)).toBe(66);
-  const faster = primaryArchetype(
-    buildEncounterConfig(
-      { ...AUTHORED_TUNING, lifetimeSeconds: 11, reversalSeconds: 1.5 },
-      { rulesVersion: "probe", matchPlayerToHead: false },
-    ),
+  expect(liveShardBoundPerEnemy(ENCOUNTER_CONFIG, PRIMARY)).toBe(66);
+  const fasterConfig = buildEncounterConfig(
+    { ...AUTHORED_TUNING, lifetimeSeconds: 11, reversalSeconds: 1.5 },
+    { rulesVersion: "probe", matchPlayerToHead: false },
   );
-  expect(liveShardBoundPerEnemy(faster)).toBe(6 * 11 * 3);
+  const faster = primaryArchetype(fasterConfig);
+  expect(liveShardBoundPerEnemy(fasterConfig, faster)).toBe(6 * 11 * 3);
 });
 
 test("debug parameter groups and toggles are derived from the registry", () => {

@@ -58,10 +58,11 @@ export type AcceptedHit = Readonly<{
 
 export type ShardState = {
   id: number;
-  /** Archetype that fired it; resolves its body for drawing and broadphase. */
-  archetypeId: string;
+  /** Catalog projectile that fired it; resolves its body for drawing and broadphase. */
+  projectileId: string;
   orientationRadians: number;
   positionTiles: Vector2;
+  /** Only meaningful for the boomerang and linear kinds; turning and wavy derive position from the spawn pose instead. */
   velocityTilesPerSecond: Vector2;
   ageSeconds: number;
   /** Captured at fire time, with reversal age and lifetime (G09). */
@@ -70,6 +71,11 @@ export type ShardState = {
   lifetimeSeconds: number;
   hasReversed: boolean;
   hasHitPlayer: boolean;
+  /** Only meaningful for the turning and wavy kinds. */
+  spawnPositionTiles: Vector2;
+  spawnOrientationRadians: number;
+  /** Only meaningful for the lob kind. */
+  detonationTargetTiles: Vector2 | null;
 };
 
 export type SessionPhase =

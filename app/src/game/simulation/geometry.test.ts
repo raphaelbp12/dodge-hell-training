@@ -7,6 +7,7 @@ import type { Vector2 } from "../models";
 import {
   constrainBodyToArena,
   convexBodyFitsCircle,
+  convexBodyOverlapsCircle,
   convexContactDistance,
   maximumBodyCenterDistance,
   pursueBody,
@@ -463,6 +464,26 @@ test("checks actual vertices for circular interior, contact and outside placemen
       arena,
     ),
   ).toBe(false);
+});
+
+test("convexBodyOverlapsCircle detects interior, boundary and outside placements", () => {
+  // Circle center inside the body: overlap regardless of radius.
+  expect(convexBodyOverlapsCircle(square, { x: 0, y: 0 }, 0.1)).toBe(true);
+  // The square's nearest edge point to (1.5, 0) is (0.5, 0), exactly 1 tile away.
+  expect(convexBodyOverlapsCircle(square, { x: 1.5, y: 0 }, 1)).toBe(true);
+  expect(convexBodyOverlapsCircle(square, { x: 1.5, y: 0 }, 0.999)).toBe(
+    false,
+  );
+  expect(convexBodyOverlapsCircle(square, { x: 1.5, y: 0 }, 1.001)).toBe(
+    true,
+  );
+  expect(convexBodyOverlapsCircle(square, { x: 10, y: 0 }, 1)).toBe(false);
+  expect(() =>
+    convexBodyOverlapsCircle(square, { x: 0, y: 0 }, 0),
+  ).toThrow(RangeError);
+  expect(() =>
+    convexBodyOverlapsCircle(square, { x: 0, y: 0 }, Number.NaN),
+  ).toThrow(RangeError);
 });
 
 test("derives rotated corner contact from the same physical vertices", () => {

@@ -1,0 +1,24 @@
+{
+  "comment": "Projectile catalog shared by every archetype's weapon. Provenance docs/mechanics.md.",
+  "projectiles": {
+    "crystal-worm-child-shard": {
+      "source": "docs/mechanics.md approved v3 tuning",
+      "damageHp": 160,
+      "speedTilesPerSecond": 8,
+      "armorPiercing": false,
+      "conditions": [],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 1.45,
+        "heightTiles": 0.65
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": {
+        "kind": "boomerang",
+        "reversalAgeSeconds": 1.5,
+        "lifetimeSeconds": 3
+      }
+    }
+  }
+}
