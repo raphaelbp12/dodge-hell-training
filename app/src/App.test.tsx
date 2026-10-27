@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
+import { commitSha } from "virtual:build-info";
 import type { EncounterView } from "./game/phaser/encounter";
 import { RULES_VERSION } from "./game/config/encounter";
 import {
@@ -269,6 +270,10 @@ test("Home includes description, accurate changelog, and delegated links", () =>
   expect(
     screen.getByRole("link", { name: "Realm of the Mad God" }),
   ).toHaveAttribute("href", "https://www.realmofthemadgod.com/");
+  expect(screen.getByRole("link", { name: "Source code" })).toHaveAttribute(
+    "href",
+    "https://github.com/raphaelbp12/dodge-hell-training",
+  );
   expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
     "None",
   );
@@ -559,4 +564,23 @@ test("loads scoped CSS Module styles", () => {
   expect(styles.probe).not.toBe("probe");
   expect(probe).toHaveClass(styles.probe);
   expect(probe).toHaveStyle({ color: "rgb(20, 90, 70)" });
+});
+
+test("the footer identifies the deployed build by commit", () => {
+  render(<App />);
+  const sha = commitSha;
+  if (/^[0-9a-f]{7,40}$/.test(sha)) {
+    const short = sha.slice(0, 7);
+    const link = screen.getByRole("link", { name: short });
+    expect(link).toHaveAttribute(
+      "href",
+      `https://github.com/raphaelbp12/dodge-hell-training/commit/${sha}`,
+    );
+    // The short form is shown, not the full forty characters.
+    expect(link).toHaveTextContent(new RegExp(`^${short}$`));
+    expect(screen.getByText(/Deployed build/)).toBeVisible();
+  } else {
+    // An unidentified build says so rather than inventing an identity.
+    expect(screen.getByText("Local build")).toBeVisible();
+  }
 });

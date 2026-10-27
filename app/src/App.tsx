@@ -13,6 +13,7 @@ import {
 } from "./storage/attempts";
 import styles from "./App.module.css";
 import { ZoomPreference } from "./storage/zoom";
+import { commitSha } from "virtual:build-info";
 import {
   DEBUG_GROUPS,
   DEBUG_PARAMETERS,
@@ -23,6 +24,19 @@ import {
   updateDebugParameter,
   type DebugSettings,
 } from "./game/config/debug";
+
+const REPOSITORY_URL = "https://github.com/raphaelbp12/dodge-hell-training";
+const SHORT_SHA_LENGTH = 7;
+
+/** The deployed build's commit, or null when the build was not identified. */
+function deployedCommit(): { short: string; url: string } | null {
+  const sha = commitSha;
+  if (!/^[0-9a-f]{7,40}$/.test(sha)) return null;
+  return {
+    short: sha.slice(0, SHORT_SHA_LENGTH),
+    url: `${REPOSITORY_URL}/commit/${sha}`,
+  };
+}
 
 /**
  * Optional `?seed=<integer>` pins spawn placement, so a run can be reproduced
@@ -601,7 +615,23 @@ export default function App() {
                   <a href="https://www.realmofthemadgod.com/">
                     Realm of the Mad God
                   </a>
+                  <a href={REPOSITORY_URL}>Source code</a>
                 </nav>
+                <p className={styles.build}>
+                  {(() => {
+                    const commit = deployedCommit();
+                    return commit ? (
+                      <>
+                        Deployed build{" "}
+                        <a href={commit.url}>
+                          <code>{commit.short}</code>
+                        </a>
+                      </>
+                    ) : (
+                      <>Local build</>
+                    );
+                  })()}
+                </p>
                 <p>
                   Unofficial practice encounter. Pursuit and timing include
                   trainer-specific approximations.

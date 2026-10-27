@@ -10,6 +10,7 @@ import type {
 
 const controlledFrameMilliseconds = 250;
 // Spawn geometry (G11-G15), kept in step with app/src/game/data/encounter.json.
+const REPOSITORY_URL = "https://github.com/raphaelbp12/dodge-hell-training";
 const SPAWN_RING_TILES = 0.84375 * 19.2;
 // Pins spawn placement so the opening bearing is deterministic. This seed
 // reproduces the historical north opening at (0, -16.2) to six decimals.
@@ -1925,6 +1926,24 @@ for (const viewport of [
       "href",
       "https://www.realmeye.com/wiki/crystal-worm-child",
     );
+    // Footer identifies the source and the deployed build.
+    await expect(
+      page.getByRole("link", { name: "Source code" }),
+    ).toHaveAttribute("href", REPOSITORY_URL);
+    // The footer is nested inside <main>, so per the HTML/ARIA spec it has no
+    // implicit landmark role here; scope by the element itself instead.
+    const commitLink = page
+      .locator("footer")
+      .getByRole("link", { name: /^[0-9a-f]{7}$/ });
+    await expect(commitLink).toHaveCount(1);
+    const commitHref = await commitLink.getAttribute("href");
+    const commitText = (await commitLink.textContent())!.trim();
+    expect(commitHref).toMatch(
+      new RegExp(`^${REPOSITORY_URL}/commit/[0-9a-f]{7,40}$`),
+    );
+    // The link target starts with the short form that is displayed.
+    expect(commitHref!.split("/commit/")[1]).toContain(commitText);
+    await expect(page.getByText(/Deployed build/)).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,

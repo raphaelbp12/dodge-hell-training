@@ -466,6 +466,13 @@
 .footer p {
   color: #4a6b5c;
 }
+.footer .build {
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.footer .build code {
+  font-family: Consolas, monospace;
+}
 .telemetry output {
   min-width: 80px;
 }
