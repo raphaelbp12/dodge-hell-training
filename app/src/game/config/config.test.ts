@@ -665,3 +665,37 @@ test("spawn sliders reach the config and stay inside the arena at both ends", ()
     }
   }
 });
+
+test("validateEncounterConfig accepts every optional ring field", () => {
+  expect(() =>
+    validateEncounterConfig(
+      withAttackSection("pattern", {
+        perBurstAdvanceDegrees: 15,
+        gapSectorsDegrees: [
+          [350, 10],
+          [100, 150],
+        ],
+        armSpreadDegreesPerSecond: 1,
+        maxArmSpreadDegrees: 10,
+      }),
+    ),
+  ).not.toThrow();
+});
+
+test.each([
+  ["a nonfinite perBurstAdvanceDegrees", { perBurstAdvanceDegrees: Number.NaN }],
+  ["a non-array gapSectorsDegrees", { gapSectorsDegrees: 5 }],
+  ["a malformed gap sector", { gapSectorsDegrees: [[0]] }],
+  ["a nonfinite gap bound", { gapSectorsDegrees: [[0, Number.NaN]] }],
+  ["a 360-degree gap sector", { gapSectorsDegrees: [[0, 360]] }],
+  ["total gap coverage of 360 degrees", { gapSectorsDegrees: [[0, 180], [180, 360]] }],
+  ["an arm spread rate without a maximum", { armSpreadDegreesPerSecond: 10 }],
+  ["a nonfinite arm spread rate", { armSpreadDegreesPerSecond: Number.POSITIVE_INFINITY, maxArmSpreadDegrees: 45 }],
+  ["a negative maximum arm spread", { armSpreadDegreesPerSecond: 10, maxArmSpreadDegrees: -1 }],
+  ["a nonfinite maximum arm spread", { armSpreadDegreesPerSecond: 10, maxArmSpreadDegrees: Number.NaN }],
+  ["an arm spread that collides two arms", { arms: 6, armSpreadDegreesPerSecond: 10, maxArmSpreadDegrees: 12 }],
+] as const)("validateEncounterConfig rejects %s", (_name, overrides) => {
+  expect(() =>
+    validateEncounterConfig(withAttackSection("pattern", overrides)),
+  ).toThrow(RangeError);
+});

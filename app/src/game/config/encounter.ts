@@ -13,6 +13,11 @@ import {
   convexBodyFitsCircle,
   transformBodyVertices,
 } from "../simulation/geometry";
+import {
+  firstArmCollisionDegrees,
+  sectorWidthDegrees,
+  totalCoverageDegrees,
+} from "./sectors";
 
 // Approved encounter geometry. Authored values live in `../data` and are
 // validated at the boundary by `./data`; this module only derives runtime
@@ -55,12 +60,33 @@ export type ProjectileSpec = Readonly<{
   motion: ProjectileMotion;
 }>;
 
+/**
+ * One rotating ring of arms. The optional fields deliberately subsume the
+ * pattern names later phases might otherwise invent: a spiral is a ring with
+ * a nonzero `clockwiseDegreesPerSecond`; a static radial burst is a ring with
+ * a zero rotation rate; and the Queen's phase 6 machinegun is a ring with
+ * `arms: 2`, a high rotation rate, gap sectors and an arm spread.
+ *
+ * A gap sector is measured in the pattern's own frame, anchored at
+ * `initialPhaseRadians`, and an arm is suppressed while its current bearing
+ * falls inside one. The live rotation therefore sweeps arms through a fixed
+ * opening rather than carrying the opening with them.
+ *
+ * `armSpreadDegreesPerSecond` adds `armIndex * elapsed` degrees of lag to each
+ * successive arm, growing from zero at the clock epoch and clamping at
+ * `maxArmSpreadDegrees`. A maximum at or above `360 / (arms * (arms - 1))`
+ * would carry two arms onto the same bearing and is rejected.
+ */
 export type RingPattern = Readonly<{
   kind: "ring";
   arms: number;
   emitterRadiusTiles: number;
   initialPhaseRadians: number;
   clockwiseDegreesPerSecond: number;
+  perBurstAdvanceDegrees?: number;
+  gapSectorsDegrees?: readonly (readonly [number, number])[];
+  armSpreadDegreesPerSecond?: number;
+  maxArmSpreadDegrees?: number;
 }>;
 
 export type SpreadPattern =
@@ -602,6 +628,59 @@ function validateProjectileSpec(projectile: ProjectileSpec): void {
     throw new RangeError("Shards must hit the player at most once");
 }
 
+/** Validates the optional ring extensions on a runtime config. */
+function validateRingPatternOptions(pattern: RingPattern): void {
+  if (
+    pattern.perBurstAdvanceDegrees !== undefined &&
+    !Number.isFinite(pattern.perBurstAdvanceDegrees)
+  )
+    throw new RangeError("perBurstAdvanceDegrees must be finite");
+
+  if (pattern.gapSectorsDegrees !== undefined) {
+    if (!Array.isArray(pattern.gapSectorsDegrees))
+      throw new RangeError("gapSectorsDegrees must be an array of pairs");
+    for (const sector of pattern.gapSectorsDegrees as readonly unknown[]) {
+      if (!Array.isArray(sector) || sector.length !== 2)
+        throw new RangeError(
+          "Each gap sector must be a two-element [fromDegrees, toDegrees] pair",
+        );
+      const [fromDegrees, toDegrees] = sector as readonly unknown[];
+      if (
+        typeof fromDegrees !== "number" ||
+        !Number.isFinite(fromDegrees) ||
+        typeof toDegrees !== "number" ||
+        !Number.isFinite(toDegrees)
+      )
+        throw new RangeError("Gap sector bounds must be finite numbers");
+      if (sectorWidthDegrees(fromDegrees, toDegrees) >= 360)
+        throw new RangeError("A gap sector must be narrower than 360 degrees");
+    }
+    if (totalCoverageDegrees(pattern.gapSectorsDegrees) >= 360)
+      throw new RangeError(
+        "Total gap coverage must leave at least some of the circle un-gapped",
+      );
+  }
+
+  const rate = pattern.armSpreadDegreesPerSecond;
+  const maximum = pattern.maxArmSpreadDegrees;
+  if (rate !== undefined && !Number.isFinite(rate))
+    throw new RangeError("armSpreadDegreesPerSecond must be finite");
+  if (maximum !== undefined) {
+    if (!Number.isFinite(maximum))
+      throw new RangeError("maxArmSpreadDegrees must be finite");
+    if (maximum < 0)
+      throw new RangeError("maxArmSpreadDegrees must be nonnegative");
+    if (pattern.arms > 1 && maximum >= firstArmCollisionDegrees(pattern.arms))
+      throw new RangeError(
+        "maxArmSpreadDegrees must stay below the first spread that makes two arms share a bearing",
+      );
+  }
+  if (rate !== undefined && rate !== 0 && maximum === undefined)
+    throw new RangeError(
+      "maxArmSpreadDegrees must be present when armSpreadDegreesPerSecond is nonzero",
+    );
+}
+
 function validateAttackSpec(
   config: EncounterConfig,
   attack: AttackSpec,
@@ -631,6 +710,7 @@ function validateAttackSpec(
       throw new RangeError("clockwiseDegreesPerSecond must be finite");
     if (!Number.isFinite(pattern.initialPhaseRadians))
       throw new RangeError("initialPhaseRadians must be finite");
+    validateRingPatternOptions(pattern);
   } else if (pattern.kind === "spread") {
     assertNonnegative(pattern.emitterRadiusTiles, "emitterRadiusTiles");
     assertNonnegative(pattern.arcDegrees, "arcDegrees");

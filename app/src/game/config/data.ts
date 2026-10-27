@@ -1,4 +1,9 @@
 import type { CircularArena, Vector2 } from "../models";
+import {
+  firstArmCollisionDegrees,
+  sectorWidthDegrees,
+  totalCoverageDegrees,
+} from "./sectors";
 import arenaData from "../data/arena.json";
 import shapesData from "../data/shapes.json";
 import enemiesData from "../data/enemies.json";
@@ -381,6 +386,10 @@ export type AuthoredRingPattern = Readonly<{
   emitterRadiusTiles: number;
   initialPhaseDegrees: number;
   clockwiseDegreesPerSecond: number;
+  perBurstAdvanceDegrees?: number;
+  gapSectorsDegrees?: readonly (readonly [number, number])[];
+  armSpreadDegreesPerSecond?: number;
+  maxArmSpreadDegrees?: number;
 }>;
 
 export type AuthoredSpreadPattern =
@@ -470,15 +479,99 @@ function validateAim(
   reject(`${path}.aim`, 'must be "player" or "fixed"');
 }
 
+/** Validates and copies the optional ring extensions, omitting absent ones. */
+function validateRingOptions(
+  pattern: Record<string, unknown>,
+  arms: number,
+  path: string,
+): Pick<
+  AuthoredRingPattern,
+  | "perBurstAdvanceDegrees"
+  | "gapSectorsDegrees"
+  | "armSpreadDegreesPerSecond"
+  | "maxArmSpreadDegrees"
+> {
+  const options: {
+    perBurstAdvanceDegrees?: number;
+    gapSectorsDegrees?: readonly (readonly [number, number])[];
+    armSpreadDegreesPerSecond?: number;
+    maxArmSpreadDegrees?: number;
+  } = {};
+
+  if ("perBurstAdvanceDegrees" in pattern)
+    options.perBurstAdvanceDegrees = finiteNumber(
+      pattern.perBurstAdvanceDegrees,
+      `${path}.perBurstAdvanceDegrees`,
+    );
+
+  if ("gapSectorsDegrees" in pattern) {
+    const raw = pattern.gapSectorsDegrees;
+    if (!Array.isArray(raw))
+      reject(
+        `${path}.gapSectorsDegrees`,
+        "must be an array of [fromDegrees, toDegrees] pairs",
+      );
+    const sectors = raw.map((sector, index) => {
+      const sectorPath = `${path}.gapSectorsDegrees[${index}]`;
+      if (!Array.isArray(sector) || sector.length !== 2)
+        reject(
+          sectorPath,
+          "must be a two-element [fromDegrees, toDegrees] pair",
+        );
+      const fromDegrees = finiteNumber(sector[0], `${sectorPath}[0]`);
+      const toDegrees = finiteNumber(sector[1], `${sectorPath}[1]`);
+      if (sectorWidthDegrees(fromDegrees, toDegrees) >= 360)
+        reject(sectorPath, "must be narrower than 360 degrees");
+      return [fromDegrees, toDegrees] as const;
+    });
+    if (totalCoverageDegrees(sectors) >= 360)
+      reject(
+        `${path}.gapSectorsDegrees`,
+        "must leave at least some of the circle un-gapped",
+      );
+    options.gapSectorsDegrees = Object.freeze(sectors);
+  }
+
+  const rate = "armSpreadDegreesPerSecond" in pattern
+    ? finiteNumber(
+        pattern.armSpreadDegreesPerSecond,
+        `${path}.armSpreadDegreesPerSecond`,
+      )
+    : undefined;
+  const maximum = "maxArmSpreadDegrees" in pattern
+    ? finiteNumber(
+        pattern.maxArmSpreadDegrees,
+        `${path}.maxArmSpreadDegrees`,
+      )
+    : undefined;
+  if (maximum !== undefined && maximum < 0)
+    reject(`${path}.maxArmSpreadDegrees`, "must be nonnegative");
+  if (rate !== undefined && rate !== 0 && maximum === undefined)
+    reject(
+      `${path}.maxArmSpreadDegrees`,
+      "must be present when armSpreadDegreesPerSecond is nonzero",
+    );
+  if (maximum !== undefined && arms > 1 && maximum >= firstArmCollisionDegrees(arms))
+    reject(
+      `${path}.maxArmSpreadDegrees`,
+      "must stay below the first spread that makes two arms share a bearing",
+    );
+  if (rate !== undefined) options.armSpreadDegreesPerSecond = rate;
+  if (maximum !== undefined) options.maxArmSpreadDegrees = maximum;
+
+  return options;
+}
+
 function validateAttackPattern(
   value: unknown,
   path: string,
 ): AuthoredAttackPattern {
   const pattern = record(value, path);
   if (pattern.kind === "ring") {
+    const arms = safeCount(pattern.arms, `${path}.arms`);
     return Object.freeze({
       kind: "ring",
-      arms: safeCount(pattern.arms, `${path}.arms`),
+      arms,
       emitterRadiusTiles: nonnegativeNumber(
         pattern.emitterRadiusTiles,
         `${path}.emitterRadiusTiles`,
@@ -491,6 +584,7 @@ function validateAttackPattern(
         pattern.clockwiseDegreesPerSecond,
         `${path}.clockwiseDegreesPerSecond`,
       ),
+      ...validateRingOptions(pattern, arms, path),
     });
   }
   if (pattern.kind === "spread") {

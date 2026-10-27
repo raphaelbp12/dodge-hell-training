@@ -14,12 +14,15 @@ const RING: RingPattern = {
   clockwiseDegreesPerSecond: 45,
 };
 
+const degrees = (value: number): number => (value * Math.PI) / 180;
+
 const baseContext: PatternContext = {
   enemyPositionTiles: { x: 1, y: 2 },
   playerPositionTiles: { x: 0, y: 0 },
   ringPhaseRadians: Math.PI / 6,
   volleyIndexInBurst: 0,
   burstsFired: 0,
+  secondsSinceEpoch: 0,
 };
 
 test("resolveBearings places six ring arms at exactly 60-degree spacing from the ring phase", () => {
@@ -46,6 +49,203 @@ test("resolveBearings is pure: it does not mutate its inputs", () => {
   resolveBearings(pattern, context);
   expect(pattern).toEqual(RING);
   expect(context).toEqual(baseContext);
+});
+
+test("a ring advances by perBurstAdvanceDegrees per completed burst, not per shot", () => {
+  const advancing = {
+    ...RING,
+    clockwiseDegreesPerSecond: 0,
+    perBurstAdvanceDegrees: 15,
+  } as RingPattern;
+  const context: PatternContext = {
+    ...baseContext,
+    ringPhaseRadians: 0,
+    burstsFired: 0,
+  };
+  const firstBurst = resolveBearings(advancing, {
+    ...context,
+    volleyIndexInBurst: 0,
+  });
+  const sameBurstLaterShot = resolveBearings(advancing, {
+    ...context,
+    volleyIndexInBurst: 7,
+  });
+  const thirdBurst = resolveBearings(advancing, {
+    ...context,
+    burstsFired: 2,
+  });
+
+  expect(sameBurstLaterShot).toEqual(firstBurst);
+  const advanceRadians = (2 * 15 * Math.PI) / 180;
+  thirdBurst.forEach((bearing, arm) => {
+    expect(bearing.bearingRadians).toBeCloseTo(
+      firstBurst[arm].bearingRadians + advanceRadians,
+      12,
+    );
+  });
+});
+
+test("a gap sector suppresses exactly the arms inside it and no others", () => {
+  const gapped = {
+    ...RING,
+    arms: 4,
+    clockwiseDegreesPerSecond: 0,
+    gapSectorsDegrees: [[0, 200]],
+  } as RingPattern;
+  const bearings = resolveBearings(gapped, {
+    ...baseContext,
+    ringPhaseRadians: 0,
+  });
+  expect(bearings).toHaveLength(1);
+  expect(bearings[0].bearingRadians).toBeCloseTo((3 * Math.PI) / 2, 12);
+});
+
+test("the same arm is suppressed and then fires as the ring phase sweeps it past a gap", () => {
+  const gapped = {
+    ...RING,
+    arms: 2,
+    initialPhaseRadians: 0,
+    clockwiseDegreesPerSecond: 0,
+    gapSectorsDegrees: [[0, 90]],
+  } as RingPattern;
+  const atEpoch = resolveBearings(gapped, {
+    ...baseContext,
+    ringPhaseRadians: 0,
+  });
+  // Arm 0 points into the gap at 0 degrees; arm 1 at 180 degrees fires.
+  expect(atEpoch).toHaveLength(1);
+  expect(atEpoch[0].bearingRadians).toBeCloseTo(Math.PI, 12);
+  const halfTurnLater = resolveBearings(gapped, {
+    ...baseContext,
+    ringPhaseRadians: Math.PI,
+  });
+  // The same arm 0 has swept to 180 degrees and now fires; arm 1 is in the
+  // gap at 360 degrees (the same bearing as 0). The gap itself did not move
+  // with the live phase, which is what makes the opening a survivable place.
+  expect(halfTurnLater).toHaveLength(1);
+  expect(halfTurnLater[0].bearingRadians).toBeCloseTo(Math.PI, 12);
+});
+
+test("a gap sector travels with the pattern's authored initial phase", () => {
+  const gaps = [[0, 10]] as const;
+  const rotated = {
+    ...RING,
+    arms: 2,
+    initialPhaseRadians: degrees(90),
+    clockwiseDegreesPerSecond: 0,
+    gapSectorsDegrees: gaps,
+  } as RingPattern;
+  const unrotated = {
+    ...rotated,
+    initialPhaseRadians: 0,
+  } as RingPattern;
+  const context: PatternContext = {
+    ...baseContext,
+    ringPhaseRadians: degrees(90),
+  };
+  // The ring's first arm starts at the pattern's 90-degree initial phase and
+  // is therefore inside the sector, which is also measured from that phase.
+  const rotatedBearings = resolveBearings(rotated, context);
+  expect(rotatedBearings).toHaveLength(1);
+  expect(rotatedBearings[0].bearingRadians).toBeCloseTo(degrees(270), 12);
+  // With no authored rotation of the pattern's frame the same phase puts the
+  // first arm at 90 degrees, outside the 0-10 degree sector, so both fire.
+  expect(resolveBearings(unrotated, context)).toHaveLength(2);
+});
+
+test("a gap sector wraps across zero degrees", () => {
+  const gapped = {
+    ...RING,
+    arms: 4,
+    initialPhaseRadians: 0,
+    clockwiseDegreesPerSecond: 0,
+    gapSectorsDegrees: [[350, 10]],
+  } as RingPattern;
+  const bearings = resolveBearings(gapped, {
+    ...baseContext,
+    ringPhaseRadians: 0,
+  });
+  expect(bearings).toHaveLength(3);
+  [90, 180, 270].forEach((degreesFromEast, index) => {
+    expect(bearings[index].bearingRadians).toBeCloseTo(
+      degrees(degreesFromEast),
+      12,
+    );
+  });
+});
+
+test("arm spread grows linearly from zero with the attack clock's elapsed seconds and clamps at the maximum", () => {
+  const spreading = {
+    ...RING,
+    arms: 2,
+    initialPhaseRadians: 0,
+    clockwiseDegreesPerSecond: 0,
+    armSpreadDegreesPerSecond: 10,
+    maxArmSpreadDegrees: 45,
+  } as RingPattern;
+  const at = (secondsSinceEpoch: number) =>
+    resolveBearings(spreading, {
+      ...baseContext,
+      ringPhaseRadians: 0,
+      secondsSinceEpoch,
+    });
+  const extraOffset = (secondsSinceEpoch: number): number =>
+    at(secondsSinceEpoch)[1].bearingRadians - Math.PI;
+
+  // At the clock epoch the spread is exactly zero: the 20.1 ring remains.
+  const plainTwoArm = {
+    ...RING,
+    arms: 2,
+    initialPhaseRadians: 0,
+    clockwiseDegreesPerSecond: 0,
+  };
+  expect(at(0)).toEqual(
+    resolveBearings(plainTwoArm, {
+      ...baseContext,
+      ringPhaseRadians: 0,
+    }),
+  );
+
+  expect(extraOffset(1)).toBeCloseTo(degrees(10), 12);
+  expect(extraOffset(2)).toBeCloseTo(degrees(20), 12);
+  expect(extraOffset(3)).toBeCloseTo(degrees(30), 12);
+  expect(extraOffset(4.5)).toBeCloseTo(degrees(45), 12);
+  expect(extraOffset(5)).toBeCloseTo(degrees(45), 12);
+  expect(extraOffset(60)).toBeCloseTo(degrees(45), 12);
+  for (const bearing of at(60)) {
+    expect(bearing.emitterRadiusTiles).toBe(0.35);
+  }
+});
+
+test("a ring with all three options absent is byte-identical to step 20.1", () => {
+  const phases = [0, Math.PI / 6, 1.234, -2.5, 7];
+  for (const ringPhaseRadians of phases) {
+    const context: PatternContext = {
+      ...baseContext,
+      ringPhaseRadians,
+      secondsSinceEpoch: 12,
+    };
+    const reference = Array.from({ length: RING.arms }, (_, arm) => ({
+      bearingRadians: ringPhaseRadians + (arm * 2 * Math.PI) / RING.arms,
+      emitterRadiusTiles: RING.emitterRadiusTiles,
+    }));
+    expect(resolveBearings(RING, context)).toEqual(reference);
+  }
+
+  const explicitlyZeroed = {
+    ...RING,
+    perBurstAdvanceDegrees: 0,
+    gapSectorsDegrees: [],
+    armSpreadDegreesPerSecond: 0,
+    maxArmSpreadDegrees: 0,
+  } as RingPattern;
+  expect(
+    resolveBearings(explicitlyZeroed, {
+      ...baseContext,
+      ringPhaseRadians: Math.PI / 6,
+      secondsSinceEpoch: 12,
+    }),
+  ).toEqual(resolveBearings(RING, baseContext));
 });
 
 test("resolveBearings rejects an unknown pattern kind", () => {

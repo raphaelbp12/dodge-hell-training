@@ -436,6 +436,9 @@ function updateAttackClock(
     ringPhaseRadians: clock.ringPhaseRadians,
     volleyIndexInBurst: shotIndex,
     burstsFired: groupIndex,
+    // Arm spread is measured from this clock's epoch, not the simulation's,
+    // so a re-entered phase starts its spread over instead of inheriting it.
+    secondsSinceEpoch: Math.max(0, state.elapsedSeconds - clock.epochSeconds),
     drawnUnitRandoms,
   });
   for (const bearing of bearings) {

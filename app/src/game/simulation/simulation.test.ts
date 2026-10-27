@@ -1951,3 +1951,49 @@ test("a scatter attack is deterministic for a seed and reproducible across step 
     differentSeedState.shards.map((shard) => shard.orientationRadians),
   ).not.toEqual(oneBigStep.shardSnapshot.map((shard) => shard.orientationRadians));
 });
+
+test("arm spread is measured from the attack clock's epoch, not the simulation's start", () => {
+  const spreadingAttack = {
+    id: "spreading-ring",
+    projectileId: PRIMARY_ATTACK.projectileId,
+    tuningSource: "trainer-authored",
+    pattern: {
+      kind: "ring" as const,
+      arms: 2,
+      emitterRadiusTiles: 0,
+      initialPhaseRadians: 0,
+      clockwiseDegreesPerSecond: 0,
+      armSpreadDegreesPerSecond: 10,
+      maxArmSpreadDegrees: 100,
+    },
+    cadence: {
+      shotsPerBurst: 1,
+      shotIntervalSeconds: 1,
+      cooldownAfterLastShotSeconds: 0.5,
+      initialDelaySeconds: 0,
+    },
+  };
+  const archetype = { ...PRIMARY, attacks: [spreadingAttack] };
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    archetypes: { [PRIMARY.id]: archetype },
+  };
+  const state = createSimulation(config, TEST_SEED);
+  // Replace the opening enemy with one whose clock epoch is t = 2 seconds,
+  // then advance to t = 3: its spread has had one second, not three.
+  state.enemies = [
+    createEnemy(config, PRIMARY.id, state.nextEnemyId++, 2, { x: 5, y: 0 }),
+  ];
+  for (let tick = 0; tick < 180; tick++)
+    advanceSimulation(state, stepSeconds, idle);
+
+  const fresh = state.shards.filter((shard) => shard.ageSeconds === 0);
+  expect(fresh).toHaveLength(2);
+  const bearings = fresh
+    .map((shard) => shard.orientationRadians)
+    .sort((left, right) => left - right);
+  expect(bearings[0]).toBeCloseTo(0, 9);
+  // 180 + 10 degrees after one clock second; measuring from the simulation
+  // start would put it at 180 + 30 degrees instead.
+  expect(bearings[1]).toBeCloseTo((190 * Math.PI) / 180, 6);
+});

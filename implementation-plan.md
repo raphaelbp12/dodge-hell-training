@@ -354,69 +354,13 @@ Read this section before your first step.
 
 ## Phase 20: Emission Patterns And Concurrent Attacks
 
+> Full prompts and execution records archived: [`docs/plan-archive/phase-19-20.md`](docs/plan-archive/phase-19-20.md).
+
 - **20.1** - Re-Express The Emitter Ring As A Pattern. Status: complete. Dependencies: 19.5. Introduced `attacks: AttackSpec[]` (pattern/cadence/projectile) replacing the single `weapon` block; added pure `resolveBearings` in `simulation/patterns.ts` for `kind: "ring"`. All gates passed.
 - **20.2** - Give Each Attack Its Own Clock. Status: complete. Dependencies: 20.1. Replaced the single enemy-level clock with `attackClocks: AttackClockState[]`, one per authored attack, each independently epoched. All gates passed.
 - **20.3** - Add The Aimed Spread Pattern. Status: complete. Dependencies: 20.2. Added `kind: "spread"` with `aim: "player" | "fixed"`; shared `resolveAimBearingRadians` helper. 456/456 tests, all gates passed.
-
-### Step 20.4 - Add The Scatter Pattern And Extend Seeded Randomness
-
-Status: complete. Dependencies: 20.3.
-
-**Implementation prompt**
-
-Add the pattern behind the source's "messy omnidirectional spray" and "messy bombardment" attacks, and extend the project's seeded randomness to cover it. Additive; no shipped attack uses it yet.
-
-Implement `kind: "scatter"` with `shots`, `coneDegrees`, `aim`, `fixedBearingDegrees` and `emitterRadiusTiles`. Each shot's bearing is drawn uniformly within `coneDegrees` centred on the aim bearing, resolved the same way `spread` resolves it. A `coneDegrees` of 360 is the omnidirectional case and is explicitly allowed here, unlike `spread`.
-
-This is the step that implements K11, so get the determinism right and treat it as the step's real deliverable:
-
-- `resolveBearings` must stay pure. Do not let it reach into simulation state for randomness. Pass the draws in: have the caller take `shots` values from the generator and hand them to `resolveBearings` as part of its context, or have `resolveBearings` accept an explicit `nextUnitRandom` function. Choose one and say which in your execution record; do not introduce both.
-- Draws happen only inside a fixed step, in `updateAttackClock`, in authored attack order and then shot order, advancing `state.randomSeed` through the existing `nextSeed` and `unitFromSeed` helpers in `simulation/random.ts`. `Math.random` must not appear anywhere in the simulation.
-- The generator cursor stays plain data on `SimulationState`, so the state remains `structuredClone`-able, exactly as G13 established.
-
-The hard requirement: **the same seed and the same input sequence must produce an identical run however many fixed steps a single update executes.** Spawn placement already draws from this generator, so a scatter attack firing in the same tick as a spawn must consume draws in a defined order. Fix that order explicitly - spawns resolve before attacks within a tick today, and that stays true - and test it.
-
-Extend `validateAttack` to accept `kind: "scatter"` with a positive integer `shots`, a `coneDegrees` greater than zero and at most 360, and the same `aim` rules as `spread`.
-
-**Focused checks:** focused failing test that two simulations with the same seed produce identical scatter bearings first. Then: every drawn bearing lies within the cone; a 360-degree cone covers the full circle over enough draws; the same seed reproduces bearings exactly while a different seed does not; a run advanced in one 10-step update matches a run advanced in ten 1-step updates, bearing for bearing and shard id for shard id; a scatter attack firing in the same tick as a timed spawn consumes draws in the documented order and both outcomes are reproducible; and `grep` over `app/src/game` finds no `Math.random`. All four routine gates.
-
-**Acceptance:** the `scatter` pattern draws bearings from the injected seeded generator only, `resolveBearings` is still pure, draw order is defined and tested across step batching, no `Math.random` exists in the simulation, nothing pre-existing changed, and all four gates pass.
-
-**Execution and verification - 2026-10-27**
-
-Implemented `kind: "scatter"` end to end. **Design choice (as required by the prompt): the caller draws, `resolveBearings` only consumes.** `simulation/patterns.ts`'s `resolveBearings` takes an optional `drawnUnitRandoms: readonly number[]` on `PatternContext` and, for `scatter`, maps each of `pattern.shots` draws to a bearing uniformly inside `coneDegrees` centred on the resolved aim bearing (`centreRadians + (draw - 0.5) * coneRadians`); it throws `RangeError` if fewer draws than `shots` are supplied. It never reads `state.randomSeed` or any generator - purity is unchanged from 20.1-20.3. `simulation.ts`'s `updateAttackClock` is the sole call site that draws: when `pattern.kind === "scatter"` it takes exactly `pattern.shots` values via `nextUnitRandom(state)`, in shot order, before calling `resolveBearings`. `updateAttacks` already iterated enemies then each enemy's attacks in authored order (20.2), so draw order across concurrent attacks and enemies was already fixed; this step adds the within-attack shot-order draws on top of that existing order. `updateSpawns` is called before `updateAttacks` in `advanceSimulation`'s step loop (unchanged from before this step), so a spawn occupying the same tick as a scatter volley always draws its generator value first.
-
-`config/data.ts` and `config/encounter.ts`: extended `validateAttackPattern`/`AttackPattern`/`validateAttack` with the `scatter` branch - positive integer `shots`, `coneDegrees` finite, greater than zero and at most 360 (360 explicitly allowed, unlike `spread`'s strict-less-than), and the same `aim`/`fixedBearingDegrees` rules as `spread` via the shared `validateAim` helper added in 20.3.
-
-Confirmed via `grep -rn "Math.random" app/src/game/`: the only occurrence is the pre-existing `arbitrarySeed()` in `simulation/random.ts`, called only from `createSimulation`'s default-seed parameter - outside the fixed-step loop, unchanged by this step, so `Math.random` still never appears inside the simulation step path.
-
-Tests: added 5 cases to `simulation/patterns.test.ts` (every drawn bearing lies within the cone; a 360-degree cone covers the full circle over 360 evenly-spaced draws, checked by maximum gap between sorted wrapped bearings; the same drawn values reproduce bearings exactly while different draws do not; `resolveBearings` rejects a scatter call with too few or zero drawn values; scatter's `aim: fixed`/`aim: player` resolve the centre the same way `spread`'s shared helper does). Added 1 integration test to `simulation/simulation.test.ts`, `"a scatter attack is deterministic for a seed and reproducible across step batching, even when a spawn lands in the same tick"`: runs the same seed through a 1-step-at-a-time loop and a single multi-step `advanceSimulation` call across a tick where a timed spawn and a scatter volley coincide, and asserts every shard's id, position and bearing match exactly between the two runs. No pre-existing assertion was weakened, deleted or widened.
-
-Checks run from `app/`: `npm run lint` (pass, no findings), `npm run typecheck` (pass), `npm run test` - 462/462 passed across 13 files (456 pre-existing + 6 net new), including the 671-volley, 30/60/120 Hz equivalence, fixed-input reproducibility, rotation-during-cooldown and two-attack-independent-cadence assertions unchanged. `npm run build` (pass; the pre-existing >500kB chunk-size advisory is unrelated to this step and unchanged). `npm run test:e2e -- --grep "pursue, fire, reverse, register hits"` (1 passed) - same live-firing substitute as prior steps in this phase; no shipped attack uses `scatter` yet, so there is no pixel-level check to re-run for it specifically.
-
-### Step 20.5 - Add Ring Gaps, Per-Burst Advance And Arm Spread
-
-Status: pending. Dependencies: 20.4.
-
-**Implementation prompt**
-
-Complete the `ring` pattern with the three options the Killer Bee Queen's later phases need, so that no separate "radial", "spiral" or "machinegun" pattern kind is ever introduced. Additive; no shipped attack uses them yet.
-
-Add three optional `ring` fields, each defaulting to the behaviour the Crystal Worm has today when absent or zero:
-
-- `perBurstAdvanceDegrees`: the ring's phase additionally advances by this many degrees per completed burst. This expresses the source's phase 7 detail that the Queen fires "4 White Bombs ... at a 15 degree-increasing angle each time". It composes with `clockwiseDegreesPerSecond` rather than replacing it; a static radial burst that steps round is `clockwiseDegreesPerSecond: 0` with a nonzero advance.
-- `gapSectorsDegrees`: an array of `[fromDegrees, toDegrees]` sectors, measured in the ring's **own rotating frame** so a gap travels with the pattern. An arm whose bearing falls inside any sector fires nothing this volley. This expresses the source's phase 6 detail that the rotating shot-machinegun has "two gaps in the rotation", which are the openings the player survives in.
-- `armSpreadDegreesPerSecond` with `maxArmSpreadDegrees`: the angular offset between arms grows from zero at the attack's start up to the maximum, then holds. This expresses the source's phase 6 detail that the attack "is initially aimed at the top and bottom of the room and will expand over the first few seconds to cover the top-right and bottom-left corners". Measure the elapsed time from the attack clock's epoch, not from the simulation start, so a re-entered phase behaves the same way.
-
-Record the mapping in a comment next to the pattern type, so a later reader does not reinvent the missing kinds: a spiral is a ring with a nonzero rotation rate; a static radial burst is a ring with a zero rotation rate; phase 6's machinegun is a ring with `arms: 2`, a high rotation rate, two gap sectors and an arm spread.
-
-Extend `validateAttack`: `perBurstAdvanceDegrees` finite and optional; `gapSectorsDegrees` an array of two-element finite pairs, each sector narrower than 360 degrees, with the **total** gap coverage strictly less than 360 so an attack can never be silenced entirely; `armSpreadDegreesPerSecond` finite with `maxArmSpreadDegrees` present and nonnegative whenever it is nonzero. Reject an arm spread that would carry two arms onto the same bearing.
-
-A ring with all three fields absent must resolve bearings identically to step 20.1's implementation. Prove that, do not assume it.
-
-**Focused checks:** focused failing test on a ring with a 15-degree per-burst advance first. Then: the advance accumulates per completed burst and not per shot; a gap sector suppresses exactly the arms inside it and no others; a gap rotates with the ring, proven by the same arm being suppressed and then not suppressed as the phase advances; arm spread grows linearly from zero and clamps at the maximum; spread is measured from the clock epoch; a ring with all three absent produces bearings byte-identical to 20.1; validation rejects total gap coverage of 360 degrees, a malformed sector pair, an arm spread without a maximum, and a spread that collides two arms. Then prove behaviour identity on the Crystal Worm: the 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must pass **unchanged**. All four routine gates.
-
-**Acceptance:** `ring` covers spiral, radial and gapped rotating-machinegun attacks through three optional fields, the absent-field case is proven identical to 20.1, validation prevents a fully silenced or self-colliding ring, the Crystal Worm timeline is unchanged, and all four gates pass.
+- **20.4** - Add The Scatter Pattern And Extend Seeded Randomness. Status: complete. Dependencies: 20.3. Added `kind: "scatter"` with caller-supplied seeded draws, keeping `resolveBearings` pure and draw order fixed. 462/462 tests, all gates passed.
+- **20.5** - Add Ring Gaps, Per-Burst Advance And Arm Spread. Status: complete. Dependencies: 20.4. Added `perBurstAdvanceDegrees`, `gapSectorsDegrees` and `armSpreadDegreesPerSecond`/`maxArmSpreadDegrees` to `ring`; absent-field bearings proven identical to 20.1. 497/497 tests, all gates passed.
 
 ## Phase 21: Player Conditions And The Damage Model
 

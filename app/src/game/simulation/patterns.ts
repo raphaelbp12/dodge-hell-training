@@ -1,4 +1,5 @@
 import { degreesToRadians, type AttackPattern } from "../config/encounter";
+import { sectorWidthDegrees } from "../config/sectors";
 import type { Vector2 } from "../models";
 
 /** What a pattern may read when resolving one volley's bearings. */
@@ -11,6 +12,12 @@ export type PatternContext = Readonly<{
   volleyIndexInBurst: number;
   /** Number of bursts already completed by this attack clock. */
   burstsFired: number;
+  /**
+   * Seconds since this attack clock's epoch. Arm spread grows from zero over
+   * this interval, so a re-entered phase starts its spread over rather than
+   * inheriting the simulation's age.
+   */
+  secondsSinceEpoch: number;
   /**
    * Values in [0, 1) already drawn from the injected seeded generator, one
    * per shot a `scatter` pattern will fire, in shot order. `resolveBearings`
@@ -28,6 +35,21 @@ export type ResolvedBearing = Readonly<{
 }>;
 
 const fullTurnRadians = 2 * Math.PI;
+
+/** Whether an arm offset lies inside any authored gap sector. */
+function insideGapSector(
+  offsetDegrees: number,
+  gaps: readonly (readonly [number, number])[],
+): boolean {
+  const normalizedOffset = ((offsetDegrees % 360) + 360) % 360;
+  return gaps.some(([fromDegrees, toDegrees]) => {
+    const width = sectorWidthDegrees(fromDegrees, toDegrees);
+    if (width === 0) return false;
+    const fromOffset =
+      ((normalizedOffset - fromDegrees) % 360 + 360) % 360;
+    return fromOffset < width;
+  });
+}
 
 /**
  * Resolves the aim bearing for `spread` (and later `scatter`): the player's
@@ -60,11 +82,40 @@ export function resolveBearings(
   context: PatternContext,
 ): readonly ResolvedBearing[] {
   if (pattern.kind === "ring") {
+    const burstAdvanceRadians =
+      degreesToRadians(pattern.perBurstAdvanceDegrees ?? 0) *
+      context.burstsFired;
+    // The extra separation between consecutive arms grows linearly from zero
+    // at the clock epoch, then holds at the authored maximum. `arm * spread`
+    // keeps arm 0 on the 20.1 bearing while every later arm lags.
+    const spreadDegrees =
+      pattern.maxArmSpreadDegrees === undefined
+        ? 0
+        : Math.max(
+            0,
+            Math.min(
+              pattern.maxArmSpreadDegrees,
+              (pattern.armSpreadDegreesPerSecond ?? 0) *
+                Math.max(0, context.secondsSinceEpoch),
+            ),
+          );
+    const spreadRadians = degreesToRadians(spreadDegrees);
+    const gaps = pattern.gapSectorsDegrees ?? [];
     const bearings: ResolvedBearing[] = [];
     for (let arm = 0; arm < pattern.arms; arm++) {
+      const bearingRadians =
+        context.ringPhaseRadians +
+        burstAdvanceRadians +
+        (arm * fullTurnRadians) / pattern.arms +
+        arm * spreadRadians;
+      // Gap sectors are measured in the pattern's own frame, anchored at its
+      // authored initial phase, and tested against the arm's current bearing:
+      // the ring's rotation sweeps arms through a stationary opening.
+      const gapFrameDegrees =
+        ((bearingRadians - pattern.initialPhaseRadians) * 180) / Math.PI;
+      if (insideGapSector(gapFrameDegrees, gaps)) continue;
       bearings.push({
-        bearingRadians:
-          context.ringPhaseRadians + (arm * fullTurnRadians) / pattern.arms,
+        bearingRadians,
         emitterRadiusTiles: pattern.emitterRadiusTiles,
       });
     }

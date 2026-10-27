@@ -343,6 +343,89 @@ test.each([
   ).toThrow(RangeError);
 });
 
+const ringAttack = (overrides: Record<string, unknown>) => ({
+  ...VALID_ATTACK,
+  pattern: { ...VALID_ATTACK.pattern, ...overrides },
+});
+
+test("validateAttack accepts and preserves every optional ring field", () => {
+  const attack = validateAttack(
+    ringAttack({
+      arms: 2,
+      perBurstAdvanceDegrees: 15,
+      gapSectorsDegrees: [
+        [350, 10],
+        [100, 150],
+      ],
+      armSpreadDegreesPerSecond: 10,
+      maxArmSpreadDegrees: 45,
+    }),
+    "attacks[0]",
+    CATALOG_IDS,
+    new Set(),
+  );
+  if (attack.pattern.kind !== "ring")
+    throw new Error("expected a validated ring pattern");
+  expect(attack.pattern.perBurstAdvanceDegrees).toBe(15);
+  expect(attack.pattern.gapSectorsDegrees).toEqual([
+    [350, 10],
+    [100, 150],
+  ]);
+  expect(attack.pattern.armSpreadDegreesPerSecond).toBe(10);
+  expect(attack.pattern.maxArmSpreadDegrees).toBe(45);
+});
+
+test("validateAttack accepts overlapping gaps whose union is below a full circle", () => {
+  expect(() =>
+    validateAttack(
+      ringAttack({
+        gapSectorsDegrees: [
+          [0, 200],
+          [100, 300],
+        ],
+      }),
+      "attacks[0]",
+      CATALOG_IDS,
+      new Set(),
+    ),
+  ).not.toThrow();
+});
+
+test("validateAttack accepts a maximum spread just below the first arm collision", () => {
+  expect(() =>
+    validateAttack(
+      ringAttack({
+        arms: 4,
+        armSpreadDegreesPerSecond: 10,
+        // Four arms first coincide at 360 / (4 * 3) = 30 degrees.
+        maxArmSpreadDegrees: 29.9,
+      }),
+      "attacks[0]",
+      CATALOG_IDS,
+      new Set(),
+    ),
+  ).not.toThrow();
+});
+
+test.each([
+  ["a nonfinite perBurstAdvanceDegrees", ringAttack({ perBurstAdvanceDegrees: Number.NaN })],
+  ["a non-array gapSectorsDegrees", ringAttack({ gapSectorsDegrees: 5 })],
+  ["a sector that is not a pair", ringAttack({ gapSectorsDegrees: [[0]] })],
+  ["a three-element sector", ringAttack({ gapSectorsDegrees: [[0, 10, 20]] })],
+  ["a nonfinite sector bound", ringAttack({ gapSectorsDegrees: [[0, Number.NaN]] })],
+  ["a sector of 360 degrees", ringAttack({ gapSectorsDegrees: [[0, 360]] })],
+  ["total gap coverage of 360 degrees", ringAttack({ gapSectorsDegrees: [[0, 180], [180, 360]] })],
+  ["an arm spread rate without a maximum", ringAttack({ armSpreadDegreesPerSecond: 10 })],
+  ["a nonfinite armSpreadDegreesPerSecond", ringAttack({ armSpreadDegreesPerSecond: Number.POSITIVE_INFINITY, maxArmSpreadDegrees: 45 })],
+  ["a negative maxArmSpreadDegrees", ringAttack({ armSpreadDegreesPerSecond: 10, maxArmSpreadDegrees: -1 })],
+  ["a nonfinite maxArmSpreadDegrees", ringAttack({ armSpreadDegreesPerSecond: 10, maxArmSpreadDegrees: Number.NaN })],
+  ["an arm spread that collides two arms", ringAttack({ arms: 4, armSpreadDegreesPerSecond: 10, maxArmSpreadDegrees: 30 })],
+] as const)("validateAttack rejects %s", (_name, bad) => {
+  expect(() =>
+    validateAttack(bad, "attacks[0]", CATALOG_IDS, new Set()),
+  ).toThrow(RangeError);
+});
+
 const VALID_SPREAD_ATTACK = {
   id: "red-stinger-spread",
   projectile: "crystal-worm-child-shard",
