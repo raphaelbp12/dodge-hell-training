@@ -2,18 +2,16 @@
 
 ## Purpose And Execution
 
-Deliver a pure-frontend ROTMG-inspired training game: repeatedly survive against the Crystal Worm Child, inspect results, and retry immediately.
+Deliver a pure-frontend ROTMG-inspired training game: repeatedly survive a faithful recreation of a real ROTMG boss encounter, inspect results, and retry immediately.
 
-This file holds the **pending** work only: phases 15-18, which retire the concluded geometry study, replace the hand-maintained encounter constants with a JSON data layer, and add timed enemy spawning.
+This file holds the **pending** work only: phases 19-24, which generalize the single-weapon simulation into a projectile catalog, an emission-pattern vocabulary, a player condition model and a multi-phase boss machine, then author the **Killer Bee Queen** of The Nest on top of them.
 
-This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 15.1`. Read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
+This is a plan, not authorization to implement all phases at once. Each numbered step below is an implementation prompt. Run one at a time with `/implement-step <step-id>`, for example `/implement-step 19.2`. Read the shared contract below, then execute only the requested prompt. Dependencies must be complete first.
 
-**Execution modes (G22).** Two modes are available and the user chooses per request:
+**Execution modes.** Two modes are available and the user chooses per request:
 
 - **Single step (default).** Run exactly one step, then stop and report. Do not commit, push, deploy or begin the next step. This is the mode whenever the user does not say otherwise.
 - **Batch, on explicit request.** When the user explicitly asks for a batch - naming the steps or phases - run them in dependency order, each with its own focused checks, execution record and gate run before the next begins. A failed gate stops the batch and is reported; it is never recorded as complete. Still no commit, push or deployment without separate authorization. A batch request covers only the steps named in it and does not carry to later requests.
-
-Phases 8-14 ran under a one-off batch authorization recorded in [the v2 archive](docs/implementation-plan-v2.md#historical-execution-authorization); it expired with them and does not apply here.
 
 Steps start pending. After completing a step, replace its status with `complete`, record the actual checks and outcomes below its prompt, and note any approved deviations. Do not mark a step complete when its required checks are blocked. Do not automatically start the next step.
 
@@ -22,588 +20,1241 @@ Steps start pending. After completing a step, replace its status with `complete`
 - [Original draft](first-draft.md): original requirements and project intent. Keep it intact.
 - This plan: consolidates subsequent user decisions and the approved technical approach. Later explicit user decisions override older statements; record changes here.
 - [The mechanics contract](docs/mechanics.md) records sources, approvals and fidelity limits. Do not treat user-supplied wiki numbers or proposed formulas as independently verified facts.
-- [The fixes decision record](docs/fixes-plan.md) supplies the Q01-Q20/R01-R05 approvals behind phases 8-14. [The adjustment notes](fixes.md) and reference image are supporting inputs, not permission to publish third-party artwork.
-- [The principles review](principles-review.md) records measured YAGNI/DRY/SOLID findings at commit `3857e5c`. Phases 15-18 address F1, F2, F3, F7, F10, F11 and F12 as a consequence of the data layer; the remaining findings are explicitly out of scope and listed in step 18.1.
+- [The Killer Bee Queen source extract](docs/killer-bee-queen-source.md) is the **transcribed, verified** wiki material for this encounter: stats, the full projectile table with derived lifetimes, the verbatim behaviour prose, and the status-effect magnitudes. Every authored gameplay number for this boss must trace to a line in that file. It also carries the eight transcribed minion extracts and records the `curl` access method, because `WebFetch` returns an empty document for RealmEye pages.
+- [The deferred register](docs/deferred-work.md) lists work that is recognised, deliberately postponed and **not approved**. If a step seems to need something listed there, stop and report it rather than implementing it.
+- [The v4 archive](docs/implementation-plan-v4.md) holds completed phases 15-18 and decisions G01-G22. Those decisions stand except where a K-numbered decision below supersedes them.
+- [The principles review](principles-review.md) records measured YAGNI/DRY/SOLID findings. F4, F5, F6, F8 and F9 remain open; see D09 in the deferred register. F5 is fixed by step 23.1, because it stops being latent once a second encounter exists.
 - Never silently resolve a gameplay ambiguity. Research it, explain alternatives, and ask the user for approval before dependent implementation.
 
 ## Completed Baseline
 
-Phases 1-14 are complete. Their prompts, blockers, resolutions and acceptance evidence are archived, not deleted or reopened. The deployed runtime is the verified v2 release, with `3857e5c` having promoted the selected tuning to the `crystal-worm-child-head-paladin-v3` encounter defaults.
+Phases 1-18 are complete. Their prompts, blockers, resolutions and acceptance evidence are archived, not deleted or reopened. The deployed runtime is the verified v4 release: a validated JSON data layer, a many-enemy simulation, and timed spawning of the `crystal-worm-child-head` archetype under the `crystal-worm-child-swarm-paladin-v4` identity.
 
 | Archive | Phases | Contents |
 | ------- | ------ | -------- |
 | [V1 archive](docs/implementation-plan-v1.md) | 1-7 | Mechanics contract, generated foundation, testable simulation, playable engine, practice interface, delivery and handoff |
 | [V2 archive](docs/implementation-plan-v2.md) | 8-14 | V2 contract and geometry, continuous collision, persisted zoom, hit feedback and audio, Controls and pause safety, verified release |
+| [V4 archive](docs/implementation-plan-v4.md) | 15-18 | Retired geometry study, JSON data layer, many-enemy generalization, timed spawning, regression and handoff |
 
-For step 15.1's dependency check, read step 14.3's archived final status and execution record in the v2 archive. Do not rerun completed steps automatically.
+For step 19.1's dependency check, read step 18.2's archived final status and execution record in the v4 archive. Do not rerun completed steps automatically.
 
 ## Confirmed Design
 
-- React application, pure frontend, deployed to GitHub Pages on every push to `main`.
-- Home screen with a prominent Start button, description, changelog, and links. The requested home screen is intentional, not a marketing landing page.
-- Desktop keyboard play: WASD movement; R immediately retries; O zooms out; P zooms in.
-- Endless survival until death. No player attacks or seal activation in this slice.
-- One fixed, average unpotted level-20 Paladin using the mechanics contract's approved equipment, stat totals, derivation and rounding. Every attempt uses identical stats; this follow-up does not reopen the preset.
-- Visible primary attributes: health, vitality, speed, defense. Derive gameplay values through verified rules rather than embedding formulas in UI code.
-- Circular arena; player spawns at its center and enemy near an edge. No shrinking floor or hazards.
-- The head slowly chases the player, slower than the configured Paladin. This intentionally replaces the wiki's wandering behavior.
-- Four emitters, spaced 90 degrees apart, rotate clockwise at 45 degrees/second. Each fires eleven projectiles 0.15 seconds apart, followed by one second after the last shot. Rotation continues during cooldown; the near-center offset is 10% of head width.
-- Enemy begins in a two-second firing cooldown. Keep the approved center-player/near-edge-enemy spawn policy.
-- Shards travel along their initial direction, reverse velocity once at a configured age, and expire only at their configured lifetime. No stored firing origin or homing target is needed. Enemy movement never changes an existing shard's trajectory.
-- A shard can damage the single player only once in its lifetime. Store `hasHitPlayer` per shard. It remains alive after a hit, overlap, or return collision. Do not remove it at arena boundaries or when offscreen.
-- Shards use 160 incoming damage and speed 8 tiles/second. Approved maximum head-center-to-leading-edge reach and arena radius are 19.2 tiles; exact reversal/lifetime derive from reviewed polygons, not total-path semantics.
-- Player-centered camera with persisted O/P zoom from 0.25 to 3.0, default 1 and step 0.125. Zoom does not change world units or gameplay.
-- Original simple convex silhouettes of at most eight sides share body geometry with collision. Add the approved health bar, hit feedback/audio and Controls/pause behavior through the phased steps below.
-- Local attempt history and comparisons support repeated practice; no backend, accounts, or online leaderboard.
+The v4 confirmed design stands unchanged in all these respects: React, pure frontend, GitHub Pages on push to `main`; Home screen with Start, description, changelog and links; desktop keyboard play with WASD, R, O and P; endless survival until death; the one fixed average unpotted level-20 Paladin preset; circular arena with the player spawning at its centre; a player-centred camera with persisted zoom; original convex silhouettes of at most eight sides shared between drawing and collision; local attempt history and comparisons with no backend.
 
+Phases 19-24 add exactly these elements, and nothing else:
 
-Phases 15-18 do not reopen this design. They change where its values are authored, and add one approved element: several enemies of the same kind present at once, arriving over time.
+- **A projectile catalog.** Projectiles are authored entries in a keyed catalog, each with its own damage, speed, range, body, applied conditions and **motion kind**. A projectile is no longer a property of one weapon.
+- **Several motion kinds.** `linear`, `boomerang`, `turning`, `wavy` and `lob`. This supersedes the v2/v4 rule that a projectile always reverses once and expires only by lifetime; that rule survives as the `boomerang` kind.
+- **An emission-pattern vocabulary.** `ring`, `spread` and `scatter`. The Crystal Worm's rotating emitters become a `ring`.
+- **Concurrent attacks.** One enemy runs several attacks at once, each on its own clock.
+- **Player conditions.** Paralyzed, Slowed, Confused, Armor Broken, Exposed, Curse and Sick affect the player. Conditions that only touch attacking are authored and inert.
+- **Enemy health and a phase machine.** An enemy has optional health, an authored progression rate, and an ordered list of phases with HP-fraction or duration exits, telegraphs, invulnerability windows, per-phase movement and per-phase attacks, plus cycling sub-phases.
+- **Enemy-driven spawns.** A phase can request minions, in addition to the existing timed encounter spawn rule.
+- **Encounter selection and drill mode.** More than one encounter exists, so the player picks one, and can practise a single phase in isolation.
+
+Nothing else is added. In particular: no player attacks, no arena mutation, no Plagued Nest, no Nest destruction. See [the deferred register](docs/deferred-work.md).
+
+## Recorded User Decisions - 2026-10-27
+
+These answer the design questions raised when the Killer Bee Queen was proposed. They are approved; do not reopen them.
+
+- **K01 - Phase progression is a simulated raid DPS, plus a drill mode.** The authentic HP-fraction thresholds from the source are authored as the real trigger. Because the player cannot attack, an authored `progression` rule drains the boss's HP at a constant rate so a full-fight run advances through every phase. A drill mode additionally lets the player start at, and loop, a single chosen phase. Giving the player attacks was explicitly rejected for this work; see D04 in the deferred register.
+- **K02 - Implement every motion kind the fight requires.** `linear`, `boomerang`, `turning`, `wavy` and `lob`. The project instruction that projectiles reverse once and expire only by lifetime is **superseded**: it now describes the `boomerang` kind specifically, not all projectiles. Both mirrored instruction files are updated accordingly.
+- **K03 - Only conditions that change dodging or survival are simulated.** Active: **Paralyzed**, **Slowed**, **Confused**, **Armor Broken**, **Exposed**, **Curse**, **Sick**. Inert, authored but with no effect: **Dazed**, **Silenced**, **Quiet**, **Weak**, **Unstable**, **Pet Stasis** - each of these only affects attacking, abilities, mana or pets, none of which exist. Sick is active specifically because the player does regenerate HP from the VIT stat.
+- **K04 - Pattern cadences are trainer-authored, not wiki facts.** The source gives projectile stats but almost no shot counts or intervals. Those are authored as this project's own tuning, each marked with an explicit `tuningSource` field, and are **tuned for trainability only after every mechanic is implemented** (step 24.2). Do not describe an invented cadence as authentic.
+- **K05 - The arena stays static.** Killer Honey flooding and hardening tiles are deferred as D01. Phases 2 and 5 are practised on the full arena and the resulting fidelity gap is documented, not hidden.
+- **K06 - Killer Bee Nests are not destructible.** Phase 6 always runs its full authored duration and always produces the default one-of-each Adolescent Beehemoth outcome. Deferred as D03.
+- **K07 - The Plagued Nest is not authored yet.** Only the 30 non-`Plagued Nest only` projectile rows enter `projectiles.json`, and only when a phase actually fires them. The 20 Plagued rows stay transcribed in the source extract. Deferred as D02.
+- **K08 - Invulnerability pauses progression.** While an enemy is invulnerable, the simulated-DPS driver does not drain its HP. This is both faithful - the source says the Queen is invulnerable between attacks and throughout phase 6 - and the mechanism that lets a scripted fixed-duration phase exist without being cut short by HP drain.
+- **K09 - A phase exits on an HP fraction or on an authored duration.** Most phases exit when the next phase's HP threshold is crossed. Phase 6 is scripted and exits after its authored duration instead. Both exits are authored per phase; phase order is monotonic and a phase is never re-entered except in drill mode.
+- **K10 - The Killer Bee Queen is a second encounter, not a replacement.** The Crystal Worm swarm stays playable with its `crystal-worm-child-swarm-paladin-v4` identity. The Queen ships as `killer-bee-queen-nest-paladin-v5`. Attempt history is recorded and compared per encounter.
+- **K11 - Randomness extends to projectile angles and wandering, through the same injected seeded generator.** The v4 scope confined randomness to spawn placement; `scatter` patterns and `wander` movement now draw from it too. `Math.random` is still never called inside the simulation. The determinism requirement is unchanged and absolute: the same seed and the same input sequence must produce an identical run, no matter how many fixed steps a single update executes.
+- **K12 - The debug panel is not extended per attack.** A slider for every projectile and attack of a boss with eight phases would be unusable and would duplicate the authored data. The panel keeps its Crystal Worm tuning registry and gains only encounter-level controls: jump to a phase or sub-phase, pause progression, and show the active phase and conditions. Killer Bee Queen cadence tuning is done by editing `enemies.json`.
+- **K13 - Every authored Killer Bee Queen value carries its provenance.** Projectile entries cite their source-extract row number. Attack entries carry `tuningSource` set to `"wiki-prose"` when the source states the shape of the attack, or `"trainer-authored"` when this project invented the number. A value with neither is a defect.
+
+## Recorded User Decisions - 2026-10-27, Second Round
+
+These resolve the three questions the first round left open. All are approved.
+
+- **K14 - The player picks an encounter from a list on the Home screen.** A simple list, for now: no difficulty settings, no unlocking, no per-encounter screens. The Queen is the default selection because she is the new content. An `?encounter=<id>` parameter is still parsed and validated like `?seed=`, so a specific encounter can be linked. Attempt history and bests are grouped per encounter and never compared across them.
+- **K15 - The simulated raid DPS is 375 HP per second.** Approved. The Worked Progression Timeline below is therefore the approved expected timeline, not a sketch, and step 23.2 authors this value. Step 24.2 may still adjust it as the single lever for total fight length, which is the one place a tuning pass should touch it.
+- **K16 - Minion stats are transcribed from their own wiki pages, not guessed.** The user approved guessing them to avoid blocking; it turned out to be unnecessary, because all eight non-Plagued minion pages are reachable by the same `curl` method and **are now transcribed** into [the source extract](docs/killer-bee-queen-source.md): Red, Blue and Yellow Killer Bee, Small Worker Bee, Killer Bee Nest (Queen) and the three Adolescent Beehemoths, each with its stats, its verbatim behaviour line and its attack table. QC is therefore closed with sourced data rather than with placeholders. The standing policy that follows from the user's decision: where a **specific value** is genuinely absent from a reachable source - a cadence, a shot count, a body size - author a `trainer-authored` placeholder and move on rather than blocking. Where a whole enemy's stats are missing, fetch the page; blocking a step on research that takes one command is not acceptable either.
+- **K17 - Enemy contact damage is implemented.** Transcribing the minions revealed a mechanic no earlier phase covered. The Small Worker Bee's only attack is an invisible projectile at speed 0 and range 0, and its behaviour is "Charges at player attempting to do contact damage": 40 armour-piercing damage and Slowed for 1.6 seconds applied on touch. The archetype already carries `contactDamageHp` and `blocksPlayer` fields that have only ever held zero and false. New step 21.5 implements them.
+- **K18 - Nests and Beehemoths are multi-phase archetypes, and a phase spawn chooses a minion's starting phase.** Both have two sourced states: a Nest fires its colour's Hive Shot while alive and a slow short-range radial ball "constantly" once it has broken open, and a Beehemoth fires aimed stinger pairs normally but radial bursts and glaive spreads during the Queen's final phase. Both are expressed with the phase machine that already exists - a duration exit for the Nest, and a `startPhaseIndex` on the spawn entry for the Beehemoth - rather than with duplicate archetypes or cross-enemy coupling. Step 22.4 gains that one optional field.
+
+## Worked Progression Timeline
+
+Derived from the source's HP thresholds at the **approved** 375 HP/second of K15, with K08 pausing the drain while invulnerable. This is the timeline a correct phase machine must produce; step 23.2 asserts against it.
+
+| Phase | Enters at | HP span | Exit rule | Duration at 375 HP/s |
+| ----- | --------- | ------- | --------- | -------------------- |
+| 1 | 100% | 11,250 | next threshold | 30 s |
+| 2 | 90% | 16,875 | next threshold | 45 s |
+| 3 | 75% | 16,875 | next threshold | 45 s |
+| 4 | 60% | 16,875 | next threshold | 45 s |
+| 5 | 45% | 22,500 | next threshold | 60 s |
+| 6 | 25% | 0 - invulnerable throughout | authored duration (29 s in the source) | 29 s |
+| 7 | 25% | 14,062.5 | next threshold | 37.5 s |
+| 8 | 12.5% | 14,062.5 | runs until death | 37.5 s |
+
+Total is about 5 minutes 29 seconds of drain, plus every telegraph and inter-sub-phase invulnerability window. Phase 6 costs no HP precisely because K08 pauses the drain, which is why phase 7 still begins at 25%.
 
 ## Approved Technical Approach
 
-- Application in `app/`; planning and project-shared Copilot customizations at repository root.
-- React + TypeScript + Vite, generated with the official CLI. npm with a committed lockfile.
-- Phaser for input integration, game loop, camera, and drawing. Use its lifecycle and supported APIs instead of hand-building a rendering engine.
-- CSS Modules for web UI; no component framework is needed for this slice.
-- Vitest for pure logic tests; React Testing Library for React interaction tests; Playwright for browser integration checks.
-- A fixed-step, framework-independent simulation owns gameplay. Phaser adapts input and renders its state; React renders session summaries and low-frequency HUD updates.
-- Do not introduce a backend, ECS, dependency injection framework, event bus library, state library, generic plugin system, or custom physics engine without a demonstrated need.
+Unchanged from v4: application in `app/`; React + TypeScript + Vite generated with the official CLI; npm with a committed lockfile; Phaser for input, loop, camera and drawing; CSS Modules; Vitest, React Testing Library and Playwright; a fixed-step framework-independent simulation that owns gameplay; authored gameplay data as validated JSON under `app/src/game/data`, imported at build time.
 
-- Authored gameplay data lives in validated JSON under `app/src/game/data`, imported at build time. No runtime fetching, schema library, authoring UI or user-supplied content.
+Still forbidden without a demonstrated need: a backend, an ECS, a dependency-injection framework, an event-bus library, a state library, a generic plugin system, a custom physics engine, a JSON schema library, or runtime data fetching.
 
 ## Architecture
 
-Create folders only when their step introduces actual code. Names below describe ownership, not a requirement to create empty scaffolding.
+The v4 boundary table stands. Ownership for the new concepts:
 
-| Boundary                  | Suggested home under app/src | Owns                                                                                       | Must not depend on               |
-| ------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------- |
-| Models                    | game/models                  | Typed entities, inputs, snapshots, session states                                          | React, Phaser, storage           |
-| Authored data             | game/data                    | Arena, enemy archetypes and encounter values as JSON in source units                       | Everything; it is inert data     |
-| Configuration/data        | game/config                  | Validated stats, encounter values, units, preset version                                   | React, Phaser, browser APIs      |
-| Simulation/rules          | game/simulation              | Fixed-step movement, pursuit, burst scheduling, shards, damage, regeneration, elapsed time | React, Phaser, DOM, localStorage |
-| Session application layer | game/session                 | Start, pause, resume, death, retry, result handoff                                         | UI components, drawing details   |
-| Engine adapter/drawing    | game/phaser                  | Phaser lifecycle, keyboard sampling, camera, geometry, render order                        | Persistence internals            |
-| Web components            | ui                           | Home, HUD, results, accessible controls                                                    | Per-frame entity mutation        |
-| Persistence adapter       | storage                      | Versioned local records and safe reads/writes                                              | Phaser                           |
+| Boundary | Home under `app/src` | Owns |
+| -------- | -------------------- | ---- |
+| Models | `game/models.ts` | Typed entities, inputs, session states, condition state |
+| Authored data | `game/data/*.json` | Arena, shapes, projectiles, enemy archetypes with phases, encounters |
+| Configuration/data | `game/config/data.ts` | Runtime validation of every authored value |
+| Configuration/derivation | `game/config/encounter.ts` | The single mapping from authored values to runtime config |
+| Simulation/rules | `game/simulation/` | Fixed step, movement, patterns, projectile motion, conditions, phases, damage |
+| Session | `game/session/` | Start, pause, resume, death, retry, encounter choice, drill mode |
+| Engine adapter | `game/phaser/` | Phaser lifecycle, input sampling, camera, drawing |
+| Web components | `App.tsx`, `ui` | Home, HUD, results, condition and phase readout |
+| Persistence | `storage/` | Versioned local records, per-encounter history |
 
-Use simple modules and functions, adding interfaces only at actual external boundaries. React must not update state for every projectile on every frame. Do not run independent React and Phaser simulation clocks. All gameplay uses tiles and seconds; conversion to pixels belongs to rendering. Prefer library collision utilities where suitable, but isolate them behind pure rules and test high-speed crossings. Phaser automatic projectile destruction must not override lifetime-only expiration.
+New simulation modules are expected, because `simulation.ts` is already 660 lines and these phases roughly double its responsibilities. Create a module only when a step's prompt names it. The expected split, created incrementally:
+
+```
+game/simulation/projectiles.ts   motion kinds: spawn, advance, expire
+game/simulation/patterns.ts      emission patterns: bearings for one volley
+game/simulation/conditions.ts    player condition refresh, tick and queries
+game/simulation/phases.ts        phase and sub-phase transitions
+game/simulation/simulation.ts    the fixed-step loop that composes the above
+```
+
+All gameplay uses tiles and seconds; pixel conversion belongs to rendering. React must not update state per projectile per frame. There is exactly one clock.
+
+## Target Data Shapes
+
+Reference shapes for the steps below. A step introduces only the fields it needs; do not author a field before its step.
+
+```jsonc
+// app/src/game/data/projectiles.json
+{
+  "projectiles": {
+    "crystal-worm-child-shard": {
+      "source": "docs/mechanics.md approved v3 tuning",
+      "damageHp": 160,
+      "speedTilesPerSecond": 8,
+      "armorPiercing": false,
+      "conditions": [],
+      "body": { "shape": "shard-hexagon", "widthTiles": 1.45, "heightTiles": 0.65 },
+      "motion": { "kind": "boomerang", "reversalAgeSeconds": 1.5, "lifetimeSeconds": 3 }
+    },
+    "kbq-red-stinger-small": {
+      "source": "docs/killer-bee-queen-source.md projectile row 1",
+      "damageHp": 100,
+      "speedTilesPerSecond": 8.5,
+      "armorPiercing": true,
+      "conditions": [],
+      "body": { "shape": "shard-hexagon", "widthTiles": 0.8, "heightTiles": 0.35 },
+      "motion": { "kind": "linear", "rangeTiles": 9.5 }
+    }
+  }
+}
+```
+
+Motion kinds, and the single rule that governs duration:
+
+| Kind | Extra fields | Lifetime |
+| ---- | ------------ | -------- |
+| `linear` | none | `rangeTiles / speedTilesPerSecond` |
+| `boomerang` | `reversalAgeSeconds`, `lifetimeSeconds` | authored directly |
+| `turning` | `turnRateDegreesPerSecond` (signed) | `rangeTiles / speedTilesPerSecond` |
+| `wavy` | `amplitudeTiles`, `frequencyHz` | `rangeTiles / speedTilesPerSecond` |
+| `lob` | `travelSeconds`, `detonationRadiusTiles` | `travelSeconds` |
+
+Every kind except `boomerang` and `lob` authors `rangeTiles` and derives its lifetime, because ROTMG's published range is speed multiplied by lifetime regardless of the path's shape. `boomerang` keeps authored seconds so the approved v3 Crystal Worm values stay exact; its approved 19.2-tile reach was measured at reversal, not over the whole path, so it cannot be re-derived from a range.
+
+```jsonc
+// one attack inside a phase, in app/src/game/data/enemies.json
+{
+  "id": "p1-targeted-stingers",
+  "projectile": "kbq-red-stinger-large",
+  "tuningSource": "wiki-prose",          // or "trainer-authored", or "approved-v3"
+  "pattern": {
+    "kind": "spread",
+    "shots": 3,
+    "arcDegrees": 24,
+    "aim": "player",
+    "emitterRadiusTiles": 0.6
+  },
+  "cadence": {
+    "shotsPerBurst": 1,
+    "shotIntervalSeconds": 0.2,
+    "cooldownAfterLastShotSeconds": 1.4,
+    "initialDelaySeconds": 0
+  }
+}
+```
+
+Pattern kinds. **`ring` deliberately subsumes spiral, radial and rotating-machinegun attacks**; there is no separate kind for each, because they differ only in parameters.
+
+| Kind | Fields | Covers |
+| ---- | ------ | ------ |
+| `ring` | `arms`, `emitterRadiusTiles`, `initialPhaseDegrees`, `clockwiseDegreesPerSecond`, `perBurstAdvanceDegrees`, `gapSectorsDegrees`, `armSpreadDegreesPerSecond`, `maxArmSpreadDegrees` | The Crystal Worm's rotating emitters (`clockwiseDegreesPerSecond: 45`); a static radial burst (`clockwiseDegreesPerSecond: 0`); an N-armed spiral; phase 7's 15-degree-advancing bombs (`perBurstAdvanceDegrees: 15`); phase 6's 2-way rotating machinegun with gaps (`arms: 2` plus gap sectors and arm spread) |
+| `spread` | `shots`, `arcDegrees`, `aim`, `fixedBearingDegrees`, `emitterRadiusTiles` | Targeted shotguns and 3-way spreads. `aim: "player"` centres the arc on the player's bearing; `aim: "fixed"` uses `fixedBearingDegrees` |
+| `scatter` | `shots`, `coneDegrees`, `aim`, `emitterRadiusTiles` | The source's "messy omnidirectional spray" attacks. Draws each bearing from the injected seeded generator (K11) |
+
+```jsonc
+// one phase inside an archetype
+{
+  "id": "phase-3-center-barrage",
+  "enterAtHpFraction": 0.75,
+  "exitAfterSeconds": null,              // set instead of relying on the next threshold (K09)
+  "telegraphSeconds": 2,
+  "invulnerableOnEnterSeconds": 2,
+  "movement": { "kind": "stationary" },
+  "progression": null,                    // or a per-phase override of the archetype's rate
+  "attacks": [ /* AttackSpec[] */ ],
+  "subPhases": null,                      // or SubPhaseSpec[] that cycle while the phase runs
+  "spawns": null                          // or PhaseSpawnSpec[]
+}
+```
+
+Movement kinds: `chase`, `stationary`, `move-to-point`, `orbit`, `wander`. Each carries its own `speedTilesPerSecond` where it moves. The Crystal Worm is `{ "kind": "chase", "speedTilesPerSecond": 1.5 }`.
+
+Runtime state additions, for reference:
+
+```ts
+type ConditionKey =
+  | "paralyzed" | "slowed" | "confused"
+  | "armorBroken" | "exposed" | "cursed" | "sick";
+
+type PlayerState = {
+  positionTiles: Vector2;
+  healthHp: number;
+  combatRemainingSeconds: number;
+  /** Remaining seconds per condition; 0 means not applied. */
+  conditionSeconds: Record<ConditionKey, number>;
+};
+
+type AttackClockState = {
+  attackId: string;
+  epochSeconds: number;
+  volleysAtEpoch: number;
+  initialDelaySeconds: number;
+  rotationEpochSeconds: number;
+  rotationPhaseAtEpoch: number;
+  ringPhaseRadians: number;
+  volleysFired: number;
+};
+
+type EnemyState = {
+  id: number;
+  archetypeId: string;
+  positionTiles: Vector2;
+  spawnedAtSeconds: number;
+  /** null for an archetype with no authored health and no progression. */
+  healthHp: number | null;
+  maxHealthHp: number | null;
+  phaseIndex: number;
+  phaseEnteredAtSeconds: number;
+  subPhaseIndex: number;
+  subPhaseEnteredAtSeconds: number;
+  invulnerableUntilSeconds: number;
+  /** One per active attack of the current phase and sub-phase. */
+  attackClocks: AttackClockState[];
+  /** Movement state owned by the active movement kind, for example an orbit bearing. */
+  movementPhaseRadians: number;
+};
+
+type ShardState = {
+  id: number;
+  projectileId: string;
+  orientationRadians: number;
+  positionTiles: Vector2;
+  velocityTilesPerSecond: Vector2;
+  ageSeconds: number;
+  damageHp: number;
+  lifetimeSeconds: number;
+  hasHitPlayer: boolean;
+  /** Only meaningful for the boomerang kind. */
+  reversalAgeSeconds: number;
+  hasReversed: boolean;
+  /** Only meaningful for turning and wavy kinds. */
+  spawnPositionTiles: Vector2;
+  spawnOrientationRadians: number;
+  /** Only meaningful for the lob kind. */
+  detonationTargetTiles: Vector2 | null;
+};
+```
+
+## Approved Scope And Review Gates
+
+- **Behaviour-identical steps must be proven, not asserted.** Steps 19.2, 20.1, 20.2, 22.1 and 22.3 are refactors. Each must leave the Crystal Worm encounter producing an identical timeline: same volley times, same shard ids, same shard positions, same accepted hits, same death times. The suite already contains exact assertions for this - the 671-volley count and the 30/60/120 Hz equivalence test - and they must pass unchanged. Weakening or deleting one of those assertions is a defect, not a fix; report it instead.
+- **No shipped Crystal Worm value may change** anywhere in phases 19 through 22. If a step appears to require it, stop and report.
+- **One clock, one simulation.** Preserve the fixed-step and catch-up policy, the per-shard once-only hit rule, and insertion-ordered iteration of enemies, attacks and shards.
+- **Determinism is absolute (K11).** Randomness enters only through the injected seeded generator, only inside fixed-step updates. A test that runs the same seed and input at 30, 60 and 120 Hz must produce identical results. Nondeterminism inside a seeded run is a defect, never an acceptable source of variety.
+- **Curved motion is bounded, not sub-stepped.** The collision test is a swept convex overlap along a straight segment per step, and a `turning` or `wavy` shard does not travel in a straight line within a step. The approved rule is to evaluate each curved path as a closed-form function of age, sweep straight between the step's exact start and end positions, and make the resulting path-versus-chord deviation a **validated loader invariant** capped at 0.02 tiles. At the source's most extreme authored values that deviation is about 0.0044 tiles, so no sub-stepping is needed; step 19.4 derives, tests and enforces this. Do not integrate a curved path incrementally - the error would then depend on how many fixed steps an update executed, which breaks K11.
+- **Every authored value carries provenance (K13).** A projectile cites its source-extract row; an attack carries `tuningSource`. The loader rejects an attack with no `tuningSource`.
+- **Performance bounds are re-derived, never relaxed.** The Queen's phases 3 and 6 are far denser than four Crystal Worms. The measured v4 peak was 264 live shards with a derived bound of 264. Step 24.1 re-derives the bound from configuration and re-measures in the browser. Never widen or delete a bound to make a run pass.
+- **The existing debug panel is extended only as K12 allows.** No per-attack sliders, no authoring UI.
+- No backend, accounts, player attacks, seal activation, touch controls, rebinding, arena mutation, Nest destruction or Plagued Nest content. See [the deferred register](docs/deferred-work.md).
 
 ## Shared Prompt Contract
 
 Every step prompt inherits these instructions:
 
-1. Read this plan and applicable repository instructions. Check the requested step's dependencies and existing implementation before editing. Preserve unrelated changes.
-2. Work only on this step. Apply YAGNI, DRY, SOLID, and TDD pragmatically: no speculative abstractions, duplicated rules, or unexplained gameplay literals. Use named constants/configuration with explicit units.
-3. If a necessary design choice is missing, ask the user. Do not turn proposed mechanics into requirements or invent an allegedly authentic ROTMG value.
-4. For testable behavior, write a focused failing test, run it to establish the expected failure, implement the smallest change, rerun it, then refactor only if needed. Documentation and generated scaffolding use appropriate structural/build checks instead of artificial unit tests.
-5. Use official commands to generate the React bootstrap and install dependencies. Never manually recreate generated bootstrap files. Never delete existing work to make a generator accept the directory.
-6. Keep game logic free from React/Phaser dependencies. Add coverage to nearby tests; do not create duplicate test harnesses.
-7. Run the step's focused checks and relevant existing checks - see the project instructions for which checks run routinely versus only to reproduce a pipeline failure. Disclose unavailable tools, source access failures, and unverified behavior. Never claim that a test or deployment ran when it did not. After committing and pushing, do not watch or poll the resulting pipeline or deployment; report the push and stop.
-8. End with changed files, actual check outcomes, remaining blockers, and a concise manual verification procedure where relevant. Update this step's status only when its acceptance criteria are met.
+1. Read this plan and the [project instructions](CLAUDE.md). Check the requested step's dependencies and the existing implementation before editing. Preserve unrelated changes.
+2. Work only on this step. Apply YAGNI, DRY, SOLID and TDD pragmatically: no speculative abstractions, no duplicated rules, no unexplained gameplay literals. Use named constants and typed configuration with explicit units.
+3. If a necessary design choice is missing, ask the user. Do not turn proposed mechanics into requirements and do not invent a ROTMG value.
+4. For testable behaviour, write a focused failing test, run it to establish the expected failure, implement the smallest change, rerun it, then refactor only if needed. Documentation steps use structural checks instead of artificial unit tests.
+5. Keep game logic free of React and Phaser dependencies. Add coverage to nearby tests; do not create a duplicate test harness.
+6. Run the step's focused checks and the routine gates. Disclose unavailable tools, source access failures and unverified behaviour. Never claim a check ran when it did not. After committing and pushing, do not watch or poll the pipeline or deployment; report the push and stop.
+7. End with changed files, actual check outcomes, remaining blockers, and a concise manual verification procedure where relevant. Update this step's status only when its acceptance criteria are met.
 
-## Execution Contract - Phases 15-18
+## How To Read A Step Prompt
 
-The architecture, shared prompt contract and project instructions above still apply. Execute only the requested numbered step and stop afterward. All steps below start pending; phases 1-14 are complete and archived.
+Read this section before your first step.
 
-This follow-up has two coupled goals: retire the concluded geometry study, and replace the hand-maintained encounter constants with a JSON data layer that can describe an arena, enemy archetypes and a timed spawn rule. Multi-enemy spawning is the first feature that actually needs the data layer, so the layer is introduced first and proven behavior-identical before any gameplay changes.
+- **The step prompt is the authority for what to build.** This plan's general sections are the authority for how. If they conflict, stop and ask rather than choosing.
+- **"Behaviour-identical" has one meaning:** a fixed input sequence against the Crystal Worm encounter produces byte-identical observable output before and after your change. Prove it by running the existing suite unchanged, not by reasoning that it should hold.
+- **Routine gates, run from `app/`, in this order:** `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. Run all four for every change that touches runtime code.
+- **Playwright is not routine.** CI runs the full `npm run test:e2e` on every push. When your step adds or changes a Playwright test, run only that test with `npm run test:e2e -- --grep "<pattern>"`. Run the full suite locally only to reproduce a failure CI reported, or when a step explicitly asks for a full acceptance run.
+- **Use the pinned toolchain** in `.node-version` (24.22.1) with `npm@12.2.1`. A mismatched local `node` is a disclosed limitation, not a substitute for a gate run.
+- **`strict` is off in `tsconfig.app.json`.** The compiler will not catch a missing or mistyped authored JSON field. Every authored value is validated at runtime in `config/data.ts`, in the same defensive style as `isAttemptRecord` in the storage adapter: reject non-objects, absent keys, wrong types, nonfinite numbers and out-of-range values, and throw a `RangeError` naming the offending path. A malformed data file is a programming error caught at module load, never a recoverable user condition, so do not add a silent fallback. Do not enable `strict`; that is out of scope.
+- **When you are blocked, report the blocker and stop.** Do not invent a gameplay number, do not implement a deferred item, and do not weaken an existing assertion to make a run pass. A step that reports an honest blocker is a successful step; one that fabricates evidence is not.
+- **Record your work in this file**, directly below the step's prompt, under an `**Execution and verification - <date>**` heading: what you changed, the actual check results with counts, any deviation from the prompt and why, and any blocker. Then set the step's status to `complete` only if every acceptance criterion is met.
 
-### Recorded User Decisions - 2026-10-26
-
-- **G01 - Geometry study is concluded.** `app/src/game/config/geometry-candidate.ts` and `app/scripts/review-geometry.mjs` are retired, not preserved. Their measurement/derivation machinery will never be used again. Keep the surviving approved facts (arena radius 19.2 tiles, enemy spawn margin, the two normalized outlines) as authored data; keep provenance in [the mechanics contract](docs/mechanics.md), not in code.
-- **G02 - Data layer is file-backed and static.** Arena and enemies are specified in JSON files imported at build time. No runtime fetching, authoring UI, or user-supplied content in this slice. "Constants for now" means the data is fixed, not that it stays in TypeScript literals.
-- **G03 - Spawn model is rule-driven.** `encounter.json` holds `firstSpawnSeconds`, `everySeconds`, `maxConcurrent`, `archetype` and a `placement` rule. Endless survival stays endless; no finite hand-maintained spawn list.
-- **G04 - One archetype, many instances.** Only the Crystal Worm Child Head exists. Spawning adds more instances of it. The data layer models archetypes as a keyed collection so a second kind is pure data later, but no new enemy's gameplay values are introduced or approved here.
-- **G05 - Debug is archetype-level.** Sliders edit the archetype spec and therefore every live and future instance of that type. The existing per-instance `spawnX`/`spawnY` sliders are replaced by spawn-rule and placement controls.
-
-- **G06 - Floating-point deviation accepted (Q1).** Replacing the measurement chain shifts each body vertex by at most 6e-17 tiles, roughly 200 times below the geometry kernel's own `64 * Number.EPSILON` budget. Assert the clean literals and record the rounding as an approved deviation. Do not preserve bit-exact output by keeping the retired divisor.
-- **G07 - `SessionSnapshot` is deleted (Q2).** It has no production reader. The Playwright `Inspection` type derives from `SimulationState` instead.
-- **G08 - Player body size is authored independently (Q3).** `encounter.json` carries the player's own `widthTiles`/`heightTiles`, set to 1.25 x 1.25 so no shipped value changes. The enemy pair is renamed `headWidth`/`headHeight` and no longer sizes the player. `matchPlayerToHead` becomes an explicit override that copies head size onto the player, not the default coupling.
-- **G09 - A damage edit re-stamps shards already in flight (Q4).** Chosen explicitly by the user. Damage joins reversal age and lifetime as a *fired-with* value, so one rule governs all three and a debug edit takes effect immediately rather than after up to one shard lifetime. Separately, shards carry `damageHp` and `archetypeId` captured at fire time so hit resolution never reads global config; that is the dependency-inversion fix that makes a second archetype correct, and it is required regardless of the re-stamp choice. Implementation note, behavior-neutral: the re-stamping that currently sits inline inside `setDebugSettings` moves into one named operation owned by the simulation module, for example `restampLiveShards(shards, weapon)`, covering all three fields plus the existing `hasReversed` and expiry reconciliation. That function is about to grow anyway, since step 16.1 makes it loop over every enemy. If a smaller diff is preferred, keeping the mutation inline is acceptable and changes no behavior.
-- **G10 - Arena radius stays 19.2 tiles (Q5).** The `fixes.md` request for an arena at double the enemy's reach is recorded as superseded by the v3 tuning; shipped reach is 12.35 tiles. More dodging room matters more once several enemies fire.
-- **G11 - Cadence is 10 seconds, cap 4 (Q6).** `firstSpawnSeconds` 10, `everySeconds` 10, `maxConcurrent` 4. The cap is reached at 30 seconds. Recorded v2 deaths near 8 seconds mean most attempts meet one enemy and better attempts meet more.
-- **G12 - Placement is the arena ring, farthest from the player, with a seeded random fallback (Q7).** `ringRadiusFraction` is `0.84375`, which is exactly `16.2 / 19.2` and therefore reproduces today's spawn distance. Direction is the point diametrically opposite the player's bearing from the arena center. When that bearing is undefined - the player standing exactly at the center - pick uniformly at random among the candidate directions. See G13 for how that randomness is implemented, and G14 for its consequence.
-- **G13 - Randomness is a seeded generator injected into the simulation (Q7, implementation).** `Math.random` must not be called inside the simulation. Add a small seeded generator advanced from simulation state and inject it the way `HitAudio` takes `getContext` and the storage adapters take `getStorage`, with a default for production. Tests inject a fixed sequence. This keeps the fixed-step catch-up path reproducible - the same elapsed time and input must produce the same result regardless of how many steps run in one update - which is a correctness requirement independent of gameplay variety. The seed is **not** recorded in `AttemptRecord`; attempts stay non-reproducible across runs and no storage schema change is needed. Add the seed later only if replay is actually wanted.
-- **G14 - The opening enemy's direction is no longer fixed north (Q7 + Q11 consequence).** Because the first enemy spawns at `t = 0` when the player is always exactly at the arena center, the undefined-bearing case is the *default opening*, not a rare edge case. Every attempt therefore opens from a random direction at distance 16.2 tiles. This supersedes the recorded v2 statement that the enemy starts north at `(0, -16.2)`. Step 17.1 records it as an approved deviation; the distance is unchanged, only the bearing varies.
-- **G15 - Concurrent spawns are spread by the golden angle (Q8).** Offset each additional concurrent spawn by 137.5 degrees from the computed point so two enemies never resolve to the same position.
-- **G16 - Enemies pass through each other (Q9).** Consistent with `blocksPlayer: false`. No enemy-to-enemy collision, so per-tick cost stays O(shards) rather than O(shards + enemies squared).
-- **G17 - Enemies never despawn (Q10).** They accumulate to the cap and remain. Pressure plateaus rather than oscillating. No enemy lifetime field.
-- **G18 - The first enemy is the schedule's `t = 0` entry (Q11).** One code path, placed by the ring rule, with no special-cased initial enemy.
-- **G19 - New rules version is `crystal-worm-child-swarm-paladin-v4` (Q12).** v1, v2 and v3 records are retained, displayed as "Other rules" and excluded from the new retained best. No storage schema change.
-- **G20 - A lowered `maxConcurrent` despawns the newest enemies (Q13).** The debug slider takes effect immediately rather than applying only to future spawns.
-- **G21 - TypeScript `strict` stays off (Q15).** The loader validates every authored value at runtime, in the same defensive style as the storage adapter. Enabling `strict` project-wide is not bundled into these phases.
-- **G22 - Both execution modes stay available (Q14).** Single step is the default; a batch runs only when the user explicitly asks for one, and covers only the steps named in that request. See Purpose And Execution above.
-
-### Approved Scope And Review Gates
-
-- Retiring the study must not change gameplay beyond documented floating-point rounding. Any shipped-value change needs an explicit recorded deviation.
-- The data layer owns authored values in source units. All derivation - outline scaling, degrees to radians, derived player stats, derived shard bounds - happens in exactly one loader. Do not reintroduce a second mapping from authored values to runtime config.
-- `strict` is not enabled in `tsconfig.app.json` and `resolveJsonModule` is unset. The compiler will not catch absent or mistyped JSON fields, so the loader validates every value at runtime in the same defensive style as the storage adapter. Enabling `strict` project-wide is out of scope here; do not bundle it into a step.
-- Preserve one clock, the existing fixed-step/catch-up policy, one shard reversal, lifetime-only expiry and per-shard once-only hits. No ECS, entity framework, event bus, scene graph or second simulation.
-- Randomness is confined to spawn placement and enters only through the injected seeded generator (G13). Gameplay variety is deliberate; nondeterminism inside a seeded run is a defect.
-- Multi-enemy generalization (phase 16) is behavior-identical refactoring: exactly one enemy at `t = 0`, same cadence, same positions, same death times. Phase 16 must not change any observable gameplay value.
-- Spawn cadence, concurrency cap, ring fraction, placement, tie-breaking, enemy-to-enemy interaction, despawn policy and the rules version are **approved** in G10-G20. Step 17.1 verifies the arithmetic and records the deviations rather than reopening the choices. Do not substitute different values; if verification shows an approved value cannot hold - for example a ring fraction that puts a body outside the arena - report it as a blocker instead of silently adjusting it.
-- Adding enemies multiplies live shards and per-tick collision work. Re-derive the live-shard bound from configuration instead of a literal, and re-measure the sustained-play browser bounds. Never weaken an existing bound to make a run pass.
-- A comparison-breaking rules version is required once spawning ships. Retain v1/v2/v3 history, exclude it from the new bests, and avoid a storage schema change - `rulesVersion` is already a record field.
-- No backend, accounts, player attacks, seal activation, touch controls, rebinding or tuning UI beyond the existing debug panel.
-
-### Target Architecture
-
-```
-app/src/game/data/            authored data, build-time imports (G02)
-  shapes.json                 named outlines normalized to a 1x1 box
-  arena.json                  circular arena: center, radius
-  enemies.json                archetypes keyed by id: body, movement, weapon
-  encounter.json              rulesVersion, simulation, player, camera, session, spawns
-app/src/game/config/
-  data.ts                     imports + runtime-validates JSON -> typed authored data
-  encounter.ts                derives ENCOUNTER_CONFIG from authored data; validates invariants
-  debug.ts                    one tuning registry over the same authored data
-```
-
-Target runtime shapes, for reference by the steps below:
-
-```ts
-type EnemyArchetype = Readonly<{
-  id: string;
-  verticesTiles: readonly Vector2[];
-  speedTilesPerSecond: number;
-  contactDamageHp: number;
-  blocksPlayer: boolean;
-  weapon: Readonly<{ emitters: ...; burst: ...; shard: ... }>;
-}>;
-
-type EnemyState = {
-  id: number;                       // instance identity, not archetype
-  archetypeId: string;
-  positionTiles: Vector2;
-  emitterPhaseRadians: number;
-  spawnedAtSeconds: number;
-  attackEpochSeconds: number;       // these six were global SimulationState
-  volleysAtEpoch: number;           // fields; they are per-enemy clock state
-  attackInitialDelaySeconds: number;
-  rotationEpochSeconds: number;
-  rotationPhaseAtEpoch: number;
-  volleysFired: number;
-};
-```
-
-`ShardState` gains `damageHp` and `archetypeId`, captured at fire time. Today `registerShardHit` reads `state.config.shard.damageHp` globally at hit time while reversal and lifetime are already copied per shard; that inconsistency must not survive into a multi-archetype world. Per G09 those three fired-with fields are re-stamped together by one named operation, not inline inside the debug setter.
-
-Randomness (G13) is an injected seeded generator with a production default, following the existing `HitAudio(getContext)` and `AttemptHistory(getStorage)` pattern. The simulation never calls `Math.random`; tests inject a fixed sequence. It is injected state, not a new boundary in the table above.
-
-### Measured Surface Area
-
-Taken from the current tree at `3857e5c`, to size each step rather than guess:
-
-| Coupling | Sites | Where |
-| --- | --- | --- |
-| Reads of singular `enemy`/`emitters`/`burst`/`shard` config | 68 production | `simulation.ts`, `encounter.ts`, `debug.ts`, `phaser/encounter.ts` |
-| Reads of `state.enemy` | 30 production | `simulation.ts`, `phaser/encounter.ts` |
-| `enemy` references in tests | 55 / 16 / 30 / 1 | `simulation.test.ts`, `config.test.ts`, `tests/app.spec.ts`, `session.test.ts` |
-| Study-only modules | 2 files | `config/geometry-candidate.ts`, `scripts/review-geometry.mjs` |
-| Study-only kernel export | `deriveShardTiming` | `simulation/geometry.ts` |
-| Study-only tests | 6 tests | 4 in `config.test.ts`, 2 in `geometry.test.ts` |
-
-`maximumBodyCenterDistance` and `convexContactDistance` are **not** study code - `constrainBodyToArena` and `pursueBody` depend on them. They stay.
-
-### Reuse And Verification Policy
-
-Extend the existing config/models, `createSimulation`/`advanceSimulation`, shard segmentation, health arithmetic, `SessionController`, `EncounterScene`, React screens and storage boundary. Reuse neighboring tests and the existing Playwright helpers, diagnostic/production split and pixel checks.
-
-Behavior steps start with a focused failing test, run it, implement the smallest change, and rerun it. Run `npm run test`, `npm run typecheck`, `npm run lint`, and `npm run build` from `app/` for every runtime-integrating change. `npm run test:e2e` is not run in full as routine verification - CI runs it on every push. When a step adds or changes Playwright coverage, run just the new or changed test(s) with `--grep` to confirm them; run the full suite locally only to reproduce a pipeline-reported failure, or for an explicit full-acceptance step like 18.1. Use the pinned toolchain in `.node-version` (24.22.1) and `npm@12.2.1`; a local `node` that does not match is a disclosed limitation, not an acceptable substitute for a final gate run.
-
-### Phase Index
+## Phase Index
 
 | Phase | Steps | Outcome | Gate |
 | ----- | ----- | ------- | ---- |
-| 15 | 15.1-15.4 | Retired study and a validated JSON data layer | G1 |
-| 16 | 16.1-16.3 | Many-enemy simulation state, behavior-identical | G2 |
-| 17 | 17.1-17.4 | Approved timed spawning and debug controls | G3 |
-| 18 | 18.1, 18.2 | Regression, compatibility and handoff | G4 |
+| 19 | 19.1-19.5 | Contract recorded; projectile catalog and all five motion kinds | G5 |
+| 20 | 20.1-20.5 | Emission-pattern vocabulary and concurrent per-attack clocks | G6 |
+| 21 | 21.1-21.5 | Player conditions, the condition-aware damage model, HUD readout and contact damage | G7 |
+| 22 | 22.1-22.5 | Movement vocabulary, enemy health, the phase machine and drill mode | G8 |
+| 23 | 23.1-23.10 | The Killer Bee Queen of The Nest, authored one phase at a time | G9 |
+| 24 | 24.1-24.4 | Bounds, trainability tuning, full regression and handoff | G10 |
 
-## Phase 15: Retire The Study And Introduce The Data Layer
+## Phase 19: The Projectile Catalog And Motion Kinds
 
-### Step 15.1 - Retire The Concluded Geometry Study
+### Step 19.1 - Record The V5 Contract And Sources
 
-Status: complete. Dependencies: 14.3.
-
-**Implementation prompt**
-
-Remove the concluded geometry study (G01) without changing gameplay. Delete `app/src/game/config/geometry-candidate.ts`, `app/scripts/review-geometry.mjs` and the `deriveShardTiming` export in `app/src/game/simulation/geometry.ts`. Keep `maximumBodyCenterDistance` and `convexContactDistance`; `constrainBodyToArena` and `pursueBody` depend on them.
-
-Inline the three facts the shipped config actually consumes as named constants in `encounter.ts` with units and a `docs/mechanics.md` citation: arena radius 19.2 tiles, the enemy three-tile center-to-wall margin producing spawn `(0, -16.2)`, and the two outlines normalized to a 1x1 box - the eight-vertex beveled octagon used by player and head, and the six-vertex centrally symmetric shard hexagon. Do not carry over `sourceWidthPixels`, `sourceHeightPixels`, `dimensionToleranceSourcePixels`, `anchor`, `orientation`, `sourcePixelsPerTile`, `pursuit`, `groupPeriodSeconds`, `shardsPerGroup`, `conservativeLiveShardBound` or `maximumShardCenterDistanceTiles`. They are inert in production, and `shardsPerGroup: 44` / `conservativeLiveShardBound: 88` are stale against the v3 cadence of six emitters times eleven shots.
-
-Because `scaleBody` normalizes by source extents, the source-pixel measurements already cancel out of every shipped vertex. Scaling a 1x1-normalized outline therefore reproduces the same geometry, with each vertex differing by at most 6e-17 tiles of floating-point rounding - roughly three orders of magnitude below the geometry module's own `64 * Number.EPSILON` budget. Replace the four tautological `scaleBody(V2_GEOMETRY_CANDIDATE...)` expectations in `config.test.ts` with the explicit literal vertices, and record the rounding as an approved deviation rather than asserting bit-identical output:
-
-- player and head, 1.25 x 1.25 tiles: `x` in `{+/-0.375, +/-0.625}`, `y` in `{+/-0.625, +/-0.375}`
-- shard, 1.45 x 0.65 tiles: `x` in `{+/-0.725, +/-0.3625, 0}`, `y` in `{0, +/-0.325}`
-
-Delete the four study tests in `config.test.ts` ("v2 geometry candidate ..." x3 and "historical v2 geometry still fits ...") and the two `deriveShardTiming` tests in `geometry.test.ts`. Retarget the two kernel tests that merely used candidate bodies as fixtures - "fits the approved north spawn and constrains both approved upright bodies" and "limits pursuit travel without pushing already-overlapping or coincident bodies apart" - to the shipped `ENCOUNTER_CONFIG` bodies, computing the east separation inline with `convexContactDistance` so the assertion keeps its meaning. Confirm the surviving `validateEncounterConfig` still proves both bodies fit the arena at spawn, so no coverage is lost. Delete the unused `SessionSnapshot` type (G07) and derive the Playwright `Inspection` type from `SimulationState`.
-
-Do not start the data layer, do not touch `debug.ts` mappings, and do not change any gameplay value.
-
-**Focused checks:** full unit suite with the six study tests removed and the two retargeted tests passing; `validateEncounterConfig` still runs at module load; typecheck, lint and build clean; `grep` confirms no remaining reference to the deleted modules, `deriveShardTiming` or the inert fields. Run `npm run test:e2e` because `tests/app.spec.ts` imports from `src/game/models.ts`.
-
-**Acceptance:** both study files and `deriveShardTiming` are gone, the shipped encounter values are unchanged apart from the recorded sub-1e-16 rounding, the kernel geometry functions keep their coverage, and all five gates pass. No JSON, no archetypes, no spawning.
-
-**Execution and verification - 2026-10-26**
-
-- Dependency 14.3 verified complete in [the v2 archive](docs/implementation-plan-v2.md). Environment: Node v22.21.1 against a pinned `.node-version` of 24.22.1 - a disclosed limitation, not a substitute for a pinned final gate run. `npm ci` installed 116 packages; Playwright needed `npx playwright install chromium` because the cached build was 1187 against the required 1248.
-- Pre-change baseline on this machine: lint, typecheck, build clean, 327 unit/component tests, 34 Chromium cases.
-- TDD: asserted the explicit literal vertices while the old derivation was still in place; `config.test.ts` failed as predicted. Measured the actual deviation per body before implementing - player `0.0`, shard `0.0`, head `5.5511e-17` tiles. Only the head body moves, well inside the predicted 6e-17 and about 250 times below the kernel's own `64 * Number.EPSILON` budget. Recorded as the G06 approved deviation.
-- Deleted `app/src/game/config/geometry-candidate.ts`, `app/scripts/review-geometry.mjs` (and the now-empty `app/scripts/`), `deriveShardTiming` from `geometry.ts`, and `SessionSnapshot` from `models.ts` (G07). `maximumBodyCenterDistance` and `convexContactDistance` are retained; `constrainBodyToArena` and `pursueBody` depend on them. Verified absent from `app/src` and `app/tests`: `deriveShardTiming`, `sourcePixelsPerTile`, `dimensionToleranceSourcePixels`, `conservativeLiveShardBound`, `shardsPerGroup`, `maximumShardCenterDistanceTiles`, `V2_GEOMETRY_CANDIDATE`, `SessionSnapshot`. The one surviving `groupPeriodSeconds` is a config-derived local in `simulation.test.ts`, not the retired literal; step 15.4 promotes that formula into the config.
-- `encounter.ts` now owns `ARENA_RADIUS_TILES` 19.2, `ENEMY_CENTER_WALL_MARGIN_TILES` 3 producing spawn `(0, -16.2)`, and the two 1x1-normalized outlines, each with units and a `docs/mechanics.md` citation.
-- **Approved deviation from this step's own prompt.** The prompt said to retarget "the two kernel tests that merely used candidate bodies as fixtures". Inspection found six usages, and several assert constants that are properties of the larger unscaled shapes - `radius(player) + radius(shard) > 2` would become 1.4539 with the shipped 1.25 x 1.25 bodies, and the pinned contact distances 1.9415422942741967 / 2.0932846919542065 belong to the 36x33 and 42x55 silhouettes. Retargeting all of them would have silently destroyed real assertions. Those shapes are therefore declared as explicit local fixtures in `geometry.test.ts`, built by the same arithmetic so every pinned constant still holds, and labelled as test-local fixture construction. Only "fits the approved north spawn and constrains both approved upright bodies" moved to `ENCOUNTER_CONFIG`, where boolean fit assertions are more meaningful against the real encounter. The pursuit test's east separation is now computed inline with `convexContactDistance`, keeping its meaning without the retired module. No assertion was weakened.
-- Second recorded correction: deriving the Playwright `Inspection` type from `SimulationState` failed typecheck, because `tests/**/*.ts` is checked under `tsconfig.node.json`'s `nodenext` resolution, which rejects `simulation.ts`'s extensionless internal imports. `Inspection` is instead described from `models.ts` primitives (`PlayerState`, `EnemyState`, `ShardState`, `SessionPhase`), which is appropriate for a diagnostic payload and keeps production modules out of the Node type project.
-- All five gates pass after the change: typecheck, lint, 318 unit/component tests across nine files, production build, and 34 Chromium cases in 2.7 minutes. The test count drops by exactly nine - four config study tests, the four-case `test.each` leading-edge timing block, and one reach-derivation rejection test. No gameplay value changed beyond the recorded head-vertex rounding.
-
-### Step 15.2 - Introduce The Validated JSON Data Boundary
-
-Status: complete. Dependencies: 15.1.
+Status: pending. Dependencies: 18.2.
 
 **Implementation prompt**
 
-Create the data layer for the arena and shared shapes (G02). Add `app/src/game/data/shapes.json` holding the two normalized outlines keyed by name, and `app/src/game/data/arena.json` holding the circular arena's center and radius in tiles. Enable `resolveJsonModule` in `tsconfig.app.json`; it is currently unset.
+Documentation only. Write down the approved contract before any code changes, so later steps cite a record instead of re-deriving it.
 
-Add `app/src/game/config/data.ts` as the single boundary that imports the JSON and validates it into typed authored data. `strict` is off in this project, so the compiler will not reject a missing or mistyped field: validate every value at runtime in the same defensive style as `isAttemptRecord` in the storage adapter. Reject nonfinite numbers, absent keys, wrong types, empty shape tables, outlines outside the 3-to-8 vertex contract and any shape whose extents are not a 1x1 box. Throw a `RangeError` naming the offending path; a malformed data file is a build-time programming error, not a recoverable user condition, so do not add a silent fallback.
+In [the mechanics contract](docs/mechanics.md), append a new section `## Approved V5 Boss Encounter Contract - Step 19.1`, following the style of the existing `## Approved V4 Swarm Contract - Step 17.1`. It is additive: do not edit or reword any existing section, and do not touch v1-v4 provenance. Record, with subsections:
 
-`encounter.ts` consumes the validated authored data instead of its own literals and keeps deriving `ENCOUNTER_CONFIG` exactly as now. Keep all derivation - outline scaling, degree-to-radian conversion - in the loader path, never in the JSON. Shipped values must not change.
+- **Source access.** That [the source extract](docs/killer-bee-queen-source.md) is the verified transcription for this encounter, retrieved 2026-10-27 from the page at Exalt version 5.14.0.0, and that `WebFetch` returns an empty document for RealmEye pages so `curl` plus HTML parsing is the access method. Add the retrieval to the contract's existing Source Access Log.
+- **Decisions.** K01 through K13 from the active plan, each in one or two sentences, as the approved contract rather than a proposal.
+- **Fidelity limits.** The five gaps this encounter ships with, each naming its deferred register id: no arena mutation (D01), no Plagued Nest (D02), no Nest destruction (D03), no player attacks and therefore no Stun or Daze windows (D04, D05), and no adaptive HP scaling (D06). State plainly that phases 2 and 5 are easier than the live fight because the player keeps the whole arena, and that phases 1, 3 and 8 are harder because a real group suppresses attacks by stunning.
+- **The two interpretations that are not sourced.** First, the phase-to-projectile-variant bindings, because the wiki's attack table does not say which phase fires which variant of a repeated sprite. Second, the ordering of Curse against this project's minimum-damage floor, because the source states only that Curse applies after defence and defence modifiers.
+- **The damage formula.** The exact condition-aware formula from step 21.3's prompt, with its seven worked cases, and the explicit note that the sub-20-defence Armor-Broken-plus-Exposed interaction is not modelled because the only player preset has 32 defence.
 
-Do not move enemy, weapon, player, camera or session values yet; step 15.3 owns those. Do not add a schema library - hand-written guards match the existing idiom and avoid a dependency for one call site.
+Then update both mirrored instruction files in the same change, because K02 supersedes a rule they currently state. In [`CLAUDE.md`](CLAUDE.md) and [`.github/copilot-instructions.md`](.github/copilot-instructions.md): change the bullet that requires shards to reverse velocity once and expire only by lifetime so that it describes the `boomerang` motion kind specifically; state that other motion kinds exist and are authored per projectile; keep the per-projectile once-only hit rule, which is unchanged. Add one bullet pointing at [the deferred register](docs/deferred-work.md) as the list of recognised, postponed, unapproved work. Add one bullet recording the `curl` access method for RealmEye pages. Keep the two files identical in content; the mirror table at the bottom of `CLAUDE.md` already records the pairing.
 
-**Focused checks:** focused failing loader test first, then valid data, each rejection case, and the resulting `ENCOUNTER_CONFIG.arena` and body vertices identical to step 15.1's literals. Typecheck proves the JSON import resolves; build proves the JSON is bundled, not fetched. Full unit suite, lint, build.
+Do not change any JSON, TypeScript or test file in this step.
 
-**Acceptance:** arena and shapes are authored in JSON behind one validating loader, every rejection case is covered, shipped geometry is byte-identical to 15.1, and all five gates pass.
+**Focused checks:** no unit tests - this step adds no behaviour. Verify structurally: every relative link in the files you touched resolves on disk; the two instruction files differ only in their header and the mirror note; `docs/mechanics.md` still contains every pre-existing section heading, confirmed by comparing the heading list before and after; and the K01-K13 wording in the contract does not contradict the active plan. Run `npm run lint`, `npm run typecheck` and `npm run test` from `app/` to prove nothing was disturbed.
 
-**Execution and verification - 2026-10-26**
+**Acceptance:** the V5 contract is recorded additively in the mechanics document, both instruction files reflect K02 and are identical in content, all links resolve, no earlier contract section is altered, and no runtime file changed.
 
-- Enabled `resolveJsonModule` in `tsconfig.app.json`; it was unset. Added `app/src/game/data/arena.json` and `app/src/game/data/shapes.json`, holding the circular arena and the two outlines normalized to a 1x1 tile box.
-- Added `app/src/game/config/data.ts` as the single validating boundary. TDD: wrote `data.test.ts` first against the absent module and confirmed the red, then implemented. Validation rejects non-objects, absent keys, wrong types, nonfinite values, nonpositive radius, outlines outside the 3-to-8 vertex contract, and any outline not spanning exactly 1 tile per axis before scaling; every rejection names the offending path and throws `RangeError` at module load rather than falling back, since malformed authored data is a programming error.
-- `encounter.ts` now derives from `AUTHORED_ARENA` and `loadOutline(...)` rather than its own literals. All derivation - outline scaling, degree-to-radian conversion - stays on the loader path; the JSON holds authored values only.
-- Confirmed the data is bundled, not fetched: the production build emits no separate JSON asset and the arena radius appears inside the JS bundle.
-- All five gates pass: typecheck, lint, 324 unit/component tests across ten files (318 plus six new loader cases), production build, and 34 Chromium cases in 2.8 minutes. Shipped geometry is unchanged from 15.1 - the existing literal-vertex assertions still hold.
+### Step 19.2 - Extract Projectiles Into A Keyed Catalog
 
-### Step 15.3 - Move The Enemy And Weapon Into A Keyed Archetype
-
-Status: complete. Dependencies: 15.2.
+Status: pending. Dependencies: 19.1.
 
 **Implementation prompt**
 
-Restructure the encounter config so the enemy becomes one entry in a keyed archetype collection (G04), still with exactly one archetype and one instance. Add `app/src/game/data/enemies.json` with `crystal-worm-child-head` holding its body (shape name plus width and height in tiles), `speedTilesPerSecond`, `contactDamageHp`, `blocksPlayer` and a `weapon` containing the current `emitters`, `burst` and `shard` values. Add `app/src/game/data/encounter.json` with `rulesVersion`, `simulation`, `player`, `camera` and `session`. Per G08 the player's body carries its own authored `widthTiles` and `heightTiles`, both `1.25`, rather than borrowing the enemy's dimensions; shipped geometry is unchanged because the values match. Extend the loader and its validation to cover both.
+Behaviour-identical refactor. Projectiles become a catalog shared by every archetype, instead of a block nested inside one weapon. No shipped gameplay value may change.
 
-Change `EncounterConfig` from singular `enemy`/`emitters`/`burst`/`shard` to `archetypes: Readonly<Record<string, EnemyArchetype>>` using the shape in the target architecture above, and update all 68 production read sites across `simulation.ts`, `encounter.ts`, `debug.ts` and `phaser/encounter.ts`. `validateEncounterConfig` validates every archetype rather than a single enemy: per-archetype positive values, reversal strictly inside lifetime, pursuit slower than the Paladin, and body fit inside the arena at its spawn position.
+Add `app/src/game/data/projectiles.json` with exactly **one** entry, `crystal-worm-child-shard`, carrying the values that `enemies.json` holds today at `archetypes.crystal-worm-child-head.weapon.shard`: `damageHp` 160, `speedTilesPerSecond` 8, the `shard-hexagon` body at 1.45 by 0.65 tiles, `expiration` `"lifetime-only"` and `hitPolicy` `"once-per-shard"`. Add `armorPiercing: false`, `conditions: []`, a `source` string citing the approved v3 tuning, and `motion: { "kind": "boomerang", "reversalAgeSeconds": 1.5, "lifetimeSeconds": 3 }`. Then replace that whole `weapon.shard` block in `enemies.json` with `"projectile": "crystal-worm-child-shard"`.
 
-Replace the literal-pinned `contactDamageHp: 0`, `blocksPlayer: false`, `expiration: "lifetime-only"` and `hitPolicy: "once-per-shard"` field types with `number`, `boolean` and unions, and assert the approved values in `validateEncounterConfig` instead. The approved rule is then enforced at runtime, in the module that owns rules, rather than by a type that forbids the variation it appears to model.
+In `config/data.ts`, add `validateProjectiles` and export `validateProjectile` so a single entry can be tested with a literal object. Validate: a nonempty keyed object; `damageHp` nonnegative; `speedTilesPerSecond` nonnegative; `armorPiercing` boolean; `conditions` an array; the body through the existing shape path; `expiration` exactly `"lifetime-only"` and `hitPolicy` exactly `"once-per-shard"`; and a `motion` object whose `kind` is `"boomerang"` with `reversalAgeSeconds` strictly greater than zero and strictly less than `lifetimeSeconds`. Reject any other `kind` in this step - later steps add them one at a time. Also reject an `enemies.json` weapon whose `projectile` names a key absent from the catalog.
 
-Keep exactly one archetype and one live enemy. Do not add spawning, a spawn rule, or any second archetype. Gameplay must be unchanged: same cadence, same positions, same death times.
+In `config/encounter.ts`, add `ProjectileSpec` to the exported types and `projectiles: Readonly<Record<string, ProjectileSpec>>` to `EncounterConfig`, with a `projectileOf(config, id)` resolver that mirrors the existing `archetypeOf` and throws on an unknown id. `EnemyArchetype["weapon"]` loses its `shard` object and gains `projectileId: string`. Route the existing `TuningValues` keys `projectileDamageHp`, `projectileSpeedTilesPerSecond`, `reversalSeconds`, `lifetimeSeconds`, `projectileWidth` and `projectileHeight` through the catalog entry inside `buildEncounterConfig`, so the debug sliders keep working and there is still exactly one mapping from authored values to runtime config. Do not add a second builder.
 
-**Focused checks:** focused failing test on the archetype-shaped config first; then archetype validation accept/reject cases, each approved-rule assertion, and an equivalence check that the derived runtime values match step 15.2 field for field. Full unit suite, typecheck, lint, build, and `npm run test:e2e` for the renderer and inspection paths.
+In `models.ts`, rename `ShardState.archetypeId` to `projectileId`. In `simulation.ts`: resolve the firing projectile through `projectileOf`; change `boundingRadiusTiles` to take the maximum over the **projectile catalog** rather than over archetypes; change `restampLiveShards(shards, weapon)` to `restampLiveShards(shards, projectile)`; and resolve each shard's collision body through `projectileOf(state.config, shard.projectileId)`. In `phaser/encounter.ts`, resolve each shard's drawing body the same way. Update the Playwright `Inspection` type so shards carry `projectileId`.
 
-**Acceptance:** the enemy and its weapon are authored data behind the keyed archetype collection, singular config fields are gone, approved rules are asserted at runtime, observable gameplay is unchanged, and all five gates pass.
+Do not add any second projectile, any other motion kind, or any new pattern. Do not change the emitter, burst, movement or spawn structures.
 
-**Execution and verification - 2026-10-26**
+**Focused checks:** start with a focused failing test that `ENCOUNTER_CONFIG.projectiles["crystal-worm-child-shard"]` exists, and confirm the red. Then: every `validateProjectile` rejection case, each naming its path; an `enemies.json` weapon naming an absent projectile is rejected; the derived runtime projectile values equal the pre-refactor `weapon.shard` values field for field; `boundingRadiusTiles` equals the maximum over the catalog; `restampLiveShards` still re-stamps damage, reversal age and lifetime and still filters expired shards. Then prove behaviour identity: the existing 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must all pass **unchanged**. Run all four routine gates, and `npm run test:e2e -- --grep "shard"` for the inspection path you changed.
 
-- Added `enemies.json` with the `crystal-worm-child-head` archetype (body, movement, weapon) and `encounter.json` with `rulesVersion`, `primaryArchetype`, `simulation`, `player`, `camera` and `session`. Per G08 the player body carries its own authored `widthTiles`/`heightTiles` of 1.25, so it no longer borrows the enemy's dimensions; the values match, so no shipped geometry changed. `fixedStepHz: 60` is authored and `fixedStepSeconds` derived, verified exact against `1 / 60`.
-- `EncounterConfig` now carries `primaryArchetypeId` and `archetypes`, replacing singular `enemy`/`emitters`/`burst`/`shard`. Added `archetypeOf` and `primaryArchetype` resolvers. Converted all 68 production read sites across `simulation.ts`, `encounter.ts`, `debug.ts` and `phaser/encounter.ts`, plus the test suites. `SELECTED_ENCOUNTER_VALUES` now derives from the authored data instead of being a second hand-maintained copy.
-- Literal-pinned field types are gone: `contactDamageHp` is `number`, `blocksPlayer` and `rotateDuringCooldown` are `boolean`, and `expiration`/`hitPolicy` are `string`. The approved values are asserted in validation instead, so the type no longer forbids the variation it appeared to model.
-- Scope correction during execution: an initial edit had the renderer resolve bodies through `enemy.archetypeId` and `shard.archetypeId`, which are 16.1 and 16.2 model fields. Reverted to `primaryArchetype(config)` so this step changes configuration only and leaves the model untouched.
-- **Finding, and the first real consequence of closing the F3 gap.** Adding `validateEncounterConfig` to `debugEncounterConfig` immediately failed 11 tests, because the debug sliders have always permitted values the production validator forbids. Two distinct causes, both resolved without weakening an assertion:
-  1. Five invariants were over-strict rather than genuinely positive. Zero is a supported, meaningful value for enemy speed (stationary), initial cooldown (fire at once), shard damage (harmless) and shard speed (frozen), and each is a slider minimum; rotation is signed, where negative is counter-clockwise and zero is no rotation. The validator now separates strictly-positive values - emitter count, shots per emitter, shot interval, cooldown, reversal age, lifetime - from nonnegative and signed ones, each group commented with why. Production values are all positive, so the shipped config is unaffected, and negatives, `NaN` and infinities are still rejected.
-  2. The spawn sliders reach past the arena wall. `debugEncounterConfig` now clamps the spawn with `constrainBodyToArena`, making the debug config valid by construction instead of relying on the simulation to correct it afterwards.
-- **Second finding: one approved rule is deliberately violable in debug.** The enemy-speed slider reaches 12 tiles/second while the Paladin derives 7.0613, so "pursuit must be slower than the Paladin" cannot hold for every debug state - that is the point of the slider, and why a debug attempt already carries `DEBUG_RULES_VERSION` and is excluded from saved history. That rule moved into a new `validateShippedEncounter`, which wraps structural validation and is called on `ENCOUNTER_CONFIG` at module load. The immutable approved rules that debug cannot vary - contact damage, blocking, rotate-during-cooldown, lifetime-only expiry, once-per-shard hits - stay in shared archetype validation, where they also guard against a bad data file. A new focused test asserts both halves: structural validation permits a faster enemy, `validateShippedEncounter` rejects it.
-- All five gates pass: typecheck, lint, 325 unit/component tests across ten files, production build, and 34 Chromium cases in 2.7 minutes. Exactly one archetype and one live enemy; cadence, positions, damage and death times unchanged, with the existing literal-vertex and approved-tuning assertions still holding.
+**Acceptance:** projectiles are a keyed catalog behind the existing validating loader, `weapon.shard` is gone in favour of `weapon.projectileId`, shards carry `projectileId`, the broadphase bound comes from the catalog, every pre-existing timeline assertion passes unchanged, and all four gates pass.
 
-### Step 15.4 - Unify The Tuning Registry
+### Step 19.3 - Add The Linear Motion Kind
 
-Status: complete. Dependencies: 15.3.
+Status: pending. Dependencies: 19.2.
 
 **Implementation prompt**
 
-Collapse the duplicated authored-value-to-config mapping before phase 17 multiplies it. Today a single tunable is maintained in five places: `SELECTED_ENCOUNTER_VALUES`, the `EncounterConfig` type, the `ENCOUNTER_CONFIG` mapping, `validateEncounterConfig`'s bounds, and both `DEBUG_PARAMETERS` and `debugEncounterConfig`. `debugEncounterConfig` re-implements the whole builder and, unlike the default path, never calls `validateEncounterConfig` - so debug configs can reach the simulation in states the production config is forbidden to take.
+Add the motion kind that most Killer Bee Queen projectiles use: travel in a straight line and expire at the published range. Additive only; no shipped projectile uses it yet, exactly as step 16.3 proved multi-enemy behaviour before any spawn rule existed.
 
-Make `DEBUG_PARAMETERS` the single registry. Give each entry its `label`, `unit`, `group`, `min`, `max`, `step` and a typed way to apply a value to a config (an `apply(config, value)` or a typed path), then build both the default and the debug config by folding the registry over the authored base. `debugEncounterConfig` becomes that fold plus `validateEncounterConfig`, not a parallel builder. Fold the three boolean toggles - `godMode`, `chaseArenaCenter`, `matchPlayerToHead` - into the same registry so `DebugPanel` stops hand-coding three near-identical blocks, and derive the panel's group list from the registry instead of the hardcoded `["Enemy", "Emitters", "Burst", "Projectiles"]` literal.
+Create `app/src/game/simulation/projectiles.ts` and move the projectile motion rules into it from `simulation.ts`: the shard-spawn construction currently inlined in `updateEnemyAttacks`, `advanceShard`, `moveShard` and `restampLiveShards`. `simulation.ts` keeps the fixed-step loop, hit registration and player/enemy movement, and calls into the new module. This is a pure move for the `boomerang` kind - do not change its behaviour while moving it.
 
-While here, remove the duplicated derivations the registry exposes: the collision bounding-radius formula written twice in `simulation.ts` (module constant and again inside `setDebugSettings`), `extent()` in `debug.ts` recomputing the span `scaleBody` already computes, and the four open-coded degree-to-radian conversions. Add a derived live-shard bound to the config - `emitterCount * shotsPerEmitter * ceil(lifetimeSeconds / burstGroupSeconds)` where `burstGroupSeconds = (shotsPerEmitter - 1) * shotIntervalSeconds + cooldownAfterLastShotSeconds` - giving the deleted `conservativeLiveShardBound` a correct home with a real consumer. For v3 this is 66, not the retired literal 88.
+Give the module a motion-kind dispatch with two named operations:
 
-Per G08, rename `enemyWidth`/`enemyHeight` to `headWidth`/`headHeight` and stop them sizing the player. The player's size comes from its own authored values added in step 15.3, and `matchPlayerToHead` becomes an explicit override that copies head size onto the player. Both default to 1.25 x 1.25, so no shipped value changes; add the player's own size sliders to the registry.
+- `createShard(projectile, id, positionTiles, orientationRadians)` returns a `ShardState` with its lifetime resolved by kind: authored `lifetimeSeconds` for `boomerang`, and `rangeTiles / speedTilesPerSecond` for `linear`. Set `reversalAgeSeconds` to `Infinity` for `linear`, so the existing reversal branch can never fire and no second code path is needed.
+- `advanceShard(...)` keeps its current signature and behaviour. A `linear` shard travels along its initial velocity and expires only when `ageSeconds` reaches `lifetimeSeconds`.
 
-Debug defaults, slider ranges and every shipped gameplay value must be unchanged.
+Extend `validateProjectile` to accept `kind: "linear"` with a `rangeTiles` strictly greater than zero, and to reject `reversalAgeSeconds` or `lifetimeSeconds` on a `linear` entry, so a lifetime can never be authored in two places. Keep rejecting every kind other than `linear` and `boomerang`.
 
-**Focused checks:** focused failing test proving one registry drives both configs; then every parameter round-trips authored value to config, `debugEncounterConfig` output equals the default config at default settings, the debug path now rejects configs that violate encounter invariants, the derived shard bound equals 66 for v3, and the panel renders the same groups and controls. Full unit suite, React tests, typecheck, lint, build, `npm run test:e2e`.
+Record one derived fact in a test rather than a comment: for the source's row 1, `red-stinger-small` at speed 8.5 and range 9.5, the derived lifetime is 9.5 / 8.5, which is 1.117647 seconds to six places. Assert the exact division, not the rounded decimal.
 
-**Acceptance:** one registry maps authored values to config for both paths, the debug path validates encounter invariants, duplicated derivations are gone, the derived live-shard bound replaces the retired literal, and all five gates pass with unchanged shipped values.
+Do not author any Killer Bee Queen projectile into `projectiles.json` in this step. Test `linear` behaviour with literal `ProjectileSpec` and `ShardState` objects in the test file, and with a config clone built through the existing public surface, following step 16.3's precedent of a test-file-local helper rather than widening the production API for tests.
 
-**Execution and verification - 2026-10-26**
+**Focused checks:** focused failing test on `createShard` with a `linear` spec first. Then: lifetime derives from range divided by speed and is exact; a `linear` shard never reverses; it expires exactly at its lifetime boundary and not a tick early or late, using the existing boundary-tolerance style; `validateProjectile` accepts a valid `linear` entry and rejects a missing or nonpositive `rangeTiles`, an authored `lifetimeSeconds`, and an authored `reversalAgeSeconds`; and the move of the boomerang rules into `projectiles.ts` changed nothing, proven by the existing timeline assertions passing unchanged. All four routine gates.
 
-- Replaced the two parallel builders with one. `encounter.ts` now exposes a flat `TuningValues` surface, `AUTHORED_TUNING` projected from the authored JSON, and a single `buildEncounterConfig(values, { rulesVersion, matchPlayerToHead })`. Both paths go through it: `ENCOUNTER_CONFIG = buildEncounterConfig(AUTHORED_TUNING, ...)` and `debugEncounterConfig` is now 11 lines - validate settings, call the shared builder, validate the result - down from about 52 lines of duplicated mapping.
-- Chose a shared mapping function over per-parameter `apply(config, value)` callbacks. The registry stays metadata only, which achieves the single-source goal the step asked for without a mutable config draft or a mini framework, and keeps the change YAGNI-consistent. Recorded as a deliberate deviation from the step prompt's suggested mechanism, not its intent.
-- G08 applied: `headWidth`/`headHeight` renamed from `enemyWidth`/`enemyHeight` and no longer size the player; the player has its own authored size and its own two sliders in a new "Player" group. `matchPlayerToHead` is now an explicit override rather than the default coupling, and `ENCOUNTER_CONFIG` is built with it off. Both default to 1.25 x 1.25, so no shipped value changed.
-- Duplications removed, each verified by grep afterwards: one `buildEncounterConfig`, one `boundingRadiusTiles` (the second copy went in 15.3), one `degreesToRadians`, and `extent()` deleted in favour of the shared `bodyExtentTiles` that `scaleBody` already needed. `radiansToDegrees` was written and then deleted unused - the debug panel reads authored degrees directly, so that conversion is gone rather than merely shared.
-- Added `liveShardBoundPerEnemy(archetype)`, giving the retired study's `conservativeLiveShardBound` a correct home with a real consumer. Recorded deviation: implemented as a derived function rather than a config field, so it cannot go stale. A test pins 66 for the shipped v3 cadence - `6 * 11 * ceil(3 / 4.9)` - against the retired literal 88.
-- `DEBUG_TOGGLES` and `DEBUG_GROUPS` are now data. `DebugPanel` maps over them instead of hand-coding three near-identical checkbox blocks and a hardcoded `["Enemy", "Emitters", "Burst", "Projectiles"]` list, so a new group or toggle renders itself.
-- **Caught a behavioural regression I introduced.** Setting `SELECTED_ENCOUNTER_VALUES = AUTHORED_TUNING` made "Load selected values" also overwrite enemy speed, spawn position and player size, which the preset had deliberately omitted; the existing "without changing omitted settings" test failed and was right to. The preset is now an explicit 16-key projection of `AUTHORED_TUNING` - still one copy of each number, but a subset by design.
-- One e2e assertion updated rather than weakened: the debug slider count moved from 19 to 21 because G08 adds the two player-size sliders. The assertion carries a comment tying it to `DEBUG_PARAMETERS`; importing the registry into the spec is not possible, since `debug.ts` reaches JSON imports that `tsconfig.node.json`'s nodenext resolution rejects.
-- Four new focused tests: the debug path at default settings reproduces the shipped config field for field apart from rules version; `buildEncounterConfig` maps every tuning value through; the live shard bound derives from configuration; groups and toggles come from the registry.
-- All five gates pass: typecheck, lint, 331 unit/component tests across ten files, production build, and 34 Chromium cases in 2.6 minutes. No shipped gameplay value changed.
+**Acceptance:** `projectiles.ts` owns projectile motion, the `linear` kind works and derives its lifetime from the published range, the `boomerang` kind is byte-identical after the move, every pre-existing timeline assertion passes unchanged, and all four gates pass.
 
-## Phase 16: Generalize To Many Enemies
+### Step 19.4 - Add The Turning And Wavy Motion Kinds
 
-### Step 16.1 - Make Enemy State A Collection With Its Own Attack Clock
-
-Status: complete. Dependencies: 15.4.
+Status: pending. Dependencies: 19.3.
 
 **Implementation prompt**
 
-Generalize the simulation from one enemy to a collection, still spawning exactly one at `t = 0`. This step is behavior-identical refactoring; no observable gameplay value may change.
+Add the two curved motion kinds the source's attack table specifies: `Turn Rate: ±70` and `±20` degrees per second, and `Amplitude: 0.8, Frequency: 1`. Additive; no shipped projectile uses them yet.
 
-Replace `SimulationState.enemy` with `enemies: EnemyState[]` and add `nextEnemyId`. Move the six global attack-clock fields - `attackEpochSeconds`, `volleysAtEpoch`, `attackInitialDelaySeconds`, `rotationEpochSeconds`, `rotationPhaseAtEpoch`, `volleysFired` - out of `SimulationState` and into each `EnemyState`, alongside `id`, `archetypeId` and `spawnedAtSeconds`. They were always one enemy's state; they only looked global because there was one enemy. Add `enemies` to `SessionSnapshot` if that type survived step 15.1.
+Both kinds derive their lifetime from `rangeTiles / speedTilesPerSecond`, exactly as `linear` does, because ROTMG's published range is speed multiplied by lifetime regardless of the path's shape. Both need the spawn pose kept on the shard, so add `spawnPositionTiles` and `spawnOrientationRadians` to `ShardState` and set them in `createShard` for every kind.
 
-Rework `updateMovement` and `updateAttacks` to iterate enemies, each pursuing the player and firing on its own clock resolved from its own archetype's weapon. Iterate in a stable order so a fixed input sequence stays reproducible; a seeded or insertion-ordered list is required, not object-key order. Keep the per-tick phase order unchanged - player movement, enemy movement, shard advance and hit resolution, firing, regeneration - so existing timing tests stay valid.
+Define each path as an exact closed-form function of age, evaluated at the end of the step, rather than as an incrementally integrated velocity. Incremental integration accumulates error differently depending on how many fixed steps a single update executes, which would break the determinism requirement in K11.
 
-Update `setDebugSettings` to reconcile every enemy's rotation and attack epochs rather than one, preserving the current semantics: a rotation or phase change re-epochs rotation, a burst change re-epochs the attack clock, and live shards are re-timed and re-filtered. Update `phaser/encounter.ts` to draw every enemy and `inspect()` to expose `enemies`, and update the Playwright `Inspection` type and its roughly 30 `enemy` assertions plus the 55 in `simulation.test.ts`.
+- `turning`: heading at age `t` is `spawnOrientationRadians + turnRate * t`. Position is the arc traced at constant speed. Set `orientationRadians` to the current heading each step so the body visibly faces its direction of travel.
+- `wavy`: position at age `t` is the point `speed * t` along the spawn orientation, plus a lateral offset of `amplitudeTiles * sin(2 * pi * frequencyHz * t)` perpendicular to it. The lateral offset is zero at `t = 0`.
 
-Do not add spawning, placement, concurrency caps or enemy-to-enemy interaction. Do not change cadence, positions, damage or death times.
+**Collision correctness, and the measurement that decides it.** The collision test is a swept convex overlap along a straight segment per fixed step. For a curved path, compute the exact position at the start and the end of the step and sweep straight between them. That approximation is acceptable only while the path's deviation from that chord stays far below the body size, so make the bound an explicit, validated invariant rather than an assumption:
 
-**Focused checks:** focused failing test on the collection shape first. Then: a single enemy at `t = 0` with the current spawn and phase; identical volley times, shard ids, positions and accepted hits to the pre-refactor run over a fixed multi-second input sequence; debug re-epoching still correct; stable iteration order across repeated runs. Reuse `simulation.test.ts` rather than adding a harness. Full unit suite, typecheck, lint, build, `npm run test:e2e`.
+- For `turning`, the per-step chord length is `speed / 60` and the per-step heading change is `turnRate / 60`. The arc's maximum deviation from its chord is about `chordLength * headingChange / 8` radians-scaled. At the source's worst case - speed 8 tiles per second and 70 degrees per second - that is about 0.00034 tiles.
+- For `wavy`, the lateral acceleration is `amplitudeTiles * (2 * pi * frequencyHz)^2`, and the per-step deviation is at most half of that times the step squared. At the source's values - amplitude 0.8 and frequency 1 - that is about 0.0044 tiles.
 
-**Acceptance:** enemies are a collection with per-enemy clocks, exactly one enemy still exists at `t = 0`, a fixed input sequence reproduces the previous run's shard and hit timeline exactly, and all five gates pass.
+Both are under half a percent of the 1.25-tile player body, so **no sub-stepping is required at the fixed 60 Hz step**. Encode that conclusion as a guard, not as a comment: add a named constant for the maximum tolerated per-step path deviation, set it to 0.02 tiles, derive each curved projectile's worst-case deviation in the loader from its authored parameters and the fixed step, and have `validateProjectile` reject any entry that exceeds it. A future projectile with an extreme turn rate then fails loudly at module load instead of silently tunnelling.
 
-**Execution and verification - 2026-10-26**
+Extend `validateProjectile` to accept `kind: "turning"` with a finite nonzero signed `turnRateDegreesPerSecond` and a positive `rangeTiles`, and `kind: "wavy"` with a positive `amplitudeTiles`, a positive `frequencyHz` and a positive `rangeTiles`. Keep rejecting unknown kinds. Keep rejecting authored `lifetimeSeconds` on any range-derived kind.
 
-- `SimulationState.enemy` became `enemies: EnemyState[]` with `nextEnemyId`, and the six attack-clock fields - `attackEpochSeconds`, `volleysAtEpoch`, `attackInitialDelaySeconds`, `rotationEpochSeconds`, `rotationPhaseAtEpoch`, `volleysFired` - moved onto `EnemyState` alongside `id`, `archetypeId` and `spawnedAtSeconds`. They were never global; one enemy made them look that way. Added `createEnemy(config, archetypeId, id, spawnedAtSeconds, positionTiles?)`, which anchors each clock at its own spawn time so a later arrival serves its own initial cooldown.
-- `updateMovement`, `setDebugSettings` and `updateAttacks` now iterate `state.enemies` in insertion order; `updateEnemyAttacks` was extracted so one enemy's rotation and volley logic is a single named unit. The per-tick phase order is unchanged - player movement, enemy movement, shard advance and hit resolution, firing, regeneration.
-- `volleysFired` is deliberately not kept at the top level. A stored aggregate would duplicate state, so `inspect()` computes the total across enemies for diagnostics while unit tests read `state.enemies[0].volleysFired`. The e2e spec's existing `volleysFired` assertions needed no change.
-- `phaser/encounter.ts` draws every enemy, and the Playwright `Inspection` type now carries `enemies` and `nextEnemyId`.
-- Two new focused tests: `createSimulation` yields exactly one enemy with its clock anchored at zero and no clock fields left on the simulation; and a fixed 600-tick input sequence with alternating movement reproduces an identical timeline of volley counts, shard ids, health and hits across runs.
-- All five gates pass: typecheck, lint, 333 unit/component tests, build, 34 Chromium cases. No observable gameplay value changed - cadence, positions, damage and death times are held by the pre-existing exact assertions, including the 671-volley count and the 30/60/120 Hz equivalence test.
+Do not author a Killer Bee Queen projectile here. Do not add sub-stepping machinery; the point of the measurement is that it is not needed.
 
-### Step 16.2 - Capture Shard Damage And Body At Fire Time
+**Focused checks:** focused failing test on a `turning` shard's position after a known age first. Then: a `turning` shard at 70 degrees per second completes a quarter turn in exactly 90/70 seconds, asserted on heading; its path length over its lifetime equals `speed * lifetime` to within floating-point tolerance; a `wavy` shard's lateral offset is zero at age 0 and at every whole multiple of `1 / frequencyHz`, and reaches `amplitudeTiles` at a quarter period; both kinds expire exactly at their derived lifetime; the derived worst-case deviation for the source's extreme values matches the figures above; `validateProjectile` rejects a turn rate or amplitude that would exceed the 0.02-tile tolerance; and advancing either kind at 30, 60 and 120 Hz over the same elapsed time gives positions that agree at the shared step boundaries. All four routine gates.
 
-Status: complete. Dependencies: 16.1.
+**Acceptance:** `turning` and `wavy` motion are implemented as closed-form functions of age, the path-deviation tolerance is a validated loader invariant with the derivation tested, determinism holds across step rates, no sub-stepping was added, every pre-existing assertion passes unchanged, and all four gates pass.
 
-**Implementation prompt**
+### Step 19.5 - Add The Lob Motion Kind And Area Detonation
 
-Make each shard carry the weapon facts it was fired with. Add `damageHp` and `archetypeId` to `ShardState`, set from the firing enemy's archetype in `updateAttacks`, and have `registerShardHit` use `shard.damageHp` instead of reading `state.config.shard.damageHp` at hit time. Resolve each shard's drawing body and the collision bounding radius from `shard.archetypeId`.
-
-This removes an existing inconsistency: reversal age and lifetime are already copied per shard, while damage was read globally at hit time, so a damage slider change retroactively altered shards already in flight.
-
-Implement G09. Treat `damageHp`, `reversalAgeSeconds` and `lifetimeSeconds` as one category - values a shard was fired with - governed by one rule. Extract the re-stamping that currently sits inline inside `setDebugSettings` into a single named operation owned by the simulation module, for example `restampLiveShards(shards, weapon)`, covering all three fields plus the existing `hasReversed` and expiry reconciliation. `setDebugSettings` calls it instead of reaching into the shard array itself. Give that operation its own focused test. Net behavior is unchanged for reversal and lifetime and becomes consistent for damage, so no existing debug assertion should need weakening; if one does, report it rather than quietly updating it.
-
-Update the collision bounding radius to the maximum over archetypes rather than the single shard shape, so a future second archetype cannot under-bound the broadphase.
-
-**Focused checks:** focused failing test that a shard fired before a damage change still applies its captured damage, or the recorded re-stamp behavior; per-archetype body resolution for drawing and broadphase; bounding radius equals the max across archetypes; existing once-per-shard, reversal and lifetime-only tests unchanged. Full unit suite, typecheck, lint, build, `npm run test:e2e`.
-
-**Acceptance:** shards carry their own damage and archetype, hit resolution no longer reads global config, the broadphase bound is archetype-safe, the re-stamp decision is recorded, and all five gates pass.
-
-**Execution and verification - 2026-10-26**
-
-- `ShardState` gained `archetypeId` and `damageHp`. These landed during 16.1 rather than here, because `updateEnemyAttacks` could not be rewritten per enemy without writing them at fire time; recorded as a pulled-forward dependency, not extra scope. `registerShardHit` now uses `shard.damageHp` instead of reading global config at hit time, and both the drawing body and the broadphase body resolve through `archetypeOf(config, shard.archetypeId)`. The bounding radius already took the maximum across archetypes from 15.3.
-- This step completes G09's second half. TDD: wrote the `restampLiveShards` test first and confirmed `restampLiveShards is not a function`, then extracted the operation out of `setDebugSettings`. It now owns the single write site for the fired-with category outside `updateEnemyAttacks`, covering damage, reversal age, lifetime, the `hasReversed` reconciliation, the velocity re-derivation and the expiry filter.
-- Damage now joins reversal age and lifetime, so a live damage edit applies to shards already in flight - the behaviour chosen in Q4. A second focused test drives it through `setDebugSettings` rather than the helper, proving the debug path end to end. No existing debug assertion needed weakening.
-- All five gates pass: typecheck, lint, 335 unit/component tests, build, 34 Chromium cases.
-
-### Step 16.3 - Prove Many Enemies Work Without Spawning Them
-
-Status: complete. Dependencies: 16.2.
+Status: pending. Dependencies: 19.4.
 
 **Implementation prompt**
 
-Verify the generalization carries real load before any spawn rule exists. Add tests only - no new production feature - that construct a simulation with several enemies of the one archetype at distinct positions and assert the properties phase 17 will depend on.
+Add bombs. The source's table gives six bomb rows with a damage, a condition and a `Radius` of 2 or 3 tiles, and no speed or range: a bomb is lobbed to a point, passes over everything on the way, and detonates into an area. Additive; no shipped projectile uses it yet.
 
-Cover: each enemy fires on its own clock from its own `spawnedAtSeconds`, so staggered creation produces staggered volleys; each pursues the player independently and stops at its own silhouette contact distance; shard ids stay unique across enemies; every enemy stays inside the arena under `constrainBodyToArena`; accepted hits remain once-per-shard with several enemies firing into the same player; and the live shard count stays within the derived bound times the enemy count. Add a focused rendering check that `drawEntities` draws one body per enemy.
+Author `kind: "lob"` with `travelSeconds` and `detonationRadiusTiles`. A lob shard's lifetime is `travelSeconds`. Resolve its destination at fire time and store it on the shard as `detonationTargetTiles`, then set `velocityTilesPerSecond` to `(target - start) / travelSeconds` so it arrives exactly at the end of its lifetime regardless of the distance. Destination resolution has exactly two cases:
 
-If the only way to construct a multi-enemy state is to reach past the public surface, add the narrowest seam needed - a `createSimulation` parameter or an explicit test helper in the test file - rather than exporting internals or widening the production API for tests.
+- The firing pattern aims at the player: the destination is the player's position at fire time, clamped so the distance never exceeds `speedTilesPerSecond * travelSeconds`.
+- Otherwise: the destination is the emitter point plus the firing direction times `speedTilesPerSecond * travelSeconds`.
 
-Also record the open questions phase 17 must answer before implementation: whether enemies overlap each other or collide, the placement tie-break when two enemies would spawn at the same ring point, and whether the player starting at the arena center leaves the "farthest from player" direction undefined. Do not answer them here.
+A lob shard **does not collide while in flight.** Skip the swept overlap test for it entirely; do not merely give it a zero-size body. When its age reaches `travelSeconds` it detonates exactly once: if the player's body overlaps a circle of `detonationRadiusTiles` centred on `detonationTargetTiles`, apply its damage and conditions through the same `registerShardHit` path every other projectile uses, so there is one damage and one hit-feedback route. Then the shard expires. A detonation that misses applies nothing. The once-per-shard hit rule is unchanged: a detonation is one hit opportunity, not a lingering area.
 
-**Focused checks:** the new multi-enemy tests, all passing, plus the full unit suite, typecheck, lint, build and `npm run test:e2e` to confirm no regression. Report the measured peak live shard count for the multi-enemy cases.
+Reuse the existing geometry kernel for the overlap test - a convex body against a circle - rather than writing a new primitive. If no existing function expresses it, add the narrowest helper to `simulation/geometry.ts` next to `convexBodyFitsCircle`, and give it its own focused test.
 
-**Acceptance:** multi-enemy behavior is proven by tests with one archetype and no spawn rule, the derived shard bound holds, phase 17's open questions are written down, and all five gates pass.
+For drawing, `phaser/encounter.ts` draws a lob shard's body in flight like any other, and additionally draws the detonation circle's outline at `detonationTargetTiles` for a short authored number of seconds before the detonation, so the attack is dodgeable rather than unfair. Put that telegraph duration in `encounter.json` under `camera` or a new `presentation` block with an explicit unit, not as a literal in the renderer.
 
-**Execution and verification - 2026-10-26**
+Extend `validateProjectile` to accept `kind: "lob"` with a positive `travelSeconds`, a positive `detonationRadiusTiles` and a positive `speedTilesPerSecond`, and to reject `rangeTiles`, `lifetimeSeconds` and `reversalAgeSeconds` on a lob entry. Do not author a Killer Bee Queen bomb here.
 
-- Added five tests only, no production feature. A local `withEnemies` helper builds extra instances through the public `createEnemy`, so no production API was widened and no internals were exported for tests.
-- Covered: each enemy fires on its own clock from its own `spawnedAtSeconds`, verified by a late arrival still at zero volleys while the original has already fired; every enemy pursues independently and stops at its own silhouette contact distance; shard ids stay unique across enemies; every enemy stays inside the arena under `constrainBodyToArena`; accepted hits stay once-per-shard with four enemies firing at one player; and live shards stay within the derived bound times the enemy count.
-- **Measured peak: 264 live shards with four enemies, against a derived bound of 264** - `liveShardBoundPerEnemy` is 66 for the shipped v3 cadence, so the bound is exactly tight rather than loose. Step 17.4 should assert against this derived value, and the existing browser bound of 88 is the single-enemy case.
-- Open questions recorded for phase 17, unanswered here as the step required: enemy-to-enemy overlap is settled by G16 (pass through), the ring tie-break by G15 (golden angle), and the undefined bearing at arena centre by G12 and G13 (seeded random among candidates), which G14 notes is the default opening rather than an edge case.
-- All five gates pass: typecheck, lint, 340 unit/component tests across ten files, build, 34 Chromium cases in 2.7 minutes.
+**Focused checks:** focused failing test that a lob shard reaches its destination exactly at `travelSeconds` first. Then: arrival is exact for a near and a far destination; a targeted destination beyond the maximum distance is clamped to it; a lob shard passing directly through the player's body in flight registers no hit; a detonation whose circle overlaps the player applies damage once through `registerShardHit` and produces one `AcceptedHit`; a detonation whose circle does not reach the player applies nothing; a detonating shard expires in the same step; the body-against-circle overlap helper is correct at the boundary, just inside and just outside; and the telegraph duration is authored configuration, proven by a test that reads it from the config rather than the renderer. All four routine gates, plus `npm run test:e2e -- --grep "<the renderer test you touched>"` if you changed a Playwright pixel check.
 
-## Phase 17: Timed Spawning
+**Acceptance:** the `lob` kind travels to a resolved destination and arrives exactly on time, does not collide in flight, detonates once into an area through the shared hit path, is telegraphed from authored configuration, every pre-existing assertion passes unchanged, and all four gates pass.
 
-### Step 17.1 - Verify And Record The Approved Spawn Rules
+## Phase 20: Emission Patterns And Concurrent Attacks
 
-Status: complete. Dependencies: 16.3.
+### Step 20.1 - Re-Express The Emitter Ring As A Pattern
 
-**Implementation prompt**
-
-The spawn rules are approved in G10-G20. This step changes no runtime code: it verifies the arithmetic holds and records the decisions and their deviations additively in [the mechanics contract](docs/mechanics.md). Do not reopen an approved choice, and do not substitute a different value.
-
-Verify, showing the arithmetic:
-
-1. **Ring fit.** `ringRadiusFraction` `0.84375` gives `0.84375 * 19.2 = 16.2` tiles, matching the current spawn distance exactly. Confirm with `convexBodyFitsCircle` that the 1.25 x 1.25 head body fits inside the arena at that distance in every direction - its farthest vertex sits `hypot(0.625, 0.375) = 0.7289` tiles from its center, so the check is `16.2 + 0.7289 < 19.2`.
-2. **Golden-angle spread.** Confirm 137.5-degree offsets keep four concurrent enemies at distinct positions, and that the offset is applied per concurrent spawn index rather than accumulated across the whole run.
-3. **Cadence.** Confirm the cap is reached at 30 seconds with `firstSpawnSeconds` 10 and `everySeconds` 10, and state the expected enemy count at the recorded v2 death times near 8 seconds.
-4. **Shard budget.** Confirm the derived per-enemy bound is 66 for v3 - `6 * 11 * ceil(3 / 4.9)` where `4.9 = (11 - 1) * 0.19 + 3` - and therefore 264 at the cap of 4. Compare against the current browser assertion of 88 and state the increase step 17.4 must re-measure.
-5. **Determinism.** Confirm the injected seeded generator (G13) leaves the fixed-step catch-up path reproducible: the same elapsed time and input must produce the same result regardless of how many steps execute in one update.
-
-Record as explicit approved deviations:
-
-- **G14**, the opening enemy's bearing is now random rather than fixed north. The 16.2-tile distance is unchanged. This supersedes the v2 statement that the enemy starts north at `(0, -16.2)`, which the mechanics contract and the v2 archive both record; note the supersession without rewriting the archive.
-- **G10**, the `fixes.md` request for an arena at double the enemy's reach is superseded by v3 tuning, with shipped reach at 12.35 tiles against a 19.2-tile radius.
-- **G19**, the move to `crystal-worm-child-swarm-paladin-v4` and the exclusion of v1, v2 and v3 records from the new retained best.
-
-Also confirm death remains the only session end condition, with no win or timeout state introduced.
-
-**Focused checks:** document structural checks, the five verifications above with their arithmetic shown, body-fit math, link integrity, and confirmation that no runtime file changed.
-
-**Acceptance:** every approved value is verified or reported as a blocker with the failing arithmetic, the three deviations are recorded additively without rewriting history, and no runtime change is made.
-
-**Execution and verification - 2026-10-26**
-
-- No runtime file changed. Output is the additive [Approved V4 Swarm Contract](docs/mechanics.md#approved-v4-swarm-contract---step-171) in the mechanics document.
-- **Ring fit verified.** `0.84375 * 19.2 = 16.2` tiles exactly, reproducing the current spawn distance. The head body's farthest vertex is 0.728869 tiles from its center, so `16.2 + 0.728869 = 16.928869 < 19.2`. Checked `convexBodyFitsCircle` at every one-degree bearing on the ring: fits at all 360.
-- **Golden-angle spread verified.** Four concurrent spawns land at 0, 137.5, 275.0 and 52.5 degrees, minimum pairwise separation 14.3301 tiles against a 1.25-tile body. Confirmed the offset is per concurrent spawn index, not accumulated across the run.
-- **Shard budget verified.** `burstGroupSeconds = (11 - 1) * 0.19 + 3 = 4.9`; bound per enemy `6 * 11 * ceil(3 / 4.9) = 66`; `264` at the cap. Step 16.3's four-enemy run measured a peak of exactly 264, so the derived bound is tight. The current browser assertion of 88 is the single-enemy v2-era literal, a 3x increase for step 17.4 to re-measure.
-- **Cadence clarified, not changed.** G11 records `firstSpawnSeconds` 10 with the cap reached at 30 seconds, and G18 records the opening enemy as the schedule's `t = 0` entry. Read together the spawn times are 0, 10, 20 and 30 seconds, giving four enemies with the cap reached at 30 - both decisions hold simultaneously, with `firstSpawnSeconds` naming the first *additional* spawn. Since `firstSpawnSeconds` equals `everySeconds`, the sequence is uniform and the opening enemy needs no special-cased code path, only the same routine at schedule index 0. Recorded explicitly because the two values could otherwise be read as conflicting.
-- **Determinism restated as a requirement.** Randomness is confined to spawn placement and enters only through a seeded generator injected into the simulation; given a seed, the same elapsed time and input must reproduce the same result including under multi-step catch-up. The seed is not persisted, so attempts are not reproducible across runs and no storage schema change is needed.
-- Three deviations recorded: the opening enemy's random bearing superseding the fixed north spawn, the arena staying at 19.2 against the `fixes.md` double-the-reach request, and the new `crystal-worm-child-swarm-paladin-v4` identity with older history retained and excluded from bests. Death remains the only session end condition.
-- No approved value was substituted and no blocker was found.
-
-### Step 17.2 - Implement Timed Spawning
-
-Status: complete. Dependencies: 17.1.
+Status: pending. Dependencies: 19.5.
 
 **Implementation prompt**
 
-Implement the spawn rule using the values approved in G10-G20 and verified in 17.1. If 17.1 reported a blocker, stop.
+Behaviour-identical refactor. The Crystal Worm's rotating emitters become the first case of a general emission pattern. No shipped gameplay value may change.
 
-Add the `spawns` block to `encounter.json`: `archetype` `crystal-worm-child-head`, `firstSpawnSeconds` 10, `everySeconds` 10, `maxConcurrent` 4, and `placement` with `ringRadiusFraction` 0.84375, rule `farthest-from-player` and a `goldenAngleDegrees` spread of 137.5. Set `rulesVersion` to `crystal-worm-child-swarm-paladin-v4`. Extend the loader's validation: the archetype must exist in `enemies.json`, intervals must be positive and finite, `maxConcurrent` must be a positive safe integer, the ring fraction must be within `(0, 1)`, and the ring must keep the archetype's body inside the arena.
+Create `app/src/game/simulation/patterns.ts` owning one pure operation:
 
-Add the seeded generator required by G13. It is a small named module - not a dependency - injected into `createSimulation` with a production default, in the same style as `HitAudio(getContext)` and `AttemptHistory(getStorage)`. The simulation must never call `Math.random` directly. Advance it from simulation state so the fixed-step catch-up path stays reproducible. Tests inject a fixed sequence. Do not add the seed to `AttemptRecord`; no storage schema change.
+```ts
+resolveBearings(pattern, context): readonly { bearingRadians: number; emitterRadiusTiles: number }[]
+```
 
-Add spawn scheduling to the fixed-step simulation. Track the next spawn time in `SimulationState` and resolve spawns at one well-defined point in the tick order, after movement and before firing, so a newly spawned enemy cannot fire during its spawn tick and instead serves its archetype's initial cooldown from its own `spawnedAtSeconds`. The cap suppresses a spawn without consuming or re-ordering the schedule; define and test whether a suppressed spawn is skipped or deferred. Per G17 enemies never despawn, so there is no expiry path. Per G18 the first enemy is the schedule's `t = 0` entry with no special case.
+where `context` carries what a pattern may read: the firing enemy's position, the player's position, the attack clock's current `ringPhaseRadians`, the volley index within the burst, and the number of bursts already fired. It returns one entry per shot in this volley. It must be pure: no mutation, no clock reading, no randomness in this step.
 
-Implement placement per G12: the point on the ring diametrically opposite the player's bearing from the arena center, offset by the golden angle per concurrent spawn index. At `t = 0` the player is exactly at the center, so that bearing is undefined and the direction is drawn from the injected generator among the candidate directions - this is the default opening, not a rare case, so test it directly.
+Implement only `kind: "ring"` with the fields the Crystal Worm needs: `arms`, `emitterRadiusTiles`, `initialPhaseDegrees` and `clockwiseDegreesPerSecond`. Its bearings are `ringPhaseRadians + armIndex * 2 * pi / arms`, which is exactly what `updateEnemyAttacks` computes inline today. Leave `perBurstAdvanceDegrees`, `gapSectorsDegrees`, `armSpreadDegreesPerSecond` and `maxArmSpreadDegrees` out entirely; step 20.5 adds them.
 
-Determinism requirement, independent of the deliberate randomness: given the same seed, the same elapsed time and the same input must produce the same enemies at the same positions, including across a catch-up update that executes several fixed steps at once. No wall-clock, and no dependence on the iteration order of an unordered structure.
+In `enemies.json`, replace the archetype's `weapon.emitters` and `weapon.burst` blocks with a single `attacks` array holding one entry, shaped as the plan's Target Data Shapes section shows: `id` `"spiral-shards"`, `projectile` `"crystal-worm-child-shard"`, `tuningSource` `"approved-v3"`, a `ring` pattern carrying arms 6, emitter radius 0.35, initial phase 0 degrees and 45 clockwise degrees per second, and a `cadence` carrying shots-per-burst 11, shot interval 0.19, cooldown-after-last-shot 3 and initial delay 2. Note the rename: the authored `rotateDuringCooldown: true` disappears, because rotation is a continuous function of elapsed time and was never actually gated by the burst - assert that in a test rather than keeping a field that only ever held one value.
 
-Confirm v1, v2 and v3 records still load, display as "Other rules" and are excluded from the new retained best, with no storage schema change.
+Extend `config/data.ts` with `validateAttack`, exported for direct testing: require a nonempty `id` unique within the archetype, a `projectile` key present in the catalog, a `tuningSource` that is one of `"approved-v3"`, `"wiki-prose"` or `"trainer-authored"` - **reject an attack with no `tuningSource`**, per K13 - a `pattern` whose `kind` is `"ring"`, and a `cadence` with a positive integer `shotsPerBurst`, a positive `shotIntervalSeconds`, a positive `cooldownAfterLastShotSeconds` and a nonnegative `initialDelaySeconds`. Reject any other pattern kind in this step.
 
-**Focused checks:** focused failing test on the first timed spawn first. Then: spawn times across a long run; the cap holding with the recorded skip-or-defer semantics; placement including the `t = 0` random bearing with an injected fixed sequence and the golden-angle spread at four concurrent enemies; bodies inside the arena at every spawn and in every drawn direction; each new enemy's independent cooldown and cadence; same-seed reproducibility across identical runs and across multi-step catch-up; the full unit suite; and history compatibility for mixed v1/v2/v3 and v4 records. Typecheck, lint, build, `npm run test:e2e`.
+Update `encounter.ts` so the archetype's whole `weapon` object is replaced by `attacks: readonly AttackSpec[]` directly on the archetype - the `projectileId` that step 19.2 put on `weapon` moves onto each attack entry - and route the existing `TuningValues` keys `emitterCount`, `emitterRadiusTiles`, `initialPhaseDegrees`, `rotationDegreesPerSecond`, `shotsPerEmitter`, `shotIntervalSeconds`, `cooldownSeconds` and `initialCooldownSeconds` into the single authored attack, so the debug sliders keep working through the one existing builder. Update `updateEnemyAttacks` in `simulation.ts` to read the attack spec and call `resolveBearings` instead of computing bearings inline. Keep `liveShardBoundPerEnemy` correct against the new shape; for the shipped v3 cadence it must still derive 66.
 
-**Acceptance:** enemies spawn on the approved schedule within the cap and placement rule, randomness enters only through the injected generator, same-seed runs are reproducible including under catch-up, v4 is in effect with older history retained and excluded from bests, and all five gates pass.
+Do not add a second attack, a second pattern kind, or per-attack clocks; step 20.2 owns the clock change.
 
-**Execution and verification - 2026-10-26**
+**Focused checks:** focused failing test on `resolveBearings` with a `ring` pattern first. Then: six bearings at exactly 60-degree spacing from a given ring phase; the emitter radius is returned unchanged; `validateAttack` accepts the authored attack and rejects a duplicate id, an unknown projectile, an absent `tuningSource`, an unknown pattern kind and each nonpositive cadence value; rotation is proven continuous across a cooldown, replacing the retired `rotateDuringCooldown` field; `liveShardBoundPerEnemy` still derives 66. Then prove behaviour identity: the 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must pass **unchanged**. All four routine gates, plus `npm run test:e2e -- --grep "volleys"`.
 
-- Authored the `spawns` block in `encounter.json` with the approved values and bumped `rulesVersion` to `crystal-worm-child-swarm-paladin-v4`. The loader validates the archetype reference, nonnegative first spawn, positive interval, safe-integer cap, a ring fraction inside `(0, 1)` and the approved placement rule; `validateEncounterConfig` additionally proves the ring keeps the body inside the arena for any config, debug included.
-- **Deviation from G13's mechanism, serving its intent.** G13 specified an injected `RandomSource` object. Implementing it that way broke the diagnostic path with `DataCloneError`, because `inspect()` calls `structuredClone(state)` and a stored closure cannot be cloned. Randomness is therefore a numeric seed cursor carried in `SimulationState` and advanced by a pure `nextSeed`/`unitFromSeed` pair; `createSimulation(config, seed)` takes the seed and `SessionController` supplies one per attempt through an injected `() => number`. This keeps the state plain serializable data, keeps `Math.random` out of the simulation, and preserves full reproducibility for a given seed. The failure was a useful signal: plain-data state is an invariant the diagnostic path depends on.
-- Spawns resolve once per fixed step, after movement and before firing, so a new arrival cannot fire in its spawn tick and serves its own initial cooldown. A suppressed spawn is skipped rather than banked: the schedule keeps advancing. The opening enemy is schedule index 0 created through the same `spawnEnemy` routine, so there is no special-cased initial enemy (G18).
-- Added a `?seed=<integer>` parameter read at the application boundary, which pins placement so a run can be reproduced or shared. Recorded as an addition beyond the step prompt: it is a small real feature rather than test-only instrumentation, and it removed a whole class of positional flakiness from the browser suite, which now pins seed `229521` - the seed whose opening bearing reproduces the historical north spawn at `(0, -16.2)` to six decimals.
-- Seven new focused tests: arrivals land on 0/10/20/30 seconds and stop at the cap; every spawn across five seeds keeps its body inside the arena; the opening bearing varies by seed and concurrent spawns spread by the golden angle; a later arrival serves its own cooldown; and a seeded run reproduces identically at one step per update and at eight, proving the catch-up path.
-- **Test expectations updated, with reasons, never weakened.** The rules version moved to v4 in eight assertions (G19). Several tests pinned the opening enemy at `(0, -16.2)`; because the bearing is now seeded, they assert the ring distance instead - the same fact expressed independently of bearing. The five-minute equivalence run is now a multi-enemy run, so its shard bound derives from `liveShardBoundPerEnemy` times the cap and its shard-id count sums volleys across enemies. One test's catch-up comparison was my own fault rather than the simulation's: resetting health per update let the player die mid-update at eight steps and truncate the loop, so it now runs in god mode. `session.test.ts` snapshots the controller's observable fields explicitly instead of `structuredClone`-ing an object that holds an injected function.
-- All five gates pass: typecheck, lint, 350 unit/component tests, build, 34 Chromium cases. A stale `dist/` initially failed the production-path case on the old rules version; rebuilding fixed it, which is a reminder that the production project serves built output.
+**Acceptance:** emission bearings come from a pure `resolveBearings` with a `ring` pattern, the authored weapon is an `attacks` array, `tuningSource` is mandatory, the debug registry still drives one builder, every pre-existing timeline assertion passes unchanged, and all four gates pass.
 
-### Step 17.3 - Expose Spawn Controls In The Debug Panel
+### Step 20.2 - Give Each Attack Its Own Clock
 
-Status: complete. Dependencies: 17.2.
+Status: pending. Dependencies: 20.1.
 
 **Implementation prompt**
 
-Extend the unified registry from 15.4 with the spawn rule's controls (G05). Add a "Spawns" group covering `firstSpawnSeconds`, `everySeconds` and `maxConcurrent`, plus the approved placement control. Replace the obsolete per-instance `spawnX` and `spawnY` sliders with the placement controls; with rule-driven spawning there is no single enemy spawn point to edit. Record this as a deliberate debug-UI change.
+Behaviour-identical refactor, and the structural change the whole boss depends on. One enemy must be able to run several attacks at once, each on its own cadence. The Crystal Worm has exactly one attack, so nothing observable may change.
 
-Confirm the archetype-level semantics: a body, speed, emitter, burst or projectile edit applies to the archetype and therefore to every live and future instance. Reconcile live state the way `setDebugSettings` already does - re-epoch clocks, re-time live shards, re-constrain positions - and extend that reconciliation to a `maxConcurrent` decrease. Per G20 a lowered cap despawns the newest enemies until the count is within it; implement and test that rather than deferring enforcement to future spawns.
+This is the same move step 16.1 made from global to per-enemy state, one level deeper. Today `EnemyState` holds one attack clock in seven fields: `attackEpochSeconds`, `volleysAtEpoch`, `attackInitialDelaySeconds`, `rotationEpochSeconds`, `rotationPhaseAtEpoch`, `volleysFired` and `emitterPhaseRadians`. Move all seven into a new `AttackClockState` keyed by `attackId`, and give `EnemyState` an `attackClocks: AttackClockState[]` built from its archetype's `attacks` in authored order. Rename `emitterPhaseRadians` to `ringPhaseRadians` while moving it, since it is now a pattern's phase rather than an emitter's.
 
-Keep `isDefaultDebugSettings` and the `DEBUG_RULES_VERSION` badge correct so debug attempts stay out of saved history and out of best comparisons.
+Build the clocks in `createEnemy`, one per authored attack, each anchored at the enemy's `spawnedAtSeconds` and each taking its own `initialDelaySeconds` from its own cadence. Split `updateEnemyAttacks` into a loop over clocks and a per-clock `updateAttackClock(state, enemy, attack, clock)` holding the arithmetic that exists today: advance the ring phase from the rotation epoch, compute the burst-group span, resolve the next shot time from the epoch plus the initial delay plus the group and shot offsets, return early if it is not yet due, otherwise resolve bearings and push one shard per bearing, then increment `volleysFired`.
 
-**Focused checks:** focused failing React test on the new group first. Then: each new slider's range and application; placement edits reflected in the next spawn; a lowered cap handled by the recorded rule; archetype edits applying to all live instances; `isDefaultDebugSettings` true only at defaults; the debug badge and unsaved-attempt behavior intact. React tests, full unit suite, typecheck, lint, build, `npm run test:e2e` including a desktop and narrow panel capture for clipping.
+Iterate attacks in authored order and push shards in bearing order, so a fixed input sequence stays reproducible and shard ids remain stable. Update `setDebugSettings` to re-epoch **every clock of every enemy**, preserving today's semantics exactly: a rotation or initial-phase change re-epochs rotation, a cadence change re-epochs the attack clock and sets `initialDelaySeconds` to the initial cooldown when no volley has fired yet and to the shot interval otherwise. Update `inspect()` to expose per-attack clocks while keeping the aggregate `volleysFired` total the Playwright suite already asserts, and update the `Inspection` type accordingly.
 
-**Acceptance:** spawn and placement are debuggable at archetype level, cap reduction follows a recorded rule, debug attempts remain excluded from history and bests, and all five gates pass.
+Do not add a second attack to any archetype. Do not change cadence, positions, damage or death times.
 
-**Execution and verification - 2026-10-26**
+**Focused checks:** focused failing test that `createEnemy` produces one clock per authored attack and that no clock field remains on `EnemyState` first. Then: a two-attack archetype built through a test-file-local helper fires both on independent cadences, with the slower one still at zero volleys while the faster has fired; shard ids are unique and ordered by attack then bearing; the debug re-epoch is applied to every clock; and the aggregate `volleysFired` in `inspect()` equals the sum across clocks. Then prove behaviour identity: the 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must pass **unchanged**. All four routine gates, plus `npm run test:e2e -- --grep "volleys"`.
 
-- Added the "Spawns" group - first spawn, spawn interval, max concurrent and spawn ring - and retired the `spawnX`/`spawnY` sliders, which no longer mean anything under rule-driven placement (G05). The 17.2 merge that fed authored spawn values into the debug path is gone; the sliders now reach the config directly.
-- G20 implemented: a lowered cap takes effect immediately by dropping the newest arrivals, and the spawn cursor is pulled forward so a lowered interval cannot bank arrivals. A changed ring fraction applies to future spawns only, since enemies in play have already moved off the ring; recorded as the deliberate reading.
-- Four new focused tests: the Spawns group exposes exactly the four keys and no longer exposes spawn points; every spawn slider reaches the config and keeps the ring inside the arena at both endpoints; lowering the cap despawns the newest and keeps holding; and an archetype edit applies to every live enemy with all bodies still inside the arena.
-- **The browser suite needed real work here, and the diagnosis is worth recording.** Retiring Spawn X/Y removed the tool several visual tests used to place the enemy on screen. Probing the live page showed why patching them one at a time kept failing: the arena canvas is only 1280x540 at a 1440x1000 viewport and 390x320 at 390x844, so a 16.2-tile opening is off-screen vertically, enemies draw beneath the player and are occluded at close range, and shards draw above bodies and cover them. The body-size measurement now reproduces the original horizontal geometry - park one enemy at the arena centre, collapse projectile lifetime and size so silhouettes are clean, then walk the player east - and releases movement early, because poll latency carries the player about 2.7 tiles further and overshooting clips the enemy against the left edge. The projectile settings are restored mid-test before the lethal-hit check that follows. Two further positional assertions became viewport-independent rather than being relaxed.
-- The debug slider count moved from 21 to 23: seventeen tuning sliders after Spawn X/Y retired, plus two player-size sliders and four spawn-rule sliders.
-- All five gates pass: typecheck, lint, 356 unit/component tests, build, 34 Chromium cases in 2.7 minutes. `isDefaultDebugSettings` and the debug badge still exclude debug attempts from saved history.
+**Acceptance:** attack clocks are a per-attack collection, a multi-attack archetype fires each on its own cadence in a test, the debug re-epoch covers every clock, the Crystal Worm still has exactly one attack with an identical timeline, and all four gates pass.
 
-### Step 17.4 - Re-Establish Performance And Resource Bounds
+### Step 20.3 - Add The Aimed Spread Pattern
 
-Status: complete. Dependencies: 17.3.
+Status: pending. Dependencies: 20.2.
 
 **Implementation prompt**
 
-Re-derive and re-measure the runtime bounds that multiple enemies invalidate. The existing sustained-play browser test asserts peak bounds of 88 shards, 16 hit texts and 4 audio voices; the 88 came from the retired v2 literal and is no longer derived from configuration.
+Add the pattern the source calls a "directed spread", a "3-way spread" and a "shotgun": a fan of shots over an arc, either aimed at the player or fixed in the world. Additive; no shipped attack uses it yet.
 
-Compute the expected worst case from config - the derived per-enemy live-shard bound times `maxConcurrent` - and assert against that derived value rather than a new hand-picked literal. Extend the 60-second sustained-play and 25-retry browser test to run with spawning active to the approved cap, and report the actual measured peaks for live shards, enemies, hit texts, audio voices and frame timing. Confirm retry and Home fully reset enemies, shards, spawn schedule and hit numbers, leaving one canvas and one effective keyboard handler.
+Implement `kind: "spread"` in `resolveBearings` with `shots`, `arcDegrees`, `aim`, `fixedBearingDegrees` and `emitterRadiusTiles`. The arc is **centred** on the aim bearing: with `shots` of 3 over 24 degrees the bearings are the centre minus 12, the centre, and the centre plus 12. With `shots` of 1 the single bearing is the centre exactly, regardless of `arcDegrees`. With `aim: "player"` the centre is `atan2` of the player's position minus the firing emitter's position; with `aim: "fixed"` it is `fixedBearingDegrees` converted to radians.
 
-Raise a bound only when the derived calculation justifies it, and never lower an assertion to make a run pass. If measured frame timing regresses materially against the recorded single-enemy baseline - median 16.7 ms, p95 16.7 ms, max 33.3 ms over 3597 frames - report it as a blocker with the measurements instead of relaxing the budget. Treat all measurements as observations on this machine, not cross-device guarantees.
+`resolveBearings` must stay pure. The player's position is already available on the context object step 20.1 defined; read it from there rather than reaching into simulation state. Where the aim bearing is undefined - the player standing exactly on the firing point - fall back to the attack clock's current `ringPhaseRadians` rather than drawing a random value, so this pattern introduces no new randomness. That mirrors the existing spawn-placement decision G12 in spirit while keeping step 20.4's seeded generator as the only source of randomness.
 
-**Focused checks:** derived-bound unit test; extended sustained browser run with actual peaks and frame statistics; retry and Home cleanup assertions; one canvas and one listener; existing pixel and layout checks. Full unit suite, typecheck, lint, build, `npm run test:e2e`.
+Note for later authoring, not for implementation here: the source's phase 1 remark that "it may sometimes look like the Queen is firing only 3 stingers, but in fact that is 9 shots with each color stinger stacked ontop of each other" is expressed as **three separate `spread` attacks sharing one cadence**, one per projectile colour, not as a single pattern that fires three projectile types. Keep one projectile per attack.
 
-**Acceptance:** bounds derive from configuration, the sustained run reports measured peaks within them, cleanup is proven across retries, frame timing is reported honestly against the recorded baseline, and all five gates pass.
+Extend `validateAttack` to accept `kind: "spread"` with a positive integer `shots`, a nonnegative `arcDegrees`, an `aim` of exactly `"player"` or `"fixed"`, a finite `fixedBearingDegrees` when and only when `aim` is `"fixed"`, and a nonnegative `emitterRadiusTiles`. Reject `arcDegrees` of 360 or more, which would make the fan wrap onto itself; a full circle is a `ring`, not a `spread`.
 
-**Execution and verification - 2026-10-26**
+**Focused checks:** focused failing test on a 3-shot 24-degree spread's bearings first. Then: the arc is centred, asserted on all three bearings; a 1-shot spread fires exactly on the aim bearing; an even shot count is still symmetric about the centre; `aim: "player"` tracks a moving player across two volleys; `aim: "fixed"` ignores the player entirely; the degenerate player-on-emitter case falls back to the ring phase and is deterministic across runs; `validateAttack` rejects a zero or fractional `shots`, an `arcDegrees` of 360, an unknown `aim`, and a `fixedBearingDegrees` present with `aim: "player"`. Prove no existing behaviour changed. All four routine gates.
 
-- The browser bound now derives from configuration rather than a literal: `LIVE_SHARD_BOUND_PER_ENEMY * MAX_CONCURRENT_ENEMIES`, which is `66 * 4 = 264` for the shipped cadence, replacing the retired v2-era 88. The sustained report also records the bound alongside the peak so the comparison is visible in the evidence rather than implied.
-- **Measured sustained run, 60 browser seconds with spawning active and 25 retries:** 58.99999999999989 simulated seconds, 3 real deaths, 223 progress samples, peak 198 live shards against the 264 bound, peak 3 concurrent enemies against the cap of 4, peak 5 hit texts against 16, peak 1 audio voice against 4, one canvas and one keyboard listener throughout.
-- Peak enemies reached 3 rather than 4 because deaths and retries reset the attempt before the 30-second cap point. The four-enemy case is covered by step 16.3's unit run, which measured a peak of exactly 264 against the derived 264 - the bound is tight, not loose.
-- Retry and Home resets are asserted explicitly: one enemy at `spawnedAtSeconds` 0, `nextEnemyId` back to 2 and `nextSpawnSeconds` back to 10, so the spawn schedule resets and does not carry arrivals across attempts.
-- **Frame timing, reported rather than smoothed.** 3721 measured frames, median 16 ms, p95 18 ms, maximum gap 102 ms. Against the recorded single-enemy baseline of 3597 frames, median 16.7 ms, p95 16.7 ms, maximum 33.3 ms: median and p95 are materially unchanged, but the worst single gap tripled. No frame-time assertion exists to relax - the test asserts 2-second liveness - and no bound was lowered. Treat the 102 ms spike as a single worst-case sample on an unpinned local toolchain (Node 22.21.1 against a pinned 24.22.1) under full diagnostic instrumentation, not as a cross-device guarantee; step 18.1 should re-measure on the pinned toolchain and report whether it persists.
-- All five gates pass: typecheck, lint, 356 unit/component tests, build, 34 Chromium cases.
+**Acceptance:** the `spread` pattern produces centred, correctly aimed fans, stays pure and deterministic with no new randomness, validation covers every rejection case, nothing pre-existing changed, and all four gates pass.
 
-## Phase 18: Regression, Compatibility And Handoff
+### Step 20.4 - Add The Scatter Pattern And Extend Seeded Randomness
 
-### Step 18.1 - Run The Full Acceptance Matrix
-
-Status: complete. Dependencies: 17.4.
+Status: pending. Dependencies: 20.3.
 
 **Implementation prompt**
 
-Run all five gates on the pinned toolchain - Node 24.22.1 and npm 12.2.1 - and verify the complete feature set end to end. Cover the data layer's rejection paths, archetype validation, multi-enemy cadence and pursuit, deterministic spawning and cap, archetype-level debug, derived bounds, and mixed-version history across v1, v2, v3 and the new version.
+Add the pattern behind the source's "messy omnidirectional spray" and "messy bombardment" attacks, and extend the project's seeded randomness to cover it. Additive; no shipped attack uses it yet.
 
-Verify desktop (1440x1000) and narrow (390x844) production-safe runs with real deaths, retries, zoom reload, health bar, hit feedback, mute, Controls, Resume and versioned records and bests. Review captures for readable nonblank gameplay with several enemies on screen, unclipped text, viewport-contained results and a debug panel that still fits.
+Implement `kind: "scatter"` with `shots`, `coneDegrees`, `aim`, `fixedBearingDegrees` and `emitterRadiusTiles`. Each shot's bearing is drawn uniformly within `coneDegrees` centred on the aim bearing, resolved the same way `spread` resolves it. A `coneDegrees` of 360 is the omnidirectional case and is explicitly allowed here, unlike `spread`.
 
-Fix only regressions owned by this follow-up. Record unrelated findings - including the open items in [the principles review](principles-review.md) that these phases did not address, such as the `EncounterScene` responsibility split, the test-only `inspect()` instrumentation shipped in the bundle, the duplicated storage protocol, the duplicated palette and the unused `index.css` token system - without broad cleanup. Automated checks do not substitute for human visual or audible acceptance; say so plainly.
+This is the step that implements K11, so get the determinism right and treat it as the step's real deliverable:
 
-**Focused checks:** current unit, type, lint, build and browser outputs with actual counts; measured spawn, shard and frame figures; screenshots; repeatability. Historical v2 and v3 release evidence is not evidence for this build.
+- `resolveBearings` must stay pure. Do not let it reach into simulation state for randomness. Pass the draws in: have the caller take `shots` values from the generator and hand them to `resolveBearings` as part of its context, or have `resolveBearings` accept an explicit `nextUnitRandom` function. Choose one and say which in your execution record; do not introduce both.
+- Draws happen only inside a fixed step, in `updateAttackClock`, in authored attack order and then shot order, advancing `state.randomSeed` through the existing `nextSeed` and `unitFromSeed` helpers in `simulation/random.ts`. `Math.random` must not appear anywhere in the simulation.
+- The generator cursor stays plain data on `SimulationState`, so the state remains `structuredClone`-able, exactly as G13 established.
 
-**Acceptance:** all five gates pass on the pinned toolchain with recorded counts and measurements, mixed-version history behaves correctly, and limitations are stated honestly. No publication implied.
+The hard requirement: **the same seed and the same input sequence must produce an identical run however many fixed steps a single update executes.** Spawn placement already draws from this generator, so a scatter attack firing in the same tick as a spawn must consume draws in a defined order. Fix that order explicitly - spawns resolve before attacks within a tick today, and that stays true - and test it.
 
-**Execution and verification - 2026-10-26**
+Extend `validateAttack` to accept `kind: "scatter"` with a positive integer `shots`, a `coneDegrees` greater than zero and at most 360, and the same `aim` rules as `spread`.
 
-- **Run on the pinned toolchain.** Installed Node 24.22.1 through nvm and npm 12.2.1 globally, matching `.node-version` and `package.json`, then a clean `npm ci`. Earlier phases ran on Node 22.21.1 and said so; this acceptance run does not.
-- **All five gates pass on the pinned toolchain:** lint, typecheck, 356 unit/component tests across eleven files, production build, and 34 Chromium cases in 2.7 minutes.
-- **The frame-timing question from 17.4 is resolved, and it is not a regression.** The recorded baseline of median 16.7 ms, p95 16.7 ms and maximum 33.3 ms came from a different machine, so it was not a fair comparison. Measuring the pre-phase-15 commit `3857e5c` in a throwaway worktree on this same machine and the same pinned toolchain gives median 16 ms, p95 18 ms, maximum 98 ms over 3735 frames at a peak of 66 shards. The current build gives median 16 ms, p95 19 ms, maximum 113 ms over 3709 frames at a peak of 162 shards. On equal footing the median is unchanged, p95 is one millisecond higher, and the worst single gap is about 15 percent higher while carrying 2.45 times the live shards. The roughly 100 ms worst-case gap is a property of this machine, not of these phases. No budget was relaxed and no assertion weakened; the earlier 102 ms observation was reported honestly and has now been explained.
-- **Measured sustained run on the pinned toolchain**, 60 browser seconds with spawning active: 59.2 simulated seconds, 2 real deaths, 25 retries, 219 progress samples, peak 162 live shards against the derived 264 bound, peak 3 concurrent enemies against the cap of 4, peak 7 hit texts against 16, peak 1 audio voice against 4, one canvas and one keyboard listener throughout. The baseline run at the same settings recorded 0 deaths, confirming that timed spawning does raise the difficulty as intended.
-- Coverage confirmed across the feature set: data-layer rejection paths, archetype validation with the shipped-versus-structural rule split, multi-enemy cadence and independent pursuit, deterministic seeded spawning including the catch-up path, archetype-level debug with the new Spawns group and cap reduction, derived bounds, and mixed-version history spanning v1 through v4 with "Other rules" display and exclusion from the retained best.
-- **Out of scope, recorded not fixed.** These [principles review](principles-review.md) findings remain: F4, the `EncounterScene` responsibility split; F5, the simulation's four remaining global `ENCOUNTER_CONFIG` reads in `advanceSimulation` and `constrainToArena`, still latent rather than live; F6, the test-only `inspect()` instrumentation and `HitAudio` counters still present in the production bundle; F8, the palette duplicated between CSS strings and Phaser numbers and the unused `index.css` token system; F9, the duplicated storage load/degrade protocol. F1, F2, F3, F7, F10, F11 and F12 were addressed by phases 15 to 17.
-- **Limitations stated plainly.** Automated checks are not human visual or audible acceptance. No screenshots were reviewed by a person in this run; the suite's own pixel and layout assertions passed. Firefox, WebKit, touch input, screen readers and an axe audit remain unverified. Frame figures are observations on one machine, not cross-device guarantees. No deployment is claimed or implied.
+**Focused checks:** focused failing test that two simulations with the same seed produce identical scatter bearings first. Then: every drawn bearing lies within the cone; a 360-degree cone covers the full circle over enough draws; the same seed reproduces bearings exactly while a different seed does not; a run advanced in one 10-step update matches a run advanced in ten 1-step updates, bearing for bearing and shard id for shard id; a scatter attack firing in the same tick as a timed spawn consumes draws in the documented order and both outcomes are reproducible; and `grep` over `app/src/game` finds no `Math.random`. All four routine gates.
 
-### Step 18.2 - Update The Handoff Documentation
+**Acceptance:** the `scatter` pattern draws bearings from the injected seeded generator only, `resolveBearings` is still pure, draw order is defined and tested across step batching, no `Math.random` exists in the simulation, nothing pre-existing changed, and all four gates pass.
 
-Status: complete. Dependencies: 18.1.
+### Step 20.5 - Add Ring Gaps, Per-Burst Advance And Arm Spread
+
+Status: pending. Dependencies: 20.4.
 
 **Implementation prompt**
 
-Update `README.md`, the Home changelog and [the mechanics contract](docs/mechanics.md) for the delivered behavior: the JSON data layer and where authored values live, the archetype model, timed spawning with its approved values, the new rules version and its history compatibility, and the retirement of the geometry study. Preserve v1, v2 and v3 provenance and approval history rather than rewriting it; the study's conclusions stay recorded even though its code is gone.
+Complete the `ring` pattern with the three options the Killer Bee Queen's later phases need, so that no separate "radial", "spiral" or "machinegun" pattern kind is ever introduced. Additive; no shipped attack uses them yet.
 
-State clearly which values are approved ROTMG-derived facts, which are trainer-specific approximations, and which are tuning choices recorded under 17.1. Document how to author a new arena or enemy archetype by editing JSON, and that no second archetype's gameplay values are approved. Do not claim a deployment; publication is a separate authorized step.
+Add three optional `ring` fields, each defaulting to the behaviour the Crystal Worm has today when absent or zero:
 
-**Focused checks:** documentation structural checks, link integrity, version and value accuracy against the shipped data files, and confirmation that no runtime file changed.
+- `perBurstAdvanceDegrees`: the ring's phase additionally advances by this many degrees per completed burst. This expresses the source's phase 7 detail that the Queen fires "4 White Bombs ... at a 15 degree-increasing angle each time". It composes with `clockwiseDegreesPerSecond` rather than replacing it; a static radial burst that steps round is `clockwiseDegreesPerSecond: 0` with a nonzero advance.
+- `gapSectorsDegrees`: an array of `[fromDegrees, toDegrees]` sectors, measured in the ring's **own rotating frame** so a gap travels with the pattern. An arm whose bearing falls inside any sector fires nothing this volley. This expresses the source's phase 6 detail that the rotating shot-machinegun has "two gaps in the rotation", which are the openings the player survives in.
+- `armSpreadDegreesPerSecond` with `maxArmSpreadDegrees`: the angular offset between arms grows from zero at the attack's start up to the maximum, then holds. This expresses the source's phase 6 detail that the attack "is initially aimed at the top and bottom of the room and will expand over the first few seconds to cover the top-right and bottom-left corners". Measure the elapsed time from the attack clock's epoch, not from the simulation start, so a re-entered phase behaves the same way.
 
-**Acceptance:** documentation matches the shipped runtime and data, provenance is preserved, authoring a new archetype is documented, and no deployment or approval is claimed that was not granted.
+Record the mapping in a comment next to the pattern type, so a later reader does not reinvent the missing kinds: a spiral is a ring with a nonzero rotation rate; a static radial burst is a ring with a zero rotation rate; phase 6's machinegun is a ring with `arms: 2`, a high rotation rate, two gap sectors and an arm spread.
 
-**Execution and verification - 2026-10-26**
+Extend `validateAttack`: `perBurstAdvanceDegrees` finite and optional; `gapSectorsDegrees` an array of two-element finite pairs, each sector narrower than 360 degrees, with the **total** gap coverage strictly less than 360 so an attack can never be silenced entirely; `armSpreadDegreesPerSecond` finite with `maxArmSpreadDegrees` present and nonnegative whenever it is nonzero. Reject an arm spread that would carry two arms onto the same bearing.
 
-- `README.md` now opens with a **Current V4 State** section covering the spawn rule and its approved values, the random opening bearing with the `?seed=` parameter, the unchanged weapon and arena policy, and the retained-but-excluded v1/v2/v3 history. An **Authored Data** subsection tables the four JSON files, says which file to edit for the arena, the enemy and spawning, and documents that adding a second archetype is pure data while being explicit that no second archetype's gameplay values are approved. A **V4 Verification** subsection records the pinned-toolchain gate run and the frame-timing comparison.
-- Recorded in the README that the geometry study is retired, that its source dimensions never affected a shipped vertex because bodies scale from a normalized outline, and that its conclusions remain in the mechanics contract even though the code is gone.
-- The Home changelog gained a 26 Oct 2026 entry in player-facing language - heads arriving over time, data-authored arena and enemies with `?seed=` replay, and the new comparison identity - preserving the earlier entries.
-- [The mechanics contract](docs/mechanics.md) keeps the additive V4 Swarm Contract written in step 17.1; v1, v2 and v3 provenance is untouched.
-- **Link integrity repaired.** Deleting the study broke ten markdown links across `README.md`, `docs/mechanics.md` and the v2 archive. Historical prose keeps its wording, with each dead link converted to a plain code reference marked retired, rather than rewriting history or leaving broken links. Every relative link in the plan, both archives, the README, the principles review, the mechanics and fixes documents and all four instruction files now resolves on disk.
-- No runtime behaviour changed by this step. Re-ran all five gates on the pinned toolchain after the changelog edit: lint, typecheck, 356 unit/component tests, build and 34 Chromium cases. No deployment is claimed; publication remains a separate authorized step.
+A ring with all three fields absent must resolve bearings identically to step 20.1's implementation. Prove that, do not assume it.
+
+**Focused checks:** focused failing test on a ring with a 15-degree per-burst advance first. Then: the advance accumulates per completed burst and not per shot; a gap sector suppresses exactly the arms inside it and no others; a gap rotates with the ring, proven by the same arm being suppressed and then not suppressed as the phase advances; arm spread grows linearly from zero and clamps at the maximum; spread is measured from the clock epoch; a ring with all three absent produces bearings byte-identical to 20.1; validation rejects total gap coverage of 360 degrees, a malformed sector pair, an arm spread without a maximum, and a spread that collides two arms. Then prove behaviour identity on the Crystal Worm: the 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must pass **unchanged**. All four routine gates.
+
+**Acceptance:** `ring` covers spiral, radial and gapped rotating-machinegun attacks through three optional fields, the absent-field case is proven identical to 20.1, validation prevents a fully silenced or self-colliding ring, the Crystal Worm timeline is unchanged, and all four gates pass.
+
+## Phase 21: Player Conditions And The Damage Model
+
+### Step 21.1 - Add Condition State, Application And Ticking
+
+Status: pending. Dependencies: 20.5.
+
+**Implementation prompt**
+
+Give the player status conditions. This step adds the state and its lifecycle only; no condition yet changes movement or damage, and no shipped projectile applies one.
+
+Create `app/src/game/simulation/conditions.ts`. Define the full key set from [the source extract](docs/killer-bee-queen-source.md)'s status table, all thirteen that the Queen can inflict:
+
+```ts
+export const ACTIVE_CONDITIONS = ["paralyzed", "slowed", "confused",
+  "armorBroken", "exposed", "cursed", "sick"] as const;
+export const INERT_CONDITIONS = ["dazed", "silenced", "quiet",
+  "weak", "unstable", "petStasis"] as const;
+```
+
+All thirteen are authorable, validated, stored and displayed; only the seven active ones ever change a rule. That is K03. Tracking the inert six is deliberate and is not speculative state: the authored data stays faithful to the source, the HUD can honestly tell the player what the live game would be doing to them, and promoting one later is a data change rather than a model change. Put that reasoning in a comment so a later reader does not "simplify" it away.
+
+Add `conditionSeconds: Record<ConditionKey, number>` to `PlayerState`, initialised to zero for every key in `createSimulation`. Give the module three operations:
+
+- `applyConditions(player, conditions)` where `conditions` is the authored array from a projectile. The refresh rule is `remaining = Math.max(remaining, appliedSeconds)`: a longer application replaces a shorter remainder, a shorter one never shortens a longer remainder, and durations never stack or sum.
+- `tickConditions(player, stepSeconds)` decrements every nonzero entry, clamping at zero.
+- `hasCondition(player, key)` returns whether its remaining time is greater than zero.
+
+**Ordering inside the fixed step, which must be exact and tested.** Call `tickConditions` at the **start** of each step, before player movement. A condition applied by a hit during step N is therefore read at full strength by step N+1's movement and damage, and is never shortened by the step that applied it. Do not decrement at the end of the step; do not decrement inside `applyConditions`.
+
+Extend `config/data.ts` so a projectile's `conditions` array is validated: each entry an object with a `key` from the thirteen and a `seconds` greater than zero; reject an unknown key, a duplicated key within one projectile, and a nonpositive duration. Author nothing into `projectiles.json`: the Crystal Worm shard keeps its empty `conditions` array.
+
+Also expose the condition state through `inspect()` and the Playwright `Inspection` type, since later steps and the acceptance run need to observe it.
+
+**Focused checks:** focused failing test on `applyConditions` first. Then: a fresh player has every key at zero; applying 1.4 seconds sets exactly 1.4; re-applying 0.8 over a 1.4 remainder leaves 1.4; re-applying 3 over a 1.4 remainder sets 3; ticking decrements by the step and clamps at zero rather than going negative; a condition expires on the exact step boundary; `hasCondition` is false at exactly zero; a hit in step N leaves the condition at full duration for step N+1, asserted on the recorded remaining time; validation rejects an unknown key, a duplicate key and a zero or negative duration. Confirm no gameplay changed: every pre-existing assertion passes unchanged. All four routine gates.
+
+**Acceptance:** all thirteen conditions are modelled, refreshed by the maximum rule, ticked once at the start of each step, validated at the data boundary and visible to `inspect()`; no condition yet changes a rule; nothing pre-existing changed; and all four gates pass.
+
+### Step 21.2 - Apply The Movement Conditions
+
+Status: pending. Dependencies: 21.1.
+
+**Implementation prompt**
+
+Make Paralyzed, Slowed and Confused change how the player moves. These are the three conditions that directly change dodging, so they are the heart of what this boss teaches.
+
+Each rule comes from the source's status table, quoted in [the source extract](docs/killer-bee-queen-source.md), and each maps onto this project's existing movement derivation in `config/stats.ts`:
+
+- **Paralyzed** - "Renders entity completely immobile." The player's travel this step is zero. Input is still read and still has no effect; do not freeze the simulation, the camera or anything else.
+- **Slowed** - "Reduces player SPD to 0 during movement speed calculation, resulting in a base speed of 4 tiles/second." Do not author 4 as a literal. Derive it by running the existing `derivePlayerStats` with the Paladin's speed stat replaced by zero, which yields `STAT_RULES.movement.baseTilesPerSecond` exactly. Compute it once as a module constant and assert in a test that it equals 4 and that it is strictly less than the Paladin's 7.0613 tiles per second.
+- **Confused** - "Changes controls by swapping directional controls... Left > Down, Down > Left, Right > Up, Up > Right." Apply this as a transform on `SimulationInput` before the direction vector is built: west becomes south, south becomes west, east becomes north, north becomes east. Transform the input, do not negate the resulting vector - a sign flip is a different and wrong effect. Note that this mapping is its own inverse, so applying it twice returns the original input; assert that.
+
+Implement these as a single `playerTravelTiles(player, stepSeconds)` and a single `effectiveInput(player, input)` in `conditions.ts`, called from `updateMovement` in `simulation.ts`. Paralyzed takes priority over Slowed, since zero speed is already the stronger effect; the published rule that Slowed "nullifies the effects of Speedy" has no referent here because no positive conditions exist.
+
+These conditions affect the **player only**. Enemy movement is untouched: nothing in this encounter slows or paralyses an enemy, and the player cannot attack. Do not add condition state to `EnemyState`.
+
+No shipped projectile applies a condition yet, so apply these in tests by setting `conditionSeconds` directly on a simulation state.
+
+**Focused checks:** focused failing test that a paralysed player does not move first. Then: a paralysed player holding every direction stays exactly in place for the whole duration and moves again on the first step after expiry; a slowed player travels exactly `4 * stepSeconds` per step and the derived constant equals 4 and is below 7.0613; paralysed plus slowed moves zero; each of the four confused mappings is correct, applied to a single direction and to a diagonal; the confused transform applied twice is the identity; the diagonal normalisation still holds under confusion, so a confused diagonal is no faster than a straight line; and arena containment still holds under every combination. Confirm nothing pre-existing changed. All four routine gates.
+
+**Acceptance:** Paralyzed, Slowed and Confused change player movement exactly as the source specifies, the slowed speed is derived rather than authored, the confused mapping is the published one and is self-inverse, enemies are unaffected, nothing pre-existing changed, and all four gates pass.
+
+### Step 21.3 - Apply The Damage Conditions And Armor Piercing
+
+Status: pending. Dependencies: 21.2.
+
+**Implementation prompt**
+
+Make Armor Broken, Exposed, Curse and Sick change damage and regeneration, and make a projectile's `armorPiercing` flag mean something. Most of the Queen's shots ignore defence, so this is what makes her dangerous rather than merely busy.
+
+**The formula, which must be implemented exactly as written.** Defence is resolved first, may go negative, and Curse is applied last:
+
+```ts
+// conditions.ts - named constants, both sourced from the status-effects page
+const EXPOSED_DEFENSE_PENALTY = 20;
+const CURSE_DAMAGE_MULTIPLIER = 1.25;
+
+export function effectiveDefenseFor(player, armorPiercing): number {
+  let defense =
+    armorPiercing || hasCondition(player, "armorBroken")
+      ? 0
+      : PALADIN_STATS.defense;
+  if (hasCondition(player, "exposed")) defense -= EXPOSED_DEFENSE_PENALTY;
+  return defense;
+}
+```
+
+Then change `calculateDamageHp` in `config/stats.ts` to take a signed defence and a `cursed` flag:
+
+```ts
+damage = Math.max(rawDamageHp - defense, rawDamageHp * minimumFraction);
+if (cursed) damage *= CURSE_DAMAGE_MULTIPLIER;
+return Math.ceil(damage);
+```
+
+`calculateDamageHp` currently calls `assertNonnegative(defense, "defense")`. **Remove that assertion** and replace it with a finiteness check, because Exposed legitimately produces a negative defence - that is exactly how the source's "20 more damage per hit" against an armour-piercing or Armor-Broken target arises. Keep the existing zero-raw-damage early return: a Red Glaive deals 0 damage and exists only to apply Armor Broken for 7 seconds, so it must still count as a hit and must still apply its condition.
+
+These are the seven cases to pin as tests, for a raw 100-damage shot against the Paladin's 32 defence:
+
+| Case | Effective defence | Damage |
+| ---- | ----------------- | ------ |
+| none | 32 | 68 |
+| armour-piercing | 0 | 100 |
+| Armor Broken | 0 | 100 |
+| Exposed | 12 | 88 |
+| armour-piercing + Exposed | -20 | 120 |
+| Armor Broken + Exposed | -20 | 120 |
+| Curse only | 32 | 85 |
+
+**Two things to record as interpretations, not facts.** First, Curse is applied after the minimum-damage floor; the source says only that Curse is calculated "after defense and defense modifiers" and says nothing about the floor. Second, the source's two sentences about Armor Broken against an already-negative defence cannot both hold in one linear formula; the formula above is correct for every defence of 20 or more, and the only player preset has 32, so the sub-20 case is deliberately not modelled. Both notes belong in the step's execution record and in the mechanics contract section written in 19.1.
+
+**Sick** stops regeneration: in `regeneratePlayer`, when the player has `sick`, add no HP at all - neither the normal nor the in-combat rate - while still decrementing `combatRemainingSeconds` so the combat window expires on schedule.
+
+Wire it together: `registerShardHit` resolves the firing projectile through `projectileOf`, computes `effectiveDefenseFor(player, projectile.armorPiercing)`, passes it and the `cursed` flag to `applyPlayerHit`, and calls `applyConditions(player, projectile.conditions)` on an accepted hit. Apply conditions **only** on an accepted hit, so the once-per-shard rule governs conditions exactly as it governs damage.
+
+**Focused checks:** focused failing test on the armour-piercing-plus-Exposed case producing 120 first. Then: all seven table rows exactly; `calculateDamageHp` accepts a negative defence and rejects a nonfinite one; the minimum-damage floor still applies to a high-defence low-damage shot; a 0-damage condition-only projectile registers a hit, applies its condition and deals 0; a sick player regenerates nothing while the combat timer still counts down; conditions are applied once per shard and a second overlap by the same shard applies nothing; and the existing `applyPlayerHit` and regeneration tests pass unchanged for an unconditioned player. All four routine gates.
+
+**Acceptance:** the condition-aware damage formula matches all seven cases, negative defence is supported and tested, Sick stops regeneration without stalling the combat timer, conditions are applied once per shard on accepted hits only, the two unsourced interpretations are recorded, and all four gates pass.
+
+### Step 21.4 - Show Active Conditions To The Player
+
+Status: pending. Dependencies: 21.3.
+
+**Implementation prompt**
+
+A dodge trainer that paralyses the player without saying so is unusable. Surface the active conditions.
+
+Draw them in **Phaser**, beside the existing health bar in `phaser/encounter.ts`, not in React. React must not re-render per frame, and the health bar already establishes this pattern for fast-changing player state. Reuse `drawHealthBar`'s layout approach and its colour constants rather than introducing a second styling route.
+
+For each condition with remaining time greater than zero, draw a small labelled chip showing a short name and the remaining seconds to one decimal place. Order them by the declaration order of `ACTIVE_CONDITIONS` followed by `INERT_CONDITIONS`, so the display never jitters as durations change. Mark an inert condition visibly - a dimmed chip and the word "inert" in its tooltip or label - so the player can see the live game would be affecting them while this trainer does not. Take the colours, chip size and spacing from the existing presentation constants in that file; add new ones there with explicit units rather than inlining numbers at the draw site.
+
+Add the condition names to the existing Controls dialog's content so the player can read what each one does, using the source's published wording for the seven active ones and "no effect in this trainer, because the player does not attack" for the six inert ones.
+
+Do not add a React HUD element, a per-frame React state update, a condition timeline, or a settings toggle.
+
+**Focused checks:** a focused Vitest check that the renderer's draw routine emits one chip per active condition in the declared order, following whatever seam the existing `drawEntities` and `drawHealthBar` tests already use; a check that an expired condition draws nothing; a React test that the Controls dialog lists all thirteen conditions and marks the six inert ones; and `npm run test:e2e -- --grep "<the condition display test you add>"` for the browser path. Confirm no React component re-renders per frame, by showing that no new state or effect was added to a per-frame path. All four routine gates.
+
+**Acceptance:** active conditions are visible in the Phaser layer with remaining time, inert ones are visibly marked as inert, the Controls dialog documents all thirteen, no per-frame React update was introduced, and all four gates pass.
+
+### Step 21.5 - Implement Enemy Contact Damage
+
+Status: pending. Dependencies: 21.4.
+
+**Implementation prompt**
+
+Implement K17. The archetype has carried `contactDamageHp` and `blocksPlayer` since step 15.3, validated and asserted to be `0` and `false`, with no behaviour behind them. The Small Worker Bee needs them: its only attack is an invisible projectile at speed 0 and range 0, and [the source extract](docs/killer-bee-queen-source.md) records its behaviour as "Charges at player attempting to do contact damage" for 40 armour-piercing damage and Slowed for 1.6 seconds.
+
+Extend the archetype's contact block to carry what a touch attack needs: `contactDamageHp`, `contactConditions` shaped exactly like a projectile's `conditions`, `contactArmorPiercing` and `contactCooldownSeconds`. The cooldown is essential - without it an overlapping enemy would apply damage sixty times a second - and it is `trainer-authored`, because the source gives no rate. Track the next eligible contact time per enemy in `EnemyState`, not globally, so two touching enemies each hit on their own schedule.
+
+Resolve contact once per fixed step, after enemy movement and before shard advance, so a chasing enemy's new position is the one tested. Use the existing swept convex overlap between the enemy's body and the player's body across the step, exactly as shards do - **not** a cheaper distance check, because a fast-charging minion must not tunnel through the player between steps. Route an accepted contact through the same `registerShardHit` path that projectiles use, so damage, conditions, the condition-aware defence formula from step 21.3, the hit audio and the floating damage number all behave identically. Where that path needs a shard id, pass a stable synthetic identity derived from the enemy id rather than minting a fake shard.
+
+Contact damage is **not** once-per-enemy: it repeats on its cooldown for as long as the bodies overlap. That is the opposite of the per-shard rule and is correct - it is the pressure that makes a charging minion dangerous. Make the difference explicit in a comment so a later reader does not "fix" it into once-only.
+
+Leave `blocksPlayer` behaviour out of this step. No enemy in this encounter blocks, G16 says enemies pass through each other, and implementing collision pushback is a separate mechanic with its own design questions. Keep the field validated and keep asserting it is `false`.
+
+The Crystal Worm keeps `contactDamageHp: 0`, and `validateEncounterConfig` must keep asserting it, so a zero contact damage must mean "no contact attack at all" rather than "a zero-damage hit on a cooldown". Short-circuit before the overlap test when contact damage is zero and there are no contact conditions, both for correctness and to keep the per-tick cost off encounters that do not use it.
+
+**Focused checks:** focused failing test that an overlapping contact-damaging enemy damages the player first. Then: contact applies on the cooldown and not every step, asserted on hit count over a known duration; it repeats while overlapping, unlike a shard; it stops when the bodies separate and resumes when they overlap again; two overlapping enemies hit on independent schedules; contact conditions are applied through the same path, proven by a contact that applies Slowed and measurably halves the player's travel; `contactArmorPiercing` goes through step 21.3's formula, so 40 armour-piercing damage deals 40 rather than 8; a fast enemy crossing the player within one step still registers, which is the tunnelling regression test; an archetype with zero contact damage and no contact conditions never runs the overlap test; and the Crystal Worm's zero-contact assertion still holds with every pre-existing assertion unchanged. All four routine gates.
+
+**Acceptance:** enemies with authored contact damage hit the player on a cooldown through the shared hit path, the swept test prevents tunnelling, contact conditions work, the repeat-versus-once-only difference is documented, `blocksPlayer` is untouched, zero-contact archetypes short-circuit, and all four gates pass.
+
+
+## Phase 22: Enemy Health, Phases And Movement Behaviours
+
+### Step 22.1 - Introduce The Movement Behaviour Vocabulary
+
+Status: pending. Dependencies: 21.5.
+
+**Implementation prompt**
+
+Behaviour-identical refactor. The Queen moves differently in every phase, so movement becomes an authored behaviour rather than a bare speed. No shipped gameplay value may change.
+
+Replace the archetype's `speedTilesPerSecond` with a `movement` discriminated union, authored in `enemies.json`. The Crystal Worm becomes `{ "kind": "chase", "speedTilesPerSecond": 1.5 }`, which must behave exactly as today. Implement all five kinds now, because step 23 authors phases that use each of them:
+
+- `chase` with `speedTilesPerSecond`: the existing `pursueBody` call, body-aware, stopping at silhouette contact distance. Unchanged.
+- `stationary`: no movement at all.
+- `move-to-point` with `target` of `"arena-center"` and `speedTilesPerSecond`: move toward a point, stopping on arrival. This is **point-based, not body-aware** - it is the behaviour the `chaseArenaCenter` debug toggle already implements inline in `updateMovement`, and that inline block must be deleted in favour of this kind. Preserve its exact semantics, including that a zero remaining distance produces zero travel.
+- `orbit` with `radiusTiles`, `degreesPerSecond`, `direction` of `"cw"` or `"ccw"`, and `approachSpeedTilesPerSecond`: while the enemy is not yet on the ring around the arena centre, move toward its nearest ring point at the approach speed; once on it, hold the ring and advance `movementPhaseRadians` at the authored rate, positioning the enemy in closed form from that phase. Derive the resulting tangential speed as `radiusTiles * degreesPerSecond` in radians and **validate it is strictly below the Paladin's 7.0613 tiles per second**, so an orbiting boss can never outrun the player.
+- `wander` with `speedTilesPerSecond`, `retargetSeconds` and `radiusTiles`: move toward a target point drawn from the injected seeded generator within `radiusTiles` of the arena centre, redrawing every `retargetSeconds` and on arrival.
+
+Add `movementPhaseRadians` to `EnemyState` for the orbit phase, and whatever minimal state `wander` needs for its current target and next retarget time. Keep every field plain data so `SimulationState` stays `structuredClone`-able.
+
+**The randomness draw order, which this step fixes and tests.** `wander` draws inside the simulation, so the full per-tick order is now: player movement, then enemy movement in enemy insertion order, then shard advance and hit resolution, then timed spawns, then attacks in enemy order and then authored attack order. Every generator draw happens in exactly that order. This extends step 20.4's spawns-before-attacks rule rather than replacing it; state the full order in a comment beside the step function and assert it with a test that mixes a wandering enemy, a timed spawn and a scatter attack in one tick.
+
+Replace the `chaseArenaCenter` debug toggle's inline implementation with a movement-spec override: the toggle swaps the active movement for `move-to-point` at the arena centre. The toggle's observable behaviour must not change. Extend `validateEncounterConfig` to validate each movement kind's own fields and to keep asserting that a `chase` speed is below the Paladin's, which `validateShippedEncounter` already requires.
+
+**Focused checks:** focused failing test on the `movement` union shape first. Then: `chase` reproduces today's pursuit and stopping distance exactly; `stationary` never moves; `move-to-point` reaches the arena centre, stops there and matches the retired `chaseArenaCenter` path step for step; `orbit` approaches the ring then holds it, advances in the authored direction, and its derived tangential speed is validated against the Paladin's speed with a rejection case; `wander` retargets on schedule and on arrival, stays inside its radius, and is reproducible under a fixed seed; the full draw order holds in a tick that mixes wander, spawn and scatter; arena containment holds for every kind. Then prove behaviour identity: the 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must pass **unchanged**. All four routine gates, plus `npm run test:e2e -- --grep "chase"`.
+
+**Acceptance:** all five movement kinds work, the `chaseArenaCenter` inline block is gone in favour of `move-to-point`, orbit speed is validated against the player's, the generator draw order is documented and tested, the Crystal Worm timeline is unchanged, and all four gates pass.
+
+### Step 22.2 - Add Enemy Health And The Simulated Progression Driver
+
+Status: pending. Dependencies: 22.1.
+
+**Implementation prompt**
+
+Give an enemy optional health and the authored drain rate that advances a boss through its phases. This implements K01's progression half and K08.
+
+Add to the archetype an optional `health` block: `maxHealthHp` and `progression`, where `progression` is `{ "kind": "none" }` or `{ "kind": "simulated-dps", "hpPerSecond": N }`. The Crystal Worm authors **no** `health` block at all, so its `healthHp` and `maxHealthHp` stay `null`: do not invent a hit-point total for it, because none is sourced. An archetype with no `health` block must behave exactly as today.
+
+Add `healthHp: number | null`, `maxHealthHp: number | null` and `invulnerableUntilSeconds: number` to `EnemyState`, set in `createEnemy` from the archetype. Add a `healthFraction(enemy)` helper returning `healthHp / maxHealthHp`, or exactly `1` when either is `null`, so the phase machine in 22.3 has one query that works for both kinds of archetype.
+
+Apply the drain once per fixed step, in a named operation in `simulation/phases.ts`, after enemy movement and before attacks:
+
+- `{ "kind": "none" }` drains nothing.
+- `{ "kind": "simulated-dps", "hpPerSecond": N }` subtracts `N * stepSeconds`, clamped at zero.
+- **K08: while `elapsedSeconds < enemy.invulnerableUntilSeconds`, drain nothing.** Invulnerability affects progression and nothing else - the player cannot deal damage, so there is nothing else for it to block. Say so in a comment, so a later reader does not look for a missing damage path.
+
+When a drained enemy reaches zero health, set `state.phase` to a new `"cleared"` value and stop the simulation the way `"ended"` already stops it. `"ended"` keeps meaning the player died; `"cleared"` means the boss did. Return both from `advanceSimulation` the same way, and make every existing early-return path that checks `state.phase === "ended"` handle `"cleared"` too - search for every comparison rather than assuming there is one.
+
+**Do not** surface `"cleared"` in the session layer, the results screen, the attempt record or the Home comparison in this step. Step 23.1 owns that, together with encounter selection and the storage implication, so the schema is touched once. Note in your execution record that a cleared run currently ends the simulation without a distinct player-visible result, and that this is deliberate and temporary.
+
+Allow a **per-phase override** of the same `progression` shape, resolved as "the active phase's `progression` if it authored one, otherwise the archetype's". Step 23.9 needs it: the source's Beehemoths heal the Queen at a fixed single-player rate during phase 7, which under this model is simply a lower net drain for that phase. One resolution rule and no second mechanism; the phase field is validated by the same validator as the archetype field. Step 22.3 reads it once the phase machine exists - until then, resolve against the archetype only and leave the field validated but unused.
+
+Add a debug toggle `pauseProgression` per K12, defaulting off, which suppresses the drain entirely so a phase can be inspected indefinitely. Add it to the existing `DEBUG_TOGGLES` registry rather than hand-coding a checkbox.
+
+**Focused checks:** focused failing test that an archetype with no `health` block has `null` health and `healthFraction` of 1 first. Then: a `simulated-dps` enemy loses exactly `hpPerSecond * stepSeconds` each step; health clamps at zero and never goes negative; the drain is suppressed for the exact duration of an invulnerability window and resumes on the first step after it; reaching zero sets `"cleared"` and stops further advancement; `pauseProgression` suppresses the drain and the enemy's health is unchanged over many steps; the drain is identical at 30, 60 and 120 Hz for the same elapsed time; a per-phase `progression` override validates and is rejected when malformed, while the archetype rate is still used when a phase authors none; and every pre-existing assertion passes unchanged for the Crystal Worm, which has no health. All four routine gates.
+
+**Acceptance:** enemies have optional health with an authored progression rate, invulnerability pauses the drain, a drained boss sets `"cleared"` and halts the simulation, `pauseProgression` works from the existing debug registry, the Crystal Worm is unaffected, and all four gates pass.
+
+### Step 22.3 - Implement The Phase Machine
+
+Status: pending. Dependencies: 22.2.
+
+**Implementation prompt**
+
+Behaviour-identical refactor, and the step the whole encounter is built on. An enemy's attacks and movement become properties of its current phase.
+
+Move the archetype's `attacks` and `movement` into an ordered `phases` array, each phase shaped as the plan's Target Data Shapes section shows: `id`, `enterAtHpFraction`, `exitAfterSeconds`, `telegraphSeconds`, `invulnerableOnEnterSeconds`, `movement`, `progression`, `attacks`. Leave `subPhases` and `spawns` out entirely; step 22.4 adds them. Connect step 22.2's per-phase `progression` override here: the drain resolves the active phase's rate when it authored one and the archetype's otherwise. The Crystal Worm authors `null`, so nothing changes for it. The Crystal Worm becomes a single phase: `id` `"sole"`, `enterAtHpFraction` 1, `exitAfterSeconds` null, `telegraphSeconds` 0, `invulnerableOnEnterSeconds` 0, its `chase` movement and its one attack. Its observable behaviour must not change.
+
+Own the transition rules in `simulation/phases.ts`:
+
+- Phases are authored in strictly **descending** `enterAtHpFraction`, and the first must be exactly 1. The loader rejects any other ordering, a duplicate threshold, a fraction outside 0 to 1 exclusive of 0, and an empty array.
+- Evaluate transitions once per fixed step, after the progression drain. Advance to the next phase when **either** `healthFraction(enemy) <= nextPhase.enterAtHpFraction` **or** the current phase authored an `exitAfterSeconds` and `elapsedSeconds - enemy.phaseEnteredAtSeconds >= it`. That is K09.
+- Progression is **monotonic**: never return to an earlier phase, and never re-enter the current one. A single step may cross more than one threshold if the drain rate is high, so advance in a loop and apply each entry's effects, rather than advancing at most one phase per step.
+- On entering a phase: set `phaseEnteredAtSeconds`, set `invulnerableUntilSeconds` to `elapsedSeconds + invulnerableOnEnterSeconds`, reset `movementPhaseRadians` and any wander state, and **rebuild `attackClocks`** from the new phase's attacks.
+- **The telegraph is implemented by the clock anchor, not by a firing gate.** When rebuilding clocks on phase entry, anchor each clock's epoch at `phaseEnteredAtSeconds + telegraphSeconds`. Each attack's own `initialDelaySeconds` then adds on top of that. Do not add a separate "is telegraphing" branch in `updateAttackClock`; one anchor is enough and it cannot drift.
+
+Read the active phase's `movement` in `updateMovement` and the active phase's `attacks` in `updateAttacks`. Add a `telegraph` colour flash to `phaser/encounter.ts` while a phase is telegraphing, using the existing presentation constants, because the source's phases are all introduced by the Queen flashing a colour and the player must be able to read it. Author the flash colour per phase in `enemies.json` as a named string resolved against the existing palette, not as a raw hex value in the data.
+
+Extend `inspect()` and the Playwright `Inspection` type with the active phase id, index and entry time.
+
+**Focused checks:** focused failing test that a three-phase test archetype enters phase 2 at its authored HP fraction first. Then: entry at exactly the threshold, not one step late; a single step crossing two thresholds lands in the correct later phase with both entries' effects applied; `exitAfterSeconds` exits on duration while health is untouched; progression never goes backward when health is restored artificially; clocks are rebuilt on entry so the new phase's attacks start from their own epoch; the telegraph delays the first shot by exactly `telegraphSeconds` plus the attack's own initial delay; the invulnerability window set on entry suppresses the drain for exactly its duration; a phase authoring a `progression` override drains at its own rate and the next phase reverts to the archetype's; the loader rejects an empty phase array, a first fraction other than 1, an ascending or duplicated threshold, and a fraction of 0 or above 1. Then prove behaviour identity: the 671-volley assertion, the 30/60/120 Hz equivalence test and the fixed-600-tick reproducibility test must pass **unchanged**. All four routine gates, plus `npm run test:e2e -- --grep "phase"`.
+
+**Acceptance:** phases own movement and attacks, transitions fire on an HP fraction or a duration, progression is monotonic and handles multi-threshold steps, the telegraph is implemented by the clock anchor and is visible, validation covers every malformed phase list, the Crystal Worm is a single phase with an unchanged timeline, and all four gates pass.
+
+### Step 22.4 - Add Cycling Sub-Phases And Phase-Driven Spawns
+
+Status: pending. Dependencies: 22.3.
+
+**Implementation prompt**
+
+Add the two remaining structures the Queen needs: the colour rotation inside phases 2, 5 and 7, and minions summoned by a phase. Additive; the Crystal Worm uses neither.
+
+**Sub-phases.** Add an optional `subPhases` array to a phase, each entry carrying `id`, `durationSeconds`, `telegraphSeconds`, `invulnerableOnEnterSeconds`, an optional `movement` override and its own `attacks`. While a phase has sub-phases, exactly one is active: it advances when `elapsedSeconds - subPhaseEnteredAtSeconds >= durationSeconds`, cycling back to the first after the last. Use the **same mechanism** as the phase machine, not a parallel one: entry sets `subPhaseEnteredAtSeconds` and `invulnerableUntilSeconds`, and rebuilds `attackClocks` anchored at the entry time plus the sub-phase's telegraph. The active attack set is the phase's own attacks plus the current sub-phase's attacks, with the phase's attacks first so clock and shard ordering stays deterministic. A sub-phase `movement` override replaces the phase's for its duration; when absent the phase's movement continues. The source's "she is invulnerable in between attacks" is expressed as a nonzero `invulnerableOnEnterSeconds` on each sub-phase, which per K08 also pauses the drain - so a sub-phase cycle lengthens the fight, which is correct and intended.
+
+Reuse `subPhaseIndex` and `subPhaseEnteredAtSeconds`, already on `EnemyState`. A phase with no sub-phases keeps `subPhaseIndex` at 0 and must behave exactly as step 22.3 left it.
+
+**Phase-driven spawns.** Add an optional `spawns` array to a phase or sub-phase, each entry carrying `archetype`, `count`, `despawnOnExit` and a `placement` of `{ "kind": "ring-around-owner", "radiusTiles": N }` or `{ "kind": "arena-ring", "ringRadiusFraction": N }`. Resolve them **once on entry**, not per step. Spread the `count` positions evenly around the chosen ring, offsetting by the golden angle already authored in `encounter.json` so repeated entries do not stack minions on the same points, reusing the existing placement helper rather than writing a second one.
+
+Add an optional `startPhaseIndex` to a spawn entry, defaulting to 0, which selects the phase the spawned minion begins in. K18 needs it: an Adolescent Beehemoth fires aimed stinger pairs normally and radial bursts during the Queen's final phase, so one archetype with two phases is spawned at index 0 by phase 7 and at index 1 by phase 8. Validate it against the spawned archetype's phase count. This is the same concept step 22.5 gives `createSimulation` for drill mode; share the entry routine rather than writing a second one.
+
+Add `spawnedByEnemyId: number | null` to `EnemyState`. On leaving a phase or sub-phase, remove every enemy that it spawned with `despawnOnExit` set, which is how the source's Killer Bees "despawn when she switches attacks". Removing an enemy must **not** remove the shards it already fired: they expire on their own lifetimes, exactly as the once-fired rules require.
+
+Guard the explosion risk explicitly. Add an authored `maxConcurrentMinions` to `encounter.json`, validate it, and have a phase spawn fewer than its `count` rather than exceed it - suppressed like the existing `maxConcurrent` cap, never queued for later. Reject a `count` above the cap at load time so an unreachable authored number is a loud failure, not a silent truncation.
+
+**Focused checks:** focused failing test that a two-sub-phase test archetype alternates on its authored durations first. Then: a sub-phase cycle wraps after the last entry; the active attack set is phase attacks followed by sub-phase attacks in that order; a sub-phase movement override applies for its duration and the phase's movement resumes when it ends; each sub-phase entry sets its invulnerability window and therefore pauses the drain; a phase with no sub-phases behaves exactly as 22.3 left it; spawns resolve once on entry and not per step; placements are evenly spread and golden-angle offset; `despawnOnExit` minions are removed on exit while their shards survive to their own lifetimes; `maxConcurrentMinions` suppresses rather than queues; a `startPhaseIndex` of 1 starts the minion in its second phase with that phase's clocks, telegraph and invulnerability applied; the loader rejects a `count` above the cap, a nonpositive `durationSeconds`, an unknown spawn archetype and a `startPhaseIndex` beyond the spawned archetype's phase count. Then prove the Crystal Worm timeline is unchanged. All four routine gates.
+
+**Acceptance:** sub-phases cycle through the same mechanism as phases, spawns resolve once on entry with reusable placement and an optional starting phase, despawn-on-exit removes minions but not their shards, the minion cap suppresses rather than queues, the Crystal Worm is unaffected, and all four gates pass.
+
+### Step 22.5 - Add Drill Mode
+
+Status: pending. Dependencies: 22.4.
+
+**Implementation prompt**
+
+Implement K01's second half: let the player practise a single phase instead of replaying the whole fight to reach it. This is the feature that makes a long boss usable as a trainer.
+
+Add an options object to `createSimulation(config, seed, options)` carrying `startPhaseIndex` and `loopPhase`, both optional, following the existing injected-dependency style rather than adding a new module boundary. When `startPhaseIndex` is given, the primary enemy starts in that phase with its health set to that phase's `enterAtHpFraction` of `maxHealthHp`, its clocks anchored as if it had just entered, and its telegraph and invulnerability window applied normally. When `loopPhase` is set, reaching the phase's exit condition re-enters the **same** phase from the top instead of advancing - resetting health to the phase's entry fraction, rebuilding clocks, re-running the telegraph, and despawning and re-spawning its minions. This is the single, explicitly approved exception to K09's monotonic rule; gate it on `loopPhase` so the normal path cannot regress.
+
+Surface it without building a new screen:
+
+- A `?phase=<index>` URL parameter and a `?loop=1` flag, parsed alongside the existing `?seed=` parameter and validated against the archetype's phase count. An out-of-range value is ignored with the full fight starting normally, matching how `?seed=` already handles bad input.
+- Phase and sub-phase jump controls in the existing debug panel, per K12: a phase selector, a "loop this phase" toggle and a "next sub-phase" action, all registered in the existing `DEBUG_PARAMETERS` and `DEBUG_TOGGLES` registries so the panel renders them without hand-coded blocks.
+
+**A drill attempt must never pollute the full-fight records.** Give it its own rules version, derived from the encounter's by suffixing the phase - for example `killer-bee-queen-nest-paladin-v5-drill-p3` - reusing the existing mechanism that already keeps `DEBUG_RULES_VERSION` attempts out of the retained best. Do not add a new exclusion mechanism, and do not change the storage schema.
+
+Do not add a phase-selection screen, a progress tracker, per-phase leaderboards or achievement state.
+
+**Focused checks:** focused failing test that `createSimulation` with `startPhaseIndex: 2` starts in phase 3 at its entry health first. Then: the started phase's telegraph and invulnerability window apply; `loopPhase` re-enters the same phase on exit with health, clocks, telegraph and minions all reset; without `loopPhase` the same exit advances normally; an out-of-range `?phase=` is ignored and the full fight starts; a drill attempt's rules version carries the phase suffix and is excluded from the retained best by the existing comparison code; the debug phase jump moves the enemy into the chosen phase mid-run; and the storage schema is unchanged, proven by an existing record still loading. All four routine gates, plus `npm run test:e2e -- --grep "drill"` for the URL parameter path.
+
+**Acceptance:** a run can start at and loop any phase through a URL parameter or the debug panel, drill attempts carry a distinct rules version and are excluded from bests through the existing mechanism, the monotonic rule is bypassed only under `loopPhase`, no new screen or schema change was added, and all four gates pass.
+
+## Phase 23: Author The Killer Bee Queen Of The Nest
+
+Every step in this phase authors data against machinery that already exists and is already tested. If a step needs a new pattern field, a new motion kind or a new phase feature, that is a signal the machinery is incomplete: **stop and report it** rather than extending the engine inside an authoring step.
+
+Three rules apply to all ten steps:
+
+1. **Cite every number.** A projectile entry's `source` names its row number in [the source extract](docs/killer-bee-queen-source.md). An attack's `tuningSource` is `"wiki-prose"` when the source states the attack's shape, or `"trainer-authored"` when this project invented the number. That is K13, and the loader enforces it.
+2. **Author a projectile only when a phase fires it.** No `Plagued Nest only` row enters `projectiles.json` (K07), and no row is added speculatively.
+3. **Record each phase's fidelity gaps** in that step's execution record: what the source describes that this phase does not do, and why.
+
+### Step 23.1 - Add Encounter Selection And The Cleared Outcome
+
+Status: pending. Dependencies: 22.5.
+
+**Implementation prompt**
+
+Make more than one encounter exist. Until this step, `encounter.json` describes the one and only encounter; the Queen needs her own arena policy, spawn policy, rules version and history. K14 settles the selection surface: a plain list on the Home screen.
+
+Restructure the authored data so encounters are a keyed collection: each entry owns its `rulesVersion`, `primaryArchetype`, arena reference, `spawns` rule, `session` values and its display name. The Crystal Worm encounter keeps `crystal-worm-child-swarm-paladin-v4` and every one of its current values unchanged. Add the Queen's encounter entry with `killer-bee-queen-nest-paladin-v5`, its `primaryArchetype` pointing at an archetype that step 23.2 will author, and a `spawns` rule that creates exactly one enemy at `t = 0` and never again - the Queen is a single boss, not a swarm, so `maxConcurrent` is 1 and no repeat cadence applies. Validate that shape rather than relying on a large `everySeconds`.
+
+**Fix F5 here, because this is the step that makes it a real defect.** `constrainToArena` and `advanceSimulation` read the module-level `ENCOUNTER_CONFIG` for the arena and the fixed step instead of reading `state.config`. That is harmless while every simulation shares one encounter and becomes wrong the moment two encounters differ. Change both to read `state.config`, and add a test that two simulations built from different encounter configs each use their own arena. Do not fix the other open principles-review findings; they stay in [the deferred register](docs/deferred-work.md) as D09.
+
+Surface the choice and the outcome:
+
+- Per K14, add a plain selectable list of encounters to the Home screen, beside the existing Start button, showing each encounter's display name and defaulting to the Queen. Reuse the existing CSS Modules styling and keyboard-accessible control patterns already on that screen; do not introduce a component library, a card layout, thumbnails or a second screen. Also add an `?encounter=<id>` parameter validated like the existing `?seed=`.
+- Record the chosen encounter on each attempt and compare bests **within** an encounter, never across. `AttemptRecord` already carries `rulesVersion`, which is per-encounter, so prefer deriving the grouping from it to adding a field. If a field is genuinely required, add it as optional with a default so existing v1-v4 records still load, and prove that with a test against a stored record from before this change.
+- Surface step 22.2's `"cleared"` simulation phase: the session ends as a win, the results screen says the boss was defeated and shows the elapsed time, and the attempt is recorded with an outcome distinguishable from a death. Keep the existing retry flow and the R key working identically for both outcomes.
+
+Do not add difficulty settings, encounter unlocking, a second arena shape or per-encounter stat presets.
+
+**Focused checks:** focused failing test on the keyed encounter collection first. Then: the Crystal Worm encounter's derived config is identical field for field to before this step; the Queen's encounter validates and spawns exactly one enemy that is never repeated; two simulations with different arenas each constrain to their own, which is the F5 regression test; the Home list renders one entry per encounter, defaults to the Queen, is keyboard operable and starts the selected encounter; `?encounter=` accepts a known id and ignores an unknown one; bests are grouped per encounter and a v4 record still loads and still appears under the Crystal Worm; a cleared run ends the session as a win, shows the elapsed time and records an attempt; and retry works from both outcomes. All four routine gates, plus `npm run test:e2e -- --grep "encounter"`.
+
+**Acceptance:** encounters are a keyed collection with per-encounter rules versions and bests, the Home screen lists them and the selection starts the right one, F5 is fixed with a regression test, the Crystal Worm encounter is byte-identical, a cleared run is a visible win, existing records still load, and all four gates pass.
+
+### Step 23.2 - Author The Queen's Skeleton
+
+Status: pending. Dependencies: 23.1.
+
+**Implementation prompt**
+
+Author the Queen as a harmless, fully-structured boss: real body, real health, all eight phases with their real thresholds, telegraphs, invulnerability windows and movement - and **no attacks at all**. A playable but harmless boss proves the phase machine against real data before a single projectile exists, which is far easier to debug than a complete fight.
+
+Add the `killer-bee-queen` archetype to `enemies.json`:
+
+- Body: a new convex outline in `shapes.json` if the existing two do not suit, normalized to a 1-by-1 box and within the three-to-eight vertex contract. Size it from the source's hitbox size of 2, authored as `widthTiles` and `heightTiles` of 2. Record that the mapping from ROTMG's "Hitbox Size" to tiles is this project's interpretation, not a published equivalence.
+- `health`: `maxHealthHp` 112,500 from the source, and `progression` of `{ "kind": "simulated-dps", "hpPerSecond": 375 }`, the rate approved in K15. Cite K15 in the authored `comment`, since 375 is this project's value and not a published one.
+- `phases`: all eight, with the source's thresholds - 1, 0.9, 0.75, 0.6, 0.45, 0.25, 0.25 and 0.125 - each with `attacks: []`, its authored movement, its telegraph colour and seconds, and its invulnerability window. Phase 6 authors `exitAfterSeconds` of 29 and an `invulnerableOnEnterSeconds` of 29, so per K08 it costs no health, which is what keeps phase 7 starting at 25%. Phases 2, 5 and 7 author their three colour sub-phases with empty attack lists.
+- Movement per phase, from the source: 1 alternating orbits via two sub-phases; 2 chase per colour; 3 `move-to-point` at the arena centre; 4 `orbit` counter-clockwise at a small radius; 5 per colour - orbit, chase, wander; 6 `move-to-point` at the centre then stationary; 7 per colour; 8 `move-to-point` at the centre.
+
+Note the two thresholds that are both 0.25: phase 6 is entered at 25% and exits on its duration, and phase 7 is then entered at the same fraction. Step 22.3's loader rejects a duplicate threshold, so this needs the rule relaxed to permit a repeat **only** where the earlier phase authors an `exitAfterSeconds`. Implement that as a narrow validation change with its own test, not by removing the ordering check.
+
+Do not author any projectile or attack. Do not author minions.
+
+**Focused checks:** focused failing test that the Queen's archetype loads and reports eight phases first. Then: her body fits inside the arena at her spawn point; the derived phase timeline matches the plan's Worked Progression Timeline at 375 HP per second, phase by phase, asserted on entry times; phase 6 costs no health and phase 7 begins at 25%; the duplicate-threshold relaxation accepts this list and still rejects a duplicate without an `exitAfterSeconds`; each phase's movement behaves as authored; a full run reaches phase 8 and then `"cleared"`; and the Crystal Worm encounter is untouched. All four routine gates, plus `npm run test:e2e -- --grep "killer bee queen"`.
+
+**Acceptance:** the Queen exists as a harmless eight-phase boss with sourced health and thresholds, her derived timeline matches the plan's table, the duplicate-threshold relaxation is narrow and tested, a full run clears, and all four gates pass.
+
+### Step 23.3 - Author Phase 1
+
+Status: pending. Dependencies: 23.2.
+
+**Implementation prompt**
+
+Author phase 1's attacks. Source: *"The Queen switches between circling the room and circling the pond of Killer Honey in the middle, throwing radial spreads of Quieting Blue Bombs around it while throwing targeted Dazing White Bombs at players. In addition, it fires directed spreads of Large Blue/Red Stingers and Small Yellow Stingers at nearby players... it may sometimes look like the Queen is firing only 3 stingers, but in fact that is 9 shots with each color stinger stacked ontop of each other."*
+
+Author these projectiles, citing their row numbers: row 30 `blue-bomb`, row 27 `white-bomb-v1`, row 2 `red-stinger-large-v1`, row 6 `blue-stinger-large`, row 3 `yellow-stinger-small-v1`. The two bombs use `kind: "lob"` with the source's radius of 2 tiles; the source gives bombs **no speed**, so their `speedTilesPerSecond` and `travelSeconds` are `trainer-authored` and must be marked as such.
+
+Author these attacks on phase 1:
+
+- A `ring` of `blue-bomb` with no rotation, which is the "radial spread... around it".
+- A `spread` of `white-bomb-v1` with `shots: 1` and `aim: "player"`, which is the "targeted" bomb.
+- **Three** `spread` attacks sharing one cadence, one each for `red-stinger-large-v1`, `blue-stinger-large` and `yellow-stinger-small-v1`, all `aim: "player"`. This is how the source's "3 stingers that are in fact 9 shots with each color stacked" is expressed, per step 20.3's note: one projectile per attack, three attacks fired together. Author `shots: 3` on each, giving nine shots in three visual lines.
+
+The phase's two sub-phases from step 23.2 keep identical attack lists and differ only in their orbit radius, which is how "switches between circling the room and circling the pond" is expressed without a second mechanism.
+
+Mark every shot count, interval, cooldown, arc and bomb travel time `trainer-authored`. The source states the **shape** of each attack, so each attack's pattern kind, aim and projectile are `wiki-prose`; its numbers are not. Do not tune for difficulty here - that is step 24.2. Pick values that are clearly survivable and let 24.2 tighten them.
+
+Record as a fidelity gap: the Plagued Nest's extra green stinger spread is excluded (K07), and the pond the Queen circles is not modelled because the arena is static (K05, D01).
+
+**Focused checks:** focused failing test that phase 1 fires something first. Then: each of the five projectiles validates and its damage, speed, range and conditions match its cited row exactly; the three stinger attacks fire in the same tick and produce nine shards; the targeted bomb's destination is the player's position at fire time; the radial bomb ring is evenly spaced; both bombs detonate and apply Quiet and Dazed respectively, which being inert conditions means the chips appear and no rule changes; a scripted dodge run survives the whole phase, and a stationary run takes damage; the loader rejects an attack if you forget `tuningSource`. All four routine gates.
+
+**Acceptance:** phase 1 fires the five sourced projectiles through two bombs and three stacked stinger spreads, every value is cited or marked trainer-authored, the sub-phase orbit alternation works, the phase is survivable, and all four gates pass.
+
+### Step 23.4 - Author Phase 2 And The Killer Bee Minions
+
+Status: pending. Dependencies: 23.3.
+
+**Implementation prompt**
+
+Author phase 2's three colour sub-phases and the first minions. Source, per sub-phase: red - *"she chases players quickly while firing multi-directional spreads of Small Red Stingers and single directed Large Red Stingers. All the while, she tosses radial bursts of Red Bombs that inflict Confused."* Blue - *"she chases players while firing directed spreads of Large Blue Stingers and spirals of Small Blue Stingers. She also fires a messy omnidirectional spray of Blue Balls along with radial bursts of Blue Bombs that Quiet."* Yellow - *"she fires 3-way spreads of Large Yellow Stingers and a messy spiral of Yellow Balls, all while tossing a large number of White Bombs that Daze around her."* And: *"For each color, she also spawns in a number of the respective Killer Bees, which despawn when she switches attacks. She is invulnerable in between attacks."*
+
+The three Killer Bees are **already transcribed** in [the source extract](docs/killer-bee-queen-source.md)'s Minion Source Extracts section (K16); author from it and do not re-fetch. All three are 400 HP, 25 defence, levitating, and all three behave identically: *"Chases players while firing single shots at them."* Their single attacks differ: Red fires `EH Red Stinger Small` at 80 damage, 7 tiles per second, 10.5 tiles range, armour-piercing, no condition; Blue fires `EH Blue Stinger Small` at 100 damage, 7.5, 9.75, Silenced for 3 seconds; Yellow fires `EH Yellow Stinger Small` at 130 damage, 6, 10.5, no condition. Note that these are **not** the Queen's own stinger rows - the damage, speed and range all differ - so they need their own catalog entries rather than reusing hers.
+
+Author the new projectiles: row 1 `red-stinger-small`, row 25 `red-bomb-v1` (Confused), row 5 `blue-stinger-small-v1`, row 9 `blue-ball-v2`, row 4 `yellow-stinger-large`, row 10 `yellow-ball-v1`. `red-stinger-large-v1`, `blue-stinger-large`, `white-bomb-v1` and `blue-bomb` already exist from 23.3; reuse them rather than adding variants.
+
+Map each described attack onto the vocabulary, and note the three that matter: *"messy omnidirectional spray"* is `scatter` with a 360-degree cone; *"spirals of Small Blue Stingers"* and *"a messy spiral of Yellow Balls"* are `ring` with a nonzero rotation rate; *"3-way spreads"* is `spread` with `shots: 3`. Red Bombs inflicting **Confused** are the first genuinely dangerous condition in the fight - the source warns that "staying in front of the queen will make them miss you entirely" - so place them as a radial `ring` of lobs around her, not aimed.
+
+Author each colour's minions as a sub-phase `spawns` entry with `despawnOnExit: true`, placed `ring-around-owner`. Each Killer Bee is its own archetype with a single phase, its own movement and its own attack, authored from its wiki page.
+
+Author each sub-phase's `invulnerableOnEnterSeconds` as a nonzero value, which is the source's "invulnerable in between attacks" and which per K08 pauses the drain.
+
+Record as a fidelity gaps: the Killer Honey flood that would confine the player to a narrow ring around the Queen is not modelled, so this phase is materially easier than the live fight (K05, D01); the teleport of all players into the room has no single-player meaning; the Plagued Nest's green sub-phase is excluded (K07).
+
+**Focused checks:** focused failing test on the red sub-phase firing first. Then: each new projectile matches its cited row; the three sub-phases cycle on their authored durations with their own attack sets and movement; minions spawn on sub-phase entry, are placed on the owner ring and are despawned on exit while their shards survive; the invulnerability window pauses the drain for exactly its duration; a `scatter` spray is reproducible under a fixed seed; each Killer Bee archetype validates and its values match the transcribed minion section exactly, including that they differ from the Queen's same-named stinger rows; the minion cap suppresses rather than queues when it is reached. All four routine gates, plus `npm run test:e2e -- --grep "killer bee"`.
+
+**Acceptance:** phase 2 cycles three colour sub-phases with sourced attacks and minions, the Killer Bees use their own transcribed stats rather than the Queen's, despawn-on-exit and the invulnerability pause both work, fidelity gaps are recorded, and all four gates pass.
+
+### Step 23.5 - Author Phase 3
+
+Status: pending. Dependencies: 23.4.
+
+**Implementation prompt**
+
+Author phase 3, the stationary barrage. This is the phase whose structure the source states most precisely, so it is the best test of the `ring` pattern.
+
+Source: *"the Queen despawns all Killer Bees and moves to the center of the room, flashing white. She then becomes stationary and begins firing a messy omnidirectional barrage of Red, Blue, and Yellow Balls along with Slowing bees, occasionally lobbing White Bombs along the cardinal/intermediate directions. Every 7 seconds and at the start of the phase, she fires an unavoidable wave of Red Glaives that do no damage but Armor Break for 7 seconds."* And the explicit pattern: *"Two 3-armed spirals of blue orbs, each one rotating in a different direction; One two-armed spiral of red orbs, rotating clockwise; Frequent rings of yellow orbs; Occasional 4-way bursts of bee projectiles."*
+
+Author these projectiles: row 14 `red-ball` (Curse), row 24 `bee-shot` (Slowed), row 7 `red-glaive-v1` (0 damage, Armor Broken 7s). Reuse `blue-ball-v2`, `yellow-ball-v1` and `white-bomb-v1`.
+
+Author six attacks, mapping the source's list one to one:
+
+- Two `ring` attacks of `blue-ball-v2`, each `arms: 3`, with **opposite** signs on `clockwiseDegreesPerSecond`.
+- One `ring` of `red-ball`, `arms: 2`, clockwise.
+- One `ring` of `yellow-ball-v1` with no rotation and a short cooldown, which is "frequent rings".
+- One `ring` of `bee-shot`, `arms: 4`, with a long cooldown, which is "occasional 4-way bursts".
+- One `ring` of `white-bomb-v1` lobs, `arms: 8`, which is "along the cardinal/intermediate directions" - author the eight bearings as a ring with eight arms, not as eight attacks.
+- One `ring` of `red-glaive-v1` with a `cooldownAfterLastShotSeconds` of **7**, which is the only cadence in this phase the source actually states, so mark it `wiki-prose` while every other cadence here stays `trainer-authored`.
+
+The phase's movement is `move-to-point` at the arena centre, which stops on arrival and is therefore stationary for the rest of the phase - no second mechanism and no sub-phase is needed. The despawn of phase 2's Killer Bees happens automatically through their `despawnOnExit` flag; confirm that in a test rather than adding explicit despawn logic.
+
+Record as a fidelity gap: the source calls the Red Glaive wave "unavoidable", which is true in the real fight's small room. This project's arena is 19.2 tiles, so a radial wave from the centre is dodgeable near the wall. Do not fake unavoidability by widening the wave into something the source does not describe; record the gap and leave it for step 24.2 to consider.
+
+**Focused checks:** focused failing test on the two counter-rotating blue spirals first. Then: the two blue rings rotate in opposite directions, asserted on bearings at two separate times; the red ring has exactly two arms and rotates clockwise; the glaive wave fires at phase entry and then every 7 seconds exactly; a glaive deals 0 damage, still registers a hit and applies Armor Broken for 7 seconds; with Armor Broken active, a subsequent 100-damage non-piercing shot deals 100 rather than 68, linking this phase to step 21.3's formula; the eight-arm bomb ring lands on the eight compass bearings; phase 2's minions are gone on entry; the Queen arrives at the centre and then stops. All four routine gates.
+
+**Acceptance:** phase 3 reproduces the source's six-attack pattern including the counter-rotating spirals and the 7-second armour-break wave, Armor Broken measurably changes damage, the minion despawn is automatic, the unavoidability gap is recorded, and all four gates pass.
+
+### Step 23.6 - Author Phase 4
+
+Status: pending. Dependencies: 23.5.
+
+**Implementation prompt**
+
+Author phase 4, the glaive phase. Source: *"the Queen begins to slowly circle counter-clockwise in the center of the room while firing 4-directional spreads of Yellow, Red, and Blue Glaives at a rapid pace. Each one is aimed at a different angle so that it cannot be dodged just by standing still. It is imperative to dodge the yellow shots as they will paralyze you and make you tank half of the next wave."*
+
+Author these projectiles: row 11 `yellow-glaive-v1` (Paralyzed 0.8s and Dazed 3s), row 12 `red-glaive-v2` (Armor Broken 3s, armour-piercing), row 13 `blue-glaive-v1` (Quiet and Pet Stasis, both inert). Reuse nothing else.
+
+Author three `ring` attacks, one per glaive colour, each `arms: 4`, sharing a cadence but each with a **different** `initialPhaseDegrees` and a nonzero `perBurstAdvanceDegrees`, which is how the source's "each one is aimed at a different angle so that it cannot be dodged just by standing still" is expressed. Choose advances that do not share a common divisor with 90 degrees, so the three rings never realign into a single dodgeable wave; assert that property in a test over many bursts rather than trusting the choice.
+
+The source's Tips section additionally states that phase 4 fires a *"shotgun of Red Hive Shots"* where *"each one inflicts 200 unblockable damage, meaning that tanking the shotgun will result in 600 armor-piercing damage"*. The behaviour prose for phase 4 does not mention it. **Record this as a source conflict**, resolve it by including it - the Tips text is specific, quantitative and names phase 4 - and author it as a `spread` of three row 15 `hive-spiral-shot-v1` with `aim: "player"`. Three shots at 200 armour-piercing damage is 600, matching the quoted figure exactly, which is good evidence the reading is right. Note in your execution record that this binding comes from the Tips section rather than the phase description.
+
+This phase is the first that can kill a careless player outright: the Paladin has 775 HP, and 600 armour-piercing damage plus a paralysing glaive is most of it. That is the intended difficulty, but confirm the phase is survivable with correct play before marking the step complete.
+
+Record as a fidelity gap: the Plagued Nest's faster spinner spreads and multicoloured 4-way spiral are excluded (K07).
+
+**Focused checks:** focused failing test on the three glaive rings firing at different phases first. Then: each projectile matches its cited row, including `red-glaive-v2`'s armour-piercing flag; the three rings never realign over at least fifty bursts, asserted on bearing sets; the hive-shot shotgun is three shots and deals exactly 600 against the Paladin's 32 defence, exercising step 21.3's armour-piercing path; a paralysing yellow glaive hit leaves the player immobile for 0.8 seconds and therefore unable to dodge the following volley, which is the source's stated consequence; the orbit's derived tangential speed is below the player's; a scripted dodge run survives the phase. All four routine gates.
+
+**Acceptance:** phase 4 fires three non-realigning glaive rings plus the Tips-sourced hive shotgun at a verified 600 armour-piercing damage, the paralysis consequence is demonstrated, the source conflict is recorded, the phase is survivable with correct play, and all four gates pass.
+
+### Step 23.7 - Author Phase 5
+
+Status: pending. Dependencies: 23.6.
+
+**Implementation prompt**
+
+Author phase 5's three colour sub-phases, the densest of the colour phases. Source: red - *"she rapidly circles the pool of Killer Honey in the middle of the room, firing streams of Red Balls in various directions while also firing radial bursts of Red Glaives and 3-directional shotguns of red Hive Spiral Shots. She also fires radial bursts of Large Red Stingers."* Blue - *"she rapidly chases players, firing a messy bombardment of Blue Balls in all directions (akin to a Djinn's pattern) while using radial bursts of Blue Glaives and 4-directional Small Blue Stingers. She also fires wide, directed shotguns of blue Hive Range Shots."* Yellow - *"she slowly wanders in the center of the room, firing short spiralling bursts of bee projetiles and 4-directional spreads of Yellow Glaives. She also uses radial bursts of Large Yellow Stingers and 4-directional yellow Hive Shots."*
+
+Author the new projectiles: row 15 `hive-spiral-shot-v1` if 23.6 did not already, row 21 `red-stinger-large-v2`, row 20 `blue-ball-v3`, row 18 `blue-stinger-small-v2`, row 16 `hive-range-shot-v1`, row 17 `hive-shot-v1`. Reuse `red-ball`, `red-glaive-v2`, `blue-glaive-v1`, `yellow-glaive-v1`, `yellow-stinger-large` and `bee-shot`.
+
+This step is where the pattern vocabulary earns its keep; map carefully and reuse:
+
+- *"streams... in various directions"* and *"messy bombardment... in all directions"* are both `scatter`, the first with a wide cone and the second with 360 degrees.
+- *"radial bursts"* are `ring` with no rotation.
+- *"3-directional"* and *"4-directional"* are `spread` with `shots` of 3 or 4 when the source says "shotgun" or "spread", and `ring` with `arms` of 4 when it says "4-directional" of a radial attack. Where the source is ambiguous between the two, choose `spread` aimed at the player when it also says "directed", and `ring` otherwise, and state your reading in the execution record.
+- *"short spiralling bursts"* is `ring` with a rotation rate and a small `shotsPerBurst`.
+
+Each sub-phase spawns its colour's Killer Bees, reusing the archetypes authored in 23.4 - *"every time she uses a colored attack she spawns in a group of the respective color Killer Bee"*. No new minion archetype is needed here; if you believe one is, check the transcribed minion section before authoring anything.
+
+Record as fidelity gaps: the hardening entrance tiles that act as walls, and the disconnect-on-changing-tile mechanic, are not modelled (K05, D01); the Queen's Stun vulnerability on each colour switch has no effect (D05); the Plagued Nest's green sub-phase is excluded (K07).
+
+**Focused checks:** focused failing test on the red sub-phase's hive shotgun first. Then: each new projectile matches its cited row; all three sub-phases cycle with their own movement - orbit, chase and wander respectively - and their own attack sets; the wander movement stays inside its radius and is seed-reproducible; the blue 360-degree scatter is reproducible and covers the circle; `hive-range-shot-v1` applies Pet Stasis and Weak, both inert, and the chips show while no rule changes; Killer Bees spawn and despawn per sub-phase; a scripted dodge run survives all three sub-phases. All four routine gates.
+
+**Acceptance:** phase 5's three sub-phases are authored with sourced attacks, each ambiguous directional reading is recorded, minions are reused rather than duplicated, the three movement kinds all work in one phase, and all four gates pass.
+
+### Step 23.8 - Author Phase 6, The Nests And Worker Bees
+
+Status: pending. Dependencies: 23.7.
+
+**Implementation prompt**
+
+Author phase 6, the "stinger phase" the source calls *"extremely dangerous and most likely instant death if not avoided"*. This is the phase the whole `ring` gap-and-spread design in step 20.5 exists for.
+
+Source: *"the Queen despawns all Killer Bees, moves back to the center of the room while flashing red, and spawns 3 Killer Bee Nests along the edges of the room... The Queen herself will be stationary and invulnerable while firing a 2-way shot-machinegun of Small Red Stingers that rotates clockwise for 29 seconds, with two gaps in the rotation. The shot-machinegun is initially aimed at the top and bottom of the room and will expand over the first few seconds to cover the top-right and bottom-left corners of the room, meaning players should start in either the top-left or bottom-right to avoid this attack."* And: *"The 3 Nests will periodically spawn Small Worker Bees and gradually swell in size until they break open."*
+
+The Nest and the Small Worker Bee are **already transcribed** in [the source extract](docs/killer-bee-queen-source.md)'s Minion Source Extracts section (K16); author from it. Its page slug is `killer-bee-nest-queen`, not `killer-bee-nest`, which is an unrelated stub.
+
+The machinegun is a single `ring` attack of `red-stinger-small`, using every option step 20.5 added: `arms: 2`, a clockwise rotation rate, two `gapSectorsDegrees` entries, and an `armSpreadDegreesPerSecond` with a `maxArmSpreadDegrees` of 45 so the two arms open from the vertical to cover the diagonals, exactly as the source describes. Its `shotsPerBurst` and `shotIntervalSeconds` make it a machinegun; those are `trainer-authored`. The two gaps are the openings the player survives in, so their width is the single most important tuning value in this phase - author it generously here and let step 24.2 narrow it.
+
+Phase 6 already authors `exitAfterSeconds: 29` and `invulnerableOnEnterSeconds: 29` from step 23.2, so it costs no health. Verify that rather than re-authoring it.
+
+Author the three Nests as a phase `spawns` entry placed `arena-ring`, with `despawnOnExit: false` - the source says the broken-open Nests keep firing through phase 7 and stop only at the Queen's death, so they must survive the phase change. Per K06 they are **not destructible**: author them with no `health` block, and record the consequence that the phase always runs its full 29 seconds and always yields the default Beehemoth set.
+
+**Each Nest is a two-phase archetype, per K18.** The source gives it two distinct attack sets, and the phase machine already expresses the transition with no new mechanism:
+
+- Phase 1, alive: a `ring` of its colour's Hive Shot, with `exitAfterSeconds` set so it breaks open at the end of the Queen's phase 6 - the Nest page says "after approximately 30 seconds". Red fires `EH Hive Spiral Shot` at 100 damage, speed 5, range 7, armour-piercing; Blue fires `EH Hive Range Shot` at 120, 5.5, 7.15, Weak for 2 seconds; Yellow fires `EH Hive Shot` at 120, 4.5, 6.75, Dazed for 2 seconds. These are again **not** the Queen's same-named rows, so they need their own catalog entries.
+- Phase 2, corpse: a `ring` of its colour's ball at 45 damage, speed 2.5, range 1.875, with a short cooldown, which is the source's "the dead Nests will fire their radial attacks constantly". Red applies Curse for 2 seconds, Blue Pet Stasis for 4, Yellow Dazed for 2. No exit - it fires until the encounter ends.
+
+Give the Nest's **alive** phase a `spawns` entry of its own for the Small Worker Bees. The Worker Bee is 125 HP, charges the player, and per K17 and step 21.5 applies its slow through **contact damage**, not a projectile: author `contactDamageHp` 40, `contactArmorPiercing` true, `contactConditions` of Slowed for 1.6 seconds, and a `trainer-authored` `contactCooldownSeconds`. Its movement is `chase`. Do not substitute `bee-shot` for its contact attack; the source is explicit that it is a speed-0, range-0 touch attack.
+
+Record as fidelity gaps: Nest destruction and Beehemoth colour control are deferred (K06, D03); the Plagued Nest's 3-way machinegun and fourth Nest are excluded (K07); the hardened honey that lowers move speed in this phase is not modelled (K05, D01).
+
+**Focused checks:** focused failing test on the machinegun's two arms and gaps first. Then: the arms start vertical and spread to 45 degrees over the authored time and then hold; a player standing inside a gap sector takes no hits for the whole 29 seconds, asserted as a scripted run with zero accepted hits; a player standing in the beam takes heavy damage quickly; the gaps rotate with the ring; the phase exits after exactly 29 seconds with the Queen's health unchanged; the three Nests spawn on the arena ring, survive the phase exit and keep firing; each Nest transitions from its alive phase to its corpse phase on its authored duration and the two attack sets differ as transcribed; the Nest attack stats differ from the Queen's same-named rows; Worker Bees spawn from the alive Nests, chase the player and apply 40 armour-piercing contact damage with Slowed through step 21.5's path rather than through a projectile; the minion cap holds with three Nests plus their Worker Bees. All four routine gates, plus `npm run test:e2e -- --grep "machinegun"`.
+
+**Acceptance:** phase 6 fires the gapped, spreading 2-arm machinegun with a provably survivable gap, runs exactly 29 seconds at no health cost, spawns three indestructible two-phase Nests that break open into their corpse attack and survive into phase 7, Worker Bees slow the player by contact, deferred items are recorded, and all four gates pass.
+
+### Step 23.9 - Author Phase 7 And The Beehemoths
+
+Status: pending. Dependencies: 23.8.
+
+**Implementation prompt**
+
+Author phase 7, the Queen's last colour rotation, with the three Adolescent Beehemoths.
+
+Source: yellow - *"she stays in the middle of the room, firing a rotating spiral of Slowing bees while firing another spiral of Yellow Balls rotating the other way. She also fires radial bursts of Large Yellow Stingers and yellow blasts, along with 4 White Bombs that Daze, at a 15 degree-increasing angle each time."* Red - *"she circles the area slowly while firing rings of Red Balls and red Hive Spiral Shots, along with wide spreads of Large Red Stingers and radial Red bombs. She makes a total of two rotations."* Blue - *"she fires sprials of Blue Glaives, radial bombardments of Blue Balls, targeted spreads of Small/Large Blue Stingers, and enormous radial blasts of blue Hive Range Shots while quickly chasing the nearest player."* And: *"the Beehemoths will heal for 7,500 HP up to 3 times... The Beehemoths also heal the Queen every 10 seconds... With less than 5 players, they will each heal for 600 HP."*
+
+The three Adolescent Beehemoths are **already transcribed** in [the source extract](docs/killer-bee-queen-source.md)'s Minion Source Extracts section (K16). All three are 20,000 HP, 40 defence, levitating, and all three behave the same way: *"Fires pairs or spreads of large stingers at the nearest player. During the Killer Bee Queen's final phase, fires radial bursts of large stingers and spreads of Glaives"* - orbs rather than glaives for the red one. Their stats: Red fires `EH Red Stinger Large` at 100 damage, speed 6, range 10.5, Armor Broken for 4 seconds, plus `EH Red Ball` at 60, 7, 10.5, Curse for 2 seconds; Blue fires `EH Blue Stinger Large` at 120, 6.5, 9.75, Weak and Pet Stasis, plus `EH Blue Glaive` at 60, 7.5, 10.5, Quiet for 3 seconds; Yellow fires `EH Yellow Stinger Large` at 150, 7, 9.8, Dazed for 2 seconds, plus `EH Yellow Glaive` at 80, 5, 8.5, Paralyzed for 0.8 seconds. None of these match the Queen's same-named rows, so all six need their own catalog entries - and note that the yellow glaive is the only Beehemoth shot that paralyses, which makes it the one the player must actually dodge.
+
+**Per K18, each Beehemoth is a two-phase archetype**: phase 1 is the aimed-stinger behaviour the source describes as normal, and phase 2 is the radial-burst-and-glaive-spread behaviour it describes for the Queen's final phase. Neither phase has an HP or duration exit - the phase is selected at spawn time by the `startPhaseIndex` that step 22.4 added. This step spawns them at index 0; step 23.10 spawns them at index 1.
+
+Author the new projectiles: row 19 `yellow-ball-v2`, row 28 `white-bomb-v2` (radius 3), row 23 `red-stinger-large-v3`, row 26 `red-bomb-v2`, row 8 `blue-ball-v1`. Reuse `bee-shot`, `yellow-stinger-large`, `hive-shot-v1`, `red-ball`, `hive-spiral-shot-v1`, `blue-glaive-v1`, `blue-stinger-small-v1`, `blue-stinger-large` and `hive-range-shot-v1`.
+
+Two details need care:
+
+- The yellow sub-phase's *"4 White Bombs... at a 15 degree-increasing angle each time"* is exactly step 20.5's `perBurstAdvanceDegrees`: a `ring` of `white-bomb-v2` lobs with `arms: 4` and `perBurstAdvanceDegrees: 15`. This is a stated number, so mark it `wiki-prose`.
+- **The Beehemoth healing is a phase-level progression override, not new machinery.** Three Beehemoths each healing 600 HP every 10 seconds is 180 HP per second of healing at the single-player rate the source gives. Author phase 7's `progression` override as the encounter's rate minus 180 HP per second, cite the source lines, and note in the execution record that the healing is modelled as reduced net drain rather than as a minion ability, because the progression rate is already an abstraction of group DPS. The Beehemoths' own self-healing of 7,500 HP up to three times has no referent, since they are not damageable; record it as omitted.
+
+Author the three Beehemoths as a phase `spawns` entry with `startPhaseIndex: 0` and `despawnOnExit: true`. The source has them persist into phase 8, and step 23.10 re-spawns them there at `startPhaseIndex: 1` to switch their behaviour; record that despawn-and-respawn at the phase boundary is an **approved simplification** of "they persist", chosen over cross-enemy phase coupling, and that it is behaviourally equivalent apart from a visible blink at the boundary. Their placement differs per colour in the source - circling the room's edge for yellow, orbiting her closely for red, following loosely for blue - so author a static placement and movement per sub-phase rather than building minion movement scripting.
+
+Record as fidelity gaps: the Queen's and Beehemoths' Armored windows are **not** modelled, because Armored only changes how fast a real group kills her and the authored progression rate already abstracts that entirely; the source's group-size healing tiers above 5 players have no single-player meaning (D06); the Plagued Nest's green sub-phase and fourth Beehemoth are excluded (K07).
+
+**Focused checks:** focused failing test on the 15-degree-advancing bomb ring first. Then: the advance accumulates exactly 15 degrees per burst and not per shot; the two yellow spirals rotate in opposite directions; each new projectile matches its cited row, including `white-bomb-v2`'s 3-tile radius; the phase 7 progression override makes the net drain exactly the encounter rate minus 180 HP per second, asserted against a measured phase duration; the three Beehemoths spawn at phase index 0, fire their aimed stinger pairs, and their six new projectiles match the transcribed rows rather than the Queen's; a yellow glaive hit paralyses for 0.8 seconds; the broken-open Nests from phase 6 are still firing their corpse attack; a scripted dodge run survives all three sub-phases. All four routine gates.
+
+**Acceptance:** phase 7's three sub-phases are authored with the stated 15-degree advance marked as sourced, the Beehemoth healing is a cited progression override with no new machinery, the Beehemoths and Nests persist into phase 8, every omission is recorded, and all four gates pass.
+
+### Step 23.10 - Author Phase 8 And Complete The Fight
+
+Status: pending. Dependencies: 23.9.
+
+**Implementation prompt**
+
+Author the final phase and make a full fight completable end to end.
+
+Source: *"the Queen returns to the center of the room and begins to fire slow, radial bursts of Large Red Stingers, Small Yellow Stingers, Blue Balls, Hive Range Shots, and all her Glaives. The Adolescent Beehemoths orbit her closely, firing radial stingers and spreads of Glaives at players, and they will cease healing the boss if her HP decreases further. This phase lasts until her death."*
+
+Author the one new projectile, row 22 `yellow-stinger-small-v2`, and reuse `red-stinger-large-v2`, `blue-ball-v2`, `hive-range-shot-v1`, `yellow-glaive-v1`, `red-glaive-v2` and `blue-glaive-v1` - "all her Glaives" is those three.
+
+Author one `ring` attack per listed projectile, all with no rotation and a long cooldown, which is the source's "slow, radial bursts". The phase's movement is `move-to-point` at the arena centre.
+
+Re-spawn the three Beehemoths here with `startPhaseIndex: 1`, which selects the final-phase behaviour transcribed in 23.9 - *"radial bursts of large stingers and spreads of Glaives"* - and `despawnOnExit: false`, since this phase ends only at the Queen's death. Their orbit placement is the source's "orbit her closely". No new Beehemoth projectile is needed; both phases fire the same two per colour in different patterns. It authors no `exitAfterSeconds`: it ends when the drain reaches zero health, which step 22.2's `"cleared"` phase and step 23.1's win screen already handle.
+
+The source says the Beehemoths "cease healing the boss if her HP decreases further", so phase 8 authors **no** progression override - it uses the encounter's full rate, unlike phase 7. State that this is the implementation of the quoted line.
+
+Then verify the whole encounter as one piece, which is this step's real deliverable:
+
+- A full run from phase 1 to `"cleared"` passes through all eight phases in order, with the three sub-phase rotations cycling, every minion spawning and despawning as authored, and the Nests and Beehemoths persisting as they should.
+- The total elapsed time is within a few seconds of the plan's Worked Progression Timeline plus the authored telegraph and invulnerability windows. Report the measured total.
+- A stationary player dies, and roughly where. Report the phase.
+- Report the peak live shard count and the peak live enemy count, which step 24.1 needs as its starting measurement.
+
+Record the final fidelity summary for the encounter in the execution record: every gap from 23.3 through 23.10 collected in one list, each naming its K or D id. That list is what step 24.4 publishes.
+
+**Focused checks:** focused failing test on phase 8's radial bursts first. Then: the new projectile matches row 22; all seven attacks fire; phase 8 uses the full encounter drain rate with no override, asserted against phase 7's reduced rate; the Beehemoths are present at phase index 1, firing radial bursts and glaive spreads rather than aimed pairs, orbiting the Queen closely; the corpse Nests are still firing; a full seeded run reaches `"cleared"` and the measured phase entry times match the derived timeline; a stationary run dies and the death phase is reported; the peak shard and enemy counts are measured and reported. All four routine gates, plus `npm run test:e2e -- --grep "full fight"` for a browser run that reaches at least phase 3.
+
+**Acceptance:** phase 8 is authored, a full seeded run clears the encounter through all eight phases with timings matching the derived table, the measured peaks are reported for step 24.1, the complete fidelity summary is recorded, and all four gates pass.
+
+## Phase 24: Bounds, Tuning, Regression And Handoff
+
+### Step 24.1 - Re-Derive And Re-Measure The Performance Bounds
+
+Status: pending. Dependencies: 23.10.
+
+**Implementation prompt**
+
+The v4 bound was derived for one archetype with one attack: `liveShardBoundPerEnemy(archetype)` computed `emitterCount * shotsPerEmitter * ceil(lifetimeSeconds / burstGroupSeconds)`, giving 66 per enemy and a measured peak of 264 with four enemies. The Queen has up to eight concurrent attacks, several minions each with their own attacks, and projectile lifetimes up to 4.252 seconds. That formula no longer describes the system.
+
+Re-derive the bound from configuration, never from a literal:
+
+- Per attack: `shotsPerVolley * shotsPerBurst * ceil(projectileLifetimeSeconds / burstGroupSeconds)`, where `shotsPerVolley` comes from the attack's pattern - `arms` for a `ring`, `shots` for a `spread` or `scatter` - and `burstGroupSeconds` is the existing `(shotsPerBurst - 1) * shotIntervalSeconds + cooldownAfterLastShotSeconds`.
+- Per phase: the sum over the phase's attacks plus the maximum over its sub-phases, since only one sub-phase is ever active.
+- Per archetype: the maximum over its phases.
+- Per encounter: the archetype bound times `maxConcurrent`, plus each possible minion's bound times `maxConcurrentMinions`.
+
+Replace `liveShardBoundPerEnemy` with this derivation, keeping it a function rather than a stored field so it cannot go stale. Assert the Crystal Worm still derives **66**, which proves the generalisation is a superset rather than a replacement.
+
+Then measure, in the browser, at the pinned toolchain, and report real numbers rather than estimates:
+
+- Peak live shards and peak live enemies over a full Queen fight from phase 1 to cleared, and separately over a 60-second drill of phase 3 and a drill of phase 6, which are the two densest phases.
+- Sustained frame timing over each of those runs, compared against the v4 figures recorded in step 17.4's execution record in [the v4 archive](docs/implementation-plan-v4.md).
+- Whether `maxStepsPerUpdate` of 8 is still sufficient, or whether the catch-up path now discards time during the dense phases. If it discards, report it as a finding with the measurement; do not raise the limit as a fix without the user's approval, because a higher limit changes the simulation's timing guarantees.
+
+If a measured peak exceeds the derived bound, the derivation is wrong - fix the derivation. **Never widen or delete a bound to make a run pass.** If the frame timing is materially worse than v4, report it with numbers and a diagnosis; a renderer optimisation is a separate, approved step, not something to bundle here.
+
+**Focused checks:** focused failing test on the per-attack derivation first. Then: the Crystal Worm still derives 66; a two-attack archetype's bound is the sum of its attacks; a phase with sub-phases uses the maximum rather than the sum across them; the encounter bound includes minions; and a measured run's peak never exceeds the derived bound, asserted as a test rather than only reported. All four routine gates, plus the full `npm run test:e2e` since this step is explicitly a measurement step.
+
+**Acceptance:** the shard bound is derived from configuration for multi-attack, multi-phase and minion-bearing archetypes, the Crystal Worm still derives 66, measured peaks and frame timings for the full fight and both dense drills are reported against the v4 baseline, any catch-up discarding is reported rather than papered over, and all gates pass.
+
+### Step 24.2 - Tune The Fight For Trainability
+
+Status: pending. Dependencies: 24.1.
+
+**Implementation prompt**
+
+Every cadence authored in phase 23 was deliberately generous. This is the step K04 reserved for tightening them, now that every mechanic exists and can be measured together.
+
+This is a **tuning** step, not a feature step. Change only `trainer-authored` values: shot counts, shot intervals, cooldowns, arc widths, gap widths, bomb travel times, sub-phase durations, minion counts and the progression rate. Do **not** change a value marked `wiki-prose` or `approved-v3`, do not add an attack, a projectile, a pattern field or a motion kind, and do not change any sourced projectile stat. If a phase cannot be made trainable without one of those, that is a finding to report, not a licence.
+
+Tune toward stated targets rather than feel, and record the measurement for each:
+
+- Every phase must be survivable by a competent player with correct movement, and must not be survivable by standing still. Demonstrate both ends with scripted runs.
+- Phase 6's machinegun gaps must leave a provably survivable opening for the full 29 seconds, which step 23.8 already asserts; tightening them must not break that assertion.
+- The full fight's total length should land where K15's 375 HP per second implies, within a few seconds. If tuning the cadences changes the natural length, adjust the progression rate rather than distorting individual phases.
+- No phase should be trivially survivable by standing in one place away from the Queen, which is the failure mode a static 19.2-tile arena invites given D01.
+
+Present the before-and-after value for every number you change, in a table, with the reason. A tuning step whose record is "adjusted for difficulty" is not acceptable; each change needs a measurement or an observation behind it.
+
+Bump the Queen's encounter `rulesVersion` if and only if tuning changes gameplay enough to invalidate comparison with attempts recorded before this step. Given that this is the first tuning pass over a brand-new encounter, it almost certainly does: use `killer-bee-queen-nest-paladin-v5` through step 23 and advance the suffix here, retaining earlier records and excluding them from the new bests exactly as G19 did for v4.
+
+**Focused checks:** the scripted survivable and non-survivable runs per phase, each asserted; the phase 6 gap-survivability assertion unchanged; the measured full-fight length; a test that no `wiki-prose` or `approved-v3` value changed, implemented by asserting the sourced projectile stats against the source extract's table; and the retained-best exclusion for the previous rules version. All four routine gates, plus the full `npm run test:e2e`.
+
+**Acceptance:** every phase is demonstrably survivable with correct play and lethal when stationary, only `trainer-authored` values changed, each change is justified with a measurement in a before-and-after table, the rules version is advanced with history retained and excluded, and all gates pass.
+
+### Step 24.3 - Run The Full Acceptance Matrix
+
+Status: pending. Dependencies: 24.2.
+
+**Implementation prompt**
+
+Verify the whole product, not just the new encounter. Add no features. Fix only defects this step finds, and report anything that needs a design decision rather than deciding it.
+
+Run and record, on the pinned toolchain in `.node-version` (24.22.1) with `npm@12.2.1`:
+
+- All four routine gates, with the actual test count and timing.
+- The full `npm run test:e2e` suite in Chromium, with its case count and timing.
+- **Crystal Worm regression.** Its encounter must behave exactly as the v4 release did: same cadence, same positions, same death times, the 671-volley assertion, and the 30/60/120 Hz equivalence. This is the proof that nineteen steps of engine generalisation cost the existing content nothing.
+- **Determinism.** The same seed and input sequence reproduces a full Queen fight identically, including every scatter bearing, every wander target and every spawn placement, at 30, 60 and 120 Hz and under both one-step and multi-step updates.
+- **Storage compatibility.** A v1, v2, v3 and v4 attempt record each still load, appear under the Crystal Worm encounter, and are excluded from the Queen's bests. A Queen record and a drill record round-trip correctly. Corrupt and absent records still degrade safely through the existing adapter.
+- **Session safety.** Pause, resume, retry with R, the Controls dialog, zoom persistence and the countdown all behave identically in both encounters and in drill mode, with no background time catch-up while paused.
+- **Both encounters end to end in a browser**, including a cleared Queen run reaching the win screen and a death run reaching the results screen.
+
+Then collect the honest limitations in one place: every fidelity gap from phase 23's records, every unsourced interpretation, every deferred item that affects this encounter, and anything the acceptance run could not verify. Name what is unverified rather than omitting it.
+
+**Focused checks:** the full matrix above. Report each item's actual outcome with numbers. A blocked item is reported as blocked, never as passed.
+
+**Acceptance:** every item in the matrix has a recorded outcome with real figures, the Crystal Worm encounter is proven unchanged from v4, determinism and storage compatibility hold, both encounters complete in a browser, and the consolidated limitations list is written down.
+
+### Step 24.4 - Update The Handoff Documentation
+
+Status: pending. Dependencies: 24.3.
+
+**Implementation prompt**
+
+Documentation only. Make the repository describe what now exists, for a reader arriving with no knowledge of this plan.
+
+- **`README.md`.** Replace the "Current V4 State" section with a "Current V5 State" section covering both encounters, the Queen's eight phases and what each teaches, drill mode with its `?phase=` and `?loop=` parameters, encounter selection, the condition model with its active and inert split, and the per-encounter comparison identities. Extend the "Authored Data" subsection to table all six JSON files - `shapes.json`, `arena.json`, `projectiles.json`, `enemies.json`, `encounter.json` and whatever 23.1 added - saying which file to edit for the arena, a projectile, an enemy's phases, and spawning. Add a "V5 Verification" subsection recording step 24.3's gate run and measurements. Preserve the existing v1-v4 history sections.
+- **A new "Fidelity And Limitations" section in `README.md`**, published from step 24.3's consolidated list: what this trainer does not reproduce and why, each item linked to its deferred register id. State plainly that phases 2 and 5 are easier than the live fight because the arena does not flood, and that phases 1, 3 and 8 are harder because a real group suppresses attacks by stunning. A training tool that misrepresents its own fidelity is worse than one that admits the gap.
+- **The Home changelog.** Add an entry in player-facing language: a new boss with eight phases, status effects that change how you move, single-phase practice, and the ability to choose which encounter to train. Preserve every earlier entry.
+- **[The mechanics contract](docs/mechanics.md).** Append the implemented-V5 handoff beside the V5 contract that step 19.1 recorded, covering the final tuned values, the sourced-versus-authored split, and the two unsourced interpretations. Do not alter the v1-v4 provenance.
+- **[The deferred register](docs/deferred-work.md).** Update it to reflect reality: items that shipped move out, items this work revealed move in, and D09's F5 entry is marked fixed by step 23.1 with the other findings left open.
+- **Archive this plan.** Copy it to `docs/implementation-plan-v5.md` with an archive header in the style of the v2 and v4 archives, rewrite its relative links for the new directory depth, and leave `implementation-plan.md` holding whatever work is genuinely pending. Verify every relative link in every file you touched resolves on disk.
+
+Do not claim a deployment. Publication remains a separately authorized step.
+
+**Focused checks:** structural only. Every relative link in every touched file resolves; the README's v1-v4 history sections and the Home changelog's earlier entries are intact, confirmed by comparing before and after; the mechanics contract retains every pre-existing heading; the archived plan's links resolve from `docs/`; and the six authored JSON files listed in the README all exist. Run all four routine gates to prove nothing was disturbed.
+
+**Acceptance:** the README describes the V5 state and publishes the fidelity limitations, the changelog gains a player-facing entry with history intact, the mechanics contract and deferred register are current, this plan is archived with working links, and all four gates pass.
 
 ## Customization Choice
 
-Use `.github/copilot-instructions.md` for shared engineering rules and `.github/prompts/implement-step.prompt.md` for the single-step command, mirrored for Claude Code by `CLAUDE.md` and `.claude/commands/implement-step.md`. Keep the mirrored pairs in sync in the same commit. No custom agent or skill is necessary yet; consider a reusable encounter-authoring skill only once a second archetype exposes a genuinely repeated workflow.
+Shared engineering rules live in `.github/copilot-instructions.md`, mirrored for Claude Code by `CLAUDE.md`; the single-step command lives in `.github/prompts/implement-step.prompt.md`, mirrored by `.claude/commands/implement-step.md`. Keep each mirrored pair in sync in the same commit. The mirror table at the bottom of `CLAUDE.md` records the pairings.
+
+Phase 23 is ten authoring steps against one stable vocabulary, which is the repeated workflow a skill would serve. Reconsider a reusable encounter-authoring skill after step 23.4: by then two phases and one minion family will have been authored and it will be clear whether the repetition is mechanical enough to automate, or whether each phase's source reading is the actual work.
