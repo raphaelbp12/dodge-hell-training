@@ -98,7 +98,7 @@ Every step prompt inherits these instructions:
 4. For testable behavior, write a focused failing test, run it to establish the expected failure, implement the smallest change, rerun it, then refactor only if needed. Documentation and generated scaffolding use appropriate structural/build checks instead of artificial unit tests.
 5. Use official commands to generate the React bootstrap and install dependencies. Never manually recreate generated bootstrap files. Never delete existing work to make a generator accept the directory.
 6. Keep game logic free from React/Phaser dependencies. Add coverage to nearby tests; do not create duplicate test harnesses.
-7. Run the step's focused checks and relevant existing checks. Disclose unavailable tools, source access failures, and unverified behavior. Never claim that a test or deployment ran when it did not.
+7. Run the step's focused checks and relevant existing checks - see the project instructions for which checks run routinely versus only to reproduce a pipeline failure. Disclose unavailable tools, source access failures, and unverified behavior. Never claim that a test or deployment ran when it did not. After committing and pushing, do not watch or poll the resulting pipeline or deployment; report the push and stop.
 8. End with changed files, actual check outcomes, remaining blockers, and a concise manual verification procedure where relevant. Update this step's status only when its acceptance criteria are met.
 
 ## Execution Contract - Phases 15-18
@@ -210,7 +210,7 @@ Taken from the current tree at `3857e5c`, to size each step rather than guess:
 
 Extend the existing config/models, `createSimulation`/`advanceSimulation`, shard segmentation, health arithmetic, `SessionController`, `EncounterScene`, React screens and storage boundary. Reuse neighboring tests and the existing Playwright helpers, diagnostic/production split and pixel checks.
 
-Behavior steps start with a focused failing test, run it, implement the smallest change, and rerun it. Run relevant checks from `app/`: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e`. All five are required for runtime-integrating changes and final acceptance. Use the pinned toolchain in `.node-version` (24.22.1) and `npm@12.2.1`; a local `node` that does not match is a disclosed limitation, not an acceptable substitute for a final gate run.
+Behavior steps start with a focused failing test, run it, implement the smallest change, and rerun it. Run `npm run test`, `npm run typecheck`, `npm run lint`, and `npm run build` from `app/` for every runtime-integrating change. `npm run test:e2e` is not run in full as routine verification - CI runs it on every push. When a step adds or changes Playwright coverage, run just the new or changed test(s) with `--grep` to confirm them; run the full suite locally only to reproduce a pipeline-reported failure, or for an explicit full-acceptance step like 18.1. Use the pinned toolchain in `.node-version` (24.22.1) and `npm@12.2.1`; a local `node` that does not match is a disclosed limitation, not an acceptable substitute for a final gate run.
 
 ### Phase Index
 
