@@ -7,6 +7,7 @@ import {
   mkdirSync,
   openSync,
   readSync,
+  rmSync,
   statSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -20,6 +21,8 @@ const isWindows = process.platform === "win32";
 const npmCommand = isWindows ? (process.env.ComSpec ?? "cmd.exe") : "npm";
 const npmArguments = (gate) =>
   isWindows ? ["/d", "/s", "/c", "npm.cmd", "run", gate] : ["run", gate];
+// Equivalent to --silent: hides npm's "npm notice run …" lines from gate logs.
+const npmEnvironment = { ...process.env, npm_config_loglevel: "silent" };
 const preliminaryGates = ["lint", "typecheck", "test"];
 const failureExcerptLines = 80;
 const failureExcerptMaxBytes = 16 * 1024;
@@ -37,13 +40,14 @@ function readFailureExcerpt(logPath) {
   } finally {
     closeSync(descriptor);
   }
-  return buffer
+  const lines = buffer
     .subarray(0, bytesRead)
     .toString("utf8")
     .trimEnd()
-    .split(/\r?\n/)
-    .slice(-failureExcerptLines)
-    .join("\n");
+    .split(/\r?\n/);
+  // A tail read that starts mid-file may begin inside a line or UTF-8 character.
+  if (length < size && lines.length > 1) lines.shift();
+  return lines.slice(-failureExcerptLines).join("\n");
 }
 
 function runGate(gate) {
@@ -53,7 +57,7 @@ function runGate(gate) {
   try {
     result = spawnSync(npmCommand, npmArguments(gate), {
       cwd: appRoot,
-      env: process.env,
+      env: npmEnvironment,
       stdio: ["ignore", descriptor, descriptor],
     });
   } finally {
@@ -76,6 +80,8 @@ for (const gate of preliminaryGates) {
   if (!runGate(gate)) failed = true;
 }
 if (failed) {
+  // Remove the previous build log so it cannot be mistaken for this run's result.
+  rmSync(join(logDirectory, "build.log"), { force: true });
   console.log("SKIP build — a preliminary gate failed");
 } else if (!runGate("build")) {
   failed = true;

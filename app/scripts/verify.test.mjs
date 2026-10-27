@@ -24,6 +24,7 @@ function runCli({
   outputLines = 3,
   singleLineLength = 0,
   missingNpm = false,
+  staleBuildLog = false,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), "quiet verify "));
   try {
@@ -34,6 +35,11 @@ function runCli({
     mkdirSync(binDirectory, { recursive: true });
     const copiedScript = join(scriptsDirectory, "verify.mjs");
     copyFileSync(sourceScript, copiedScript);
+    if (staleBuildLog) {
+      const logDirectory = join(appRoot, "test-results", "verification");
+      mkdirSync(logDirectory, { recursive: true });
+      writeFileSync(join(logDirectory, "build.log"), "stale build output\n");
+    }
 
     const callsPath = join(root, "calls.log");
     if (!missingNpm) {
@@ -132,6 +138,13 @@ for (const failureGate of preliminaryGates) {
   });
 }
 
+test("removes a previous build log when build is skipped", () => {
+  const { result, logs } = runCli({ failureGate: "lint", staleBuildLog: true });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /SKIP build/);
+  assert.equal(logs.build, undefined);
+});
+
 test("bounds failure excerpts without truncating logs", () => {
   const { result, logs } = runCli({ failureGate: "test", outputLines: 200 });
   assert.notEqual(result.status, 0);
@@ -151,6 +164,7 @@ test("bounds a large single-line failure without truncating its log", () => {
   });
   assert.notEqual(result.status, 0);
   assert.ok(result.stderr.length < 20_000);
+  assert.match(result.stderr, /x{1000}/);
   assert.equal(logs.lint.length, 200_000);
 });
 
