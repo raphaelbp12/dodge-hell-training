@@ -1,5 +1,12 @@
 import { constrainBodyToArena, pursueBody } from "./geometry";
 import {
+  applyConditions,
+  createConditionSeconds,
+  effectiveInput,
+  playerTravelTiles,
+  tickConditions,
+} from "./conditions";
+import {
   archetypeOf,
   ENCOUNTER_CONFIG,
   projectileOf,
@@ -22,7 +29,6 @@ import {
 } from "../config/debug";
 import {
   assertNonnegative,
-  PALADIN_DERIVED_STATS,
   PALADIN_STATS,
 } from "../config/stats";
 import type {
@@ -140,6 +146,7 @@ export function createSimulation(
       positionTiles: { ...config.player.spawnTiles },
       healthHp: PALADIN_STATS.healthHp,
       combatRemainingSeconds: 0,
+      conditionSeconds: createConditionSeconds(),
     },
     enemies: [],
     shards: [],
@@ -297,19 +304,21 @@ function constrainToArena(
 function updateMovement(state: SimulationState, input: SimulationInput): void {
   const config = state.config;
   const stepSeconds = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
-  const directionX = Number(input.east) - Number(input.west);
-  const directionY = Number(input.south) - Number(input.north);
+  const conditionedInput = effectiveInput(state.player, input);
+  const directionX =
+    Number(conditionedInput.east) - Number(conditionedInput.west);
+  const directionY =
+    Number(conditionedInput.south) - Number(conditionedInput.north);
   const directionLength = Math.hypot(directionX, directionY) || 1;
-  const playerTravelTiles =
-    PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
+  const playerTravel = playerTravelTiles(state.player, stepSeconds);
   state.player.positionTiles = constrainToArena(
     {
       x:
         state.player.positionTiles.x +
-        (directionX / directionLength) * playerTravelTiles,
+        (directionX / directionLength) * playerTravel,
       y:
         state.player.positionTiles.y +
-        (directionY / directionLength) * playerTravelTiles,
+        (directionY / directionLength) * playerTravel,
     },
     config.player.verticesTiles,
   );
@@ -356,6 +365,10 @@ function registerShardHit(
   const damageHp = applyPlayerHit(state.player, shard.damageHp);
   if (damageHp === null) return;
   shard.hasHitPlayer = true;
+  applyConditions(
+    state.player,
+    projectileOf(state.config, shard.projectileId).conditions,
+  );
   state.hitsTaken++;
   acceptedHits.push({
     shardId: shard.id,
@@ -494,6 +507,9 @@ export function advanceSimulation(
 
   let stepsExecuted = 0;
   while (stepsExecuted < maximumSteps) {
+    // Conditions tick before movement; hits later in the step retain their
+    // full authored duration and first decrement on the following step.
+    tickConditions(state.player, fixedStepSeconds);
     const playerStart = state.player.positionTiles;
     updateMovement(state, input);
     state.ticksElapsed++;

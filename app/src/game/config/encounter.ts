@@ -1,4 +1,5 @@
 import type { CircularArena, Vector2 } from "../models";
+import type { ConditionApplication } from "../simulation/conditions";
 import {
   AUTHORED_ARCHETYPES,
   AUTHORED_ARENA,
@@ -53,7 +54,7 @@ export type ProjectileSpec = Readonly<{
   damageHp: number;
   speedTilesPerSecond: number;
   armorPiercing: boolean;
-  conditions: readonly unknown[];
+  conditions: readonly ConditionApplication[];
   verticesTiles: readonly Vector2[];
   expiration: string;
   hitPolicy: string;

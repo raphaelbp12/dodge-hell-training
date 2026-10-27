@@ -1,3 +1,18 @@
+export type ConditionKey =
+  | "paralyzed"
+  | "slowed"
+  | "confused"
+  | "armorBroken"
+  | "exposed"
+  | "cursed"
+  | "sick"
+  | "dazed"
+  | "silenced"
+  | "quiet"
+  | "weak"
+  | "unstable"
+  | "petStasis";
+
 export type Vector2 = Readonly<{ x: number; y: number }>;
 
 export type CircularArena = Readonly<{
@@ -31,6 +46,8 @@ export type PlayerState = {
   positionTiles: Vector2;
   healthHp: number;
   combatRemainingSeconds: number;
+  /** Remaining seconds per condition; 0 means not applied. */
+  conditionSeconds: Record<ConditionKey, number>;
 };
 
 /**

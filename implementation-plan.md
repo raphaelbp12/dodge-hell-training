@@ -366,7 +366,7 @@ Read this section before your first step.
 
 ### Step 21.1 - Add Condition State, Application And Ticking
 
-Status: pending. Dependencies: 20.5.
+Status: complete. Dependencies: 20.5.
 
 **Implementation prompt**
 
@@ -399,9 +399,17 @@ Also expose the condition state through `inspect()` and the Playwright `Inspecti
 
 **Acceptance:** all thirteen conditions are modelled, refreshed by the maximum rule, ticked once at the start of each step, validated at the data boundary and visible to `inspect()`; no condition yet changes a rule; nothing pre-existing changed; and all four gates pass.
 
+**Execution and verification - 2026-10-27**
+
+Added `simulation/conditions.ts` with the seven active and six inert keys, deliberate inert-state documentation, zero-filled initialisation, maximum-rule refresh, start-of-step ticking with exact-boundary clamping, and positive-remainder queries. `PlayerState.conditionSeconds` is initialised by `createSimulation` and is therefore included in the existing structured-clone `inspect()` payload and its Playwright `PlayerState` type. Authored projectile conditions now have typed entries and loader validation for objects, known keys, duplicates and positive finite durations. No shipped JSON value changed.
+
+Accepted-hit condition application was included in this step because its required hit-ordering test cannot otherwise observe the lifecycle; step 21.3 retains all condition-aware damage work. This does not change shipped gameplay because the Crystal Worm still authors no conditions. A machine-precision relative tolerance handles exact expiry after floating-point subtraction without changing zero-step behavior. The apply/refresh, ticking, accepted-hit ordering and six malformed-data cases were each watched fail before implementation.
+
+Checks run from `app/` with Node 24.22.1/npm 12.2.1: focused condition/data tests - 95/95 passed; `npm run lint` (pass); `npm run typecheck` (pass); `npm run test` - 508/508 passed across 14 files; `npm run build` (pass, existing large-chunk warning only). No blockers.
+
 ### Step 21.2 - Apply The Movement Conditions
 
-Status: pending. Dependencies: 21.1.
+Status: complete. Dependencies: 21.1.
 
 **Implementation prompt**
 
@@ -422,6 +430,14 @@ No shipped projectile applies a condition yet, so apply these in tests by settin
 **Focused checks:** focused failing test that a paralysed player does not move first. Then: a paralysed player holding every direction stays exactly in place for the whole duration and moves again on the first step after expiry; a slowed player travels exactly `4 * stepSeconds` per step and the derived constant equals 4 and is below 7.0613; paralysed plus slowed moves zero; each of the four confused mappings is correct, applied to a single direction and to a diagonal; the confused transform applied twice is the identity; the diagonal normalisation still holds under confusion, so a confused diagonal is no faster than a straight line; and arena containment still holds under every combination. Confirm nothing pre-existing changed. All four routine gates.
 
 **Acceptance:** Paralyzed, Slowed and Confused change player movement exactly as the source specifies, the slowed speed is derived rather than authored, the confused mapping is the published one and is self-inverse, enemies are unaffected, nothing pre-existing changed, and all four gates pass.
+
+**Execution and verification - 2026-10-27**
+
+Added `playerTravelTiles` and `effectiveInput` in `simulation/conditions.ts` and composed them into the existing player-only movement path. Paralyzed produces zero travel and takes priority; Slowed derives its speed once through `derivePlayerStats({ ...PALADIN_STATS, speed: 0 })`, yielding 4 tiles/second without an authored gameplay literal; Confused applies the published west→south, south→west, east→north, north→east input transform. Enemy state and movement rules were not changed.
+
+Tests cover paralysis in every direction and diagonal, expiry-step recovery, Paralyzed-plus-Slowed priority, exact slowed travel and derived speed, every confused mapping including a diagonal, self-inversion, confused diagonal normalization, and containment for all eight movement-condition combinations. The paralysis, slowed-speed and confused-mapping checks were watched fail before their implementations.
+
+Checks run from `app/` with Node 24.22.1/npm 12.2.1: focused condition tests - 13/13 passed; `npm run lint` (pass); `npm run typecheck` (pass); `npm run test` - 516/516 passed across 14 files; `npm run build` (pass, existing large-chunk warning only). No deviations or blockers.
 
 ### Step 21.3 - Apply The Damage Conditions And Armor Piercing
 

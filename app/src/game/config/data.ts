@@ -1,5 +1,10 @@
 import type { CircularArena, Vector2 } from "../models";
 import {
+  CONDITION_KEYS,
+  type ConditionApplication,
+  type ConditionKey,
+} from "../simulation/conditions";
+import {
   firstArmCollisionDegrees,
   sectorWidthDegrees,
   totalCoverageDegrees,
@@ -219,13 +224,37 @@ export function wavyDeviationTiles(
   return 0.5 * lateralAccelerationTilesPerSecondSquared * stepSeconds * stepSeconds;
 }
 
+export function validateConditions(
+  value: unknown,
+  path: string,
+): readonly ConditionApplication[] {
+  if (!Array.isArray(value)) reject(path, "must be an array");
+  const seen = new Set<ConditionKey>();
+  return Object.freeze(
+    value.map((entry, index) => {
+      const entryPath = `${path}[${index}]`;
+      const condition = record(entry, entryPath);
+      const keyText = text(condition.key, `${entryPath}.key`);
+      if (!CONDITION_KEYS.includes(keyText as ConditionKey))
+        reject(`${entryPath}.key`, "must be a defined condition");
+      const key = keyText as ConditionKey;
+      if (seen.has(key)) reject(`${entryPath}.key`, "must not be duplicated");
+      seen.add(key);
+      return Object.freeze({
+        key,
+        seconds: positiveNumber(condition.seconds, `${entryPath}.seconds`),
+      });
+    }),
+  );
+}
+
 export type AuthoredProjectile = Readonly<{
   id: string;
   source: string;
   damageHp: number;
   speedTilesPerSecond: number;
   armorPiercing: boolean;
-  conditions: readonly unknown[];
+  conditions: readonly ConditionApplication[];
   body: AuthoredBody;
   expiration: string;
   hitPolicy: string;
@@ -317,8 +346,6 @@ export function validateProjectile(
   const path = `projectiles.projectiles.${id}`;
   const projectile = record(value, path);
   const motion = validateProjectileMotion(projectile.motion, `${path}.motion`);
-  if (!Array.isArray(projectile.conditions))
-    reject(`${path}.conditions`, "must be an array");
   const speedTilesPerSecond = positiveNumber(
     projectile.speedTilesPerSecond,
     `${path}.speedTilesPerSecond`,
@@ -356,7 +383,7 @@ export function validateProjectile(
       projectile.armorPiercing,
       `${path}.armorPiercing`,
     ),
-    conditions: Object.freeze([...projectile.conditions]),
+    conditions: validateConditions(projectile.conditions, `${path}.conditions`),
     body: validateBody(projectile.body, `${path}.body`),
     expiration: text(projectile.expiration, `${path}.expiration`),
     hitPolicy: text(projectile.hitPolicy, `${path}.hitPolicy`),

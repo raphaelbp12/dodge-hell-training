@@ -2,12 +2,14 @@ import { expect, test } from "vitest";
 import { PALADIN_STATS } from "../config/stats";
 import type { PlayerState } from "../models";
 import { applyPlayerHit, regeneratePlayer } from "./health.ts";
+import { createConditionSeconds } from "./conditions";
 
 function player(): PlayerState {
   return {
     positionTiles: { x: 0, y: 0 },
     healthHp: 700,
     combatRemainingSeconds: 0,
+    conditionSeconds: createConditionSeconds(),
   };
 }
 

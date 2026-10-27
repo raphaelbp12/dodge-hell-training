@@ -163,6 +163,23 @@ test.each([
   );
 });
 
+test.each([
+  ["an unknown key", [{ key: "stunned", seconds: 1 }]],
+  ["a duplicate key", [{ key: "slowed", seconds: 1 }, { key: "slowed", seconds: 2 }]],
+  ["a zero duration", [{ key: "slowed", seconds: 0 }]],
+  ["a negative duration", [{ key: "slowed", seconds: -1 }]],
+  ["a non-object entry", ["slowed"]],
+  ["a nonfinite duration", [{ key: "slowed", seconds: Number.NaN }]],
+] as const)("validateProjectile rejects %s in conditions", (_name, conditions) => {
+  expect(() =>
+    validateProjectile(
+      { ...VALID_PROJECTILE, conditions },
+      "condition-shard",
+      TEST_STEP_SECONDS,
+    ),
+  ).toThrow(RangeError);
+});
+
 test("validateProjectiles rejects an empty catalog", () => {
   expect(() =>
     validateProjectiles({ projectiles: {} }, TEST_STEP_SECONDS),
