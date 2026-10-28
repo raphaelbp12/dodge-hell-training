@@ -60,6 +60,7 @@ import {
   applyPhaseTransitions,
   applyProgression,
   createAttackClocks,
+  enterDrillPhase,
   resolveEntrySpawns,
 } from "./phases";
 import { arbitrarySeed, assertSeed, nextSeed, unitFromSeed } from "./random";
@@ -75,6 +76,12 @@ export type SimulationState = {
   /** Generator cursor. Plain data, so the state stays structuredClone-able. */
   randomSeed: number;
   rulesVersion: string;
+  /**
+   * Drill mode (step 22.5): the phase index the primary enemy re-enters from
+   * the top on its own exit, instead of advancing - K01's one approved
+   * exception to the monotonic phase rule. `null` outside drill mode.
+   */
+  loopPhaseIndex: number | null;
   /** "ended" means the player died; "cleared" means a drained boss's health reached zero. */
   phase: "playing" | "ended" | "cleared";
   hitsTaken: number;
@@ -170,10 +177,28 @@ export function createEnemy(
   };
 }
 
+/** `startPhaseIndex` and `loopPhase` implement drill mode (K01, step 22.5). */
+export type CreateSimulationOptions = Readonly<{
+  /** The phase the primary enemy starts in, instead of its archetype's phase 0. */
+  startPhaseIndex?: number;
+  /** When true, the drilled phase re-enters itself on exit instead of advancing. */
+  loopPhase?: boolean;
+}>;
+
 export function createSimulation(
   config: EncounterConfig = ENCOUNTER_CONFIG,
   seed: number = arbitrarySeed(),
+  options: CreateSimulationOptions = {},
 ): SimulationState {
+  const primaryPhaseCount =
+    archetypeOf(config, config.primaryArchetypeId).phases.length;
+  if (
+    options.startPhaseIndex !== undefined &&
+    (!Number.isInteger(options.startPhaseIndex) ||
+      options.startPhaseIndex < 0 ||
+      options.startPhaseIndex >= primaryPhaseCount)
+  )
+    throw new RangeError("startPhaseIndex must name an authored phase");
   const state: SimulationState = {
     config,
     debugSettings: DEFAULT_DEBUG_SETTINGS,
@@ -182,7 +207,14 @@ export function createSimulation(
     nextEnemyId: 1,
     nextSpawnSeconds: config.spawns.firstSpawnSeconds,
     randomSeed: assertSeed(seed),
-    rulesVersion: config.rulesVersion,
+    rulesVersion:
+      options.startPhaseIndex !== undefined
+        ? `${config.rulesVersion}-drill-p${options.startPhaseIndex}`
+        : config.rulesVersion,
+    loopPhaseIndex:
+      options.loopPhase && options.startPhaseIndex !== undefined
+        ? options.startPhaseIndex
+        : null,
     phase: "playing",
     hitsTaken: 0,
     player: {
@@ -199,7 +231,14 @@ export function createSimulation(
   };
   // The opening enemy is schedule index 0, created through the same routine as
   // every later spawn, so there is no special-cased initial enemy (G18).
-  spawnEnemy(state);
+  const enemy = spawnEnemy(state);
+  if (enemy && options.startPhaseIndex !== undefined)
+    enterDrillPhase(
+      state,
+      enemy,
+      archetypeOf(config, config.primaryArchetypeId),
+      options.startPhaseIndex,
+    );
   return state;
 }
 

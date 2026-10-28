@@ -16,6 +16,12 @@ export function healthFraction(enemy: EnemyState): number {
   return enemy.healthHp / enemy.maxHealthHp;
 }
 
+/** Resets health to a phase's own entry fraction (step 22.5's drill entry/loop). */
+function setHealthToPhaseEntry(enemy: EnemyState, phase: PhaseSpec): void {
+  if (enemy.healthHp === null || enemy.maxHealthHp === null) return;
+  enemy.healthHp = phase.enterAtHpFraction * enemy.maxHealthHp;
+}
+
 /**
  * One clock per authored attack, anchored at `epochSeconds`. The telegraph is
  * implemented by this anchor alone (step 22.3): a phase entry anchors the
@@ -236,6 +242,24 @@ export function enterPhase(
   resolveSpawns(state, enemy, phase.spawns);
 }
 
+/**
+ * Enters a phase for drill mode (step 22.5): resets health to that phase's
+ * own entry fraction first, since a drill run never actually drained the
+ * phases it skipped, then enters through the normal mechanism so clocks,
+ * telegraph, invulnerability and spawns all apply exactly as a real entry
+ * would. Shared by `createSimulation`'s drill start, `loopPhase`'s re-entry,
+ * and the debug panel's phase jump.
+ */
+export function enterDrillPhase(
+  state: SimulationState,
+  enemy: EnemyState,
+  archetype: EnemyArchetype,
+  index: number,
+): void {
+  setHealthToPhaseEntry(enemy, archetype.phases[index]);
+  enterPhase(state, enemy, archetype, index);
+}
+
 /** Advances one enemy by at most one phase; the caller loops to cross several thresholds in one step. */
 function tryAdvancePhase(
   state: SimulationState,
@@ -251,7 +275,17 @@ function tryAdvancePhase(
     phase.exitAfterSeconds !== null &&
     state.elapsedSeconds - enemy.phaseEnteredAtSeconds >= phase.exitAfterSeconds;
   if (!byHealth && !byDuration) return false;
-  enterPhase(state, enemy, archetype, nextIndex);
+  // K01/step 22.5: the one approved exception to the monotonic rule. Only the
+  // primary enemy can be drilled, and only when its current phase is the
+  // authored loop target - a phase-driven minion always advances normally.
+  if (
+    state.loopPhaseIndex === enemy.phaseIndex &&
+    archetype.id === state.config.primaryArchetypeId
+  ) {
+    enterDrillPhase(state, enemy, archetype, enemy.phaseIndex);
+  } else {
+    enterPhase(state, enemy, archetype, nextIndex);
+  }
   return true;
 }
 
@@ -277,6 +311,22 @@ function tryAdvanceSubPhase(
   const nextIndex = (enemy.subPhaseIndex + 1) % phase.subPhases.length;
   enterSubPhase(state, enemy, archetype, enemy.phaseIndex, nextIndex);
   return true;
+}
+
+/**
+ * Debug panel's "next sub-phase" action (step 22.5, K12): advances past the
+ * authored duration gate on command. A no-op when the active phase has no
+ * sub-phases.
+ */
+export function forceNextSubPhase(
+  state: SimulationState,
+  enemy: EnemyState,
+  archetype: EnemyArchetype,
+): void {
+  const phase = currentPhaseOf(archetype, enemy);
+  if (!phase.subPhases || phase.subPhases.length === 0) return;
+  const nextIndex = (enemy.subPhaseIndex + 1) % phase.subPhases.length;
+  enterSubPhase(state, enemy, archetype, enemy.phaseIndex, nextIndex);
 }
 
 /**

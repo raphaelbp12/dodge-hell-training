@@ -329,13 +329,13 @@ type ShardState = {
 
 ## Phase 22: Enemy Health, Phases And Movement Behaviours
 
-> Step prompts and execution records: [`docs/plan/phase-22.md`](plan/phase-22.md).
+> Full prompts and execution records archived: [`docs/plan-archive/phase-22.md`](plan-archive/phase-22.md).
 
 - **22.1** - Introduce The Movement Behaviour Vocabulary. Status: complete. Dependencies: 21.5. `EnemyArchetype.speedTilesPerSecond` replaced by an authored `movement` union (`chase`, `stationary`, `move-to-point`, `orbit`, `wander`); the `chaseArenaCenter` debug toggle now overrides to `move-to-point` instead of an inline branch; orbit's tangential speed is validated below the Paladin's; the full per-tick randomness draw order is documented and tested. 555/555 tests, all gates passed, Crystal Worm timeline unchanged.
-- **22.2** - Add Enemy Health And The Simulated Progression Driver. Status: pending. Dependencies: 22.1.
-- **22.3** - Implement The Phase Machine. Status: pending. Dependencies: 22.2.
+- **22.2** - Add Enemy Health And The Simulated Progression Driver. Status: complete. Dependencies: 22.1. Added `healthHp`/`maxHealthHp`/`invulnerableUntilSeconds` to `EnemyState` and a `healthFraction` helper; `resolveProgression` resolves a per-phase progression override against the archetype's own. No shipped Crystal Worm value changed.
+- **22.3** - Implement The Phase Machine. Status: complete. Dependencies: 22.2. Moved `attacks`/`movement` into an ordered `phases` array with HP-fraction or duration exits, telegraphs and invulnerability windows; the Crystal Worm became a single `"sole"` phase with unchanged behaviour.
 - **22.4** - Add Cycling Sub-Phases And Phase-Driven Spawns. Status: complete. Dependencies: 22.3. Sub-phases cycle through the same entry mechanism as phases; phase/sub-phase `spawns` resolve once on entry with evenly spread, golden-angle-offset ring placement and an optional `startPhaseIndex`; `despawnOnExit` removes a minion on exit without touching its already-fired shards; `maxConcurrentMinions` suppresses rather than queues. 600/600 tests, all gates passed, Crystal Worm timeline unchanged.
-- **22.5** - Add Drill Mode. Status: pending. Dependencies: 22.4.
+- **22.5** - Add Drill Mode. Status: complete. Dependencies: 22.4. `createSimulation` takes an optional `{ startPhaseIndex, loopPhase }`; the primary enemy can start in and loop a single phase via the new `enterDrillPhase`/`loopPhaseIndex`, surfaced through a `?phase=`/`?loop=1` URL parameter and three new `EncounterHandle` debug methods (a dedicated "Phase drill" panel section, not the numeric `DEBUG_PARAMETERS`/`DEBUG_TOGGLES` registries - see the execution record for why). A drill attempt's `rulesVersion` carries a `-drill-p<n>` suffix and is excluded from the retained best by the existing exact-match comparison, no new exclusion code. 606/606 tests, 1/1 `--grep "drill"` Playwright test, all gates passed, Crystal Worm timeline unchanged.
 
 ## Phase 23: Author The Killer Bee Queen Of The Nest
 

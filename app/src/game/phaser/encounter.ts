@@ -12,7 +12,9 @@ import {
 import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
 import { CONDITION_LABELS, visibleConditions } from "../simulation/conditions";
-import { currentPhaseOf } from "../simulation/phases";
+import { currentPhaseOf, enterDrillPhase, forceNextSubPhase } from "../simulation/phases";
+import type { CreateSimulationOptions } from "../simulation/simulation";
+import { arbitrarySeed } from "../simulation/random";
 import type { TelegraphColorName } from "../config/data";
 import type { AcceptedHit, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
@@ -37,11 +39,19 @@ export type EncounterHandle = {
   setMuted(muted: boolean): void;
   setControlsOpen(open: boolean): void;
   setDebugSettings(settings: DebugSettings): void;
+  /** Debug panel's phase jump (step 22.5, K12): moves the primary enemy mid-run. */
+  jumpToPhase(index: number): void;
+  /** Debug panel's "loop this phase" toggle: arms or disarms the drill re-entry rule. */
+  setLoopPhase(enabled: boolean): void;
+  /** Debug panel's "next sub-phase" action; a no-op without sub-phases. */
+  advanceSubPhase(): void;
 };
 
 type EncounterOptions = {
   /** Pins spawn placement so a run can be reproduced; omitted means varied. */
   seed?: number;
+  /** Drill mode (step 22.5): starts the primary enemy in one phase, optionally looping it. */
+  drill?: CreateSimulationOptions;
   initialZoom?: number;
   initialMuted?: boolean;
   initialDebugSettings?: DebugSettings;
@@ -154,9 +164,12 @@ class EncounterScene extends Phaser.Scene {
   ) {
     super("Encounter");
     this.session =
-      options.seed === undefined
+      options.seed === undefined && !options.drill
         ? new SessionController()
-        : new SessionController(() => options.seed!);
+        : new SessionController(
+            options.seed === undefined ? arbitrarySeed : () => options.seed!,
+            options.drill ?? {},
+          );
     this.host = host;
     this.publish = publish;
     this.zoom = options.initialZoom ?? ENCOUNTER_CONFIG.camera.defaultZoom;
@@ -345,6 +358,38 @@ class EncounterScene extends Phaser.Scene {
     if (!this.bodies) return;
     this.drawEntities();
     this.publishView();
+  }
+
+  jumpToPhase(index: number): void {
+    if (this.disposed || this.state.phase !== "playing") return;
+    const enemy = this.state.enemies.find(
+      (candidate) => candidate.archetypeId === this.state.config.primaryArchetypeId,
+    );
+    if (!enemy) return;
+    const archetype = archetypeOf(this.state.config, enemy.archetypeId);
+    if (index < 0 || index >= archetype.phases.length) return;
+    enterDrillPhase(this.state, enemy, archetype, index);
+    if (this.bodies) this.drawEntities();
+    this.publishView();
+  }
+
+  advanceSubPhase(): void {
+    if (this.disposed || this.state.phase !== "playing") return;
+    const enemy = this.state.enemies.find(
+      (candidate) => candidate.archetypeId === this.state.config.primaryArchetypeId,
+    );
+    if (!enemy) return;
+    forceNextSubPhase(this.state, enemy, archetypeOf(this.state.config, enemy.archetypeId));
+    if (this.bodies) this.drawEntities();
+    this.publishView();
+  }
+
+  setLoopPhase(enabled: boolean): void {
+    if (this.disposed || this.state.phase !== "playing") return;
+    const enemy = this.state.enemies.find(
+      (candidate) => candidate.archetypeId === this.state.config.primaryArchetypeId,
+    );
+    this.state.loopPhaseIndex = enabled && enemy ? enemy.phaseIndex : null;
   }
 
   setControlsOpen(open: boolean): void {
@@ -776,6 +821,9 @@ export function createEncounter(
       options.initialDebugSettings = settings;
       scene?.setDebugSettings(settings);
     },
+    jumpToPhase: (index) => scene?.jumpToPhase(index),
+    setLoopPhase: (enabled) => scene?.setLoopPhase(enabled),
+    advanceSubPhase: () => scene?.advanceSubPhase(),
     destroy: () => {
       if (disposed) return;
       disposed = true;

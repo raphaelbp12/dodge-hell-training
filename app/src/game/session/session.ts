@@ -1,7 +1,10 @@
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { assertNonnegative } from "../config/stats";
 import type { AcceptedHit, SessionPhase, SimulationInput } from "../models";
-import type { SimulationState } from "../simulation/simulation";
+import type {
+  CreateSimulationOptions,
+  SimulationState,
+} from "../simulation/simulation";
 import {
   advanceSimulation,
   createSimulation,
@@ -35,10 +38,20 @@ export class SessionController {
   private debugSettings = DEFAULT_DEBUG_SETTINGS;
   /** Supplies each attempt's seed; injected so a test can pin placement. */
   private nextSeed: () => number;
+  /** Drill mode (step 22.5): a single phase to start in and optionally loop. */
+  private drillOptions: CreateSimulationOptions;
 
-  constructor(nextSeed: () => number = arbitrarySeed) {
+  constructor(
+    nextSeed: () => number = arbitrarySeed,
+    drillOptions: CreateSimulationOptions = {},
+  ) {
     this.nextSeed = nextSeed;
-    this.simulation = createSimulation(ENCOUNTER_CONFIG, this.nextSeed());
+    this.drillOptions = drillOptions;
+    this.simulation = createSimulation(
+      ENCOUNTER_CONFIG,
+      this.nextSeed(),
+      this.drillOptions,
+    );
   }
 
   start(): boolean {
@@ -54,7 +67,11 @@ export class SessionController {
   }
 
   private initialize(countdownSeconds: number): void {
-    this.simulation = createSimulation(ENCOUNTER_CONFIG, this.nextSeed());
+    this.simulation = createSimulation(
+      ENCOUNTER_CONFIG,
+      this.nextSeed(),
+      this.drillOptions,
+    );
     setDebugSettings(this.simulation, this.debugSettings);
     this.attemptId++;
     this.result = null;

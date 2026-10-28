@@ -243,6 +243,25 @@ test("selected values are the scored defaults without opening Debug", async ({
   await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
 });
 
+test("the ?phase= drill URL parameter starts the named phase and suffixes rulesVersion, and an out-of-range value is ignored", async ({
+  page,
+}) => {
+  await page.goto(`${seededUrl()}&phase=0`);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page);
+  const drilled = await inspect(page);
+  expect(drilled.rulesVersion).toBe(
+    "crystal-worm-child-swarm-paladin-v4-drill-p0",
+  );
+  expect(drilled.enemies[0]?.phaseIndex).toBe(0);
+
+  await page.goto(`${seededUrl()}&phase=99`);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page);
+  const ignored = await inspect(page);
+  expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v4");
+});
+
 for (const width of [1440, 390]) {
   test(`live enemy debug sliders, god mode and safe Retry work at ${width}px`, async ({
     page,

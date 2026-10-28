@@ -5,7 +5,11 @@ import {
   type EncounterView,
 } from "./game/phaser/encounter";
 import { PALADIN_STATS } from "./game/config/stats";
-import { ENCOUNTER_CONFIG, RULES_VERSION } from "./game/config/encounter";
+import {
+  ENCOUNTER_CONFIG,
+  primaryArchetype,
+  RULES_VERSION,
+} from "./game/config/encounter";
 import {
   AttemptHistory,
   retainedBestSeconds,
@@ -55,15 +59,43 @@ function readSeedFromLocation(): number | undefined {
   return Number.isFinite(seed) ? Math.trunc(seed) : undefined;
 }
 
+/**
+ * Drill mode (step 22.5, K01): `?phase=<index>` starts the primary enemy in
+ * one phase, validated against its archetype's phase count; an out-of-range
+ * or malformed value is ignored and the full fight starts normally, matching
+ * how `?seed=` already handles bad input. `?loop=1` additionally re-enters
+ * that phase on its own exit instead of advancing.
+ */
+function readDrillFromLocation(): { startPhaseIndex?: number; loopPhase?: boolean } {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("phase");
+  if (raw === null) return {};
+  const phaseIndex = Number(raw);
+  const phaseCount = primaryArchetype(ENCOUNTER_CONFIG).phases.length;
+  if (
+    !Number.isInteger(phaseIndex) ||
+    phaseIndex < 0 ||
+    phaseIndex >= phaseCount
+  )
+    return {};
+  return { startPhaseIndex: phaseIndex, loopPhase: params.get("loop") === "1" };
+}
+
+const PHASE_COUNT = primaryArchetype(ENCOUNTER_CONFIG).phases.length;
+
 function DebugPanel({
   settings,
   onChange,
   onClose,
+  encounterHandle,
 }: {
   settings: DebugSettings;
   onChange: (settings: DebugSettings) => void;
   onClose: () => void;
+  encounterHandle: RefObject<EncounterHandle | null>;
 }) {
+  const [phaseIndex, setPhaseIndex] = useState(0);
+  const [loopPhase, setLoopPhase] = useState(false);
   return (
     <aside
       id="debug-tools"
@@ -96,6 +128,45 @@ function DebugPanel({
           {toggle.label}
         </label>
       ))}
+      <fieldset>
+        <legend>Phase drill</legend>
+        <label className={styles.debugParameter}>
+          <span>Phase</span>
+          <select
+            aria-label="Jump to phase"
+            value={phaseIndex}
+            onChange={(event) => {
+              const index = Number(event.target.value);
+              setPhaseIndex(index);
+              encounterHandle.current?.jumpToPhase(index);
+            }}
+          >
+            {Array.from({ length: PHASE_COUNT }, (_, index) => (
+              <option key={index} value={index}>
+                {index + 1}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.debugToggle}>
+          <input
+            type="checkbox"
+            aria-label="Loop this phase"
+            checked={loopPhase}
+            onChange={(event) => {
+              setLoopPhase(event.target.checked);
+              encounterHandle.current?.setLoopPhase(event.target.checked);
+            }}
+          />
+          Loop this phase
+        </label>
+        <button
+          type="button"
+          onClick={() => encounterHandle.current?.advanceSubPhase()}
+        >
+          Next sub-phase
+        </button>
+      </fieldset>
       {DEBUG_GROUPS.map((group) => (
         <fieldset key={group}>
           <legend>{group}</legend>
@@ -252,6 +323,7 @@ function Encounter({
   history,
   historySnapshot,
   onHistoryChange,
+  encounterHandle,
 }: {
   zoomPreference: RefObject<number>;
   zoomStorage: ZoomPreference;
@@ -261,10 +333,11 @@ function Encounter({
   history: AttemptHistory;
   historySnapshot: HistorySnapshot;
   onHistoryChange: (snapshot: HistorySnapshot) => void;
+  encounterHandle: RefObject<EncounterHandle | null>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
-  const runtime = useRef<EncounterHandle | null>(null);
+  const runtime = encounterHandle;
   const [controlsOpen, setControlsOpen] = useState(false);
   const initialMuted = useRef(muted);
   const initialDebugSettings = useRef(debugSettings);
@@ -293,6 +366,7 @@ function Encounter({
       },
       {
         seed: readSeedFromLocation(),
+        drill: readDrillFromLocation(),
         initialZoom: zoomPreference.current,
         initialMuted: initialMuted.current,
         initialDebugSettings: initialDebugSettings.current,
@@ -482,6 +556,7 @@ export default function App() {
   );
   const debugButton = useRef<HTMLButtonElement>(null);
   const startButton = useRef<HTMLButtonElement>(null);
+  const encounterHandle = useRef<EncounterHandle | null>(null);
   const [zoomStorage] = useState(
     () => new ZoomPreference(() => window.localStorage),
   );
@@ -532,6 +607,7 @@ export default function App() {
               history={history}
               historySnapshot={historySnapshot}
               onHistoryChange={setHistorySnapshot}
+              encounterHandle={encounterHandle}
             />
           ) : (
             <div className={styles.home}>
@@ -666,6 +742,7 @@ export default function App() {
               setDebugOpen(false);
               debugButton.current?.focus();
             }}
+            encounterHandle={encounterHandle}
           />
         )}
       </div>

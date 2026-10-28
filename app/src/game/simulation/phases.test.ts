@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  archetypeOf,
   ENCOUNTER_CONFIG,
   primaryArchetype,
   validateEncounterConfig,
@@ -12,7 +13,7 @@ import {
 } from "../config/encounter";
 import type { EnemyState, SimulationInput } from "../models";
 import { advanceSimulation, createSimulation } from "./simulation";
-import { healthFraction } from "./phases";
+import { enterDrillPhase, healthFraction } from "./phases";
 
 const idle: SimulationInput = {
   north: false,
@@ -352,6 +353,73 @@ test("validateEncounterConfig rejects a malformed health block and accepts a wel
       }),
     ),
   ).not.toThrow();
+});
+
+// --- Step 22.5: drill mode -------------------------------------------------
+
+test("createSimulation with startPhaseIndex starts the primary enemy in that phase at its entry health", () => {
+  const state = createSimulation(threePhaseConfig(), TEST_SEED, {
+    startPhaseIndex: 2,
+  });
+  const enemy = state.enemies[0];
+  expect(enemy.phaseIndex).toBe(2);
+  expect(enemy.healthHp).toBeCloseTo(20, 9);
+  expect(enemy.attackClocks[0].attackId).toBe("p3-attack");
+});
+
+test("a drilled phase's telegraph and invulnerability window apply exactly as a real entry would", () => {
+  const state = createSimulation(threePhaseConfig(), TEST_SEED, {
+    startPhaseIndex: 1,
+  });
+  const enemy = state.enemies[0];
+  expect(enemy.invulnerableUntilSeconds).toBeCloseTo(0.5, 9);
+  expect(enemy.attackClocks[0].epochSeconds).toBeCloseTo(1, 9);
+});
+
+test("loopPhase re-enters the drilled phase on exit, resetting health, clocks and telegraph", () => {
+  const state = createSimulation(threePhaseConfig(), TEST_SEED, {
+    startPhaseIndex: 1,
+    loopPhase: true,
+  });
+  const enemy = state.enemies[0];
+  // p2 drains at 5 hp/s from its 50 hp entry; exits to p3 at 20 hp without
+  // looping (6 s past the invulnerability window), so push well past that
+  // point while looped and confirm health was seen reset above it again.
+  let sawReset = false;
+  while (state.elapsedSeconds < 10) {
+    runTicks(state, 1);
+    if ((enemy.healthHp as number) > 20) sawReset = true;
+  }
+  expect(enemy.phaseIndex).toBe(1);
+  expect(sawReset).toBe(true);
+  expect(enemy.attackClocks[0].attackId).toBe("p2-attack");
+});
+
+test("without loopPhase, the same drilled phase's exit advances normally", () => {
+  const state = createSimulation(threePhaseConfig(), TEST_SEED, {
+    startPhaseIndex: 1,
+  });
+  while (state.enemies[0].phaseIndex === 1) runTicks(state, 1);
+  expect(state.enemies[0].phaseIndex).toBe(2);
+});
+
+test("an out-of-range startPhaseIndex is rejected", () => {
+  expect(() =>
+    createSimulation(threePhaseConfig(), TEST_SEED, { startPhaseIndex: 3 }),
+  ).toThrow(RangeError);
+  expect(() =>
+    createSimulation(threePhaseConfig(), TEST_SEED, { startPhaseIndex: -1 }),
+  ).toThrow(RangeError);
+});
+
+test("the debug phase jump moves the enemy into the chosen phase mid-run", () => {
+  const config = threePhaseConfig();
+  const state = createSimulation(config, TEST_SEED);
+  const enemy = state.enemies[0];
+  expect(enemy.phaseIndex).toBe(0);
+  enterDrillPhase(state, enemy, archetypeOf(config, enemy.archetypeId), 2);
+  expect(enemy.phaseIndex).toBe(2);
+  expect(enemy.healthHp).toBeCloseTo(20, 9);
 });
 
 // --- Step 22.4: cycling sub-phases and phase-driven spawns ----------------
