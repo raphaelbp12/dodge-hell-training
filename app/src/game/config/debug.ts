@@ -245,6 +245,7 @@ export const DEBUG_PARAMETERS = [
 export const DEBUG_TOGGLES = [
   { key: "godMode", label: "God mode" },
   { key: "chaseArenaCenter", label: "Chase arena center" },
+  { key: "pauseProgression", label: "Pause progression" },
   { key: "matchPlayerToHead", label: "Match player to head" },
 ] as const satisfies readonly { key: string; label: string }[];
 
@@ -273,6 +274,7 @@ export const DEFAULT_DEBUG_SETTINGS: DebugSettings = Object.freeze({
   ),
   godMode: false,
   chaseArenaCenter: false,
+  pauseProgression: false,
   matchPlayerToHead: true,
 }) as DebugSettings;
 
@@ -280,6 +282,7 @@ export function isDefaultDebugSettings(settings: DebugSettings): boolean {
   return (
     !settings.godMode &&
     !settings.chaseArenaCenter &&
+    !settings.pauseProgression &&
     settings.matchPlayerToHead === DEFAULT_DEBUG_SETTINGS.matchPlayerToHead &&
     DEBUG_PARAMETERS.every(
       (parameter) => settings[parameter.key] === parameter.defaultValue,
@@ -313,6 +316,7 @@ export function validateDebugSettings(settings: DebugSettings): void {
   if (
     typeof settings.godMode !== "boolean" ||
     typeof settings.chaseArenaCenter !== "boolean" ||
+    typeof settings.pauseProgression !== "boolean" ||
     typeof settings.matchPlayerToHead !== "boolean" ||
     settings.reversalSeconds >= settings.lifetimeSeconds
   )

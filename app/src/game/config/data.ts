@@ -9,6 +9,7 @@ import {
   sectorWidthDegrees,
   totalCoverageDegrees,
 } from "./sectors";
+import { PALADIN_DERIVED_STATS } from "./stats";
 import arenaData from "../data/arena.json";
 import shapesData from "../data/shapes.json";
 import enemiesData from "../data/enemies.json";
@@ -133,6 +134,12 @@ function nonnegativeNumber(value: unknown, path: string): number {
 
 function safeCount(value: unknown, path: string): number {
   const number = positiveNumber(value, path);
+  if (!Number.isSafeInteger(number)) reject(path, "must be a safe integer");
+  return number;
+}
+
+function safeNonnegativeCount(value: unknown, path: string): number {
+  const number = nonnegativeNumber(value, path);
   if (!Number.isSafeInteger(number)) reject(path, "must be a safe integer");
   return number;
 }
@@ -712,40 +719,458 @@ export function validateAttack(
   });
 }
 
+export type AuthoredMovement =
+  | Readonly<{ kind: "chase"; speedTilesPerSecond: number }>
+  | Readonly<{ kind: "stationary" }>
+  | Readonly<{
+      kind: "move-to-point";
+      target: "arena-center";
+      speedTilesPerSecond: number;
+    }>
+  | Readonly<{
+      kind: "orbit";
+      radiusTiles: number;
+      degreesPerSecond: number;
+      direction: "cw" | "ccw";
+      approachSpeedTilesPerSecond: number;
+    }>
+  | Readonly<{
+      kind: "wander";
+      speedTilesPerSecond: number;
+      retargetSeconds: number;
+      radiusTiles: number;
+    }>;
+
+const degreesToRadiansLocal = (degrees: number): number =>
+  (degrees * Math.PI) / 180;
+
+export function validateMovement(value: unknown, path: string): AuthoredMovement {
+  const movement = record(value, path);
+  if (movement.kind === "chase") {
+    return Object.freeze({
+      kind: "chase",
+      speedTilesPerSecond: positiveNumber(
+        movement.speedTilesPerSecond,
+        `${path}.speedTilesPerSecond`,
+      ),
+    });
+  }
+  if (movement.kind === "stationary") return Object.freeze({ kind: "stationary" });
+  if (movement.kind === "move-to-point") {
+    if (movement.target !== "arena-center")
+      reject(`${path}.target`, 'must be "arena-center"');
+    return Object.freeze({
+      kind: "move-to-point",
+      target: "arena-center",
+      speedTilesPerSecond: positiveNumber(
+        movement.speedTilesPerSecond,
+        `${path}.speedTilesPerSecond`,
+      ),
+    });
+  }
+  if (movement.kind === "orbit") {
+    const radiusTiles = positiveNumber(movement.radiusTiles, `${path}.radiusTiles`);
+    const degreesPerSecond = positiveNumber(
+      movement.degreesPerSecond,
+      `${path}.degreesPerSecond`,
+    );
+    const approachSpeedTilesPerSecond = positiveNumber(
+      movement.approachSpeedTilesPerSecond,
+      `${path}.approachSpeedTilesPerSecond`,
+    );
+    if (movement.direction !== "cw" && movement.direction !== "ccw")
+      reject(`${path}.direction`, 'must be "cw" or "ccw"');
+    const tangentialSpeedTilesPerSecond =
+      radiusTiles * degreesToRadiansLocal(degreesPerSecond);
+    if (
+      tangentialSpeedTilesPerSecond >= PALADIN_DERIVED_STATS.speedTilesPerSecond
+    )
+      reject(
+        `${path}`,
+        "orbit tangential speed must stay below the Paladin's",
+      );
+    return Object.freeze({
+      kind: "orbit",
+      radiusTiles,
+      degreesPerSecond,
+      direction: movement.direction,
+      approachSpeedTilesPerSecond,
+    });
+  }
+  if (movement.kind === "wander") {
+    return Object.freeze({
+      kind: "wander",
+      speedTilesPerSecond: positiveNumber(
+        movement.speedTilesPerSecond,
+        `${path}.speedTilesPerSecond`,
+      ),
+      retargetSeconds: positiveNumber(
+        movement.retargetSeconds,
+        `${path}.retargetSeconds`,
+      ),
+      radiusTiles: positiveNumber(movement.radiusTiles, `${path}.radiusTiles`),
+    });
+  }
+  reject(
+    `${path}.kind`,
+    'must be "chase", "stationary", "move-to-point", "orbit" or "wander"',
+  );
+}
+
+export type AuthoredProgression =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{ kind: "simulated-dps"; hpPerSecond: number }>;
+
+export type AuthoredHealth = Readonly<{
+  maxHealthHp: number;
+  progression: AuthoredProgression;
+}>;
+
+export function validateProgression(
+  value: unknown,
+  path: string,
+): AuthoredProgression {
+  const progression = record(value, path);
+  if (progression.kind === "none") return Object.freeze({ kind: "none" });
+  if (progression.kind === "simulated-dps") {
+    return Object.freeze({
+      kind: "simulated-dps",
+      hpPerSecond: positiveNumber(
+        progression.hpPerSecond,
+        `${path}.hpPerSecond`,
+      ),
+    });
+  }
+  reject(`${path}.kind`, 'must be "none" or "simulated-dps"');
+}
+
+function validateHealth(value: unknown, path: string): AuthoredHealth {
+  const health = record(value, path);
+  return Object.freeze({
+    maxHealthHp: positiveNumber(health.maxHealthHp, `${path}.maxHealthHp`),
+    progression: validateProgression(health.progression, `${path}.progression`),
+  });
+}
+
+/** Names resolved against the presentation layer's own palette (Phaser owns the hex values). */
+export const TELEGRAPH_COLOR_NAMES = [
+  "white",
+  "amber",
+  "red",
+  "violet",
+  "cyan",
+] as const;
+
+export type TelegraphColorName = (typeof TELEGRAPH_COLOR_NAMES)[number];
+
+function validateTelegraphColor(value: unknown, path: string): TelegraphColorName {
+  const name = text(value, path);
+  if (!TELEGRAPH_COLOR_NAMES.includes(name as TelegraphColorName))
+    reject(path, `must be one of ${TELEGRAPH_COLOR_NAMES.join(", ")}`);
+  return name as TelegraphColorName;
+}
+
+export type AuthoredSubPhase = Readonly<{
+  id: string;
+  durationSeconds: number;
+  telegraphSeconds: number;
+  invulnerableOnEnterSeconds: number;
+  /** `null` means the phase's own movement continues for this sub-phase. */
+  movement: AuthoredMovement | null;
+  attacks: readonly AuthoredAttack[];
+  spawns: readonly AuthoredPhaseSpawn[] | null;
+}>;
+
+function validateSubPhase(
+  value: unknown,
+  path: string,
+  projectileIds: ReadonlySet<string>,
+  seenAttackIds: Set<string>,
+  maxConcurrentMinions: number,
+): AuthoredSubPhase {
+  const subPhase = record(value, path);
+  if (!Array.isArray(subPhase.attacks))
+    reject(`${path}.attacks`, "must be an array of attacks");
+  if (subPhase.attacks.length === 0)
+    reject(`${path}.attacks`, "must define at least one attack");
+  return Object.freeze({
+    id: text(subPhase.id, `${path}.id`),
+    durationSeconds: positiveNumber(
+      subPhase.durationSeconds,
+      `${path}.durationSeconds`,
+    ),
+    telegraphSeconds: nonnegativeNumber(
+      subPhase.telegraphSeconds,
+      `${path}.telegraphSeconds`,
+    ),
+    invulnerableOnEnterSeconds: nonnegativeNumber(
+      subPhase.invulnerableOnEnterSeconds,
+      `${path}.invulnerableOnEnterSeconds`,
+    ),
+    movement:
+      subPhase.movement === undefined || subPhase.movement === null
+        ? null
+        : validateMovement(subPhase.movement, `${path}.movement`),
+    attacks: Object.freeze(
+      subPhase.attacks.map((attack, index) =>
+        validateAttack(
+          attack,
+          `${path}.attacks[${index}]`,
+          projectileIds,
+          seenAttackIds,
+        ),
+      ),
+    ),
+    spawns: validatePhaseSpawns(
+      subPhase.spawns,
+      `${path}.spawns`,
+      maxConcurrentMinions,
+    ),
+  });
+}
+
+function validateSubPhases(
+  value: unknown,
+  path: string,
+  projectileIds: ReadonlySet<string>,
+  seenAttackIds: Set<string>,
+  maxConcurrentMinions: number,
+): readonly AuthoredSubPhase[] | null {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) reject(path, "must be an array of sub-phases");
+  if (value.length === 0) reject(path, "must define at least one sub-phase");
+  return Object.freeze(
+    value.map((subPhase, index) =>
+      validateSubPhase(
+        subPhase,
+        `${path}[${index}]`,
+        projectileIds,
+        seenAttackIds,
+        maxConcurrentMinions,
+      ),
+    ),
+  );
+}
+
+export type AuthoredSpawnPlacement =
+  | Readonly<{ kind: "ring-around-owner"; radiusTiles: number }>
+  | Readonly<{ kind: "arena-ring"; ringRadiusFraction: number }>;
+
+function validateSpawnPlacement(
+  value: unknown,
+  path: string,
+): AuthoredSpawnPlacement {
+  const placement = record(value, path);
+  if (placement.kind === "ring-around-owner") {
+    return Object.freeze({
+      kind: "ring-around-owner",
+      radiusTiles: positiveNumber(
+        placement.radiusTiles,
+        `${path}.radiusTiles`,
+      ),
+    });
+  }
+  if (placement.kind === "arena-ring") {
+    const ringRadiusFraction = positiveNumber(
+      placement.ringRadiusFraction,
+      `${path}.ringRadiusFraction`,
+    );
+    if (ringRadiusFraction >= 1)
+      reject(`${path}.ringRadiusFraction`, "must be inside the arena, below 1");
+    return Object.freeze({ kind: "arena-ring", ringRadiusFraction });
+  }
+  reject(`${path}.kind`, 'must be "ring-around-owner" or "arena-ring"');
+}
+
+export type AuthoredPhaseSpawn = Readonly<{
+  archetype: string;
+  count: number;
+  despawnOnExit: boolean;
+  startPhaseIndex: number;
+  placement: AuthoredSpawnPlacement;
+}>;
+
+function validatePhaseSpawn(
+  value: unknown,
+  path: string,
+  maxConcurrentMinions: number,
+): AuthoredPhaseSpawn {
+  const spawn = record(value, path);
+  const count = safeCount(spawn.count, `${path}.count`);
+  if (count > maxConcurrentMinions)
+    reject(`${path}.count`, "must not exceed encounter.maxConcurrentMinions");
+  return Object.freeze({
+    archetype: text(spawn.archetype, `${path}.archetype`),
+    count,
+    despawnOnExit: boolean(spawn.despawnOnExit, `${path}.despawnOnExit`),
+    startPhaseIndex:
+      spawn.startPhaseIndex === undefined
+        ? 0
+        : safeNonnegativeCount(spawn.startPhaseIndex, `${path}.startPhaseIndex`),
+    placement: validateSpawnPlacement(spawn.placement, `${path}.placement`),
+  });
+}
+
+function validatePhaseSpawns(
+  value: unknown,
+  path: string,
+  maxConcurrentMinions: number,
+): readonly AuthoredPhaseSpawn[] | null {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) reject(path, "must be an array of spawns");
+  if (value.length === 0) reject(path, "must define at least one spawn");
+  return Object.freeze(
+    value.map((spawn, index) =>
+      validatePhaseSpawn(spawn, `${path}[${index}]`, maxConcurrentMinions),
+    ),
+  );
+}
+
+export type AuthoredPhase = Readonly<{
+  id: string;
+  enterAtHpFraction: number;
+  exitAfterSeconds: number | null;
+  telegraphSeconds: number;
+  invulnerableOnEnterSeconds: number;
+  telegraphColor: TelegraphColorName;
+  movement: AuthoredMovement;
+  progression: AuthoredProgression | null;
+  attacks: readonly AuthoredAttack[];
+  subPhases: readonly AuthoredSubPhase[] | null;
+  spawns: readonly AuthoredPhaseSpawn[] | null;
+}>;
+
+function validatePhase(
+  value: unknown,
+  path: string,
+  projectileIds: ReadonlySet<string>,
+  maxConcurrentMinions: number,
+): AuthoredPhase {
+  const phase = record(value, path);
+  if (!Array.isArray(phase.attacks))
+    reject(`${path}.attacks`, "must be an array of attacks");
+  if (phase.attacks.length === 0)
+    reject(`${path}.attacks`, "must define at least one attack");
+  const enterAtHpFraction = finiteNumber(
+    phase.enterAtHpFraction,
+    `${path}.enterAtHpFraction`,
+  );
+  if (enterAtHpFraction <= 0 || enterAtHpFraction > 1)
+    reject(`${path}.enterAtHpFraction`, "must be in the range (0, 1]");
+  const exitAfterSeconds =
+    phase.exitAfterSeconds === null
+      ? null
+      : positiveNumber(phase.exitAfterSeconds, `${path}.exitAfterSeconds`);
+  const seenAttackIds = new Set<string>();
+  return Object.freeze({
+    id: text(phase.id, `${path}.id`),
+    enterAtHpFraction,
+    exitAfterSeconds,
+    telegraphSeconds: nonnegativeNumber(
+      phase.telegraphSeconds,
+      `${path}.telegraphSeconds`,
+    ),
+    invulnerableOnEnterSeconds: nonnegativeNumber(
+      phase.invulnerableOnEnterSeconds,
+      `${path}.invulnerableOnEnterSeconds`,
+    ),
+    telegraphColor: validateTelegraphColor(
+      phase.telegraphColor,
+      `${path}.telegraphColor`,
+    ),
+    movement: validateMovement(phase.movement, `${path}.movement`),
+    progression:
+      phase.progression === null
+        ? null
+        : validateProgression(phase.progression, `${path}.progression`),
+    attacks: Object.freeze(
+      phase.attacks.map((attack, index) =>
+        validateAttack(
+          attack,
+          `${path}.attacks[${index}]`,
+          projectileIds,
+          seenAttackIds,
+        ),
+      ),
+    ),
+    subPhases: validateSubPhases(
+      phase.subPhases,
+      `${path}.subPhases`,
+      projectileIds,
+      seenAttackIds,
+      maxConcurrentMinions,
+    ),
+    spawns: validatePhaseSpawns(
+      phase.spawns,
+      `${path}.spawns`,
+      maxConcurrentMinions,
+    ),
+  });
+}
+
+/**
+ * Phases are authored in strictly descending `enterAtHpFraction`, with the
+ * first fixed at exactly 1 (K09). Rejects an empty array, a first fraction
+ * other than 1, and an ascending or duplicated threshold.
+ */
+function validatePhases(
+  value: unknown,
+  path: string,
+  projectileIds: ReadonlySet<string>,
+  maxConcurrentMinions: number,
+): readonly AuthoredPhase[] {
+  if (!Array.isArray(value)) reject(path, "must be an array of phases");
+  if (value.length === 0) reject(path, "must define at least one phase");
+  const phases = value.map((phase, index) =>
+    validatePhase(
+      phase,
+      `${path}[${index}]`,
+      projectileIds,
+      maxConcurrentMinions,
+    ),
+  );
+  if (phases[0].enterAtHpFraction !== 1)
+    reject(`${path}[0].enterAtHpFraction`, "must be exactly 1");
+  for (let index = 1; index < phases.length; index++) {
+    if (phases[index].enterAtHpFraction >= phases[index - 1].enterAtHpFraction)
+      reject(
+        `${path}[${index}].enterAtHpFraction`,
+        "must be strictly less than the previous phase's",
+      );
+  }
+  return Object.freeze(phases);
+}
+
 export type AuthoredArchetype = Readonly<{
   id: string;
   spawnTiles: Vector2;
   body: AuthoredBody;
-  speedTilesPerSecond: number;
+  /** Omitted entirely by an archetype with no sourced hit-point total, e.g. the Crystal Worm. */
+  health?: AuthoredHealth;
   contactDamageHp: number;
   contactConditions: readonly ConditionApplication[];
   contactArmorPiercing: boolean;
   /** Trainer-authored (K17): the source gives no contact rate. Unused while contactDamageHp is 0. */
   contactCooldownSeconds: number;
   blocksPlayer: boolean;
-  attacks: readonly AuthoredAttack[];
+  phases: readonly AuthoredPhase[];
 }>;
 
 function validateArchetype(
   value: unknown,
   id: string,
   projectileIds: ReadonlySet<string>,
+  maxConcurrentMinions: number,
 ): AuthoredArchetype {
   const path = `enemies.archetypes.${id}`;
   const archetype = record(value, path);
-  if (!Array.isArray(archetype.attacks))
-    reject(`${path}.attacks`, "must be an array of attacks");
-  if (archetype.attacks.length === 0)
-    reject(`${path}.attacks`, "must define at least one attack");
-  const seenIds = new Set<string>();
   return Object.freeze({
     id,
     spawnTiles: readPoint(archetype.spawnTiles, `${path}.spawnTiles`),
     body: validateBody(archetype.body, `${path}.body`),
-    speedTilesPerSecond: positiveNumber(
-      archetype.speedTilesPerSecond,
-      `${path}.speedTilesPerSecond`,
-    ),
+    ...(archetype.health !== undefined
+      ? { health: validateHealth(archetype.health, `${path}.health`) }
+      : {}),
     contactDamageHp: nonnegativeNumber(
       archetype.contactDamageHp,
       `${path}.contactDamageHp`,
@@ -763,15 +1188,11 @@ function validateArchetype(
       `${path}.contactCooldownSeconds`,
     ),
     blocksPlayer: boolean(archetype.blocksPlayer, `${path}.blocksPlayer`),
-    attacks: Object.freeze(
-      archetype.attacks.map((attack, index) =>
-        validateAttack(
-          attack,
-          `${path}.attacks[${index}]`,
-          projectileIds,
-          seenIds,
-        ),
-      ),
+    phases: validatePhases(
+      archetype.phases,
+      `${path}.phases`,
+      projectileIds,
+      maxConcurrentMinions,
     ),
   });
 }
@@ -779,20 +1200,39 @@ function validateArchetype(
 export function validateArchetypes(
   value: unknown,
   projectileIds: ReadonlySet<string>,
+  maxConcurrentMinions: number,
 ): Readonly<Record<string, AuthoredArchetype>> {
   const data = record(value, "enemies");
   const archetypes = record(data.archetypes, "enemies.archetypes");
   const ids = Object.keys(archetypes);
   if (ids.length === 0)
     reject("enemies.archetypes", "must define at least one archetype");
-  return Object.freeze(
+  const built = Object.freeze(
     Object.fromEntries(
       ids.map((id) => [
         id,
-        validateArchetype(archetypes[id], id, projectileIds),
+        validateArchetype(archetypes[id], id, projectileIds, maxConcurrentMinions),
       ]),
     ),
   );
+  for (const [id, archetype] of Object.entries(built)) {
+    for (const [phaseIndex, phase] of archetype.phases.entries()) {
+      for (const spawn of phase.spawns ?? []) {
+        const spawned = built[spawn.archetype];
+        if (!spawned)
+          reject(
+            `enemies.archetypes.${id}.phases[${phaseIndex}].spawns`,
+            "archetype must name an archetype defined in enemies.json",
+          );
+        if (spawn.startPhaseIndex >= spawned.phases.length)
+          reject(
+            `enemies.archetypes.${id}.phases[${phaseIndex}].spawns`,
+            "startPhaseIndex must be within the spawned archetype's phase count",
+          );
+      }
+    }
+  }
+  return built;
 }
 
 export type AuthoredSpawns = Readonly<{
@@ -811,6 +1251,8 @@ export type AuthoredEncounter = Readonly<{
   rulesVersion: string;
   primaryArchetype: string;
   spawns: AuthoredSpawns;
+  /** Caps phase/sub-phase-driven minions; a phase spawns fewer than its count rather than exceed it. */
+  maxConcurrentMinions: number;
   simulation: Readonly<{ fixedStepSeconds: number; maxStepsPerUpdate: number }>;
   player: Readonly<{ spawnTiles: Vector2; body: AuthoredBody }>;
   camera: Readonly<{
@@ -888,6 +1330,10 @@ export function validateEncounterData(value: unknown): AuthoredEncounter {
       data.primaryArchetype,
       "encounter.primaryArchetype",
     ),
+    maxConcurrentMinions: safeCount(
+      data.maxConcurrentMinions,
+      "encounter.maxConcurrentMinions",
+    ),
     simulation: Object.freeze({
       fixedStepSeconds:
         1 / safeCount(simulation.fixedStepHz, "encounter.simulation.fixedStepHz"),
@@ -941,6 +1387,7 @@ export const AUTHORED_PROJECTILES = validateProjectiles(
 export const AUTHORED_ARCHETYPES = validateArchetypes(
   enemiesData,
   new Set(Object.keys(AUTHORED_PROJECTILES)),
+  AUTHORED_ENCOUNTER.maxConcurrentMinions,
 );
 
 if (!AUTHORED_ARCHETYPES[AUTHORED_ENCOUNTER.primaryArchetype])

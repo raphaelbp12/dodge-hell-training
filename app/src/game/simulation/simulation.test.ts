@@ -37,7 +37,8 @@ const idle: SimulationInput = {
 const east: SimulationInput = { ...idle, east: true };
 const stepSeconds = 1 / 60;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
-const PRIMARY_ATTACK = PRIMARY.attacks[0];
+const PRIMARY_PHASE = PRIMARY.phases[0];
+const PRIMARY_ATTACK = PRIMARY_PHASE.attacks[0];
 const PRIMARY_PROJECTILE = projectileOf(
   ENCOUNTER_CONFIG,
   PRIMARY_ATTACK.projectileId,
@@ -48,6 +49,9 @@ const PRIMARY_MOTION = PRIMARY_PROJECTILE.motion;
 if (PRIMARY_ATTACK.pattern.kind !== "ring")
   throw new Error("test fixture assumes the shipped attack is ring-kind");
 const PRIMARY_PATTERN = PRIMARY_ATTACK.pattern;
+if (PRIMARY_PHASE.movement.kind !== "chase")
+  throw new Error("test fixture assumes the shipped archetype is chase-kind");
+const PRIMARY_MOVEMENT = PRIMARY_PHASE.movement;
 // Spawn placement draws from the seeded generator, so these tests pin a seed.
 const TEST_SEED = 20261026;
 const freshSimulation = () => createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
@@ -339,7 +343,7 @@ test.each([
   // One second of pursuit closes 1.5 tiles toward the centred player,
   // whatever bearing the seeded opening used.
   expect(ringDistance(state)).toBeCloseTo(
-    ENCOUNTER_CONFIG.spawns.ringRadiusTiles - PRIMARY.speedTilesPerSecond,
+    ENCOUNTER_CONFIG.spawns.ringRadiusTiles - PRIMARY_MOVEMENT.speedTilesPerSecond,
     9,
   );
 });
@@ -402,7 +406,7 @@ test("pursues the updated player position at the configured slower speed", () =>
   advanceSimulation(state, stepSeconds, east);
   expect(state.enemies[0].positionTiles.x).toBeGreaterThan(0);
   expect(distance(state.enemies[0].positionTiles, initialEnemy)).toBeCloseTo(
-    PRIMARY.speedTilesPerSecond * stepSeconds,
+    PRIMARY_MOVEMENT.speedTilesPerSecond * stepSeconds,
     9,
   );
   expect(distance(state.enemies[0].positionTiles, initialEnemy)).toBeLessThan(
@@ -1344,7 +1348,7 @@ test("starts with exactly one enemy whose clock is anchored at its spawn", () =>
     PRIMARY_ATTACK.cadence.initialDelaySeconds,
   );
   // One clock per authored attack - exactly one attack for this archetype.
-  expect(enemy.attackClocks).toHaveLength(PRIMARY.attacks.length);
+  expect(enemy.attackClocks).toHaveLength(PRIMARY_PHASE.attacks.length);
   expect(enemy.attackClocks[0].attackId).toBe(PRIMARY_ATTACK.id);
   // The clock fields live on each enemy's attackClocks, not on the simulation.
   expect(state).not.toHaveProperty("attackEpochSeconds");
@@ -1851,7 +1855,7 @@ test("a two-attack archetype fires each attack on its own independent cadence, w
   };
   const twoAttackArchetype = {
     ...PRIMARY,
-    attacks: [fastAttack, slowAttack],
+    phases: [{ ...PRIMARY_PHASE, attacks: [fastAttack, slowAttack] }],
   };
   const config = {
     ...ENCOUNTER_CONFIG,
@@ -1899,7 +1903,10 @@ test("a scatter attack is deterministic for a seed and reproducible across step 
       initialDelaySeconds: 0,
     },
   };
-  const scattererArchetype = { ...PRIMARY, attacks: [scatterAttack] };
+  const scattererArchetype = {
+    ...PRIMARY,
+    phases: [{ ...PRIMARY_PHASE, attacks: [scatterAttack] }],
+  };
   const config = {
     ...ENCOUNTER_CONFIG,
     archetypes: { [PRIMARY.id]: scattererArchetype },
@@ -1973,7 +1980,10 @@ test("arm spread is measured from the attack clock's epoch, not the simulation's
       initialDelaySeconds: 0,
     },
   };
-  const archetype = { ...PRIMARY, attacks: [spreadingAttack] };
+  const archetype = {
+    ...PRIMARY,
+    phases: [{ ...PRIMARY_PHASE, attacks: [spreadingAttack] }],
+  };
   const config = {
     ...ENCOUNTER_CONFIG,
     archetypes: { [PRIMARY.id]: archetype },
@@ -1998,14 +2008,23 @@ test("arm spread is measured from the attack clock's epoch, not the simulation's
   expect(bearings[1]).toBeCloseTo((190 * Math.PI) / 180, 6);
 });
 
-/** Spawns a lone contact-capable enemy at `positionTiles`, overriding the primary archetype's contact fields. */
+/** Spawns a lone contact-capable enemy at `positionTiles`, overriding the primary archetype's contact fields (and, via `movement`, its sole phase's movement). */
 function contactState(
-  archetypeOverrides: Partial<typeof PRIMARY>,
+  archetypeOverrides: Partial<typeof PRIMARY> & {
+    movement?: (typeof PRIMARY_PHASE)["movement"];
+  },
   enemyPositionTiles: Vector2,
 ): ReturnType<typeof createSimulation> {
+  const { movement, ...rest } = archetypeOverrides;
   // Strip the archetype's own shard attack so only contact damage, never a
   // volley fired at point-blank range, produces the hits these tests count.
-  const archetype = { ...PRIMARY, attacks: [], ...archetypeOverrides };
+  const archetype = {
+    ...PRIMARY,
+    ...rest,
+    phases: [
+      { ...PRIMARY_PHASE, attacks: [], ...(movement ? { movement } : {}) },
+    ],
+  };
   const config = {
     ...ENCOUNTER_CONFIG,
     archetypes: { [PRIMARY.id]: archetype },
@@ -2051,7 +2070,11 @@ test("contact applies on its cooldown, not every step, and repeats while overlap
 
 test("contact stops when bodies separate and resumes when they overlap again", () => {
   const state = contactState(
-    { contactDamageHp: 40, contactCooldownSeconds: 0.5, speedTilesPerSecond: 0 },
+    {
+      contactDamageHp: 40,
+      contactCooldownSeconds: 0.5,
+      movement: { kind: "chase", speedTilesPerSecond: 0 },
+    },
     { x: 0, y: 0 },
   );
   expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toHaveLength(1);
@@ -2064,7 +2087,7 @@ test("contact stops when bodies separate and resumes when they overlap again", (
 test("two overlapping enemies hit the player on independent cooldown schedules", () => {
   const archetype = {
     ...PRIMARY,
-    attacks: [],
+    phases: [{ ...PRIMARY_PHASE, attacks: [] }],
     contactDamageHp: 40,
     contactCooldownSeconds: 0.5,
   };
@@ -2129,10 +2152,18 @@ test("a fast enemy crossing the player within one step still registers contact (
   const far = horizontalContactTiles + 1;
   const archetype = {
     ...PRIMARY,
-    attacks: [],
+    phases: [
+      {
+        ...PRIMARY_PHASE,
+        attacks: [],
+        movement: {
+          kind: "chase" as const,
+          speedTilesPerSecond: (2 * far) / stepSeconds,
+        },
+      },
+    ],
     contactDamageHp: 40,
     contactCooldownSeconds: 10,
-    speedTilesPerSecond: (2 * far) / stepSeconds,
   };
   const config = {
     ...ENCOUNTER_CONFIG,

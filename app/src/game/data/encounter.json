@@ -21,6 +21,7 @@
     "maxZoom": 3,
     "zoomStep": 0.125
   },
+  "maxConcurrentMinions": 8,
   "spawns": {
     "comment": "Opening enemy at t=0 is schedule index 0; firstSpawnSeconds is the first additional spawn, so spawns land at 0, 10, 20 and 30 seconds. ringRadiusFraction 0.84375 is exactly 16.2/19.2, the approved spawn distance.",
     "archetype": "crystal-worm-child-head",

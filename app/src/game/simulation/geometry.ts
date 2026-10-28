@@ -312,6 +312,18 @@ export function maximumBodyCenterDistance(
   return Math.max(0, distanceTiles);
 }
 
+/** A point at `radiusTiles` from `center`, at `bearingRadians` (shared by spawn placement). */
+export function pointOnRing(
+  center: Vector2,
+  radiusTiles: number,
+  bearingRadians: number,
+): Vector2 {
+  return {
+    x: center.x + Math.cos(bearingRadians) * radiusTiles,
+    y: center.y + Math.sin(bearingRadians) * radiusTiles,
+  };
+}
+
 export function constrainBodyToArena(
   orientedLocalVerticesTiles: readonly Vector2[],
   candidatePositionTiles: Vector2,

@@ -6,7 +6,9 @@ import {
   AUTHORED_ENCOUNTER,
   AUTHORED_PROJECTILES,
   loadOutline,
+  TELEGRAPH_COLOR_NAMES,
   type AuthoredBody,
+  type TelegraphColorName,
 } from "./data";
 import { assertNonnegative, PALADIN_DERIVED_STATS } from "./stats";
 import {
@@ -126,6 +128,46 @@ export type ScatterPattern =
 
 export type AttackPattern = RingPattern | SpreadPattern | ScatterPattern;
 
+/**
+ * An enemy's movement behaviour, authored per archetype (step 22.1). `chase`
+ * is the sole kind the shipped Crystal Worm uses and the only one
+ * `validateShippedEncounter` holds below the Paladin's speed; the debug panel
+ * only ever edits a `chase` speed. `orbit`'s tangential speed is checked
+ * against the Paladin unconditionally, in `validateEncounterConfig` itself,
+ * because an orbiting boss must never be able to outrun the player under any
+ * configuration, debug included.
+ */
+export type MovementSpec =
+  | Readonly<{ kind: "chase"; speedTilesPerSecond: number }>
+  | Readonly<{ kind: "stationary" }>
+  | Readonly<{
+      kind: "move-to-point";
+      target: "arena-center";
+      speedTilesPerSecond: number;
+    }>
+  | Readonly<{
+      kind: "orbit";
+      radiusTiles: number;
+      degreesPerSecond: number;
+      direction: "cw" | "ccw";
+      approachSpeedTilesPerSecond: number;
+    }>
+  | Readonly<{
+      kind: "wander";
+      speedTilesPerSecond: number;
+      retargetSeconds: number;
+      radiusTiles: number;
+    }>;
+
+export type Progression =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{ kind: "simulated-dps"; hpPerSecond: number }>;
+
+export type HealthSpec = Readonly<{
+  maxHealthHp: number;
+  progression: Progression;
+}>;
+
 export type AttackCadence = Readonly<{
   shotsPerBurst: number;
   shotIntervalSeconds: number;
@@ -141,17 +183,72 @@ export type AttackSpec = Readonly<{
   cadence: AttackCadence;
 }>;
 
+export type { TelegraphColorName };
+
+/**
+ * One phase of an enemy's lifecycle (step 22.3): its own movement, attacks and
+ * optional progression override, entered on an HP threshold or on the
+ * previous phase's authored duration (K09). The telegraph is implemented by
+ * anchoring the rebuilt attack clocks' epoch past `telegraphSeconds`, not by a
+ * separate firing gate - see `simulation/phases.ts`.
+ */
+/**
+ * One sub-phase of a cycling attack rotation inside a phase (step 22.4),
+ * entered and advanced through the same mechanism as a phase: duration-based
+ * entry, its own invulnerability window and telegraph, and a rebuilt attack
+ * clock set. `movement` is `null` when the sub-phase leaves the phase's own
+ * movement in effect for its duration.
+ */
+export type SubPhaseSpec = Readonly<{
+  id: string;
+  durationSeconds: number;
+  telegraphSeconds: number;
+  invulnerableOnEnterSeconds: number;
+  movement: MovementSpec | null;
+  attacks: readonly AttackSpec[];
+  spawns: readonly PhaseSpawnSpec[] | null;
+}>;
+
+export type SpawnPlacement =
+  | Readonly<{ kind: "ring-around-owner"; radiusTiles: number }>
+  | Readonly<{ kind: "arena-ring"; ringRadiusFraction: number }>;
+
+/** Resolved once on entering the phase or sub-phase that authors it (step 22.4). */
+export type PhaseSpawnSpec = Readonly<{
+  archetypeId: string;
+  count: number;
+  despawnOnExit: boolean;
+  startPhaseIndex: number;
+  placement: SpawnPlacement;
+}>;
+
+export type PhaseSpec = Readonly<{
+  id: string;
+  enterAtHpFraction: number;
+  exitAfterSeconds: number | null;
+  telegraphSeconds: number;
+  invulnerableOnEnterSeconds: number;
+  telegraphColor: TelegraphColorName;
+  movement: MovementSpec;
+  progression: Progression | null;
+  attacks: readonly AttackSpec[];
+  subPhases: readonly SubPhaseSpec[] | null;
+  spawns: readonly PhaseSpawnSpec[] | null;
+}>;
+
 export type EnemyArchetype = Readonly<{
   id: string;
   spawnTiles: Vector2;
   verticesTiles: readonly Vector2[];
-  speedTilesPerSecond: number;
+  /** Ordered, strictly descending by `enterAtHpFraction`; the first is always 1 (K09). */
+  phases: readonly PhaseSpec[];
+  /** Absent entirely for an enemy with no sourced hit-point total, e.g. the Crystal Worm. */
+  health?: HealthSpec;
   contactDamageHp: number;
   contactConditions: readonly ConditionApplication[];
   contactArmorPiercing: boolean;
   contactCooldownSeconds: number;
   blocksPlayer: boolean;
-  attacks: readonly AttackSpec[];
 }>;
 
 export type SpawnRule = Readonly<{
@@ -166,6 +263,7 @@ export type SpawnRule = Readonly<{
 export type EncounterConfig = Readonly<{
   rulesVersion: string;
   spawns: SpawnRule;
+  maxConcurrentMinions: number;
   simulation: Readonly<{
     fixedStepSeconds: number;
     maxStepsPerUpdate: number;
@@ -194,14 +292,24 @@ export const RULES_VERSION = AUTHORED_ENCOUNTER.rulesVersion;
 export const PRIMARY_ARCHETYPE_ID = AUTHORED_ENCOUNTER.primaryArchetype;
 
 const authoredPrimary = AUTHORED_ARCHETYPES[PRIMARY_ARCHETYPE_ID];
+// The debug panel is not phase-aware; it tunes the single phase the shipped
+// primary archetype authors.
+if (authoredPrimary.phases.length !== 1)
+  throw new RangeError("The debug-tunable archetype must author exactly one phase");
+const authoredPrimaryPhase = authoredPrimary.phases[0];
 // The debug panel tunes exactly one attack; later steps that add a second
 // attack to any archetype must not route sliders through this index.
-const authoredPrimaryAttack = authoredPrimary.attacks[0];
+const authoredPrimaryAttack = authoredPrimaryPhase.attacks[0];
 // The debug panel only ever tunes a ring-kind attack (the shipped Crystal
 // Worm spiral); a `spread` attack is additive and not yet debug-tunable.
 if (authoredPrimaryAttack.pattern.kind !== "ring")
   throw new RangeError("The debug-tunable attack must use a ring pattern");
 const authoredPrimaryPattern = authoredPrimaryAttack.pattern;
+// The debug panel only ever tunes a `chase` speed; later archetypes may use
+// another movement kind, but the shipped primary never does.
+if (authoredPrimaryPhase.movement.kind !== "chase")
+  throw new RangeError("The debug-tunable archetype must use chase movement");
+const authoredPrimaryMovement = authoredPrimaryPhase.movement;
 const AUTHORED_PROJECTILE_ID = authoredPrimaryAttack.projectile;
 const authoredProjectile = AUTHORED_PROJECTILES[AUTHORED_PROJECTILE_ID];
 // The debug panel only ever tunes the shipped, boomerang-kind shard (G: 19.3
@@ -281,7 +389,7 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   headHeight: authoredPrimary.body.heightTiles,
   playerWidth: AUTHORED_ENCOUNTER.player.body.widthTiles,
   playerHeight: AUTHORED_ENCOUNTER.player.body.heightTiles,
-  enemySpeedTilesPerSecond: authoredPrimary.speedTilesPerSecond,
+  enemySpeedTilesPerSecond: authoredPrimaryMovement.speedTilesPerSecond,
   spawnX: authoredPrimary.spawnTiles.x,
   spawnY: authoredPrimary.spawnTiles.y,
   emitterCount: authoredPrimaryPattern.arms,
@@ -368,30 +476,47 @@ export function buildEncounterConfig(
       ARENA,
     ),
     verticesTiles,
-    speedTilesPerSecond: values.enemySpeedTilesPerSecond,
     contactDamageHp: authoredPrimary.contactDamageHp,
     contactConditions: authoredPrimary.contactConditions,
     contactArmorPiercing: authoredPrimary.contactArmorPiercing,
     contactCooldownSeconds: authoredPrimary.contactCooldownSeconds,
     blocksPlayer: authoredPrimary.blocksPlayer,
-    attacks: Object.freeze([
+    phases: Object.freeze([
       Object.freeze({
-        id: authoredPrimaryAttack.id,
-        projectileId: AUTHORED_PROJECTILE_ID,
-        tuningSource: authoredPrimaryAttack.tuningSource,
-        pattern: Object.freeze({
-          kind: "ring",
-          arms: values.emitterCount,
-          emitterRadiusTiles: values.emitterRadiusTiles,
-          initialPhaseRadians: degreesToRadians(values.initialPhaseDegrees),
-          clockwiseDegreesPerSecond: values.rotationDegreesPerSecond,
+        id: authoredPrimaryPhase.id,
+        enterAtHpFraction: authoredPrimaryPhase.enterAtHpFraction,
+        exitAfterSeconds: authoredPrimaryPhase.exitAfterSeconds,
+        telegraphSeconds: authoredPrimaryPhase.telegraphSeconds,
+        invulnerableOnEnterSeconds:
+          authoredPrimaryPhase.invulnerableOnEnterSeconds,
+        telegraphColor: authoredPrimaryPhase.telegraphColor,
+        movement: Object.freeze({
+          kind: "chase",
+          speedTilesPerSecond: values.enemySpeedTilesPerSecond,
         }),
-        cadence: Object.freeze({
-          shotsPerBurst: values.shotsPerEmitter,
-          shotIntervalSeconds: values.shotIntervalSeconds,
-          cooldownAfterLastShotSeconds: values.cooldownSeconds,
-          initialDelaySeconds: values.initialCooldownSeconds,
-        }),
+        progression: null,
+        subPhases: null,
+        spawns: null,
+        attacks: Object.freeze([
+          Object.freeze({
+            id: authoredPrimaryAttack.id,
+            projectileId: AUTHORED_PROJECTILE_ID,
+            tuningSource: authoredPrimaryAttack.tuningSource,
+            pattern: Object.freeze({
+              kind: "ring",
+              arms: values.emitterCount,
+              emitterRadiusTiles: values.emitterRadiusTiles,
+              initialPhaseRadians: degreesToRadians(values.initialPhaseDegrees),
+              clockwiseDegreesPerSecond: values.rotationDegreesPerSecond,
+            }),
+            cadence: Object.freeze({
+              shotsPerBurst: values.shotsPerEmitter,
+              shotIntervalSeconds: values.shotIntervalSeconds,
+              cooldownAfterLastShotSeconds: values.cooldownSeconds,
+              initialDelaySeconds: values.initialCooldownSeconds,
+            }),
+          }),
+        ]),
       }),
     ]),
   });
@@ -426,6 +551,7 @@ export function buildEncounterConfig(
         AUTHORED_ENCOUNTER.spawns.placement.goldenAngleDegrees,
       ),
     },
+    maxConcurrentMinions: AUTHORED_ENCOUNTER.maxConcurrentMinions,
     simulation: AUTHORED_ENCOUNTER.simulation,
     arena: ARENA,
     player: {
@@ -476,23 +602,32 @@ function shotsPerVolley(pattern: AttackPattern): number {
   return pattern.kind === "ring" ? pattern.arms : pattern.shots;
 }
 
+/**
+ * Only one phase is ever active per enemy at a time, so the bound is the
+ * worst case across an enemy's own phase - the max over phases, not a sum
+ * (unlike the sum across one phase's concurrently-firing attacks, below).
+ */
 export function liveShardBoundPerEnemy(
   config: EncounterConfig,
   archetype: EnemyArchetype,
 ): number {
-  return archetype.attacks.reduce((total, attack) => {
-    const { pattern, cadence } = attack;
-    const projectile = projectileOf(config, attack.projectileId);
-    const groupSeconds =
-      (cadence.shotsPerBurst - 1) * cadence.shotIntervalSeconds +
-      cadence.cooldownAfterLastShotSeconds;
-    return (
-      total +
-      shotsPerVolley(pattern) *
-        cadence.shotsPerBurst *
-        Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
-    );
-  }, 0);
+  return Math.max(
+    ...archetype.phases.map((phase) =>
+      phase.attacks.reduce((total, attack) => {
+        const { pattern, cadence } = attack;
+        const projectile = projectileOf(config, attack.projectileId);
+        const groupSeconds =
+          (cadence.shotsPerBurst - 1) * cadence.shotIntervalSeconds +
+          cadence.cooldownAfterLastShotSeconds;
+        return (
+          total +
+          shotsPerVolley(pattern) *
+            cadence.shotsPerBurst *
+            Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
+        );
+      }, 0),
+    ),
+  );
 }
 
 /** Resolves an archetype by id, rejecting an unknown one. */
@@ -589,6 +724,9 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   assertPositive(spawns.maxConcurrent, "maxConcurrentEnemies");
   if (!Number.isSafeInteger(spawns.maxConcurrent))
     throw new RangeError("maxConcurrentEnemies must be a safe integer");
+  assertPositive(config.maxConcurrentMinions, "maxConcurrentMinions");
+  if (!Number.isSafeInteger(config.maxConcurrentMinions))
+    throw new RangeError("maxConcurrentMinions must be a safe integer");
   assertPositive(spawns.ringRadiusTiles, "spawnRingRadiusTiles");
   if (spawns.ringRadiusTiles >= config.arena.radiusTiles)
     throw new RangeError("Spawn ring must lie inside the arena");
@@ -735,13 +873,193 @@ function validateAttackSpec(
   }
 }
 
+/**
+ * The speed a movement kind travels at, where it moves at all: the field a
+ * caller overriding the active movement (the `chaseArenaCenter` debug toggle)
+ * needs regardless of which kind the archetype authors.
+ */
+export function movementSpeedTilesPerSecond(movement: MovementSpec): number {
+  switch (movement.kind) {
+    case "chase":
+    case "move-to-point":
+    case "wander":
+      return movement.speedTilesPerSecond;
+    case "orbit":
+      return movement.approachSpeedTilesPerSecond;
+    case "stationary":
+      return 0;
+  }
+}
+
+/** Validates one archetype's authored movement kind and its own fields. */
+function validateMovementSpec(movement: MovementSpec): void {
+  if (movement.kind === "chase" || movement.kind === "move-to-point") {
+    // Nonnegative, not strictly positive: the debug panel's chase-speed
+    // slider spans down to 0 (G: F3), and only the shipped encounter's own
+    // rule (validateShippedEncounter) holds a chase speed below the Paladin's.
+    assertNonnegative(movement.speedTilesPerSecond, "speedTilesPerSecond");
+    if (movement.kind === "move-to-point" && movement.target !== "arena-center")
+      throw new RangeError('move-to-point target must be "arena-center"');
+  } else if (movement.kind === "orbit") {
+    assertPositive(movement.radiusTiles, "orbitRadiusTiles");
+    assertPositive(movement.degreesPerSecond, "orbitDegreesPerSecond");
+    assertPositive(
+      movement.approachSpeedTilesPerSecond,
+      "orbitApproachSpeedTilesPerSecond",
+    );
+    if (movement.direction !== "cw" && movement.direction !== "ccw")
+      throw new RangeError('orbit direction must be "cw" or "ccw"');
+    const tangentialSpeedTilesPerSecond =
+      movement.radiusTiles * degreesToRadians(movement.degreesPerSecond);
+    if (
+      tangentialSpeedTilesPerSecond >= PALADIN_DERIVED_STATS.speedTilesPerSecond
+    )
+      throw new RangeError(
+        "An orbit's tangential speed must stay below the Paladin's",
+      );
+  } else if (movement.kind === "wander") {
+    assertPositive(movement.speedTilesPerSecond, "speedTilesPerSecond");
+    assertPositive(movement.retargetSeconds, "retargetSeconds");
+    assertPositive(movement.radiusTiles, "wanderRadiusTiles");
+  } else if (movement.kind !== "stationary") {
+    throw new RangeError(
+      `Unknown movement kind: ${(movement as { kind: string }).kind}`,
+    );
+  }
+}
+
+/** Resolves one enemy's active progression: an authored phase override, else its archetype's. */
+export function resolveProgression(
+  archetype: EnemyArchetype,
+  phaseOverride?: Progression | null,
+): Progression {
+  return phaseOverride ?? archetype.health?.progression ?? { kind: "none" };
+}
+
+function validateProgressionSpec(progression: Progression): void {
+  if (progression.kind === "simulated-dps")
+    assertPositive(progression.hpPerSecond, "hpPerSecond");
+  else if (progression.kind !== "none")
+    throw new RangeError(
+      `Unknown progression kind: ${(progression as { kind: string }).kind}`,
+    );
+}
+
+function validateHealthSpec(health: HealthSpec): void {
+  assertPositive(health.maxHealthHp, "maxHealthHp");
+  validateProgressionSpec(health.progression);
+}
+
+function validateSubPhaseSpec(
+  config: EncounterConfig,
+  subPhase: SubPhaseSpec,
+): void {
+  if (subPhase.attacks.length === 0)
+    throw new RangeError("A sub-phase requires at least one attack");
+  for (const attack of subPhase.attacks) validateAttackSpec(config, attack);
+  if (subPhase.movement !== null) validateMovementSpec(subPhase.movement);
+  assertPositive(subPhase.durationSeconds, "durationSeconds");
+  assertNonnegative(subPhase.telegraphSeconds, "telegraphSeconds");
+  assertNonnegative(
+    subPhase.invulnerableOnEnterSeconds,
+    "invulnerableOnEnterSeconds",
+  );
+  if (subPhase.spawns !== null) {
+    if (subPhase.spawns.length === 0)
+      throw new RangeError("spawns must not be an empty array");
+    for (const spawn of subPhase.spawns) validateSpawnSpec(config, spawn);
+  }
+}
+
+function validateSpawnSpec(
+  config: EncounterConfig,
+  spawn: PhaseSpawnSpec,
+): void {
+  if (!Number.isSafeInteger(spawn.count) || spawn.count <= 0)
+    throw new RangeError("spawn count must be a positive safe integer");
+  if (spawn.count > config.maxConcurrentMinions)
+    throw new RangeError("spawn count must not exceed maxConcurrentMinions");
+  if (!config.archetypes[spawn.archetypeId])
+    throw new RangeError("spawn archetypeId must name a defined archetype");
+  const spawnedPhases = config.archetypes[spawn.archetypeId].phases;
+  if (
+    !Number.isSafeInteger(spawn.startPhaseIndex) ||
+    spawn.startPhaseIndex < 0 ||
+    spawn.startPhaseIndex >= spawnedPhases.length
+  )
+    throw new RangeError(
+      "spawn startPhaseIndex must index the spawned archetype's phases",
+    );
+  if (spawn.placement.kind === "ring-around-owner")
+    assertPositive(spawn.placement.radiusTiles, "radiusTiles");
+  else {
+    assertPositive(spawn.placement.ringRadiusFraction, "ringRadiusFraction");
+    if (spawn.placement.ringRadiusFraction >= 1)
+      throw new RangeError("ringRadiusFraction must be inside the arena, below 1");
+  }
+}
+
+function validatePhaseSpec(config: EncounterConfig, phase: PhaseSpec): void {
+  if (phase.attacks.length === 0)
+    throw new RangeError("A phase requires at least one attack");
+  for (const attack of phase.attacks) validateAttackSpec(config, attack);
+  validateMovementSpec(phase.movement);
+  if (phase.progression !== null) validateProgressionSpec(phase.progression);
+  assertNonnegative(phase.telegraphSeconds, "telegraphSeconds");
+  assertNonnegative(
+    phase.invulnerableOnEnterSeconds,
+    "invulnerableOnEnterSeconds",
+  );
+  if (phase.exitAfterSeconds !== null)
+    assertPositive(phase.exitAfterSeconds, "exitAfterSeconds");
+  if (!TELEGRAPH_COLOR_NAMES.includes(phase.telegraphColor))
+    throw new RangeError(`Unknown telegraph colour: ${phase.telegraphColor}`);
+  if (phase.subPhases !== null) {
+    if (phase.subPhases.length === 0)
+      throw new RangeError("subPhases must not be an empty array");
+    for (const subPhase of phase.subPhases)
+      validateSubPhaseSpec(config, subPhase);
+  }
+  if (phase.spawns !== null) {
+    if (phase.spawns.length === 0)
+      throw new RangeError("spawns must not be an empty array");
+    for (const spawn of phase.spawns) validateSpawnSpec(config, spawn);
+  }
+}
+
+/**
+ * Phases are authored in strictly descending `enterAtHpFraction`, with the
+ * first fixed at exactly 1 (K09): rejects an empty array, a first fraction
+ * other than 1, an ascending or duplicated threshold, and a fraction outside
+ * the range (0, 1].
+ */
+function validatePhases(
+  config: EncounterConfig,
+  phases: readonly PhaseSpec[],
+): void {
+  if (phases.length === 0)
+    throw new RangeError("An archetype requires at least one phase");
+  if (phases[0].enterAtHpFraction !== 1)
+    throw new RangeError("The first phase must enter at HP fraction 1");
+  let previousFraction = Infinity;
+  for (const phase of phases) {
+    if (phase.enterAtHpFraction <= 0 || phase.enterAtHpFraction > 1)
+      throw new RangeError("enterAtHpFraction must be in the range (0, 1]");
+    if (phase.enterAtHpFraction >= previousFraction)
+      throw new RangeError(
+        "Phases must be authored in strictly descending enterAtHpFraction order",
+      );
+    previousFraction = phase.enterAtHpFraction;
+    validatePhaseSpec(config, phase);
+  }
+}
+
 function validateArchetype(
   config: EncounterConfig,
   archetype: EnemyArchetype,
 ): void {
-  if (archetype.attacks.length === 0)
-    throw new RangeError("An archetype requires at least one attack");
-  for (const attack of archetype.attacks) validateAttackSpec(config, attack);
+  validatePhases(config, archetype.phases);
+  if (archetype.health !== undefined) validateHealthSpec(archetype.health);
   // Approved rules, asserted here rather than pinned in the structural type so
   // the type does not forbid the variation it appears to model (G: F10).
   // Contact damage is approved (K17); blocking is not (G16: enemies pass
@@ -769,10 +1087,14 @@ function validateArchetype(
 export function validateShippedEncounter(config: EncounterConfig): void {
   validateEncounterConfig(config);
   for (const archetype of Object.values(config.archetypes)) {
-    if (
-      archetype.speedTilesPerSecond >= PALADIN_DERIVED_STATS.speedTilesPerSecond
-    ) {
-      throw new RangeError("Enemy pursuit must be slower than the Paladin");
+    for (const phase of archetype.phases) {
+      if (
+        phase.movement.kind === "chase" &&
+        phase.movement.speedTilesPerSecond >=
+          PALADIN_DERIVED_STATS.speedTilesPerSecond
+      ) {
+        throw new RangeError("Enemy pursuit must be slower than the Paladin");
+      }
     }
   }
 }

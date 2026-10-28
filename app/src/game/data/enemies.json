@@ -9,30 +9,41 @@
         "widthTiles": 1.25,
         "heightTiles": 1.25
       },
-      "speedTilesPerSecond": 1.5,
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,
       "contactCooldownSeconds": 0,
       "blocksPlayer": false,
-      "attacks": [
+      "phases": [
         {
-          "id": "spiral-shards",
-          "projectile": "crystal-worm-child-shard",
-          "tuningSource": "approved-v3",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0.35,
-            "initialPhaseDegrees": 0,
-            "clockwiseDegreesPerSecond": 45
-          },
-          "cadence": {
-            "shotsPerBurst": 11,
-            "shotIntervalSeconds": 0.19,
-            "cooldownAfterLastShotSeconds": 3,
-            "initialDelaySeconds": 2
-          }
+          "id": "sole",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 1.5 },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "spiral-shards",
+              "projectile": "crystal-worm-child-shard",
+              "tuningSource": "approved-v3",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0.35,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 45
+              },
+              "cadence": {
+                "shotsPerBurst": 11,
+                "shotIntervalSeconds": 0.19,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 2
+              }
+            }
+          ]
         }
       ]
     }

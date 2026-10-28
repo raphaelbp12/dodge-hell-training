@@ -134,7 +134,8 @@ test("authored data names the offending path when it rejects", () => {
 test("the projectile catalog contains the shipped crystal worm shard", () => {
   expect(AUTHORED_PROJECTILES["crystal-worm-child-shard"]).toBeDefined();
   expect(
-    AUTHORED_ARCHETYPES["crystal-worm-child-head"].attacks[0].projectile,
+    AUTHORED_ARCHETYPES["crystal-worm-child-head"].phases[0].attacks[0]
+      .projectile,
   ).toBe("crystal-worm-child-shard");
 });
 
@@ -296,34 +297,175 @@ test("validateArchetypes rejects a weapon naming a projectile absent from the ca
           "crystal-worm-child-head": {
             spawnTiles: { x: 0, y: 0 },
             body: { shape: "beveled-octagon", widthTiles: 1.25, heightTiles: 1.25 },
-            speedTilesPerSecond: 1.5,
             contactDamageHp: 0,
             blocksPlayer: false,
-            attacks: [
+            phases: [
               {
-                id: "spiral-shards",
-                projectile: "no-such-projectile",
-                tuningSource: "approved-v3",
-                pattern: {
-                  kind: "ring",
-                  arms: 6,
-                  emitterRadiusTiles: 0.35,
-                  initialPhaseDegrees: 0,
-                  clockwiseDegreesPerSecond: 45,
-                },
-                cadence: {
-                  shotsPerBurst: 11,
-                  shotIntervalSeconds: 0.19,
-                  cooldownAfterLastShotSeconds: 3,
-                  initialDelaySeconds: 2,
-                },
+                id: "sole",
+                enterAtHpFraction: 1,
+                exitAfterSeconds: null,
+                telegraphSeconds: 0,
+                invulnerableOnEnterSeconds: 0,
+                telegraphColor: "amber",
+                movement: { kind: "chase", speedTilesPerSecond: 1.5 },
+                progression: null,
+                attacks: [
+                  {
+                    id: "spiral-shards",
+                    projectile: "no-such-projectile",
+                    tuningSource: "approved-v3",
+                    pattern: {
+                      kind: "ring",
+                      arms: 6,
+                      emitterRadiusTiles: 0.35,
+                      initialPhaseDegrees: 0,
+                      clockwiseDegreesPerSecond: 45,
+                    },
+                    cadence: {
+                      shotsPerBurst: 11,
+                      shotIntervalSeconds: 0.19,
+                      cooldownAfterLastShotSeconds: 3,
+                      initialDelaySeconds: 2,
+                    },
+                  },
+                ],
               },
             ],
           },
         },
       },
       catalogIds,
+      8,
     ),
+  ).toThrow(RangeError);
+});
+
+const VALID_PHASE = {
+  id: "sole",
+  enterAtHpFraction: 1,
+  exitAfterSeconds: null,
+  telegraphSeconds: 0,
+  invulnerableOnEnterSeconds: 0,
+  telegraphColor: "amber",
+  movement: { kind: "chase", speedTilesPerSecond: 1.5 },
+  progression: null,
+  attacks: [VALID_ATTACK],
+};
+
+const VALID_ARCHETYPE_SANS_HEALTH = {
+  spawnTiles: { x: 0, y: -16.2 },
+  body: { shape: "beveled-octagon", widthTiles: 1.25, heightTiles: 1.25 },
+  contactDamageHp: 0,
+  contactConditions: [],
+  contactArmorPiercing: false,
+  contactCooldownSeconds: 0,
+  blocksPlayer: false,
+  phases: [VALID_PHASE],
+};
+
+function withArchetypeHealth(health?: unknown) {
+  return validateArchetypes(
+    {
+      archetypes: {
+        "crystal-worm-child-head": {
+          ...VALID_ARCHETYPE_SANS_HEALTH,
+          ...(health !== undefined ? { health } : {}),
+        },
+      },
+    },
+    CATALOG_IDS,
+    8,
+  );
+}
+
+test("an archetype with no health block loads with health left undefined", () => {
+  const archetypes = withArchetypeHealth();
+  expect(archetypes["crystal-worm-child-head"].health).toBeUndefined();
+});
+
+test("validateArchetypes accepts a well-formed health block", () => {
+  const archetypes = withArchetypeHealth({
+    maxHealthHp: 500,
+    progression: { kind: "simulated-dps", hpPerSecond: 10 },
+  });
+  expect(archetypes["crystal-worm-child-head"].health).toEqual({
+    maxHealthHp: 500,
+    progression: { kind: "simulated-dps", hpPerSecond: 10 },
+  });
+});
+
+test.each([
+  ["nonpositive maxHealthHp", { maxHealthHp: 0, progression: { kind: "none" } }],
+  [
+    "unknown progression kind",
+    { maxHealthHp: 500, progression: { kind: "bogus" } },
+  ],
+  [
+    "nonpositive simulated-dps hpPerSecond",
+    {
+      maxHealthHp: 500,
+      progression: { kind: "simulated-dps", hpPerSecond: 0 },
+    },
+  ],
+] as const)("validateArchetypes rejects a health block with %s", (_name, health) => {
+  expect(() => withArchetypeHealth(health)).toThrow(RangeError);
+});
+
+function withPhases(phases: readonly unknown[]) {
+  return validateArchetypes(
+    {
+      archetypes: {
+        "crystal-worm-child-head": { ...VALID_ARCHETYPE_SANS_HEALTH, phases },
+      },
+    },
+    CATALOG_IDS,
+    8,
+  );
+}
+
+test("validateArchetypes accepts a single phase entering at HP fraction 1", () => {
+  expect(() => withPhases([VALID_PHASE])).not.toThrow();
+});
+
+test("validateArchetypes accepts phases in strictly descending enterAtHpFraction order", () => {
+  expect(() =>
+    withPhases([
+      VALID_PHASE,
+      { ...VALID_PHASE, id: "p2", enterAtHpFraction: 0.5 },
+    ]),
+  ).not.toThrow();
+});
+
+test.each([
+  ["an empty phase array", []],
+  [
+    "a first phase not entering at fraction 1",
+    [{ ...VALID_PHASE, enterAtHpFraction: 0.9 }],
+  ],
+  [
+    "an ascending threshold",
+    [
+      { ...VALID_PHASE, enterAtHpFraction: 1 },
+      { ...VALID_PHASE, id: "p2", enterAtHpFraction: 0.5 },
+      { ...VALID_PHASE, id: "p3", enterAtHpFraction: 0.75 },
+    ],
+  ],
+  [
+    "a duplicated threshold",
+    [
+      { ...VALID_PHASE, enterAtHpFraction: 1 },
+      { ...VALID_PHASE, id: "p2", enterAtHpFraction: 1 },
+    ],
+  ],
+  ["a fraction of 0", [{ ...VALID_PHASE, enterAtHpFraction: 0 }]],
+  ["a fraction above 1", [{ ...VALID_PHASE, enterAtHpFraction: 1.1 }]],
+] as const)("validateArchetypes rejects %s", (_name, phases) => {
+  expect(() => withPhases(phases)).toThrow(RangeError);
+});
+
+test("validateArchetypes rejects an unknown telegraph colour", () => {
+  expect(() =>
+    withPhases([{ ...VALID_PHASE, telegraphColor: "mauve" }]),
   ).toThrow(RangeError);
 });
 

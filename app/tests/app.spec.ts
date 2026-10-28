@@ -43,6 +43,8 @@ type Inspection = {
   hitsTaken: number;
   player: PlayerState;
   enemies: EnemyState[];
+  /** The authored phase id each enemy's `phaseIndex` resolves to, in enemy order. */
+  enemyPhaseIds: string[];
   nextEnemyId: number;
   nextSpawnSeconds: number;
   randomSeed: number;

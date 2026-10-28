@@ -76,6 +76,27 @@ export type EnemyState = {
   attackClocks: AttackClockState[];
   /** Per-enemy contact cooldown clock (K17): contact repeats, unlike a shard's once-only hit. */
   nextContactEligibleSeconds: number;
+  /** Closed-form orbit angle; unused and left at 0 by every other movement kind. */
+  movementPhaseRadians: number;
+  /** Only meaningful for the wander kind. */
+  wanderTargetTiles: Vector2 | null;
+  /** Only meaningful for the wander kind. */
+  wanderRetargetAtSeconds: number;
+  /** `null` for an archetype with no `health` block, e.g. the Crystal Worm. */
+  healthHp: number | null;
+  maxHealthHp: number | null;
+  /** K08: while `elapsedSeconds` is below this, progression drain is suppressed. */
+  invulnerableUntilSeconds: number;
+  /** Index into the archetype's `phases`, monotonic outside drill mode (K09). */
+  phaseIndex: number;
+  phaseEnteredAtSeconds: number;
+  /** Index into the active phase's `subPhases`; 0 and unused for a phase with none. */
+  subPhaseIndex: number;
+  subPhaseEnteredAtSeconds: number;
+  /** Non-null for a minion created by a phase/sub-phase's `spawns` entry. */
+  spawnedByEnemyId: number | null;
+  /** Removed when `spawnedByEnemyId`'s owner leaves the phase or sub-phase that spawned it. */
+  despawnOnExit: boolean;
 };
 
 export type AcceptedHit = Readonly<{

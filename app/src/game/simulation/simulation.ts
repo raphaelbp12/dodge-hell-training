@@ -1,5 +1,6 @@
 import {
   constrainBodyToArena,
+  pointOnRing,
   pursueBody,
   sweptConvexOverlap,
   transformBodyVertices,
@@ -16,10 +17,14 @@ import {
 } from "./conditions";
 import {
   archetypeOf,
+  degreesToRadians,
   ENCOUNTER_CONFIG,
+  movementSpeedTilesPerSecond,
   projectileOf,
   type AttackSpec,
   type EncounterConfig,
+  type EnemyArchetype,
+  type MovementSpec,
 } from "../config/encounter";
 import {
   advanceShard,
@@ -49,6 +54,14 @@ import type {
   Vector2,
 } from "../models";
 import { applyPlayerHit, regeneratePlayer } from "./health";
+import {
+  activeAttacks,
+  activeMovement,
+  applyPhaseTransitions,
+  applyProgression,
+  createAttackClocks,
+  resolveEntrySpawns,
+} from "./phases";
 import { arbitrarySeed, assertSeed, nextSeed, unitFromSeed } from "./random";
 
 export type SimulationState = {
@@ -62,7 +75,8 @@ export type SimulationState = {
   /** Generator cursor. Plain data, so the state stays structuredClone-able. */
   randomSeed: number;
   rulesVersion: string;
-  phase: "playing" | "ended";
+  /** "ended" means the player died; "cleared" means a drained boss's health reached zero. */
+  phase: "playing" | "ended" | "cleared";
   hitsTaken: number;
   player: PlayerState;
   /** Insertion-ordered so a fixed input sequence stays reproducible. */
@@ -103,36 +117,56 @@ function boundingRadiusTiles(config: EncounterConfig): number {
  * initial cooldown. Clocks are built in authored order, which is also the
  * order shards are pushed in, so a fixed input sequence stays reproducible.
  */
+export type CreateEnemyOptions = Readonly<{
+  /** K18: the phase index a spawned minion begins in, instead of its archetype's phase 0. */
+  startPhaseIndex?: number;
+  spawnedByEnemyId?: number | null;
+  despawnOnExit?: boolean;
+}>;
+
 export function createEnemy(
   config: EncounterConfig,
   archetypeId: string,
   id: number,
   spawnedAtSeconds: number,
   positionTiles?: Vector2,
+  options: CreateEnemyOptions = {},
 ): EnemyState {
   const archetype = archetypeOf(config, archetypeId);
+  const phaseIndex = options.startPhaseIndex ?? 0;
+  const phase = archetype.phases[phaseIndex];
+  // A phase with sub-phases is anchored as if the enemy had just entered its
+  // first sub-phase (step 22.4), the same entry effects `enterSubPhase` would
+  // apply; a phase with none behaves exactly as step 22.3 left it.
+  const subPhase = phase.subPhases?.[0] ?? null;
+  const attacks = subPhase ? [...phase.attacks, ...subPhase.attacks] : phase.attacks;
+  const telegraphSeconds = subPhase?.telegraphSeconds ?? phase.telegraphSeconds;
+  const invulnerableOnEnterSeconds =
+    subPhase?.invulnerableOnEnterSeconds ?? phase.invulnerableOnEnterSeconds;
   return {
     id,
     archetypeId,
     positionTiles: { ...(positionTiles ?? archetype.spawnTiles) },
     spawnedAtSeconds,
-    // ringPhaseRadians/rotationPhaseAtEpoch are ring-specific; a non-ring
-    // pattern never rotates one, so it starts and stays at 0 - a fixed,
-    // deterministic fallback bearing for a pattern like `spread`'s degenerate
-    // aim case, not a value that pattern ever advances.
-    attackClocks: archetype.attacks.map((attack) => ({
-      attackId: attack.id,
-      epochSeconds: spawnedAtSeconds,
-      volleysAtEpoch: 0,
-      initialDelaySeconds: attack.cadence.initialDelaySeconds,
-      rotationEpochSeconds: spawnedAtSeconds,
-      rotationPhaseAtEpoch:
-        attack.pattern.kind === "ring" ? attack.pattern.initialPhaseRadians : 0,
-      ringPhaseRadians:
-        attack.pattern.kind === "ring" ? attack.pattern.initialPhaseRadians : 0,
-      volleysFired: 0,
-    })),
+    attackClocks: createAttackClocks(
+      attacks,
+      spawnedAtSeconds + telegraphSeconds,
+    ),
     nextContactEligibleSeconds: spawnedAtSeconds,
+    movementPhaseRadians: 0,
+    wanderTargetTiles: null,
+    // Due immediately: the first movement tick after spawn draws a wander
+    // enemy's opening target rather than leaving it stuck at null.
+    wanderRetargetAtSeconds: spawnedAtSeconds,
+    healthHp: archetype.health?.maxHealthHp ?? null,
+    maxHealthHp: archetype.health?.maxHealthHp ?? null,
+    invulnerableUntilSeconds: spawnedAtSeconds + invulnerableOnEnterSeconds,
+    phaseIndex,
+    phaseEnteredAtSeconds: spawnedAtSeconds,
+    subPhaseIndex: 0,
+    subPhaseEnteredAtSeconds: spawnedAtSeconds,
+    spawnedByEnemyId: options.spawnedByEnemyId ?? null,
+    despawnOnExit: options.despawnOnExit ?? false,
   };
 }
 
@@ -202,12 +236,10 @@ export function spawnEnemy(state: SimulationState): EnemyState | null {
     spawns.archetypeId,
     state.nextEnemyId++,
     state.elapsedSeconds,
-    {
-      x: arena.centerTiles.x + Math.cos(bearing) * spawns.ringRadiusTiles,
-      y: arena.centerTiles.y + Math.sin(bearing) * spawns.ringRadiusTiles,
-    },
+    pointOnRing(arena.centerTiles, spawns.ringRadiusTiles, bearing),
   );
   state.enemies.push(enemy);
+  resolveEntrySpawns(state, enemy, archetypeOf(state.config, spawns.archetypeId));
   return enemy;
 }
 
@@ -253,9 +285,10 @@ export function setDebugSettings(
     settings.initialCooldownSeconds !== previous.initialCooldownSeconds;
   for (const enemy of state.enemies) {
     const archetype = archetypeOf(config, enemy.archetypeId);
+    const attacks = activeAttacks(archetype, enemy);
     for (let index = 0; index < enemy.attackClocks.length; index++) {
       const clock = enemy.attackClocks[index];
-      const attack = archetype.attacks[index];
+      const attack = attacks[index];
       if (rotationChanged && attack.pattern.kind === "ring") {
         clock.rotationEpochSeconds = state.elapsedSeconds;
         clock.rotationPhaseAtEpoch =
@@ -294,7 +327,8 @@ export function setDebugSettings(
     state.shards,
     projectileOf(
       config,
-      archetypeOf(config, config.primaryArchetypeId).attacks[0].projectileId,
+      archetypeOf(config, config.primaryArchetypeId).phases[0].attacks[0]
+        .projectileId,
     ),
   );
 }
@@ -310,6 +344,175 @@ function constrainToArena(
   );
 }
 
+/** Point-based travel toward a target: not body-aware, and a zero remaining
+ * distance travels zero (the retired `chaseArenaCenter` inline block's exact
+ * semantics, preserved for `move-to-point`, `orbit`'s approach and `wander`). */
+function movePointToward(
+  start: Vector2,
+  target: Vector2,
+  maxTravelTiles: number,
+): Vector2 {
+  const deltaX = target.x - start.x;
+  const deltaY = target.y - start.y;
+  const length = Math.hypot(deltaX, deltaY);
+  const fraction = length === 0 ? 0 : Math.min(1, maxTravelTiles / length);
+  return { x: start.x + deltaX * fraction, y: start.y + deltaY * fraction };
+}
+
+const orbitRingToleranceTiles = 1e-9;
+
+/**
+ * Advances one `orbit` enemy: moves toward its nearest ring point at the
+ * approach speed while off the ring, then holds the ring and advances
+ * `movementPhaseRadians` in closed form at the authored rate. `cw` increases
+ * the bearing angle and `ccw` decreases it.
+ */
+function advanceOrbitMovement(
+  enemy: EnemyState,
+  movement: Extract<MovementSpec, { kind: "orbit" }>,
+  arenaCenterTiles: Vector2,
+  stepSeconds: number,
+): Vector2 {
+  const offsetX = enemy.positionTiles.x - arenaCenterTiles.x;
+  const offsetY = enemy.positionTiles.y - arenaCenterTiles.y;
+  const distanceTiles = Math.hypot(offsetX, offsetY);
+  const bearingRadians =
+    distanceTiles === 0
+      ? enemy.movementPhaseRadians
+      : Math.atan2(offsetY, offsetX);
+  if (Math.abs(distanceTiles - movement.radiusTiles) > orbitRingToleranceTiles) {
+    enemy.movementPhaseRadians = bearingRadians;
+    return movePointToward(
+      enemy.positionTiles,
+      {
+        x: arenaCenterTiles.x + Math.cos(bearingRadians) * movement.radiusTiles,
+        y: arenaCenterTiles.y + Math.sin(bearingRadians) * movement.radiusTiles,
+      },
+      movement.approachSpeedTilesPerSecond * stepSeconds,
+    );
+  }
+  const signedDegreesPerSecond =
+    movement.direction === "cw"
+      ? movement.degreesPerSecond
+      : -movement.degreesPerSecond;
+  enemy.movementPhaseRadians =
+    bearingRadians + degreesToRadians(signedDegreesPerSecond) * stepSeconds;
+  return {
+    x:
+      arenaCenterTiles.x +
+      Math.cos(enemy.movementPhaseRadians) * movement.radiusTiles,
+    y:
+      arenaCenterTiles.y +
+      Math.sin(enemy.movementPhaseRadians) * movement.radiusTiles,
+  };
+}
+
+const wanderArrivalToleranceTiles = 1e-9;
+
+/**
+ * Advances one `wander` enemy toward a target drawn from the injected seeded
+ * generator within `radiusTiles` of the arena centre, redrawing on schedule
+ * or on arrival. The only randomness `wander` draws: one angle, then one
+ * radius fraction, per redraw - see the draw-order comment on `updateMovement`.
+ */
+function advanceWanderMovement(
+  state: SimulationState,
+  enemy: EnemyState,
+  movement: Extract<MovementSpec, { kind: "wander" }>,
+  arenaCenterTiles: Vector2,
+  stepSeconds: number,
+): Vector2 {
+  const arrived =
+    enemy.wanderTargetTiles !== null &&
+    Math.hypot(
+      enemy.positionTiles.x - enemy.wanderTargetTiles.x,
+      enemy.positionTiles.y - enemy.wanderTargetTiles.y,
+    ) <= wanderArrivalToleranceTiles;
+  if (
+    enemy.wanderTargetTiles === null ||
+    arrived ||
+    state.elapsedSeconds >= enemy.wanderRetargetAtSeconds
+  ) {
+    const angleRadians = nextUnitRandom(state) * fullTurnRadians;
+    const radiusTiles = nextUnitRandom(state) * movement.radiusTiles;
+    enemy.wanderTargetTiles = {
+      x: arenaCenterTiles.x + Math.cos(angleRadians) * radiusTiles,
+      y: arenaCenterTiles.y + Math.sin(angleRadians) * radiusTiles,
+    };
+    enemy.wanderRetargetAtSeconds =
+      state.elapsedSeconds + movement.retargetSeconds;
+  }
+  return movePointToward(
+    enemy.positionTiles,
+    enemy.wanderTargetTiles,
+    movement.speedTilesPerSecond * stepSeconds,
+  );
+}
+
+/** Resolves one enemy's unconstrained next position under its active movement kind. */
+function advanceEnemyMovement(
+  state: SimulationState,
+  enemy: EnemyState,
+  archetype: EnemyArchetype,
+  stepSeconds: number,
+): Vector2 {
+  const config = state.config;
+  const phaseMovement = activeMovement(archetype, enemy);
+  // The `chaseArenaCenter` debug toggle swaps the active movement for
+  // `move-to-point` at the arena centre, at the archetype's own speed,
+  // rather than branching inline on every movement kind.
+  const movement: MovementSpec = state.debugSettings.chaseArenaCenter
+    ? {
+        kind: "move-to-point",
+        target: "arena-center",
+        speedTilesPerSecond: movementSpeedTilesPerSecond(phaseMovement),
+      }
+    : phaseMovement;
+  switch (movement.kind) {
+    case "chase":
+      return pursueBody(
+        archetype.verticesTiles,
+        enemy.positionTiles,
+        config.player.verticesTiles,
+        state.player.positionTiles,
+        movement.speedTilesPerSecond * stepSeconds,
+      );
+    case "stationary":
+      return enemy.positionTiles;
+    case "move-to-point":
+      return movePointToward(
+        enemy.positionTiles,
+        config.arena.centerTiles,
+        movement.speedTilesPerSecond * stepSeconds,
+      );
+    case "orbit":
+      return advanceOrbitMovement(
+        enemy,
+        movement,
+        config.arena.centerTiles,
+        stepSeconds,
+      );
+    case "wander":
+      return advanceWanderMovement(
+        state,
+        enemy,
+        movement,
+        config.arena.centerTiles,
+        stepSeconds,
+      );
+  }
+}
+
+/**
+ * Advances the player, then every enemy in insertion order. The full per-tick
+ * randomness draw order (K11), fixed by this step: player movement draws
+ * nothing; enemy movement draws here, per enemy in insertion order, only for
+ * a `wander` kind; then shard advance and hit resolution; then timed spawns
+ * (the opening-bearing fallback); then attacks, in enemy order and then
+ * authored attack order (a `scatter` pattern's draws). Every generator draw
+ * happens in exactly this order, so a fixed seed and input sequence stay
+ * reproducible regardless of step rate.
+ */
 function updateMovement(state: SimulationState, input: SimulationInput): void {
   const config = state.config;
   const stepSeconds = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
@@ -335,31 +538,7 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   for (const enemy of state.enemies) {
     const archetype = archetypeOf(config, enemy.archetypeId);
     enemy.positionTiles = constrainToArena(
-      state.debugSettings.chaseArenaCenter
-        ? (() => {
-            const target = config.arena.centerTiles;
-            const deltaX = target.x - enemy.positionTiles.x;
-            const deltaY = target.y - enemy.positionTiles.y;
-            const length = Math.hypot(deltaX, deltaY);
-            const fraction =
-              length === 0
-                ? 0
-                : Math.min(
-                    1,
-                    (archetype.speedTilesPerSecond * stepSeconds) / length,
-                  );
-            return {
-              x: enemy.positionTiles.x + deltaX * fraction,
-              y: enemy.positionTiles.y + deltaY * fraction,
-            };
-          })()
-        : pursueBody(
-            archetype.verticesTiles,
-            enemy.positionTiles,
-            config.player.verticesTiles,
-            state.player.positionTiles,
-            archetype.speedTilesPerSecond * stepSeconds,
-          ),
+      advanceEnemyMovement(state, enemy, archetype, stepSeconds),
       archetype.verticesTiles,
     );
   }
@@ -469,13 +648,9 @@ function updateAttacks(state: SimulationState): void {
   const config = state.config;
   for (const enemy of state.enemies) {
     const archetype = archetypeOf(config, enemy.archetypeId);
-    for (let index = 0; index < archetype.attacks.length; index++) {
-      updateAttackClock(
-        state,
-        enemy,
-        archetype.attacks[index],
-        enemy.attackClocks[index],
-      );
+    const attacks = activeAttacks(archetype, enemy);
+    for (let index = 0; index < attacks.length; index++) {
+      updateAttackClock(state, enemy, attacks[index], enemy.attackClocks[index]);
     }
   }
 }
@@ -556,6 +731,15 @@ function updateAttackClock(
   clock.volleysFired++;
 }
 
+/**
+ * Reads `state.phase` through an opaque call so TS does not keep narrowing
+ * it to an earlier-checked literal across the fixed-step loop below, where
+ * `applyProgression` can reassign it mid-iteration.
+ */
+function currentPhase(state: SimulationState): SimulationState["phase"] {
+  return state.phase;
+}
+
 export function advanceSimulation(
   state: SimulationState,
   elapsedSeconds: number,
@@ -563,7 +747,7 @@ export function advanceSimulation(
 ): AdvanceResult {
   assertNonnegative(elapsedSeconds, "elapsedSeconds");
   const acceptedHits: AcceptedHit[] = [];
-  if (state.phase === "ended")
+  if (currentPhase(state) !== "playing")
     return { stepsExecuted: 0, discardedSeconds: elapsedSeconds, acceptedHits };
   const pendingSeconds = state.accumulatorSeconds + elapsedSeconds;
   assertNonnegative(pendingSeconds, "pendingSeconds");
@@ -599,7 +783,9 @@ export function advanceSimulation(
     updateMovement(state, input);
     state.ticksElapsed++;
     state.elapsedSeconds = state.ticksElapsed * fixedStepSeconds;
-    if (state.player.healthHp > 0)
+    applyProgression(state, fixedStepSeconds);
+    applyPhaseTransitions(state);
+    if (state.player.healthHp > 0 && currentPhase(state) === "playing")
       resolveEnemyContact(
         state,
         enemyStarts,
@@ -608,7 +794,7 @@ export function advanceSimulation(
         acceptedHits,
       );
     state.shards = state.shards.filter((shard) => {
-      if (state.phase === "ended") return true;
+      if (currentPhase(state) !== "playing") return true;
       const result = advanceShard(
         state,
         shard,
@@ -619,7 +805,7 @@ export function advanceSimulation(
       if (result.hitPlayer) registerShardHit(state, shard, acceptedHits);
       return result.alive;
     });
-    if (state.player.healthHp > 0) {
+    if (state.player.healthHp > 0 && currentPhase(state) === "playing") {
       updateSpawns(state);
       const existingCount = state.shards.length;
       updateAttacks(state);
@@ -640,7 +826,7 @@ export function advanceSimulation(
       regeneratePlayer(state.player, fixedStepSeconds);
     }
     stepsExecuted++;
-    if (state.player.healthHp === 0) {
+    if (state.player.healthHp === 0 || currentPhase(state) === "cleared") {
       state.accumulatorSeconds = 0;
       return {
         stepsExecuted,

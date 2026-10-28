@@ -12,6 +12,8 @@ import {
 import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
 import { CONDITION_LABELS, visibleConditions } from "../simulation/conditions";
+import { currentPhaseOf } from "../simulation/phases";
+import type { TelegraphColorName } from "../config/data";
 import type { AcceptedHit, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
 import { HitAudio } from "./hit-audio";
@@ -56,6 +58,13 @@ const presentation = {
   boundary: 0x648575,
   player: 0xf0f5ef,
   enemy: 0xea7969,
+  telegraphColors: {
+    white: 0xffffff,
+    amber: 0xffb347,
+    red: 0xff5f5f,
+    violet: 0xb388ff,
+    cyan: 0x69e8ea,
+  } satisfies Record<TelegraphColorName, number>,
   shard: 0xffdf69,
   spentShard: 0xc9a948,
   lobTelegraph: {
@@ -524,11 +533,18 @@ class EncounterScene extends Phaser.Scene {
       graphics.fillStyle(color).fillPoints(points, true);
     };
     for (const enemy of enemies) {
+      const archetype = archetypeOf(this.state.config, enemy.archetypeId);
+      const phase = currentPhaseOf(archetype, enemy);
+      const isTelegraphing =
+        this.state.elapsedSeconds <
+        enemy.phaseEnteredAtSeconds + phase.telegraphSeconds;
       draw(
         this.bodies,
-        archetypeOf(this.state.config, enemy.archetypeId).verticesTiles,
+        archetype.verticesTiles,
         enemy.positionTiles,
-        presentation.enemy,
+        isTelegraphing
+          ? presentation.telegraphColors[phase.telegraphColor]
+          : presentation.enemy,
       );
     }
     draw(
@@ -655,6 +671,15 @@ class EncounterScene extends Phaser.Scene {
   inspect() {
     return {
       ...structuredClone(this.state),
+      // phaseIndex and phaseEnteredAtSeconds are already on each cloned
+      // enemy; this adds the authored phase id the index resolves to.
+      enemyPhaseIds: this.state.enemies.map(
+        (enemy) =>
+          currentPhaseOf(
+            archetypeOf(this.state.config, enemy.archetypeId),
+            enemy,
+          ).id,
+      ),
       volleysFired: this.state.enemies.reduce(
         (total, enemy) =>
           total +

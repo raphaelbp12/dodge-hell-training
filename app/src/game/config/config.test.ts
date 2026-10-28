@@ -40,7 +40,8 @@ import {
 } from "./stats";
 
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
-const PRIMARY_ATTACK = PRIMARY.attacks[0];
+const PRIMARY_PHASE = PRIMARY.phases[0];
+const PRIMARY_ATTACK = PRIMARY_PHASE.attacks[0];
 const PRIMARY_PROJECTILE = projectileOf(
   ENCOUNTER_CONFIG,
   PRIMARY_ATTACK.projectileId,
@@ -51,8 +52,13 @@ const PRIMARY_MOTION = PRIMARY_PROJECTILE.motion;
 if (PRIMARY_ATTACK.pattern.kind !== "ring")
   throw new Error("test fixture assumes the shipped attack is ring-kind");
 const PRIMARY_PATTERN = PRIMARY_ATTACK.pattern;
+if (PRIMARY_PHASE.movement.kind !== "chase")
+  throw new Error("test fixture assumes the shipped archetype is chase-kind");
+const PRIMARY_MOVEMENT = PRIMARY_PHASE.movement;
 /** Narrows a debug-built config's pattern, which is always ring-kind. */
-function asRingPattern(pattern: EnemyArchetype["attacks"][number]["pattern"]) {
+function asRingPattern(
+  pattern: EnemyArchetype["phases"][number]["attacks"][number]["pattern"],
+) {
   if (pattern.kind !== "ring")
     throw new Error("debug-built configs only ever produce a ring pattern");
   return pattern;
@@ -66,12 +72,16 @@ const withArchetype = (
   archetypes: { [PRIMARY.id]: { ...PRIMARY, ...overrides } },
 });
 
+/** ENCOUNTER_CONFIG with the primary archetype's sole phase partially overridden. */
+const withPhase = (overrides: Partial<EnemyArchetype["phases"][number]>) =>
+  withArchetype({ phases: [{ ...PRIMARY_PHASE, ...overrides }] });
+
 /** ENCOUNTER_CONFIG with one section of the primary attack overridden. */
 const withAttackSection = (
   section: "pattern" | "cadence",
   overrides: Record<string, unknown>,
 ): EncounterConfig =>
-  withArchetype({
+  withPhase({
     attacks: [
       {
         ...PRIMARY_ATTACK,
@@ -168,7 +178,8 @@ test("loads all screenshot-selected values without changing omitted settings", (
   expect(() => validateDebugSettings(selected)).not.toThrow();
   expect(
     asRingPattern(
-      primaryArchetype(debugEncounterConfig(selected)).attacks[0].pattern,
+      primaryArchetype(debugEncounterConfig(selected)).phases[0].attacks[0]
+        .pattern,
     ).arms,
   ).toBe(6);
   expect(PRIMARY_PATTERN.arms).toBe(6);
@@ -426,30 +437,43 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
     id: "crystal-worm-child-head",
     spawnTiles: { x: 0, y: -16.2 },
     verticesTiles: BEVELED_BODY_1_25_TILES,
-    speedTilesPerSecond: 1.5,
     contactDamageHp: 0,
     contactConditions: [],
     contactArmorPiercing: false,
     contactCooldownSeconds: 0,
     blocksPlayer: false,
-    attacks: [
+    phases: [
       {
-        id: "spiral-shards",
-        projectileId: "crystal-worm-child-shard",
-        tuningSource: "approved-v3",
-        pattern: {
-          kind: "ring",
-          arms: 6,
-          emitterRadiusTiles: 0.35,
-          initialPhaseRadians: 0,
-          clockwiseDegreesPerSecond: 45,
-        },
-        cadence: {
-          shotsPerBurst: 11,
-          shotIntervalSeconds: 0.19,
-          cooldownAfterLastShotSeconds: 3,
-          initialDelaySeconds: 2,
-        },
+        id: "sole",
+        enterAtHpFraction: 1,
+        exitAfterSeconds: null,
+        telegraphSeconds: 0,
+        invulnerableOnEnterSeconds: 0,
+        telegraphColor: "amber",
+        movement: { kind: "chase", speedTilesPerSecond: 1.5 },
+        progression: null,
+        subPhases: null,
+        spawns: null,
+        attacks: [
+          {
+            id: "spiral-shards",
+            projectileId: "crystal-worm-child-shard",
+            tuningSource: "approved-v3",
+            pattern: {
+              kind: "ring",
+              arms: 6,
+              emitterRadiusTiles: 0.35,
+              initialPhaseRadians: 0,
+              clockwiseDegreesPerSecond: 45,
+            },
+            cadence: {
+              shotsPerBurst: 11,
+              shotIntervalSeconds: 0.19,
+              cooldownAfterLastShotSeconds: 3,
+              initialDelaySeconds: 2,
+            },
+          },
+        ],
       },
     ],
   });
@@ -500,12 +524,15 @@ test("the shipped encounter requires pursuit slower than the Paladin", () => {
   // Structural validity alone permits a faster enemy, because the debug panel
   // deliberately exposes speeds above the Paladin's; only the shipped
   // encounter is held to the approved rule.
-  const faster = withArchetype({
-    speedTilesPerSecond: PALADIN_DERIVED_STATS.speedTilesPerSecond,
+  const faster = withPhase({
+    movement: {
+      kind: "chase",
+      speedTilesPerSecond: PALADIN_DERIVED_STATS.speedTilesPerSecond,
+    },
   });
   expect(() => validateEncounterConfig(faster)).not.toThrow();
   expect(() => validateShippedEncounter(faster)).toThrow(RangeError);
-  expect(PRIMARY.speedTilesPerSecond).toBeLessThan(
+  expect(PRIMARY_MOVEMENT.speedTilesPerSecond).toBeLessThan(
     PALADIN_DERIVED_STATS.speedTilesPerSecond,
   );
 });
@@ -619,7 +646,8 @@ test("buildEncounterConfig maps every tuning value into the config", () => {
   const archetype = primaryArchetype(config);
   expect(bodyExtentTiles(archetype.verticesTiles, "x")).toBeCloseTo(2, 12);
   expect(
-    projectileOf(config, archetype.attacks[0].projectileId).damageHp,
+    projectileOf(config, archetype.phases[0].attacks[0].projectileId)
+      .damageHp,
   ).toBe(7);
   expect(archetype.spawnTiles.x).toBeCloseTo(1, 12);
   expect(config.rulesVersion).toBe("probe");
@@ -648,6 +676,7 @@ test("debug parameter groups and toggles are derived from the registry", () => {
   expect(DEBUG_TOGGLES.map((toggle) => toggle.key)).toEqual([
     "godMode",
     "chaseArenaCenter",
+    "pauseProgression",
     "matchPlayerToHead",
   ]);
   for (const group of DEBUG_GROUPS)

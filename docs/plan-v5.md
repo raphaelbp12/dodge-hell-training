@@ -324,17 +324,17 @@ type ShardState = {
 - **21.1** - Add Condition State, Application And Ticking. Status: complete. Dependencies: 20.5.
 - **21.2** - Apply The Movement Conditions. Status: complete. Dependencies: 21.1.
 - **21.3** - Apply The Damage Conditions And Armor Piercing. Status: complete. Dependencies: 21.2. `calculateDamageHp` now takes signed defense and a cursed multiplier; `effectiveDefenseFor` resolves armor-piercing/Armor Broken/Exposed; Sick halts regeneration. All gates passed.
-- **21.4** - Show Active Conditions To The Player. Status: pending. Dependencies: 21.3.
-- **21.5** - Implement Enemy Contact Damage. Status: pending. Dependencies: 21.4.
+- **21.4** - Show Active Conditions To The Player. Status: complete. Dependencies: 21.3. Added per-condition HUD chips rendered in declared order; Controls dialog lists all thirteen conditions and marks the six inert ones. All gates passed.
+- **21.5** - Implement Enemy Contact Damage. Status: complete. Dependencies: 21.4. Enemies with authored contact damage hit the player on a cooldown through the shared hit path; swept test prevents tunnelling; contact conditions apply through the damage model. 543/543 tests, all gates passed. This completed phase 21; moved to `docs/plan-archive/phase-21.md`.
 
 ## Phase 22: Enemy Health, Phases And Movement Behaviours
 
 > Step prompts and execution records: [`docs/plan/phase-22.md`](plan/phase-22.md).
 
-- **22.1** - Introduce The Movement Behaviour Vocabulary. Status: pending. Dependencies: 21.5.
+- **22.1** - Introduce The Movement Behaviour Vocabulary. Status: complete. Dependencies: 21.5. `EnemyArchetype.speedTilesPerSecond` replaced by an authored `movement` union (`chase`, `stationary`, `move-to-point`, `orbit`, `wander`); the `chaseArenaCenter` debug toggle now overrides to `move-to-point` instead of an inline branch; orbit's tangential speed is validated below the Paladin's; the full per-tick randomness draw order is documented and tested. 555/555 tests, all gates passed, Crystal Worm timeline unchanged.
 - **22.2** - Add Enemy Health And The Simulated Progression Driver. Status: pending. Dependencies: 22.1.
 - **22.3** - Implement The Phase Machine. Status: pending. Dependencies: 22.2.
-- **22.4** - Add Cycling Sub-Phases And Phase-Driven Spawns. Status: pending. Dependencies: 22.3.
+- **22.4** - Add Cycling Sub-Phases And Phase-Driven Spawns. Status: complete. Dependencies: 22.3. Sub-phases cycle through the same entry mechanism as phases; phase/sub-phase `spawns` resolve once on entry with evenly spread, golden-angle-offset ring placement and an optional `startPhaseIndex`; `despawnOnExit` removes a minion on exit without touching its already-fired shards; `maxConcurrentMinions` suppresses rather than queues. 600/600 tests, all gates passed, Crystal Worm timeline unchanged.
 - **22.5** - Add Drill Mode. Status: pending. Dependencies: 22.4.
 
 ## Phase 23: Author The Killer Bee Queen Of The Nest
