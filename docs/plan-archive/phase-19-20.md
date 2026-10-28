@@ -1,6 +1,6 @@
 # Plan Archive: Phases 19-20.3
 
-> Full step prompts and execution records for completed steps, moved out of [`implementation-plan.md`](../../implementation-plan.md) to keep that file small. Status, dependency and acceptance summaries stay in the main plan; this file is read only when a specific past decision needs to be re-checked, not on every step.
+> Full step prompts and execution records for completed steps, moved out of [plan v5](../plan-v5.md) to keep that file small; [the implementation plan](../../implementation-plan.md) covers the reusable process. Status, dependency and acceptance summaries stay in plan v5; this file is read only when a specific past decision needs to be re-checked, not on every step.
 
 ## Phase 19: The Projectile Catalog And Motion Kinds
 

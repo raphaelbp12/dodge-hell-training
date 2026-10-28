@@ -1,6 +1,6 @@
 # Phase 23: Author The Killer Bee Queen Of The Nest
 
-> Step prompts and execution records for phase 23 of [the implementation plan](../../implementation-plan.md), whose general sections stay the authority for how to work. Read only this introduction and the requested step: grep `^### Step 23.` and read that section. When every step here is complete, move this file to `docs/plan-archive/phase-23.md` and replace the plan's step lines with one-sentence outcomes.
+> Step prompts and execution records for phase 23 of [plan v5](../plan-v5.md), whose general sections stay the authority for how to work; [the implementation plan](../../implementation-plan.md) covers the reusable process. Read only this introduction and the requested step: grep `^### Step 23.` and read that section. When every step here is complete, move this file to `docs/plan-archive/phase-23.md` and replace the plan's step lines with one-sentence outcomes.
 
 Every step in this phase authors data against machinery that already exists and is already tested. If a step needs a new pattern field, a new motion kind or a new phase feature, that is a signal the machinery is incomplete: **stop and report it** rather than extending the engine inside an authoring step.
 

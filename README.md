@@ -16,11 +16,11 @@ v1, v2 and v3 records are retained, shown as **Other rules** and excluded from t
 
 Gameplay values are authored as JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`, because `strict` is not enabled and the compiler cannot reject a missing or mistyped field. A malformed data file throws at module load rather than falling back.
 
-| File | Holds |
-| --- | --- |
-| `shapes.json` | Named convex outlines normalized to a 1x1 tile box |
-| `arena.json` | Circular arena centre and radius, in tiles |
-| `enemies.json` | Enemy archetypes keyed by id: body, movement and weapon |
+| File             | Holds                                                                         |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `shapes.json`    | Named convex outlines normalized to a 1x1 tile box                            |
+| `arena.json`     | Circular arena centre and radius, in tiles                                    |
+| `enemies.json`   | Enemy archetypes keyed by id: body, movement and weapon                       |
 | `encounter.json` | Rules version, primary archetype, simulation, player, spawns, camera, session |
 
 **To change the arena,** edit `arena.json`. **To retune the enemy,** edit its archetype in `enemies.json`. **To change spawning,** edit `encounter.json`'s `spawns` block. All derivation - outline scaling, degrees to radians, derived bounds - happens in one loader, so there is no second mapping to keep in sync.
@@ -483,4 +483,4 @@ The lockfile records installed dependency versions. The initial installation rep
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 
-Implement one step at a time with `/implement-step <step-id>`. Completing a step does not automatically authorize later steps, a commit, or a push.
+Implement one phase at a time with `/implement-phase <phase-id>`. Completing a phase does not automatically authorize later phases, a commit, or a push.

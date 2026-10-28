@@ -4,7 +4,7 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 
 ## Context loading
 
-- Do not read `implementation-plan.md`, `first-draft.md`, `docs/plan/`, `docs/mechanics.md`, the plan archives or `README.md` unless the user asks, `/implement-step` runs, or the task changes gameplay rules. Even then, grep for the relevant heading and read that section, not the whole file.
+- Do not read `implementation-plan.md`, `docs/plan-v*.md`, `first-draft.md`, `docs/plan/`, `docs/mechanics.md`, the plan archives or `README.md` unless the user asks, `/implement-phase` or `/brainstorm` runs, or the task changes gameplay rules. Even then, grep for the relevant heading and read that section, not the whole file.
 - If a request conflicts with a recorded decision in the plan, ask rather than silently choosing.
 - Do not re-read a file already in context this session. Prefer `grep` and line-range reads over full reads of large files.
 
@@ -29,7 +29,7 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 Checks cost time and tokens, so run them at the end of a unit of work, not after each edit.
 
 - While iterating, run only the focused test file from `app/`: `npx vitest run <path>`.
-- Run `npm run verify` from `app/` once when a plan step or a set of code edits under `app/` is finished, before reporting. It runs `lint`, `typecheck`, `test` and `build`, prints one line per gate, and puts full logs in `app/test-results/verification/<gate>.log`. Read a log only when the printed excerpt is not enough. Do not run the four gates separately.
+- Run `npm run verify` from `app/` once when a plan phase or a set of code edits under `app/` is finished, before reporting. It runs `lint`, `typecheck`, `test` and `build`, prints one line per gate, and puts full logs in `app/test-results/verification/<gate>.log`. Read a log only when the printed excerpt is not enough. Do not run the four gates separately.
 - Skip `npm run verify` when only documentation, plans or agent instruction files changed.
 - Playwright is not routine; CI runs the full suite on every push. When adding or changing a Playwright test, run only that test: `npm run test:e2e -- --grep "<pattern>"`. Run the full suite only to reproduce a CI failure or when the user asks for an acceptance run.
 - Report the checks you actually ran and any blockers. Never claim a check passed when it did not run.
@@ -41,9 +41,10 @@ Checks cost time and tokens, so run them at the end of a unit of work, not after
 
 ## Instruction files
 
-| File | Role |
-| --- | --- |
-| `AGENTS.md` | Rules for every agent (this file) |
-| `CLAUDE.md` | `@AGENTS.md` import for Claude Code |
-| `.claude/skills/implement-step/SKILL.md` | `/implement-step <id>` workflow, for Claude Code and Copilot |
-| `.claude/skills/verify/SKILL.md` | `/verify` workflow; mirrors `.github/workflows/pages.yml` |
+| File                                      | Role                                                          |
+| ----------------------------------------- | ------------------------------------------------------------- |
+| `AGENTS.md`                               | Rules for every agent (this file)                             |
+| `CLAUDE.md`                               | `@AGENTS.md` import for Claude Code                           |
+| `.claude/skills/implement-phase/SKILL.md` | `/implement-phase <id>` workflow, for Claude Code and Copilot |
+| `.claude/skills/brainstorm/SKILL.md`      | `/brainstorm <topic>` workflow: produces a new `docs/plan-v<N>.md` and its `docs/plan/phase-*.md` files |
+| `.claude/skills/verify/SKILL.md`          | `/verify` workflow; mirrors `.github/workflows/pages.yml`     |

@@ -605,7 +605,7 @@ Spawn placement is the only source of randomness, and it enters through a seeded
 
 ## Approved V5 Boss Encounter Contract - Step 19.1
 
-Additive record of the user's 2026-10-27 decisions (K01-K18 in [the active plan](../implementation-plan.md)) for the Killer Bee Queen encounter, phases 19-24. This supersedes nothing in the v2 or v4 record except where stated.
+Additive record of the user's 2026-10-27 decisions (K01-K18 in [plan v5](plan-v5.md)) for the Killer Bee Queen encounter, phases 19-24. This supersedes nothing in the v2 or v4 record except where stated.
 
 ### Source Access
 

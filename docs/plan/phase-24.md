@@ -1,6 +1,6 @@
 # Phase 24: Bounds, Tuning, Regression And Handoff
 
-> Step prompts and execution records for phase 24 of [the implementation plan](../../implementation-plan.md), whose general sections stay the authority for how to work. Read only this introduction and the requested step: grep `^### Step 24.` and read that section. When every step here is complete, move this file to `docs/plan-archive/phase-24.md` and replace the plan's step lines with one-sentence outcomes.
+> Step prompts and execution records for phase 24 of [plan v5](../plan-v5.md), whose general sections stay the authority for how to work; [the implementation plan](../../implementation-plan.md) covers the reusable process. Read only this introduction and the requested step: grep `^### Step 24.` and read that section. When every step here is complete, move this file to `docs/plan-archive/phase-24.md` and replace the plan's step lines with one-sentence outcomes.
 
 ### Step 24.1 - Re-Derive And Re-Measure The Performance Bounds
 
