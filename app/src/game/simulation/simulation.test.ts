@@ -1997,3 +1997,167 @@ test("arm spread is measured from the attack clock's epoch, not the simulation's
   // start would put it at 180 + 30 degrees instead.
   expect(bearings[1]).toBeCloseTo((190 * Math.PI) / 180, 6);
 });
+
+/** Spawns a lone contact-capable enemy at `positionTiles`, overriding the primary archetype's contact fields. */
+function contactState(
+  archetypeOverrides: Partial<typeof PRIMARY>,
+  enemyPositionTiles: Vector2,
+): ReturnType<typeof createSimulation> {
+  // Strip the archetype's own shard attack so only contact damage, never a
+  // volley fired at point-blank range, produces the hits these tests count.
+  const archetype = { ...PRIMARY, attacks: [], ...archetypeOverrides };
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    archetypes: { [PRIMARY.id]: archetype },
+  };
+  const state = createSimulation(config, TEST_SEED);
+  state.player.positionTiles = { x: 0, y: 0 };
+  state.enemies = [
+    createEnemy(config, PRIMARY.id, state.nextEnemyId++, 0, enemyPositionTiles),
+  ];
+  return state;
+}
+
+/** Runs `count` idle ticks, returning the total accepted-hit count across all of them. */
+function runTicksCountingHits(
+  state: ReturnType<typeof createSimulation>,
+  count: number,
+): number {
+  let hits = 0;
+  for (let tick = 0; tick < count; tick++)
+    hits += advanceSimulation(state, stepSeconds, idle).acceptedHits.length;
+  return hits;
+}
+
+test("an overlapping contact-damaging enemy damages the player", () => {
+  const state = contactState(
+    { contactDamageHp: 40, contactCooldownSeconds: 0.5 },
+    { x: 0, y: 0 },
+  );
+  expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
+  advanceSimulation(state, stepSeconds, idle);
+  expect(state.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+test("contact applies on its cooldown, not every step, and repeats while overlapping", () => {
+  const state = contactState(
+    { contactDamageHp: 40, contactCooldownSeconds: 0.5 },
+    { x: 0, y: 0 },
+  );
+  // 2 seconds / 0.5 s cooldown: eligible at t=0, 0.5, 1, 1.5 - four hits, not 120.
+  const hits = runTicksCountingHits(state, 120);
+  expect(hits).toBe(4);
+});
+
+test("contact stops when bodies separate and resumes when they overlap again", () => {
+  const state = contactState(
+    { contactDamageHp: 40, contactCooldownSeconds: 0.5, speedTilesPerSecond: 0 },
+    { x: 0, y: 0 },
+  );
+  expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toHaveLength(1);
+  state.enemies[0].positionTiles = { x: 10, y: 10 };
+  expect(runTicksCountingHits(state, 30)).toBe(0);
+  state.enemies[0].positionTiles = { x: 0, y: 0 };
+  expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toHaveLength(1);
+});
+
+test("two overlapping enemies hit the player on independent cooldown schedules", () => {
+  const archetype = {
+    ...PRIMARY,
+    attacks: [],
+    contactDamageHp: 40,
+    contactCooldownSeconds: 0.5,
+  };
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    archetypes: { [PRIMARY.id]: archetype },
+  };
+  const state = createSimulation(config, TEST_SEED);
+  state.player.positionTiles = { x: 0, y: 0 };
+  state.enemies = [
+    createEnemy(config, PRIMARY.id, state.nextEnemyId++, 0, { x: 0, y: 0 }),
+    createEnemy(config, PRIMARY.id, state.nextEnemyId++, 0.25, { x: 0, y: 0 }),
+  ];
+  const hits = runTicksCountingHits(state, 90);
+  // First enemy: eligible at 0, 0.5, 1 - three hits. Second, epoch 0.25: eligible
+  // at 0.25, 0.75, 1.25 - three hits. Independent schedules, six total.
+  expect(hits).toBe(6);
+});
+
+test("contact conditions apply through the shared hit path: Slowed halves the player's travel", () => {
+  const state = contactState(
+    {
+      contactDamageHp: 0,
+      contactConditions: [{ key: "slowed" as const, seconds: 1 }],
+      contactCooldownSeconds: 10,
+    },
+    { x: 0, y: 0 },
+  );
+  advanceSimulation(state, stepSeconds, idle);
+  const traveled = { ...state.player.positionTiles };
+  advanceSimulation(state, stepSeconds, east);
+  const slowedTravel = state.player.positionTiles.x - traveled.x;
+  const unslowedTravel = PALADIN_DERIVED_STATS.speedTilesPerSecond * stepSeconds;
+  expect(slowedTravel).toBeLessThan(unslowedTravel);
+  expect(slowedTravel).toBeGreaterThan(0);
+});
+
+test("contactArmorPiercing routes through the condition-aware defense formula: 40 armor-piercing deals 40, not 8", () => {
+  const unpierced = contactState(
+    { contactDamageHp: 40, contactArmorPiercing: false, contactCooldownSeconds: 10 },
+    { x: 0, y: 0 },
+  );
+  expect(
+    advanceSimulation(unpierced, stepSeconds, idle).acceptedHits[0].damageHp,
+  ).toBe(8);
+
+  const pierced = contactState(
+    { contactDamageHp: 40, contactArmorPiercing: true, contactCooldownSeconds: 10 },
+    { x: 0, y: 0 },
+  );
+  expect(
+    advanceSimulation(pierced, stepSeconds, idle).acceptedHits[0].damageHp,
+  ).toBe(40);
+});
+
+test("a fast enemy crossing the player within one step still registers contact (tunnelling regression)", () => {
+  // The player sits at the origin, directly on the segment between the
+  // enemy's start and the arena center it is made to chase. A single-step
+  // end-position overlap check would miss this entirely: the enemy's final
+  // position is far past the player on the other side. Only the swept test
+  // the shard path already uses can catch a crossing this fast.
+  const far = horizontalContactTiles + 1;
+  const archetype = {
+    ...PRIMARY,
+    attacks: [],
+    contactDamageHp: 40,
+    contactCooldownSeconds: 10,
+    speedTilesPerSecond: (2 * far) / stepSeconds,
+  };
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    archetypes: { [PRIMARY.id]: archetype },
+    arena: { ...ENCOUNTER_CONFIG.arena, centerTiles: { x: far, y: 0 } },
+  };
+  const state = createSimulation(config, TEST_SEED);
+  state.player.positionTiles = { x: 0, y: 0 };
+  state.enemies = [
+    createEnemy(config, PRIMARY.id, state.nextEnemyId++, 0, { x: -far, y: 0 }),
+  ];
+  state.debugSettings = { ...state.debugSettings, chaseArenaCenter: true };
+  advanceSimulation(state, stepSeconds, idle);
+  // The enemy's final position is the far side of the player, not overlapping
+  // it - only the swept test along the way caught the contact.
+  expect(
+    distance(state.enemies[0].positionTiles, state.player.positionTiles),
+  ).toBeCloseTo(far, 6);
+  expect(state.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+test("an archetype with zero contact damage and no contact conditions never starts a contact cooldown", () => {
+  const state = contactState({}, { x: 0, y: 0 });
+  const spawnedAt = state.enemies[0].nextContactEligibleSeconds;
+  runTicksCountingHits(state, 30);
+  expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
+  expect(state.enemies[0].nextContactEligibleSeconds).toBe(spawnedAt);
+});

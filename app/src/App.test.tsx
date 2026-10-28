@@ -13,6 +13,11 @@ import {
 } from "./game/config/debug";
 import type { AttemptResult } from "./game/session/session";
 import {
+  ACTIVE_CONDITIONS,
+  CONDITION_LABELS,
+  INERT_CONDITIONS,
+} from "./game/simulation/conditions";
+import {
   HISTORY_STORAGE_KEY,
   HISTORY_SCHEMA_VERSION,
 } from "./storage/attempts";
@@ -180,6 +185,23 @@ test("Home Controls is labeled, lists actual bindings, closes and restores its o
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(controls).toHaveFocus();
   expect(adapter.created).toBe(0);
+});
+
+test("Controls dialog lists all thirteen conditions and marks the six inert ones", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Controls" }));
+  const dialog = screen.getByRole("dialog", { name: "Controls" });
+  for (const key of ACTIVE_CONDITIONS)
+    expect(
+      within(dialog).getByText(CONDITION_LABELS[key], { exact: true }),
+    ).toBeVisible();
+  for (const key of INERT_CONDITIONS)
+    expect(
+      within(dialog).getByText(`${CONDITION_LABELS[key]} (inert)`, {
+        exact: true,
+      }),
+    ).toBeVisible();
 });
 
 test("HUD Controls uses runtime modal isolation and never resumes on close", async () => {

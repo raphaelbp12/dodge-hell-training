@@ -1,13 +1,17 @@
 import { expect, test } from "vitest";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
+import { PALADIN_STATS } from "../config/stats";
 import { createSimulation, advanceSimulation } from "./simulation";
 import { createShard } from "./projectiles";
 import {
+  ACTIVE_CONDITIONS,
   applyConditions,
+  createConditionSeconds,
   effectiveInput,
   hasCondition,
   SLOWED_SPEED_TILES_PER_SECOND,
   tickConditions,
+  visibleConditions,
 } from "./conditions";
 import {
   convexBodyFitsCircle,
@@ -214,4 +218,99 @@ test("an accepted hit applies full duration without same-step decay, then ticks 
     1.4 - stepSeconds,
     12,
   );
+});
+
+test("an armor-piercing projectile ignores defense end-to-end", () => {
+  const projectileId = "crystal-worm-child-shard";
+  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    projectiles: {
+      ...ENCOUNTER_CONFIG.projectiles,
+      [projectileId]: { ...projectile, damageHp: 100, armorPiercing: true },
+    },
+  } as const;
+  const state = createSimulation(config, 123);
+  state.shards.push(
+    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+  );
+
+  const hit = advanceSimulation(state, stepSeconds, idle);
+  expect(hit.acceptedHits[0]!.damageHp).toBe(100);
+});
+
+test("an active Curse multiplies a subsequent hit's damage end-to-end", () => {
+  const projectileId = "crystal-worm-child-shard";
+  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    projectiles: {
+      ...ENCOUNTER_CONFIG.projectiles,
+      [projectileId]: { ...projectile, damageHp: 100 },
+    },
+  } as const;
+  const state = createSimulation(config, 123);
+  state.player.conditionSeconds.cursed = 10;
+  state.shards.push(
+    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+  );
+
+  const hit = advanceSimulation(state, stepSeconds, idle);
+  expect(hit.acceptedHits[0]!.damageHp).toBe(85);
+});
+
+test("a 0-damage condition-only projectile still registers a hit and applies its condition", () => {
+  const projectileId = "crystal-worm-child-shard";
+  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const config = {
+    ...ENCOUNTER_CONFIG,
+    projectiles: {
+      ...ENCOUNTER_CONFIG.projectiles,
+      [projectileId]: {
+        ...projectile,
+        damageHp: 0,
+        conditions: [{ key: "armorBroken", seconds: 7 }],
+      },
+    },
+  } as const;
+  const state = createSimulation(config, 123);
+  state.shards.push(
+    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+  );
+
+  const hit = advanceSimulation(state, stepSeconds, idle);
+  expect(hit.acceptedHits).toHaveLength(1);
+  expect(hit.acceptedHits[0]!.damageHp).toBe(0);
+  expect(state.player.conditionSeconds.armorBroken).toBe(7);
+  expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
+});
+
+test("visibleConditions is empty for a fresh player", () => {
+  const player = {
+    positionTiles: { x: 0, y: 0 },
+    healthHp: 1,
+    combatRemainingSeconds: 0,
+    conditionSeconds: createConditionSeconds(),
+  };
+  expect(visibleConditions(player)).toEqual([]);
+});
+
+test("visibleConditions orders active before inert, matching declaration order, and omits expired ones", () => {
+  const player = {
+    positionTiles: { x: 0, y: 0 },
+    healthHp: 1,
+    combatRemainingSeconds: 0,
+    conditionSeconds: createConditionSeconds(),
+  };
+  player.conditionSeconds.sick = 2.34;
+  player.conditionSeconds.paralyzed = 1.0;
+  player.conditionSeconds.dazed = 5.0;
+  player.conditionSeconds.confused = 0;
+
+  expect(visibleConditions(player)).toEqual([
+    { key: "paralyzed", remainingSeconds: 1.0, inert: false },
+    { key: "sick", remainingSeconds: 2.34, inert: false },
+    { key: "dazed", remainingSeconds: 5.0, inert: true },
+  ]);
+  expect(ACTIVE_CONDITIONS.includes("paralyzed")).toBe(true);
 });

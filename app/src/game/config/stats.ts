@@ -74,19 +74,29 @@ export function calculateEquippedStats(
   return equipped;
 }
 
+function assertFinite(value: number, name: string): void {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`${name} must be finite`);
+  }
+}
+
+/** Sourced from the status-effects wiki page (Curse: "+25% incoming damage"). */
+export const CURSE_DAMAGE_MULTIPLIER = 1.25;
+
 export function calculateDamageHp(
   rawDamageHp: number,
   defense: number,
+  cursed = false,
 ): number {
   assertNonnegative(rawDamageHp, "rawDamageHp");
-  assertNonnegative(defense, "defense");
+  assertFinite(defense, "defense");
   if (rawDamageHp === 0) return 0;
-  return Math.ceil(
-    Math.max(
-      rawDamageHp - defense,
-      rawDamageHp * STAT_RULES.damage.minimumFraction,
-    ),
+  let damage = Math.max(
+    rawDamageHp - defense,
+    rawDamageHp * STAT_RULES.damage.minimumFraction,
   );
+  if (cursed) damage *= CURSE_DAMAGE_MULTIPLIER;
+  return Math.ceil(damage);
 }
 
 export function calculateCombatTriggerHp(defense: number): number {

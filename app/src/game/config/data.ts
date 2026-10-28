@@ -718,6 +718,10 @@ export type AuthoredArchetype = Readonly<{
   body: AuthoredBody;
   speedTilesPerSecond: number;
   contactDamageHp: number;
+  contactConditions: readonly ConditionApplication[];
+  contactArmorPiercing: boolean;
+  /** Trainer-authored (K17): the source gives no contact rate. Unused while contactDamageHp is 0. */
+  contactCooldownSeconds: number;
   blocksPlayer: boolean;
   attacks: readonly AuthoredAttack[];
 }>;
@@ -745,6 +749,18 @@ function validateArchetype(
     contactDamageHp: nonnegativeNumber(
       archetype.contactDamageHp,
       `${path}.contactDamageHp`,
+    ),
+    contactConditions: validateConditions(
+      archetype.contactConditions,
+      `${path}.contactConditions`,
+    ),
+    contactArmorPiercing: boolean(
+      archetype.contactArmorPiercing,
+      `${path}.contactArmorPiercing`,
+    ),
+    contactCooldownSeconds: nonnegativeNumber(
+      archetype.contactCooldownSeconds,
+      `${path}.contactCooldownSeconds`,
     ),
     blocksPlayer: boolean(archetype.blocksPlayer, `${path}.blocksPlayer`),
     attacks: Object.freeze(

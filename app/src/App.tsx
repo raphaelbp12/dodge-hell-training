@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
 import {
   createEncounter,
   type EncounterHandle,
@@ -24,6 +24,12 @@ import {
   updateDebugParameter,
   type DebugSettings,
 } from "./game/config/debug";
+import {
+  CONDITION_DESCRIPTIONS,
+  CONDITION_KEYS,
+  CONDITION_LABELS,
+  INERT_CONDITIONS,
+} from "./game/simulation/conditions";
 
 const REPOSITORY_URL = "https://github.com/raphaelbp12/dodge-hell-training";
 const SHORT_SHA_LENGTH = 7;
@@ -160,6 +166,15 @@ function ControlsDialog({ onClose }: { onClose: () => void }) {
     >
       <h2 id="controls-title">Controls</h2>
       <dl>
+        {CONDITION_KEYS.map((key) => (
+          <Fragment key={key}>
+            <dt>
+              {CONDITION_LABELS[key]}
+              {(INERT_CONDITIONS as readonly string[]).includes(key) && " (inert)"}
+            </dt>
+            <dd>{CONDITION_DESCRIPTIONS[key]}</dd>
+          </Fragment>
+        ))}
         <dt>WASD</dt>
         <dd>Move</dd>
         <dt>R</dt>

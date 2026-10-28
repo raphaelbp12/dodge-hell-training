@@ -74,6 +74,8 @@ export type EnemyState = {
   spawnedAtSeconds: number;
   /** One per authored attack of the archetype, in authored order. */
   attackClocks: AttackClockState[];
+  /** Per-enemy contact cooldown clock (K17): contact repeats, unlike a shard's once-only hit. */
+  nextContactEligibleSeconds: number;
 };
 
 export type AcceptedHit = Readonly<{

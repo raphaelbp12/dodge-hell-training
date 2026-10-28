@@ -323,7 +323,7 @@ type ShardState = {
 
 - **21.1** - Add Condition State, Application And Ticking. Status: complete. Dependencies: 20.5.
 - **21.2** - Apply The Movement Conditions. Status: complete. Dependencies: 21.1.
-- **21.3** - Apply The Damage Conditions And Armor Piercing. Status: pending. Dependencies: 21.2.
+- **21.3** - Apply The Damage Conditions And Armor Piercing. Status: complete. Dependencies: 21.2. `calculateDamageHp` now takes signed defense and a cursed multiplier; `effectiveDefenseFor` resolves armor-piercing/Armor Broken/Exposed; Sick halts regeneration. All gates passed.
 - **21.4** - Show Active Conditions To The Player. Status: pending. Dependencies: 21.3.
 - **21.5** - Implement Enemy Contact Damage. Status: pending. Dependencies: 21.4.
 

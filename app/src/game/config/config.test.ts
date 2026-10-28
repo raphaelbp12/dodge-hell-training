@@ -331,6 +331,33 @@ test.each([
 );
 
 test.each([
+  ["none", 32, false, 68],
+  ["armour-piercing", 0, false, 100],
+  ["Armor Broken", 0, false, 100],
+  ["Exposed", 12, false, 88],
+  ["armour-piercing + Exposed", -20, false, 120],
+  ["Armor Broken + Exposed", -20, false, 120],
+  ["Curse only", 32, true, 85],
+])(
+  "the %s condition case for a raw 100-damage shot deals the expected HP",
+  (_label, defense, cursed, expected) => {
+    expect(calculateDamageHp(100, defense, cursed)).toBe(expected);
+  },
+);
+
+test("accepts a negative defense and the minimum-damage floor still applies to a high-defense low-damage shot", () => {
+  expect(calculateDamageHp(100, -20)).toBe(120);
+  expect(calculateDamageHp(7, 100)).toBe(1);
+});
+
+test.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+  "rejects a nonfinite defense %s",
+  (invalid) => {
+    expect(() => calculateDamageHp(1, invalid)).toThrow(RangeError);
+  },
+);
+
+test.each([
   [0, 1],
   [12, 12],
   [15, 15],
@@ -365,7 +392,6 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
   "rejects invalid rule input %s instead of propagating it",
   (invalid) => {
     expect(() => calculateDamageHp(invalid, 0)).toThrow(RangeError);
-    expect(() => calculateDamageHp(1, invalid)).toThrow(RangeError);
     expect(() => calculateCombatTriggerHp(invalid)).toThrow(RangeError);
     expect(() => calculateCombatDurationSeconds(invalid)).toThrow(RangeError);
     for (const stat of ["healthHp", "defense", "speed", "vitality"] as const) {
@@ -402,6 +428,9 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
     verticesTiles: BEVELED_BODY_1_25_TILES,
     speedTilesPerSecond: 1.5,
     contactDamageHp: 0,
+    contactConditions: [],
+    contactArmorPiercing: false,
+    contactCooldownSeconds: 0,
     blocksPlayer: false,
     attacks: [
       {

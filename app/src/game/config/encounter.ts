@@ -147,6 +147,9 @@ export type EnemyArchetype = Readonly<{
   verticesTiles: readonly Vector2[];
   speedTilesPerSecond: number;
   contactDamageHp: number;
+  contactConditions: readonly ConditionApplication[];
+  contactArmorPiercing: boolean;
+  contactCooldownSeconds: number;
   blocksPlayer: boolean;
   attacks: readonly AttackSpec[];
 }>;
@@ -367,6 +370,9 @@ export function buildEncounterConfig(
     verticesTiles,
     speedTilesPerSecond: values.enemySpeedTilesPerSecond,
     contactDamageHp: authoredPrimary.contactDamageHp,
+    contactConditions: authoredPrimary.contactConditions,
+    contactArmorPiercing: authoredPrimary.contactArmorPiercing,
+    contactCooldownSeconds: authoredPrimary.contactCooldownSeconds,
     blocksPlayer: authoredPrimary.blocksPlayer,
     attacks: Object.freeze([
       Object.freeze({
@@ -738,8 +744,8 @@ function validateArchetype(
   for (const attack of archetype.attacks) validateAttackSpec(config, attack);
   // Approved rules, asserted here rather than pinned in the structural type so
   // the type does not forbid the variation it appears to model (G: F10).
-  if (archetype.contactDamageHp !== 0)
-    throw new RangeError("Contact damage is not approved for this encounter");
+  // Contact damage is approved (K17); blocking is not (G16: enemies pass
+  // through each other, and pushback is a separate, un-designed mechanic).
   if (archetype.blocksPlayer !== false)
     throw new RangeError("Enemy body blocking is not approved");
 

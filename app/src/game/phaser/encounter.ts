@@ -11,6 +11,7 @@ import {
 } from "../config/debug";
 import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
+import { CONDITION_LABELS, visibleConditions } from "../simulation/conditions";
 import type { AcceptedHit, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
 import { HitAudio } from "./hit-audio";
@@ -82,6 +83,17 @@ const presentation = {
     empty: 0x592e39,
     border: 0x101b1b,
   },
+  conditionChip: {
+    gapAboveHealthBarCssPixels: 4,
+    gapBetweenCssPixels: 3,
+    heightCssPixels: 14,
+    horizontalPaddingCssPixels: 5,
+    fontSizeCssPixels: 10,
+    activeFill: 0x55303a,
+    inertFill: 0x2a2a2a,
+    activeTextColor: "#ffdf69",
+    inertTextColor: "#7a7a7a",
+  },
 } as const;
 const pixelsPerTile = ENCOUNTER_CONFIG.camera.cssPixelsPerTile;
 const encounters = new WeakMap<HTMLElement, EncounterScene>();
@@ -95,6 +107,8 @@ class EncounterScene extends Phaser.Scene {
   private bodies!: Phaser.GameObjects.Graphics;
   private projectiles!: Phaser.GameObjects.Graphics;
   private healthBar!: Phaser.GameObjects.Graphics;
+  private conditionChips!: Phaser.GameObjects.Graphics;
+  private conditionChipTexts: Phaser.GameObjects.Text[] = [];
   private hitNumbers: {
     hit: AcceptedHit;
     ageSeconds: number;
@@ -151,6 +165,7 @@ class EncounterScene extends Phaser.Scene {
     this.bodies = this.add.graphics().setDepth(1);
     this.projectiles = this.add.graphics().setDepth(2);
     this.healthBar = this.add.graphics().setDepth(3);
+    this.conditionChips = this.add.graphics().setDepth(3);
     const keyboard = this.input.keyboard!;
     this.keys = keyboard.addKeys(
       { north: "W", south: "S", east: "D", west: "A" },
@@ -579,6 +594,7 @@ class EncounterScene extends Phaser.Scene {
         (width * player.healthHp) / PALADIN_STATS.healthHp,
         height,
       );
+    this.drawConditionChips(player, left, top + height, border);
     const policy = presentation.hitNumbers;
     for (const number of this.hitNumbers) {
       const lane = (number.hit.shardId % policy.lanes) - (policy.lanes - 1) / 2;
@@ -593,6 +609,46 @@ class EncounterScene extends Phaser.Scene {
                 policy.lifetimeSeconds) /
               this.zoom,
         );
+    }
+  }
+
+  /** Draws one labelled chip per active-or-visible condition, below the health bar. */
+  private drawConditionChips(
+    player: typeof this.state.player,
+    left: number,
+    topOfBar: number,
+    border: number,
+  ): void {
+    const policy = presentation.conditionChip;
+    for (const text of this.conditionChipTexts) text.destroy();
+    this.conditionChipTexts = [];
+    this.conditionChips.clear();
+    let top = topOfBar + border + policy.gapAboveHealthBarCssPixels / this.zoom;
+    for (const condition of visibleConditions(player)) {
+      const label = `${CONDITION_LABELS[condition.key]} ${condition.remainingSeconds.toFixed(1)}${
+        condition.inert ? " (inert)" : ""
+      }`;
+      const text = this.add
+        .text(0, 0, label, {
+          fontFamily: "Consolas, monospace",
+          fontSize: `${policy.fontSizeCssPixels}px`,
+          color: condition.inert ? policy.inertTextColor : policy.activeTextColor,
+        })
+        .setOrigin(0, 0)
+        .setScale(1 / this.zoom)
+        .setDepth(4);
+      const width =
+        text.width / this.zoom + (policy.horizontalPaddingCssPixels * 2) / this.zoom;
+      const height = policy.heightCssPixels / this.zoom;
+      this.conditionChips
+        .fillStyle(condition.inert ? policy.inertFill : policy.activeFill)
+        .fillRect(left, top, width, height);
+      text.setPosition(
+        left + policy.horizontalPaddingCssPixels / this.zoom,
+        top + (height - text.height / this.zoom) / 2,
+      );
+      this.conditionChipTexts.push(text);
+      top += height + policy.gapBetweenCssPixels / this.zoom;
     }
   }
 

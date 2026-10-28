@@ -26,7 +26,7 @@ test.each([
   "applies raw damage %s through the approved defense/minimum/ceiling rules",
   (rawDamageHp, expectedDamageHp) => {
     const state = player();
-    applyPlayerHit(state, rawDamageHp);
+    applyPlayerHit(state, rawDamageHp, PALADIN_STATS.defense, false);
     expect(state.healthHp).toBe(700 - expectedDamageHp);
   },
 );
@@ -39,17 +39,24 @@ test.each([
   "raw damage %s enters combat only at the inclusive 27 HP trigger",
   (rawDamageHp, expectedCombatSeconds) => {
     const state = player();
-    applyPlayerHit(state, rawDamageHp);
+    applyPlayerHit(state, rawDamageHp, PALADIN_STATS.defense, false);
     expect(state.combatRemainingSeconds).toBe(expectedCombatSeconds);
   },
 );
 
+test("passes defense and cursed through to calculateDamageHp", () => {
+  const state = player();
+  const damageHp = applyPlayerHit(state, 100, -20, true);
+  expect(damageHp).toBe(150);
+  expect(state.healthHp).toBe(700 - 150);
+});
+
 test("subthreshold damage does not clear or refresh existing combat", () => {
   const state = player();
   state.combatRemainingSeconds = 1;
-  applyPlayerHit(state, 58);
+  applyPlayerHit(state, 58, PALADIN_STATS.defense, false);
   expect(state.combatRemainingSeconds).toBe(1);
-  applyPlayerHit(state, 59);
+  applyPlayerHit(state, 59, PALADIN_STATS.defense, false);
   expect(state.combatRemainingSeconds).toBe(5.32);
 });
 
@@ -82,10 +89,20 @@ test("caps fractional regeneration without rounding internal HP", () => {
 test("clamps lethal damage to zero and never damages or regenerates a dead player", () => {
   const state = player();
   state.healthHp = 1;
-  applyPlayerHit(state, 160);
+  applyPlayerHit(state, 160, PALADIN_STATS.defense, false);
   expect(state.healthHp).toBe(0);
   const dead = structuredClone(state);
   regeneratePlayer(state, 100);
-  applyPlayerHit(state, 160);
+  applyPlayerHit(state, 160, PALADIN_STATS.defense, false);
   expect(state).toEqual(dead);
+});
+
+test("a sick player regenerates nothing while the combat timer still counts down", () => {
+  const state = player();
+  state.healthHp = 500;
+  state.combatRemainingSeconds = 0.25;
+  state.conditionSeconds.sick = 10;
+  regeneratePlayer(state, 1);
+  expect(state.healthHp).toBe(500);
+  expect(state.combatRemainingSeconds).toBe(0);
 });

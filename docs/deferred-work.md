@@ -95,6 +95,16 @@ Rules for this register:
 
 **Blocked on.** Nothing - but note that **F5 stops being latent the moment a second encounter exists.** `constrainToArena` and `advanceSimulation` read the module-level `ENCOUNTER_CONFIG` rather than `state.config`, which is harmless while every simulation shares one arena and one fixed step, and wrong as soon as two encounters differ in either. The active plan fixes F5 inside the step that introduces encounter selection rather than leaving it here.
 
+### D10 - Playwright Coverage For The Condition Chip Display
+
+**What.** A browser-path (Playwright) check that step 21.4's Phaser condition chips actually render for a live, running encounter.
+
+**Why deferred.** `tests/app.spec.ts` has no existing seam to set `conditionSeconds` on the player of a running encounter: no shipped projectile or debug control applies a condition yet (that lands with later steps and the 23.x boss authoring). Adding one now would mean inventing a debug-only injection backdoor outside step 21.4's scope. The feature is covered by focused Vitest checks on the pure `visibleConditions` function and the Controls dialog instead; only the end-to-end browser render is unverified.
+
+**Blocked on.** A shipped projectile, enemy contact or debug control that applies a condition to the player in a running encounter, giving the e2e test a real seam instead of a purpose-built one.
+
+**Fidelity gap this leaves.** None to the trainer's rules; this is a test-coverage gap, not a behavior gap. The chip-drawing code path is otherwise exercised by its focused unit tests.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

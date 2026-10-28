@@ -1,10 +1,18 @@
-import { constrainBodyToArena, pursueBody } from "./geometry";
+import {
+  constrainBodyToArena,
+  pursueBody,
+  sweptConvexOverlap,
+  transformBodyVertices,
+} from "./geometry";
 import {
   applyConditions,
   createConditionSeconds,
+  effectiveDefenseFor,
   effectiveInput,
+  hasCondition,
   playerTravelTiles,
   tickConditions,
+  type ConditionApplication,
 } from "./conditions";
 import {
   archetypeOf,
@@ -124,6 +132,7 @@ export function createEnemy(
         attack.pattern.kind === "ring" ? attack.pattern.initialPhaseRadians : 0,
       volleysFired: 0,
     })),
+    nextContactEligibleSeconds: spawnedAtSeconds,
   };
 }
 
@@ -356,26 +365,99 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   }
 }
 
+/**
+ * Shared hit path for both a shard and an enemy contact: resolves the
+ * condition-aware defense formula, applies damage and conditions, and records
+ * the hit. Returns whether the hit was accepted, so a shard caller can mark
+ * itself as having hit (once-only) while a contact caller never does.
+ */
+function applyAcceptedHit(
+  state: SimulationState,
+  shardId: number,
+  rawDamageHp: number,
+  armorPiercing: boolean,
+  conditions: readonly ConditionApplication[],
+  acceptedHits: AcceptedHit[],
+): boolean {
+  if (state.debugSettings.godMode) return false;
+  const defense = effectiveDefenseFor(state.player, armorPiercing);
+  const cursed = hasCondition(state.player, "cursed");
+  const damageHp = applyPlayerHit(state.player, rawDamageHp, defense, cursed);
+  if (damageHp === null) return false;
+  applyConditions(state.player, conditions);
+  state.hitsTaken++;
+  acceptedHits.push({
+    shardId,
+    damageHp,
+    positionTiles: { ...state.player.positionTiles },
+  });
+  if (state.player.healthHp === 0) state.phase = "ended";
+  return true;
+}
+
 function registerShardHit(
   state: SimulationState,
   shard: ShardState,
   acceptedHits: AcceptedHit[],
 ): void {
-  if (state.debugSettings.godMode) return;
-  const damageHp = applyPlayerHit(state.player, shard.damageHp);
-  if (damageHp === null) return;
-  shard.hasHitPlayer = true;
-  applyConditions(
-    state.player,
-    projectileOf(state.config, shard.projectileId).conditions,
-  );
-  state.hitsTaken++;
-  acceptedHits.push({
-    shardId: shard.id,
-    damageHp,
-    positionTiles: { ...state.player.positionTiles },
-  });
-  if (state.player.healthHp === 0) state.phase = "ended";
+  const projectile = projectileOf(state.config, shard.projectileId);
+  if (
+    applyAcceptedHit(
+      state,
+      shard.id,
+      shard.damageHp,
+      projectile.armorPiercing,
+      projectile.conditions,
+      acceptedHits,
+    )
+  )
+    shard.hasHitPlayer = true;
+}
+
+/**
+ * Resolves enemy contact damage (K17), once per fixed step, after enemy
+ * movement and before shard advance. Unlike a shard's once-per-shard rule,
+ * contact repeats on its cooldown for as long as the bodies overlap - that is
+ * deliberate, not a bug to "fix" into once-only: it is the pressure a
+ * charging minion applies. Uses the same swept-convex-overlap test as shards
+ * so a fast enemy cannot tunnel through the player within one step.
+ */
+function resolveEnemyContact(
+  state: SimulationState,
+  enemyStarts: ReadonlyMap<number, Vector2>,
+  playerStart: Vector2,
+  playerEnd: Vector2,
+  acceptedHits: AcceptedHit[],
+): void {
+  for (const enemy of state.enemies) {
+    if (state.player.healthHp === 0) break;
+    const archetype = archetypeOf(state.config, enemy.archetypeId);
+    if (archetype.contactDamageHp === 0 && archetype.contactConditions.length === 0)
+      continue;
+    if (state.elapsedSeconds < enemy.nextContactEligibleSeconds) continue;
+    const enemyStart = enemyStarts.get(enemy.id) ?? enemy.positionTiles;
+    const enemyEnd = enemy.positionTiles;
+    const overlaps = sweptConvexOverlap(
+      transformBodyVertices(archetype.verticesTiles, enemyStart),
+      { x: enemyEnd.x - enemyStart.x, y: enemyEnd.y - enemyStart.y },
+      transformBodyVertices(state.config.player.verticesTiles, playerStart),
+      { x: playerEnd.x - playerStart.x, y: playerEnd.y - playerStart.y },
+    );
+    if (!overlaps) continue;
+    // Stable synthetic shard identity derived from the enemy id, not a
+    // minted fake shard, since the shared hit path only needs an id to tag.
+    const accepted = applyAcceptedHit(
+      state,
+      -enemy.id,
+      archetype.contactDamageHp,
+      archetype.contactArmorPiercing,
+      archetype.contactConditions,
+      acceptedHits,
+    );
+    if (accepted)
+      enemy.nextContactEligibleSeconds =
+        state.elapsedSeconds + archetype.contactCooldownSeconds;
+  }
 }
 
 /**
@@ -511,9 +593,20 @@ export function advanceSimulation(
     // full authored duration and first decrement on the following step.
     tickConditions(state.player, fixedStepSeconds);
     const playerStart = state.player.positionTiles;
+    const enemyStarts = new Map(
+      state.enemies.map((enemy) => [enemy.id, enemy.positionTiles] as const),
+    );
     updateMovement(state, input);
     state.ticksElapsed++;
     state.elapsedSeconds = state.ticksElapsed * fixedStepSeconds;
+    if (state.player.healthHp > 0)
+      resolveEnemyContact(
+        state,
+        enemyStarts,
+        playerStart,
+        state.player.positionTiles,
+        acceptedHits,
+      );
     state.shards = state.shards.filter((shard) => {
       if (state.phase === "ended") return true;
       const result = advanceShard(

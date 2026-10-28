@@ -11,6 +11,9 @@
       },
       "speedTilesPerSecond": 1.5,
       "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
       "blocksPlayer": false,
       "attacks": [
         {

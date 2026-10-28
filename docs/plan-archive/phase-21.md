@@ -79,7 +79,7 @@ Checks run from `app/` with Node 24.22.1/npm 12.2.1: focused condition tests - 1
 
 ### Step 21.3 - Apply The Damage Conditions And Armor Piercing
 
-Status: pending. Dependencies: 21.2.
+Status: complete. Dependencies: 21.2.
 
 **Implementation prompt**
 
@@ -134,9 +134,11 @@ Wire it together: `registerShardHit` resolves the firing projectile through `pro
 
 **Acceptance:** the condition-aware damage formula matches all seven cases, negative defence is supported and tested, Sick stops regeneration without stalling the combat timer, conditions are applied once per shard on accepted hits only, the two unsourced interpretations are recorded, and all four gates pass.
 
+**Execution record.** `calculateDamageHp` (`config/stats.ts`) takes a signed `defense` and a `cursed` flag; `assertNonnegative(defense, ...)` replaced by a finiteness check; `CURSE_DAMAGE_MULTIPLIER` (1.25) lives beside it since it is only consumed there. `effectiveDefenseFor` and `EXPOSED_DEFENSE_PENALTY` (20) were added to `simulation/conditions.ts`. `applyPlayerHit` (`simulation/health.ts`) now takes `defense` and `cursed` from its caller instead of reading `PALADIN_STATS.defense` itself; `regeneratePlayer` skips both regeneration terms while Sick is active but still decrements `combatRemainingSeconds`. `registerShardHit` (`simulation/simulation.ts`) resolves the firing projectile once, computes `effectiveDefenseFor(player, projectile.armorPiercing)` and reads the player's pre-hit `cursed` status before calling `applyConditions`, so a hit that itself applies Curse is not retroactively cursed. All seven table rows, the finite-defense rejection, the minimum-damage floor, the 0-damage condition-only hit, the once-per-shard rule and the unconditioned regression tests pass. **Interpretations recorded, as required:** Curse is applied after the minimum-damage floor (the source states only that it applies after defense and its modifiers); the sub-20-defense case for Armor Broken plus Exposed is not modelled, because the source's two sentences about it cannot both hold in one linear formula and the only player preset has 32 defense. 252 tests in the focused run, all four `npm run verify` gates passed.
+
 ### Step 21.4 - Show Active Conditions To The Player
 
-Status: pending. Dependencies: 21.3.
+Status: complete. Dependencies: 21.3.
 
 **Implementation prompt**
 
@@ -154,9 +156,21 @@ Do not add a React HUD element, a per-frame React state update, a condition time
 
 **Acceptance:** active conditions are visible in the Phaser layer with remaining time, inert ones are visibly marked as inert, the Controls dialog documents all thirteen, no per-frame React update was introduced, and all four gates pass.
 
+**Execution and verification - 2026-10-28**
+
+Added `visibleConditions` (pure, `simulation/conditions.ts`) returning active-then-inert declaration-order entries with remaining seconds, filtered to nonzero; `CONDITION_LABELS` and `CONDITION_DESCRIPTIONS` (published wording for the seven active conditions, trainer note for the six inert) live beside it so the Phaser chip and the React Controls dialog share one source of labels/text. `EncounterScene.drawEntities` (`phaser/encounter.ts`) now calls a new `drawConditionChips`, drawn into a dedicated `conditionChips` Graphics layer plus a pooled set of `Phaser.GameObjects.Text` labels, stacked below the existing health bar using a new `presentation.conditionChip` block (fill/text colours, padding, gaps, font size) following the same CSS-pixels-over-zoom convention as `presentation.healthBar`. Each chip's label is `"<name> <seconds>.0"`, with `" (inert)"` appended for the six inert conditions, dimmed via `inertFill`/`inertTextColor`. No React state or effect was added; the chips are drawn entirely inside the existing per-frame Phaser `drawEntities` path, same as the health bar.
+
+`App.tsx`'s `ControlsDialog` now maps `CONDITION_KEYS` to a `<dt>/<dd>` pair per condition, reusing `CONDITION_LABELS`/`CONDITION_DESCRIPTIONS` and marking each of the six `INERT_CONDITIONS` with `" (inert)"` in its term.
+
+**Focused checks implemented:** a failing-first Vitest pair on `visibleConditions` (empty for a fresh player; active-then-inert order, omits an expired condition) in `conditions.test.ts`; a failing-first React test asserting the Controls dialog lists all seven active condition labels and all six inert ones with `" (inert)"` in `App.test.tsx`.
+
+**Not implemented, and why:** the Playwright acceptance check for the chip's browser-rendered appearance was not added. No shipped projectile or debug control yet sets `conditionSeconds` on the live player (that lands in later steps and 23.x authoring), and `tests/app.spec.ts` has no existing seam to inject a condition into a running encounter; adding one would mean inventing a debug-only backdoor outside this step's scope. This is flagged as an open item rather than claimed as run.
+
+Checks run from `app/` with Node 24.22.1/npm 12.2.1: focused `conditions.test.ts` - 18/18 passed; focused `App.test.tsx` - 20/20 passed; `npm run verify` - lint, typecheck, test (all prior tests unchanged), build all passed.
+
 ### Step 21.5 - Implement Enemy Contact Damage
 
-Status: pending. Dependencies: 21.4.
+Status: complete. Dependencies: 21.4.
 
 **Implementation prompt**
 
@@ -175,3 +189,13 @@ The Crystal Worm keeps `contactDamageHp: 0`, and `validateEncounterConfig` must 
 **Focused checks:** focused failing test that an overlapping contact-damaging enemy damages the player first. Then: contact applies on the cooldown and not every step, asserted on hit count over a known duration; it repeats while overlapping, unlike a shard; it stops when the bodies separate and resumes when they overlap again; two overlapping enemies hit on independent schedules; contact conditions are applied through the same path, proven by a contact that applies Slowed and measurably halves the player's travel; `contactArmorPiercing` goes through step 21.3's formula, so 40 armour-piercing damage deals 40 rather than 8; a fast enemy crossing the player within one step still registers, which is the tunnelling regression test; an archetype with zero contact damage and no contact conditions never runs the overlap test; and the Crystal Worm's zero-contact assertion still holds with every pre-existing assertion unchanged. All four routine gates.
 
 **Acceptance:** enemies with authored contact damage hit the player on a cooldown through the shared hit path, the swept test prevents tunnelling, contact conditions work, the repeat-versus-once-only difference is documented, `blocksPlayer` is untouched, zero-contact archetypes short-circuit, and all four gates pass.
+
+**Execution and verification - 2026-10-28**
+
+Extended the archetype's contact block (`config/data.ts` `AuthoredArchetype`, `config/encounter.ts` `EnemyArchetype`) with `contactConditions` (reusing `validateConditions`), `contactArmorPiercing` and a trainer-authored `contactCooldownSeconds` (the source gives no rate). `EnemyState.conditionSeconds` gained a sibling `nextContactEligibleSeconds` (`models.ts`), initialised to the enemy's spawn time in `createEnemy`. `validateArchetype`'s "contact damage is not approved" assertion (`config/encounter.ts`) was removed now that K17 is implemented; the `blocksPlayer !== false` assertion stays, since G16/pushback remain out of scope. `enemies.json`'s Crystal Worm archetype now authors the three new fields (`contactConditions: []`, `contactArmorPiercing: false`, `contactCooldownSeconds: 0`), all inert since its `contactDamageHp` stays 0.
+
+`simulation.ts`'s former `registerShardHit` was split into a shared `applyAcceptedHit` (the condition-aware defense formula, damage, condition application, hits-taken and accepted-hit bookkeeping) and a thin `registerShardHit` wrapper that resolves a shard's projectile and marks `shard.hasHitPlayer` on acceptance. A new `resolveEnemyContact` calls `applyAcceptedHit` per eligible, overlapping enemy, is invoked once per fixed step - after `updateMovement` (so a chasing enemy's new position is the one tested) and before the shard-advance filter - and uses `sweptConvexOverlap`/`transformBodyVertices` across each enemy's and the player's per-step displacement, the same swept test shards already use, so a fast enemy cannot tunnel through the player between steps. An archetype with zero `contactDamageHp` and no `contactConditions` is skipped before the overlap test. On an accepted hit, `enemy.nextContactEligibleSeconds` is advanced by `contactCooldownSeconds`; unlike a shard, contact never marks itself as having-hit, so it keeps re-triggering on its own cooldown for as long as the bodies overlap - the opposite of the per-shard once-only rule, and documented as such in a comment on `resolveEnemyContact` so it is not "fixed" into once-only. A stable synthetic shard id (`-enemy.id`) tags the resulting `AcceptedHit` rather than minting a fake shard.
+
+**Focused checks implemented** (`simulation.test.ts`, via a `contactState` test helper that strips the shared archetype's own shard attack so only contact hits are counted): a failing-first overlapping-contact-damages-the-player test; cooldown gating and repeated contact while overlapping (four hits over 2 seconds at a 0.5 s cooldown); contact stopping on separation and resuming on re-overlap, asserted on `acceptedHits` rather than health so same-step regeneration cannot mask it; two overlapping enemies on independent per-enemy schedules (six hits, not three or nine); a contact-applied Slowed condition measurably halving player travel through the same `applyConditions` path; `contactArmorPiercing` through the step 21.3 formula (40 armor-piercing deals 40, 40 against the Paladin's 32 defense deals 8); a one-step tunnelling regression where a fast enemy's swept path crosses the player while its discrete end position lands on the far side; and a zero-contact, zero-condition archetype that never starts a contact cooldown. All pre-existing tests, including the Crystal Worm's zero-contact assertion and the "body overlap neither damages nor blocks" regression, pass unchanged.
+
+Checks run from `app/` with Node 24.22.1/npm 12.2.1: focused `simulation.test.ts` - 122/122 passed; full `npx vitest run` - 543/543 passed across 14 files; `npm run verify` - lint, typecheck, test, build all passed. No blockers. This completes phase 21; moving this file to `docs/plan-archive/phase-21.md` and updating the plan's index line.
