@@ -1560,6 +1560,7 @@ test("enemies arrive on the approved schedule and stop at the cap", () => {
   const state = freshSimulation();
   const { firstSpawnSeconds, everySeconds, maxConcurrent } =
     ENCOUNTER_CONFIG.spawns;
+  if (everySeconds === null) throw new Error("expected a repeating cadence");
   expect(state.enemies).toHaveLength(1);
   expect(state.enemies[0].spawnedAtSeconds).toBe(0);
   const arrivals: number[] = [0];
@@ -2191,4 +2192,31 @@ test("an archetype with zero contact damage and no contact conditions never star
   runTicksCountingHits(state, 30);
   expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
   expect(state.enemies[0].nextContactEligibleSeconds).toBe(spawnedAt);
+});
+
+// F5 regression (step 23.1): movement and the fixed step must come from the
+// simulation's own `state.config`, not the module-level `ENCOUNTER_CONFIG`,
+// so two encounters with different arenas never bleed into each other.
+test("two simulations built from different encounter configs each constrain to their own arena", () => {
+  const smallArenaConfig = {
+    ...ENCOUNTER_CONFIG,
+    arena: { centerTiles: { x: 5, y: 5 }, radiusTiles: 2 },
+  };
+  const smallState = createSimulation(smallArenaConfig, TEST_SEED);
+  smallState.player.positionTiles = { x: 100, y: 100 };
+  advanceSimulation(smallState, stepSeconds, east);
+  expect(
+    distance(smallState.player.positionTiles, smallArenaConfig.arena.centerTiles),
+  ).toBeLessThanOrEqual(smallArenaConfig.arena.radiusTiles + 1e-9);
+
+  const defaultState = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  defaultState.player.positionTiles = { x: 0, y: 0 };
+  advanceSimulation(defaultState, stepSeconds, east);
+  expect(
+    distance(defaultState.player.positionTiles, ENCOUNTER_CONFIG.arena.centerTiles),
+  ).toBeLessThanOrEqual(ENCOUNTER_CONFIG.arena.radiusTiles + 1e-9);
+  expect(defaultState.player.positionTiles.x).not.toBeCloseTo(
+    smallArenaConfig.arena.centerTiles.x,
+    3,
+  );
 });

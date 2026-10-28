@@ -47,6 +47,7 @@ import {
 import type {
   AcceptedHit,
   AttackClockState,
+  CircularArena,
   EnemyState,
   PlayerState,
   ShardState,
@@ -103,7 +104,6 @@ export type AdvanceResult = Readonly<{
 const timeRoundingToleranceSeconds =
   ENCOUNTER_CONFIG.simulation.fixedStepSeconds * Number.EPSILON * 16;
 const fullTurnRadians = 2 * Math.PI;
-const combinedBoundingRadiusTiles = boundingRadiusTiles(ENCOUNTER_CONFIG);
 
 /** Broadphase bound: player body plus the largest body across the projectile catalog. */
 function boundingRadiusTiles(config: EncounterConfig): number {
@@ -202,7 +202,7 @@ export function createSimulation(
   const state: SimulationState = {
     config,
     debugSettings: DEFAULT_DEBUG_SETTINGS,
-    collisionBoundingRadiusTiles: combinedBoundingRadiusTiles,
+    collisionBoundingRadiusTiles: boundingRadiusTiles(config),
     nextShardId: 1,
     nextEnemyId: 1,
     nextSpawnSeconds: config.spawns.firstSpawnSeconds,
@@ -288,6 +288,8 @@ export function spawnEnemy(state: SimulationState): EnemyState | null {
  */
 function updateSpawns(state: SimulationState): void {
   const { everySeconds } = state.config.spawns;
+  // `null` means the opening spawn (schedule index 0) is never repeated (K10).
+  if (everySeconds === null) return;
   const toleranceSeconds =
     Math.max(state.elapsedSeconds, state.nextSpawnSeconds) *
     Number.EPSILON *
@@ -348,6 +350,7 @@ export function setDebugSettings(
     enemy.positionTiles = constrainToArena(
       enemy.positionTiles,
       archetype.verticesTiles,
+      config.arena,
     );
   }
   // G20: a lowered cap takes effect at once by dropping the newest arrivals.
@@ -360,6 +363,7 @@ export function setDebugSettings(
   state.player.positionTiles = constrainToArena(
     state.player.positionTiles,
     config.player.verticesTiles,
+    config.arena,
   );
   state.collisionBoundingRadiusTiles = boundingRadiusTiles(config);
   state.shards = restampLiveShards(
@@ -375,12 +379,9 @@ export function setDebugSettings(
 function constrainToArena(
   positionTiles: Vector2,
   verticesTiles: readonly Vector2[],
+  arena: CircularArena,
 ): Vector2 {
-  return constrainBodyToArena(
-    verticesTiles,
-    positionTiles,
-    ENCOUNTER_CONFIG.arena,
-  );
+  return constrainBodyToArena(verticesTiles, positionTiles, arena);
 }
 
 /** Point-based travel toward a target: not body-aware, and a zero remaining
@@ -554,7 +555,7 @@ function advanceEnemyMovement(
  */
 function updateMovement(state: SimulationState, input: SimulationInput): void {
   const config = state.config;
-  const stepSeconds = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
+  const stepSeconds = config.simulation.fixedStepSeconds;
   const conditionedInput = effectiveInput(state.player, input);
   const directionX =
     Number(conditionedInput.east) - Number(conditionedInput.west);
@@ -572,6 +573,7 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
         (directionY / directionLength) * playerTravel,
     },
     config.player.verticesTiles,
+    config.arena,
   );
 
   for (const enemy of state.enemies) {
@@ -579,6 +581,7 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
     enemy.positionTiles = constrainToArena(
       advanceEnemyMovement(state, enemy, archetype, stepSeconds),
       archetype.verticesTiles,
+      config.arena,
     );
   }
 }
@@ -790,7 +793,7 @@ export function advanceSimulation(
     return { stepsExecuted: 0, discardedSeconds: elapsedSeconds, acceptedHits };
   const pendingSeconds = state.accumulatorSeconds + elapsedSeconds;
   assertNonnegative(pendingSeconds, "pendingSeconds");
-  const { fixedStepSeconds, maxStepsPerUpdate } = ENCOUNTER_CONFIG.simulation;
+  const { fixedStepSeconds, maxStepsPerUpdate } = state.config.simulation;
   const availableSteps = Math.floor(
     (pendingSeconds + timeRoundingToleranceSeconds) / fixedStepSeconds,
   );

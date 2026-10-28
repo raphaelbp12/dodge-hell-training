@@ -1,7 +1,5 @@
 {
-  "comment": "Encounter-wide authored values. The player body is sized independently of any enemy (G08).",
-  "rulesVersion": "crystal-worm-child-swarm-paladin-v4",
-  "primaryArchetype": "crystal-worm-child-head",
+  "comment": "Encounter-wide authored values, shared by every encounter (K14). The player body is sized independently of any enemy (G08). Per-encounter values (rulesVersion, displayName, primaryArchetype, spawns, session) live under encounters.",
   "simulation": {
     "fixedStepHz": 60,
     "maxStepsPerUpdate": 8
@@ -21,26 +19,56 @@
     "maxZoom": 3,
     "zoomStep": 0.125
   },
-  "maxConcurrentMinions": 8,
-  "spawns": {
-    "comment": "Opening enemy at t=0 is schedule index 0; firstSpawnSeconds is the first additional spawn, so spawns land at 0, 10, 20 and 30 seconds. ringRadiusFraction 0.84375 is exactly 16.2/19.2, the approved spawn distance.",
-    "archetype": "crystal-worm-child-head",
-    "firstSpawnSeconds": 10,
-    "everySeconds": 10,
-    "maxConcurrent": 4,
-    "placement": {
-      "ringRadiusFraction": 0.84375,
-      "rule": "farthest-from-player",
-      "goldenAngleDegrees": 137.5
-    }
-  },
-  "session": {
-    "startCountdownSeconds": 3,
-    "retryCountdownSeconds": 0,
-    "historyLimit": 100
-  },
+  "maxConcurrentMinions": 12,
   "presentation": {
     "comment": "Trainer-authored, not sourced: how long a lob's detonation circle is telegraphed before it goes off.",
     "lobTelegraphSeconds": 0.3
+  },
+  "defaultEncounter": "killer-bee-queen",
+  "encounters": {
+    "crystal-worm": {
+      "rulesVersion": "crystal-worm-child-swarm-paladin-v4",
+      "displayName": "Crystal Worm Swarm",
+      "primaryArchetype": "crystal-worm-child-head",
+      "spawns": {
+        "comment": "Opening enemy at t=0 is schedule index 0; firstSpawnSeconds is the first additional spawn, so spawns land at 0, 10, 20 and 30 seconds. ringRadiusFraction 0.84375 is exactly 16.2/19.2, the approved spawn distance.",
+        "archetype": "crystal-worm-child-head",
+        "firstSpawnSeconds": 10,
+        "everySeconds": 10,
+        "maxConcurrent": 4,
+        "placement": {
+          "ringRadiusFraction": 0.84375,
+          "rule": "farthest-from-player",
+          "goldenAngleDegrees": 137.5
+        }
+      },
+      "session": {
+        "startCountdownSeconds": 3,
+        "retryCountdownSeconds": 0,
+        "historyLimit": 100
+      }
+    },
+    "killer-bee-queen": {
+      "rulesVersion": "killer-bee-queen-nest-paladin-v5",
+      "displayName": "Killer Bee Queen",
+      "primaryArchetype": "killer-bee-queen",
+      "spawns": {
+        "comment": "K10: a single boss, not a swarm. One enemy at t=0 and never again - everySeconds null means the periodic schedule never repeats.",
+        "archetype": "killer-bee-queen",
+        "firstSpawnSeconds": 0,
+        "everySeconds": null,
+        "maxConcurrent": 1,
+        "placement": {
+          "ringRadiusFraction": 0.84375,
+          "rule": "farthest-from-player",
+          "goldenAngleDegrees": 137.5
+        }
+      },
+      "session": {
+        "startCountdownSeconds": 3,
+        "retryCountdownSeconds": 0,
+        "historyLimit": 100
+      }
+    }
   }
 }

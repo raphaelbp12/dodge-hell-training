@@ -260,6 +260,18 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
   },
 );
 
+test("a cleared simulation phase ends the session as a win, distinguishable from a death", () => {
+  const session = running();
+  session.simulation.phase = "cleared";
+  const result = session.advance(tick, idle);
+  expect(result?.outcome).toBe("cleared");
+  expect(session.phase).toBe("ended");
+  expect(session.result?.outcome).toBe("cleared");
+  // Retry works identically from a cleared outcome, same as from a death.
+  expect(session.retry()).toBe(true);
+  expect(session.phase).toBe("playing");
+});
+
 test("the controller imports and runs without browser globals", () => {
   expect(typeof document).toBe("undefined");
   expect(typeof window).toBe("undefined");

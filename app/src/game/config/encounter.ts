@@ -4,10 +4,17 @@ import {
   AUTHORED_ARCHETYPES,
   AUTHORED_ARENA,
   AUTHORED_ENCOUNTER,
+  AUTHORED_ENCOUNTER_DATA,
   AUTHORED_PROJECTILES,
   loadOutline,
   TELEGRAPH_COLOR_NAMES,
+  type AuthoredArchetype,
+  type AuthoredAttack,
   type AuthoredBody,
+  type AuthoredPhase,
+  type AuthoredPhaseSpawn,
+  type AuthoredProjectile,
+  type AuthoredSubPhase,
   type TelegraphColorName,
 } from "./data";
 import { assertNonnegative, PALADIN_DERIVED_STATS } from "./stats";
@@ -254,7 +261,8 @@ export type EnemyArchetype = Readonly<{
 export type SpawnRule = Readonly<{
   archetypeId: string;
   firstSpawnSeconds: number;
-  everySeconds: number;
+  /** `null` means the opening spawn is never repeated (K10: a single boss). */
+  everySeconds: number | null;
   maxConcurrent: number;
   ringRadiusTiles: number;
   goldenAngleRadians: number;
@@ -289,6 +297,8 @@ export type EncounterConfig = Readonly<{
 }>;
 
 export const RULES_VERSION = AUTHORED_ENCOUNTER.rulesVersion;
+/** The only encounter the debug panel ever tunes (K12); its id in `ENCOUNTER_CONFIGS`. */
+export const DEBUG_TUNABLE_ENCOUNTER_ID = "crystal-worm";
 export const PRIMARY_ARCHETYPE_ID = AUTHORED_ENCOUNTER.primaryArchetype;
 
 const authoredPrimary = AUTHORED_ARCHETYPES[PRIMARY_ARCHETYPE_ID];
@@ -317,6 +327,13 @@ const authoredProjectile = AUTHORED_PROJECTILES[AUTHORED_PROJECTILE_ID];
 if (authoredProjectile.motion.kind !== "boomerang")
   throw new RangeError("The debug-tunable projectile must use boomerang motion");
 const authoredBoomerangMotion = authoredProjectile.motion;
+// The debug panel's spawn-rate slider edits a real cadence; the debug-tunable
+// encounter must author one, unlike the Queen's single never-repeated spawn.
+if (AUTHORED_ENCOUNTER.spawns.everySeconds === null)
+  throw new RangeError(
+    "The debug-tunable encounter must author a repeating spawn cadence",
+  );
+const authoredPrimaryEverySeconds = AUTHORED_ENCOUNTER.spawns.everySeconds;
 
 export function scaleBody(
   vertices: readonly Vector2[],
@@ -408,7 +425,7 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   projectileWidth: authoredProjectile.body.widthTiles,
   projectileHeight: authoredProjectile.body.heightTiles,
   firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
-  spawnEverySeconds: AUTHORED_ENCOUNTER.spawns.everySeconds,
+  spawnEverySeconds: authoredPrimaryEverySeconds,
   maxConcurrentEnemies: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
   spawnRingFraction: AUTHORED_ENCOUNTER.spawns.placement.ringRadiusFraction,
 });
@@ -577,6 +594,208 @@ export const ENCOUNTER_CONFIG = buildEncounterConfig(AUTHORED_TUNING, {
 });
 
 /**
+ * Maps an authored attack pattern to its runtime shape (K14/F5): identical
+ * field-for-field except `ring`'s phase, authored in degrees like every other
+ * authored angle, converted once here to the radians the simulation uses.
+ */
+function patternFromAuthored(pattern: AuthoredAttack["pattern"]): AttackPattern {
+  if (pattern.kind !== "ring") return pattern;
+  const { initialPhaseDegrees, ...rest } = pattern;
+  return Object.freeze({
+    ...rest,
+    initialPhaseRadians: degreesToRadians(initialPhaseDegrees),
+  });
+}
+
+function attackSpecFromAuthored(attack: AuthoredAttack): AttackSpec {
+  return Object.freeze({
+    id: attack.id,
+    projectileId: attack.projectile,
+    tuningSource: attack.tuningSource,
+    pattern: patternFromAuthored(attack.pattern),
+    cadence: attack.cadence,
+  });
+}
+
+function phaseSpawnFromAuthored(spawn: AuthoredPhaseSpawn): PhaseSpawnSpec {
+  return Object.freeze({
+    archetypeId: spawn.archetype,
+    count: spawn.count,
+    despawnOnExit: spawn.despawnOnExit,
+    startPhaseIndex: spawn.startPhaseIndex,
+    placement: spawn.placement,
+  });
+}
+
+function subPhaseSpecFromAuthored(subPhase: AuthoredSubPhase): SubPhaseSpec {
+  return Object.freeze({
+    id: subPhase.id,
+    durationSeconds: subPhase.durationSeconds,
+    telegraphSeconds: subPhase.telegraphSeconds,
+    invulnerableOnEnterSeconds: subPhase.invulnerableOnEnterSeconds,
+    movement: subPhase.movement,
+    attacks: Object.freeze(subPhase.attacks.map(attackSpecFromAuthored)),
+    spawns: subPhase.spawns
+      ? Object.freeze(subPhase.spawns.map(phaseSpawnFromAuthored))
+      : null,
+  });
+}
+
+function phaseSpecFromAuthored(phase: AuthoredPhase): PhaseSpec {
+  return Object.freeze({
+    id: phase.id,
+    enterAtHpFraction: phase.enterAtHpFraction,
+    exitAfterSeconds: phase.exitAfterSeconds,
+    telegraphSeconds: phase.telegraphSeconds,
+    invulnerableOnEnterSeconds: phase.invulnerableOnEnterSeconds,
+    telegraphColor: phase.telegraphColor,
+    movement: phase.movement,
+    progression: phase.progression,
+    attacks: Object.freeze(phase.attacks.map(attackSpecFromAuthored)),
+    subPhases: phase.subPhases
+      ? Object.freeze(phase.subPhases.map(subPhaseSpecFromAuthored))
+      : null,
+    spawns: phase.spawns
+      ? Object.freeze(phase.spawns.map(phaseSpawnFromAuthored))
+      : null,
+  });
+}
+
+/**
+ * Maps any authored archetype to its runtime shape as authored, with no
+ * debug-slider overrides - the generalization the single Crystal Worm debug
+ * path (`buildEncounterConfig`, above) never needed until a second, static
+ * encounter existed (F5).
+ */
+function archetypeFromAuthored(authored: AuthoredArchetype): EnemyArchetype {
+  const outline = loadOutline(authored.body.shape);
+  return Object.freeze({
+    id: authored.id,
+    spawnTiles: authored.spawnTiles,
+    verticesTiles: scaleBody(
+      outline,
+      authored.body.widthTiles,
+      authored.body.heightTiles,
+    ),
+    ...(authored.health ? { health: authored.health } : {}),
+    contactDamageHp: authored.contactDamageHp,
+    contactConditions: authored.contactConditions,
+    contactArmorPiercing: authored.contactArmorPiercing,
+    contactCooldownSeconds: authored.contactCooldownSeconds,
+    blocksPlayer: authored.blocksPlayer,
+    phases: Object.freeze(authored.phases.map(phaseSpecFromAuthored)),
+  });
+}
+
+function projectileFromAuthored(authored: AuthoredProjectile): ProjectileSpec {
+  const outline = loadOutline(authored.body.shape);
+  return Object.freeze({
+    id: authored.id,
+    damageHp: authored.damageHp,
+    speedTilesPerSecond: authored.speedTilesPerSecond,
+    armorPiercing: authored.armorPiercing,
+    conditions: authored.conditions,
+    verticesTiles: scaleBody(
+      outline,
+      authored.body.widthTiles,
+      authored.body.heightTiles,
+    ),
+    expiration: authored.expiration,
+    hitPolicy: authored.hitPolicy,
+    motion: authored.motion,
+  });
+}
+
+/** Every archetype and projectile, converted once and shared by every static (non-debug-tunable) encounter. */
+const STATIC_ARCHETYPES: Readonly<Record<string, EnemyArchetype>> =
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(AUTHORED_ARCHETYPES).map(([id, archetype]) => [
+        id,
+        archetypeFromAuthored(archetype),
+      ]),
+    ),
+  );
+const STATIC_PROJECTILES: Readonly<Record<string, ProjectileSpec>> =
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(AUTHORED_PROJECTILES).map(([id, projectile]) => [
+        id,
+        projectileFromAuthored(projectile),
+      ]),
+    ),
+  );
+
+/** Builds a non-debug-tunable encounter's runtime config straight from its authored entry (K14). */
+function buildStaticEncounterConfig(
+  entryId: string,
+): EncounterConfig {
+  const entry = AUTHORED_ENCOUNTER_DATA.encounters[entryId];
+  return {
+    rulesVersion: entry.rulesVersion,
+    spawns: {
+      archetypeId: entry.spawns.archetype,
+      firstSpawnSeconds: entry.spawns.firstSpawnSeconds,
+      everySeconds: entry.spawns.everySeconds,
+      maxConcurrent: entry.spawns.maxConcurrent,
+      ringRadiusTiles:
+        entry.spawns.placement.ringRadiusFraction * ARENA.radiusTiles,
+      goldenAngleRadians: degreesToRadians(
+        entry.spawns.placement.goldenAngleDegrees,
+      ),
+    },
+    maxConcurrentMinions: AUTHORED_ENCOUNTER_DATA.maxConcurrentMinions,
+    simulation: AUTHORED_ENCOUNTER_DATA.simulation,
+    arena: ARENA,
+    player: {
+      spawnTiles: AUTHORED_ENCOUNTER_DATA.player.spawnTiles,
+      verticesTiles: scaleBody(
+        loadOutline(AUTHORED_ENCOUNTER_DATA.player.body.shape),
+        AUTHORED_ENCOUNTER_DATA.player.body.widthTiles,
+        AUTHORED_ENCOUNTER_DATA.player.body.heightTiles,
+      ),
+    },
+    primaryArchetypeId: entry.primaryArchetype,
+    archetypes: STATIC_ARCHETYPES,
+    projectiles: STATIC_PROJECTILES,
+    camera: AUTHORED_ENCOUNTER_DATA.camera,
+    session: entry.session,
+    presentation: AUTHORED_ENCOUNTER_DATA.presentation,
+  };
+}
+
+/** One runtime config per authored encounter (K14); the Crystal Worm keeps its debug-tunable build. */
+export const ENCOUNTER_CONFIGS: Readonly<Record<string, EncounterConfig>> =
+  Object.freeze(
+    Object.fromEntries(
+      Object.keys(AUTHORED_ENCOUNTER_DATA.encounters).map((id) => [
+        id,
+        id === "crystal-worm" ? ENCOUNTER_CONFIG : buildStaticEncounterConfig(id),
+      ]),
+    ),
+  );
+
+export const DEFAULT_ENCOUNTER_ID = AUTHORED_ENCOUNTER_DATA.defaultEncounter;
+
+/** The Home screen's selectable list (K14): one entry per encounter, in authored order. */
+export const ENCOUNTER_LIST: readonly Readonly<{
+  id: string;
+  displayName: string;
+}>[] = Object.freeze(
+  Object.entries(AUTHORED_ENCOUNTER_DATA.encounters).map(([id, entry]) => ({
+    id,
+    displayName: entry.displayName,
+  })),
+);
+
+/** Resolves an encounter id to its runtime config, rejecting an unknown one. */
+export function encounterConfigOf(id: string): EncounterConfig {
+  const config = ENCOUNTER_CONFIGS[id];
+  if (!config) throw new RangeError(`Unknown encounter: ${id}`);
+  return config;
+}
+
+/**
  * Worst-case live shards for one enemy of this archetype: every shard emitted
  * within one shard lifetime. Replaces the retired study's stale literal, and
  * step 17.4 asserts the browser bound against this rather than a hand-picked
@@ -720,7 +939,9 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   }
   const spawns = config.spawns;
   assertNonnegative(spawns.firstSpawnSeconds, "firstSpawnSeconds");
-  assertPositive(spawns.everySeconds, "spawnEverySeconds");
+  // `null` means the opening spawn is never repeated (K10: a single boss).
+  if (spawns.everySeconds !== null)
+    assertPositive(spawns.everySeconds, "spawnEverySeconds");
   assertPositive(spawns.maxConcurrent, "maxConcurrentEnemies");
   if (!Number.isSafeInteger(spawns.maxConcurrent))
     throw new RangeError("maxConcurrentEnemies must be a safe integer");
@@ -954,8 +1175,6 @@ function validateSubPhaseSpec(
   config: EncounterConfig,
   subPhase: SubPhaseSpec,
 ): void {
-  if (subPhase.attacks.length === 0)
-    throw new RangeError("A sub-phase requires at least one attack");
   for (const attack of subPhase.attacks) validateAttackSpec(config, attack);
   if (subPhase.movement !== null) validateMovementSpec(subPhase.movement);
   assertPositive(subPhase.durationSeconds, "durationSeconds");
@@ -1000,8 +1219,6 @@ function validateSpawnSpec(
 }
 
 function validatePhaseSpec(config: EncounterConfig, phase: PhaseSpec): void {
-  if (phase.attacks.length === 0)
-    throw new RangeError("A phase requires at least one attack");
   for (const attack of phase.attacks) validateAttackSpec(config, attack);
   validateMovementSpec(phase.movement);
   if (phase.progression !== null) validateProgressionSpec(phase.progression);
@@ -1041,15 +1258,26 @@ function validatePhases(
     throw new RangeError("An archetype requires at least one phase");
   if (phases[0].enterAtHpFraction !== 1)
     throw new RangeError("The first phase must enter at HP fraction 1");
-  let previousFraction = Infinity;
+  let previousPhase: PhaseSpec | null = null;
   for (const phase of phases) {
     if (phase.enterAtHpFraction <= 0 || phase.enterAtHpFraction > 1)
       throw new RangeError("enterAtHpFraction must be in the range (0, 1]");
-    if (phase.enterAtHpFraction >= previousFraction)
+    // A phase costs no health when it exits by duration instead of by
+    // threshold (K08/K09), so the next phase may repeat its entry fraction
+    // only in that case - step 23.2's phase 6 into phase 7.
+    const repeatsAfterScriptedDuration =
+      previousPhase !== null &&
+      phase.enterAtHpFraction === previousPhase.enterAtHpFraction &&
+      previousPhase.exitAfterSeconds !== null;
+    if (
+      previousPhase !== null &&
+      phase.enterAtHpFraction >= previousPhase.enterAtHpFraction &&
+      !repeatsAfterScriptedDuration
+    )
       throw new RangeError(
-        "Phases must be authored in strictly descending enterAtHpFraction order",
+        "Phases must be authored in strictly descending enterAtHpFraction order, unless the previous phase exits by duration",
       );
-    previousFraction = phase.enterAtHpFraction;
+    previousPhase = phase;
     validatePhaseSpec(config, phase);
   }
 }

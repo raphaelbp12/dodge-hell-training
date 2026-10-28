@@ -15,8 +15,11 @@ const SPAWN_RING_TILES = 0.84375 * 19.2;
 // Pins spawn placement so the opening bearing is deterministic. This seed
 // reproduces the historical north opening at (0, -16.2) to six decimals.
 const NORTH_SEED = 229521;
+// Step 23.1: the Home screen now defaults to the Killer Bee Queen (K14), but
+// this whole spec's shard counts, spawn geometry and timings are authored
+// against the Crystal Worm, so every navigation pins that encounter.
 const seededUrl = (path = "./") =>
-  `${path}${path.includes("?") ? "&" : "?"}seed=${NORTH_SEED}`;
+  `${path}${path.includes("?") ? "&" : "?"}seed=${NORTH_SEED}&encounter=crystal-worm`;
 const MAX_CONCURRENT_ENEMIES = 4;
 const LIVE_SHARD_BOUND_PER_ENEMY = 6 * 11 * Math.ceil(3 / 4.9);
 /** Distance of a position from the arena centre, in tiles. */
@@ -260,6 +263,32 @@ test("the ?phase= drill URL parameter starts the named phase and suffixes rulesV
   await finishCountdown(page);
   const ignored = await inspect(page);
   expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v4");
+});
+
+test("the Home encounter list defaults to the Killer Bee Queen, is keyboard operable, and ?encounter= selects a known id", async ({
+  page,
+}) => {
+  await page.goto(`./?seed=${NORTH_SEED}`);
+  const queenRadio = page.getByRole("radio", { name: "Killer Bee Queen" });
+  const wormRadio = page.getByRole("radio", { name: "Crystal Worm Swarm" });
+  await expect(queenRadio).toBeChecked();
+  await expect(wormRadio).not.toBeChecked();
+  await wormRadio.focus();
+  await page.keyboard.press("Space");
+  await expect(wormRadio).toBeChecked();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page);
+  expect((await inspect(page)).rulesVersion).toBe(
+    "crystal-worm-child-swarm-paladin-v4",
+  );
+
+  await page.goto(seededUrl());
+  await expect(wormRadio).toBeChecked();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page);
+  expect((await inspect(page)).rulesVersion).toBe(
+    "crystal-worm-child-swarm-paladin-v4",
+  );
 });
 
 for (const width of [1440, 390]) {

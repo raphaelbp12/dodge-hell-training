@@ -260,6 +260,54 @@ test("exitAfterSeconds exits on duration while health is untouched", () => {
   expect(state.enemies[0].healthHp).toBe(healthAtEntry);
 });
 
+test("a duplicated threshold after a scripted phase waits for its duration, not just the health match", () => {
+  // Step 23.2 fix: a scripted phase's exitAfterSeconds is a minimum dwell
+  // time, so byHealth alone must not fire the instant the next phase's
+  // fraction happens to equal the current one (K09's one approved repeat).
+  const duplicatedPhases: PhaseSpec[] = [
+    {
+      id: "scripted",
+      enterAtHpFraction: 1,
+      exitAfterSeconds: 2,
+      telegraphSeconds: 0,
+      invulnerableOnEnterSeconds: 2,
+      telegraphColor: "amber",
+      movement: STATIONARY_MOVEMENT,
+      progression: null,
+      subPhases: null,
+      spawns: null,
+      attacks: [{ ...PRIMARY_ATTACK, id: "scripted-attack" }],
+    },
+    {
+      id: "after-script",
+      enterAtHpFraction: 1,
+      exitAfterSeconds: null,
+      telegraphSeconds: 0,
+      invulnerableOnEnterSeconds: 0,
+      telegraphColor: "red",
+      movement: STATIONARY_MOVEMENT,
+      progression: null,
+      subPhases: null,
+      spawns: null,
+      attacks: [{ ...PRIMARY_ATTACK, id: "after-script-attack" }],
+    },
+  ];
+  const archetype: EnemyArchetype = {
+    ...PRIMARY,
+    health: { maxHealthHp: 100, progression: { kind: "simulated-dps", hpPerSecond: 10 } },
+    phases: duplicatedPhases,
+  };
+  const config: EncounterConfig = {
+    ...ENCOUNTER_CONFIG,
+    archetypes: { [PRIMARY.id]: archetype },
+  };
+  const state = createSimulation(config, TEST_SEED);
+  runTicks(state, Math.round(2 / stepSeconds) - 1);
+  expect(state.enemies[0].phaseIndex).toBe(0);
+  runTicks(state, 1);
+  expect(state.enemies[0].phaseIndex).toBe(1);
+});
+
 test("progression never goes backward when health is restored artificially", () => {
   const state = createSimulation(threePhaseConfig(), TEST_SEED);
   runTicks(state, 1);

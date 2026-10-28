@@ -80,6 +80,16 @@ test("retains the latest configured 100 deaths across all rules and derives best
   expect(retainedBestSeconds(records, "unknown-rules")).toBeNull();
 });
 
+test("step 23.1: saves and reloads a cleared (win) outcome alongside death records", () => {
+  const boundary = storage();
+  const history = new AttemptHistory(() => boundary);
+  const cleared: AttemptRecord = { ...record("win-1"), outcome: "cleared" };
+  history.save(cleared);
+  history.save(record("death-1", 5));
+  const refreshed = new AttemptHistory(() => boundary);
+  expect(refreshed.snapshot().records).toEqual([record("death-1", 5), cleared]);
+});
+
 test("retains v2 scores without comparing them to selected v3 defaults", () => {
   const legacy = record("v2-best", 999, "crystal-worm-child-head-paladin-v2");
   const boundary = storage(encoded([legacy]));

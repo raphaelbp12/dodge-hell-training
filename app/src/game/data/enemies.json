@@ -3,7 +3,10 @@
   "archetypes": {
     "crystal-worm-child-head": {
       "comment": "spawnTiles is the approved north spawn, a 3-tile center-to-wall margin inside the 19.2-tile arena.",
-      "spawnTiles": { "x": 0, "y": -16.2 },
+      "spawnTiles": {
+        "x": 0,
+        "y": -16.2
+      },
       "body": {
         "shape": "beveled-octagon",
         "widthTiles": 1.25,
@@ -22,7 +25,10 @@
           "telegraphSeconds": 0,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 1.5 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 1.5
+          },
           "progression": null,
           "attacks": [
             {
@@ -41,6 +47,2241 @@
                 "shotIntervalSeconds": 0.19,
                 "cooldownAfterLastShotSeconds": 3,
                 "initialDelaySeconds": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "killer-bee-queen": {
+      "comment": "Step 23.2's harmless eight-phase skeleton (K16): real body, health, thresholds, telegraphs, invulnerability and movement from docs/killer-bee-queen-source.md, with zero attacks and zero minions - those are steps 23.3-23.10. Fidelity gaps, all trainer-authored pending a later step's own sourcing: every telegraphSeconds/invulnerableOnEnterSeconds except phase 6's sourced 29s; every sub-phase durationSeconds; every movement speed/radius/rate not stated by the source as a number. Phase 6's exitAfterSeconds and invulnerableOnEnterSeconds are both the source's sourced 29 seconds (K08), which is why phase 7 repeats phase 6's 25% threshold instead of draining through it.",
+      "spawnTiles": {
+        "x": 0,
+        "y": -16.2
+      },
+      "body": {
+        "comment": "Hitbox Size 2 (docs/killer-bee-queen-source.md stats table), mapped to 2x2 tiles - this project's interpretation of the wiki's unitless hitbox size, not a published tile equivalence.",
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "health": {
+        "comment": "maxHealthHp 112,500 is the source's Base HP. progression.hpPerSecond 375 is K15 (approved simulated raid DPS), not a published value.",
+        "maxHealthHp": 112500,
+        "progression": {
+          "kind": "simulated-dps",
+          "hpPerSecond": 375
+        }
+      },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "phase-1-honey-pond",
+          "comment": "Source (23.3): radial blue-bomb ring (Quiet), targeted white-bomb (Dazed), and three stacked stinger spreads (red/blue/yellow, 3 shots each = 9 shards) sharing one cadence. Authored on the phase itself so both sub-phases (circling the room vs the pond) fire identically. Bomb travelSeconds and every cadence/arc value are trainer-authored; the five projectiles and their shapes are wiki-prose.",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "white",
+          "movement": {
+            "kind": "orbit",
+            "radiusTiles": 10,
+            "degreesPerSecond": 20,
+            "direction": "cw",
+            "approachSpeedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "blue-bomb-ring",
+              "projectile": "blue-bomb",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 4,
+                "initialDelaySeconds": 1
+              }
+            },
+            {
+              "id": "white-bomb-targeted",
+              "projectile": "white-bomb-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 1,
+                "arcDegrees": 0,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 1.5
+              }
+            },
+            {
+              "id": "red-stinger-spread",
+              "projectile": "red-stinger-large-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 30,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2.5,
+                "initialDelaySeconds": 2
+              }
+            },
+            {
+              "id": "blue-stinger-spread",
+              "projectile": "blue-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 30,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2.5,
+                "initialDelaySeconds": 2
+              }
+            },
+            {
+              "id": "yellow-stinger-spread",
+              "projectile": "yellow-stinger-small-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 30,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2.5,
+                "initialDelaySeconds": 2
+              }
+            }
+          ],
+          "subPhases": [
+            {
+              "id": "circle-room",
+              "durationSeconds": 10,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 0,
+              "movement": {
+                "kind": "orbit",
+                "radiusTiles": 10,
+                "degreesPerSecond": 20,
+                "direction": "cw",
+                "approachSpeedTilesPerSecond": 3
+              },
+              "attacks": []
+            },
+            {
+              "id": "circle-pond",
+              "durationSeconds": 10,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 0,
+              "movement": {
+                "kind": "orbit",
+                "radiusTiles": 3,
+                "degreesPerSecond": 40,
+                "direction": "ccw",
+                "approachSpeedTilesPerSecond": 3
+              },
+              "attacks": []
+            }
+          ]
+        },
+        {
+          "id": "phase-2-color-chase",
+          "comment": "Source: at 90% HP the room floods and she alternates chasing while red/blue/yellow; invulnerable between colours. Three colour sub-phases, no attacks yet.",
+          "enterAtHpFraction": 0.9,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [],
+          "subPhases": [
+            {
+              "id": "red",
+              "comment": "Source (23.4): multi-directional spread of Small Red Stingers, single directed Large Red Stinger, and a non-aimed radial ring of Red Bombs (Confused) so standing in front of the Queen misses them. Spawns despawn-on-exit Red Killer Bees. Invulnerable between colours (K08 pauses the drain).",
+              "durationSeconds": 10,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 1,
+              "movement": null,
+              "attacks": [
+                {
+                  "id": "red-stinger-spread",
+                  "projectile": "red-stinger-small",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 3,
+                    "arcDegrees": 40,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "red-stinger-large-directed",
+                  "projectile": "red-stinger-large-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 1,
+                    "arcDegrees": 0,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 1.5
+                  }
+                },
+                {
+                  "id": "red-bomb-ring",
+                  "projectile": "red-bomb-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 2
+                  }
+                }
+              ],
+              "spawns": [
+                {
+                  "archetype": "red-killer-bee",
+                  "count": 3,
+                  "despawnOnExit": true,
+                  "startPhaseIndex": 0,
+                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                }
+              ]
+            },
+            {
+              "id": "blue",
+              "comment": "Source (23.4): directed spread of Large Blue Stingers, a rotating spiral of Small Blue Stingers, a 360-degree scatter spray of Blue Balls, and a non-aimed radial ring of Blue Bombs (Quiet). Spawns despawn-on-exit Blue Killer Bees.",
+              "durationSeconds": 10,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 1,
+              "movement": null,
+              "attacks": [
+                {
+                  "id": "blue-stinger-large-directed",
+                  "projectile": "blue-stinger-large",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 1,
+                    "arcDegrees": 0,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "blue-stinger-spiral",
+                  "projectile": "blue-stinger-small-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 2,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 60
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1,
+                    "initialDelaySeconds": 1.5
+                  }
+                },
+                {
+                  "id": "blue-ball-scatter",
+                  "projectile": "blue-ball-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "scatter",
+                    "shots": 10,
+                    "coneDegrees": 360,
+                    "aim": "fixed",
+                    "fixedBearingDegrees": 0,
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 2
+                  }
+                },
+                {
+                  "id": "blue-bomb-ring",
+                  "projectile": "blue-bomb",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 2.5
+                  }
+                }
+              ],
+              "spawns": [
+                {
+                  "archetype": "blue-killer-bee",
+                  "count": 3,
+                  "despawnOnExit": true,
+                  "startPhaseIndex": 0,
+                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                }
+              ]
+            },
+            {
+              "id": "yellow",
+              "comment": "Source (23.4): 3-way spread of Large Yellow Stingers, a rotating spiral of Yellow Balls, and a non-aimed radial ring of White Bombs (Dazed) with a large arm count for 'a large number'. Spawns despawn-on-exit Yellow Killer Bees.",
+              "durationSeconds": 10,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 1,
+              "movement": null,
+              "attacks": [
+                {
+                  "id": "yellow-stinger-spread",
+                  "projectile": "yellow-stinger-large",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 3,
+                    "arcDegrees": 40,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "yellow-ball-spiral",
+                  "projectile": "yellow-ball-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 3,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": -50
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 1.5
+                  }
+                },
+                {
+                  "id": "white-bomb-ring",
+                  "projectile": "white-bomb-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 12,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 2
+                  }
+                }
+              ],
+              "spawns": [
+                {
+                  "archetype": "yellow-killer-bee",
+                  "count": 3,
+                  "despawnOnExit": true,
+                  "startPhaseIndex": 0,
+                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "phase-3-pond-barrage",
+          "comment": "Source (23.5): at 75% HP she despawns phase 2's minions (automatic via their despawnOnExit) and moves to the arena centre, flashing white, then stays stationary (move-to-point stops on arrival; no second mechanism) while firing a six-attack barrage: two counter-rotating 3-arm blue spirals, one clockwise 2-arm red spiral, frequent non-rotating yellow rings, occasional 4-way bee bursts, an 8-arm white-bomb ring on the compass bearings, and a red-glaive wave Armor-Breaking for 7s that fires at entry and every 7 seconds (the only cadence the source states; every other cadence here is trainer-authored). Fidelity gap: the source calls the glaive wave 'unavoidable', true only in the real fight's small room - this project's 19.2-tile arena makes it dodgeable near the wall, recorded rather than faked by widening the wave (deferred to 24.2).",
+          "enterAtHpFraction": 0.75,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "white",
+          "movement": {
+            "kind": "move-to-point",
+            "target": "arena-center",
+            "speedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "blue-ball-spiral-cw",
+              "projectile": "blue-ball-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 3,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 50
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.2,
+                "initialDelaySeconds": 0.5
+              }
+            },
+            {
+              "id": "blue-ball-spiral-ccw",
+              "projectile": "blue-ball-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 3,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 60,
+                "clockwiseDegreesPerSecond": -50
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.2,
+                "initialDelaySeconds": 0.5
+              }
+            },
+            {
+              "id": "red-ball-spiral-cw",
+              "projectile": "red-ball",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 2,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 40
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.75
+              }
+            },
+            {
+              "id": "yellow-ball-ring-frequent",
+              "projectile": "yellow-ball-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1,
+                "initialDelaySeconds": 0.25
+              }
+            },
+            {
+              "id": "bee-shot-burst-occasional",
+              "projectile": "bee-shot",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 4,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 5,
+                "initialDelaySeconds": 3
+              }
+            },
+            {
+              "id": "white-bomb-compass-ring",
+              "projectile": "white-bomb-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 4,
+                "initialDelaySeconds": 2
+              }
+            },
+            {
+              "id": "red-glaive-wave",
+              "projectile": "red-glaive-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 7,
+                "initialDelaySeconds": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "phase-4-glaive-circle",
+          "comment": "Source (23.6): at 60% HP she slowly circles counter-clockwise in the centre while firing 4-directional glaive spreads, each colour's ring sharing one cadence but advancing its own, mutually-prime bearing per burst (7/11/13 degrees - none share a divisor with 90, so the four-arm rings never realign; asserted over many bursts rather than trusted) so standing still cannot dodge them. Also fires the Tips-sourced 'shotgun of Red Hive Shots' (200 unblockable/armour-piercing damage each, 600 total tanked) as a three-shot player-aimed spread of hive-spiral-shot-v1: the behaviour prose for this phase never mentions it, but the Tips text is specific, quantitative and names phase 4, and row 15's 200-damage armour-piercing projectile matches the quoted 600 exactly, so the conflict is resolved by including it (recorded here rather than silently dropped). Fidelity gap: the Plagued Nest's faster spinner spreads and multicoloured 4-way spiral are excluded (K07).",
+          "enterAtHpFraction": 0.6,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": {
+            "kind": "orbit",
+            "radiusTiles": 5,
+            "degreesPerSecond": 15,
+            "direction": "ccw",
+            "approachSpeedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "yellow-glaive-spread-ring",
+              "projectile": "yellow-glaive-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 4,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0,
+                "perBurstAdvanceDegrees": 7
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 0.3,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "red-glaive-spread-ring",
+              "projectile": "red-glaive-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 4,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 30,
+                "clockwiseDegreesPerSecond": 0,
+                "perBurstAdvanceDegrees": 11
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 0.3,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "blue-glaive-spread-ring",
+              "projectile": "blue-glaive-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 4,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 60,
+                "clockwiseDegreesPerSecond": 0,
+                "perBurstAdvanceDegrees": 13
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 0.3,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "hive-spiral-shot-shotgun",
+              "projectile": "hive-spiral-shot-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 20,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 4,
+                "initialDelaySeconds": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "phase-5-color-return",
+          "comment": "Source (23.7): at 45% HP the entrance hardens and colour attacks return, denser than phases 2-4. Each sub-phase reuses its colour's Killer Bee from 23.4. Readings: 'streams'/'messy bombardment ... in all directions' are scatter (red narrow-cone, blue full 360, akin to a Djinn's pattern); 'radial bursts' are non-rotating rings; '3-directional'/'wide, directed' shotguns are player-aimed spreads (red's phrasing matches 23.6's own Tips-sourced hive-spiral shotgun reading); '4-directional' of a radial attack (blue's Small Blue Stingers, yellow's Hive Shots) is a 4-arm ring, matching 23.6's reading of 'spreads' of glaives; 'short spiralling bursts' is a small-arm ring with a rotation rate. Fidelity gaps: the hardening entrance tiles acting as walls and the disconnect-on-colour-change mechanic are not modelled (K05, D01); the Queen's Stun vulnerability on colour switch has no effect (D05); the Plagued Nest's green sub-phase is excluded (K07).",
+          "enterAtHpFraction": 0.45,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "violet",
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [],
+          "subPhases": [
+            {
+              "id": "red",
+              "durationSeconds": 15,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 1,
+              "movement": {
+                "kind": "orbit",
+                "radiusTiles": 3,
+                "degreesPerSecond": 30,
+                "direction": "cw",
+                "approachSpeedTilesPerSecond": 3
+              },
+              "attacks": [
+                {
+                  "id": "red-ball-stream-scatter",
+                  "projectile": "red-ball",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "scatter",
+                    "shots": 6,
+                    "coneDegrees": 150,
+                    "aim": "fixed",
+                    "fixedBearingDegrees": 0,
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 0.5
+                  }
+                },
+                {
+                  "id": "red-glaive-ring",
+                  "projectile": "red-glaive-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "red-hive-spiral-shotgun",
+                  "projectile": "hive-spiral-shot-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 3,
+                    "arcDegrees": 20,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 2
+                  }
+                },
+                {
+                  "id": "red-stinger-large-ring",
+                  "projectile": "red-stinger-large-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 22.5,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 3
+                  }
+                }
+              ],
+              "spawns": [
+                {
+                  "archetype": "red-killer-bee",
+                  "count": 3,
+                  "despawnOnExit": true,
+                  "startPhaseIndex": 0,
+                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                }
+              ]
+            },
+            {
+              "id": "blue",
+              "durationSeconds": 15,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 1,
+              "movement": {
+                "kind": "chase",
+                "speedTilesPerSecond": 3
+              },
+              "attacks": [
+                {
+                  "id": "blue-ball-all-directions-scatter",
+                  "projectile": "blue-ball-v3",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "scatter",
+                    "shots": 12,
+                    "coneDegrees": 360,
+                    "aim": "fixed",
+                    "fixedBearingDegrees": 0,
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 0.5
+                  }
+                },
+                {
+                  "id": "blue-glaive-ring",
+                  "projectile": "blue-glaive-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "blue-stinger-small-ring",
+                  "projectile": "blue-stinger-small-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 4,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 2
+                  }
+                },
+                {
+                  "id": "blue-hive-range-shotgun",
+                  "projectile": "hive-range-shot-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 5,
+                    "arcDegrees": 60,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 3
+                  }
+                }
+              ],
+              "spawns": [
+                {
+                  "archetype": "blue-killer-bee",
+                  "count": 3,
+                  "despawnOnExit": true,
+                  "startPhaseIndex": 0,
+                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                }
+              ]
+            },
+            {
+              "id": "yellow",
+              "durationSeconds": 15,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 1,
+              "movement": {
+                "kind": "wander",
+                "speedTilesPerSecond": 2,
+                "retargetSeconds": 3,
+                "radiusTiles": 4
+              },
+              "attacks": [
+                {
+                  "id": "yellow-bee-shot-spiral",
+                  "projectile": "bee-shot",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 2,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": -40
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 3,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 0.5
+                  }
+                },
+                {
+                  "id": "yellow-glaive-ring",
+                  "projectile": "yellow-glaive-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 4,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "yellow-stinger-large-ring",
+                  "projectile": "yellow-stinger-large",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 2
+                  }
+                },
+                {
+                  "id": "yellow-hive-shot-ring",
+                  "projectile": "hive-shot-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 4,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 45,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 4,
+                    "initialDelaySeconds": 3
+                  }
+                }
+              ],
+              "spawns": [
+                {
+                  "archetype": "yellow-killer-bee",
+                  "count": 3,
+                  "despawnOnExit": true,
+                  "startPhaseIndex": 0,
+                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "phase-6-nests",
+          "comment": "Source: at 25% HP she returns to the centre, flashing red, invulnerable for the sourced 29 seconds while 3 Nests spawn (K08: no health cost, so phase 7 re-enters at the same 25%). Step 23.8: the 2-arm gapped, spreading machinegun of red-stinger-small and the three Nests, one per colour, despawnOnExit false so they survive into phase 7.",
+          "enterAtHpFraction": 0.25,
+          "exitAfterSeconds": 29,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 29,
+          "telegraphColor": "red",
+          "movement": {
+            "kind": "move-to-point",
+            "target": "arena-center",
+            "speedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "stinger-machinegun",
+              "projectile": "red-stinger-small",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 2,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 90,
+                "clockwiseDegreesPerSecond": 12,
+                "gapSectorsDegrees": [
+                  [90, 180],
+                  [270, 0]
+                ],
+                "armSpreadDegreesPerSecond": 15,
+                "maxArmSpreadDegrees": 45
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 0.1,
+                "initialDelaySeconds": 0
+              }
+            }
+          ],
+          "spawns": [
+            {
+              "archetype": "killer-bee-nest-red",
+              "count": 1,
+              "despawnOnExit": false,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+            },
+            {
+              "archetype": "killer-bee-nest-blue",
+              "count": 1,
+              "despawnOnExit": false,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+            },
+            {
+              "archetype": "killer-bee-nest-yellow",
+              "count": 1,
+              "despawnOnExit": false,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+            }
+          ]
+        },
+        {
+          "id": "phase-7-beehemoths",
+          "comment": "Source: swells in size and reverts to colour attacks with Beehemoth escorts - yellow stays central, red circles slowly, blue chases. Progression override 195 HP/s = encounter's 375 HP/s minus 180 HP/s (3 Beehemoths healing 600 HP each every 10s at the <5-player rate, killer-bee-queen-source.md phase 7 Quantitative Facts row); the Beehemoths' own 7,500 HP self-heal has no referent since they are not damageable, and is omitted (D06 covers the group-size healing tiers). Armored windows are not modelled: Armored only changes how fast a real group kills her, and the authored progression rate already abstracts group DPS entirely.",
+          "enterAtHpFraction": 0.25,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 3
+          },
+          "progression": { "kind": "simulated-dps", "hpPerSecond": 195 },
+          "attacks": [],
+          "spawns": [
+            {
+              "archetype": "adolescent-red-beehemoth",
+              "count": 1,
+              "despawnOnExit": true,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+            },
+            {
+              "archetype": "adolescent-blue-beehemoth",
+              "count": 1,
+              "despawnOnExit": true,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 6 }
+            },
+            {
+              "archetype": "adolescent-yellow-beehemoth",
+              "count": 1,
+              "despawnOnExit": true,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+            }
+          ],
+          "subPhases": [
+            {
+              "id": "yellow",
+              "durationSeconds": 15,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 0,
+              "movement": {
+                "kind": "stationary"
+              },
+              "attacks": [
+                {
+                  "id": "slowing-bee-spiral",
+                  "projectile": "bee-shot",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 1,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 40
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 0.4,
+                    "initialDelaySeconds": 0
+                  }
+                },
+                {
+                  "id": "yellow-ball-spiral",
+                  "projectile": "yellow-ball-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 1,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 90,
+                    "clockwiseDegreesPerSecond": -40
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 0.4,
+                    "initialDelaySeconds": 0.2
+                  }
+                },
+                {
+                  "id": "yellow-stinger-burst",
+                  "projectile": "yellow-stinger-large",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 6,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 0.5
+                  }
+                },
+                {
+                  "id": "yellow-blast-burst",
+                  "projectile": "hive-shot-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 6,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 30,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "white-bomb-advance",
+                  "projectile": "white-bomb-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 4,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0,
+                    "perBurstAdvanceDegrees": 15
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2.5,
+                    "initialDelaySeconds": 1.5
+                  }
+                }
+              ]
+            },
+            {
+              "id": "red",
+              "durationSeconds": 15,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 0,
+              "movement": {
+                "kind": "orbit",
+                "radiusTiles": 6,
+                "degreesPerSecond": 10,
+                "direction": "cw",
+                "approachSpeedTilesPerSecond": 3
+              },
+              "attacks": [
+                {
+                  "id": "red-ball-ring",
+                  "projectile": "red-ball",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 6,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 0
+                  }
+                },
+                {
+                  "id": "hive-spiral-ring",
+                  "projectile": "hive-spiral-shot-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 6,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 30,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 0.75
+                  }
+                },
+                {
+                  "id": "red-stinger-wide-spread",
+                  "projectile": "red-stinger-large-v3",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 5,
+                    "arcDegrees": 90,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 1.5
+                  }
+                },
+                {
+                  "id": "red-bomb-ring",
+                  "projectile": "red-bomb-v2",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 6,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 60,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2,
+                    "initialDelaySeconds": 2.25
+                  }
+                }
+              ]
+            },
+            {
+              "id": "blue",
+              "durationSeconds": 15,
+              "telegraphSeconds": 1,
+              "invulnerableOnEnterSeconds": 0,
+              "movement": {
+                "kind": "chase",
+                "speedTilesPerSecond": 3
+              },
+              "attacks": [
+                {
+                  "id": "blue-glaive-spiral",
+                  "projectile": "blue-glaive-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 2,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 50
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 0.5,
+                    "initialDelaySeconds": 0
+                  }
+                },
+                {
+                  "id": "blue-ball-ring",
+                  "projectile": "blue-ball-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 8,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 0.5
+                  }
+                },
+                {
+                  "id": "blue-stinger-small-spread",
+                  "projectile": "blue-stinger-small-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 3,
+                    "arcDegrees": 30,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 1
+                  }
+                },
+                {
+                  "id": "blue-stinger-large-spread",
+                  "projectile": "blue-stinger-large",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "spread",
+                    "shots": 3,
+                    "arcDegrees": 30,
+                    "aim": "player",
+                    "emitterRadiusTiles": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 1.5,
+                    "initialDelaySeconds": 1.5
+                  }
+                },
+                {
+                  "id": "hive-range-ring",
+                  "projectile": "hive-range-shot-v1",
+                  "tuningSource": "wiki-prose",
+                  "pattern": {
+                    "kind": "ring",
+                    "arms": 12,
+                    "emitterRadiusTiles": 0,
+                    "initialPhaseDegrees": 0,
+                    "clockwiseDegreesPerSecond": 0
+                  },
+                  "cadence": {
+                    "shotsPerBurst": 1,
+                    "shotIntervalSeconds": 0.1,
+                    "cooldownAfterLastShotSeconds": 2.5,
+                    "initialDelaySeconds": 2
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "phase-8-final",
+          "comment": "Source: at 12.5% HP she returns to the centre and fires slow radial bursts of Large Red Stingers, Small Yellow Stingers, Blue Balls, Hive Range Shots and all three Glaives until death. No sub-phases; runs until death since there is no further phase. No progression override here (unlike phase 7's 195 HP/s) - implements the source's 'they will cease healing the boss if her HP decreases further' by using the encounter's full 375 HP/s drain. The three Beehemoths are re-spawned at startPhaseIndex 1 (final-phase behaviour authored in 23.9) with despawnOnExit false, since this phase ends only at death; the source's 'orbit her closely' reuses phase 7's placements.",
+          "enterAtHpFraction": 0.125,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 2,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": {
+            "kind": "move-to-point",
+            "target": "arena-center",
+            "speedTilesPerSecond": 3
+          },
+          "progression": null,
+          "spawns": [
+            {
+              "archetype": "adolescent-red-beehemoth",
+              "count": 1,
+              "despawnOnExit": false,
+              "startPhaseIndex": 1,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+            },
+            {
+              "archetype": "adolescent-blue-beehemoth",
+              "count": 1,
+              "despawnOnExit": false,
+              "startPhaseIndex": 1,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 6 }
+            },
+            {
+              "archetype": "adolescent-yellow-beehemoth",
+              "count": 1,
+              "despawnOnExit": false,
+              "startPhaseIndex": 1,
+              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+            }
+          ],
+          "attacks": [
+            {
+              "id": "final-red-stinger-burst",
+              "projectile": "red-stinger-large-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "final-yellow-stinger-burst",
+              "projectile": "yellow-stinger-small-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 30,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 0.5
+              }
+            },
+            {
+              "id": "final-blue-ball-burst",
+              "projectile": "blue-ball-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 60,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 1
+              }
+            },
+            {
+              "id": "final-hive-range-burst",
+              "projectile": "hive-range-shot-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 90,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 1.5
+              }
+            },
+            {
+              "id": "final-yellow-glaive-burst",
+              "projectile": "yellow-glaive-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 120,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 2
+              }
+            },
+            {
+              "id": "final-red-glaive-burst",
+              "projectile": "red-glaive-v2",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 150,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 2.5
+              }
+            },
+            {
+              "id": "final-blue-glaive-burst",
+              "projectile": "blue-glaive-v1",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 180,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 3,
+                "initialDelaySeconds": 3
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "red-killer-bee": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Red Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF has no drain (K16's minions are not timed-progression enemies). Spawned by phase 2's red sub-phase, despawn-on-exit.",
+      "spawnTiles": { "x": 0, "y": -16.2 },
+      "body": { "shape": "beveled-octagon", "widthTiles": 1, "heightTiles": 1 },
+      "health": { "maxHealthHp": 400, "progression": { "kind": "none" } },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "sole",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 3 },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "single-shot",
+              "projectile": "red-killer-bee-stinger",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 1,
+                "arcDegrees": 0,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.5
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "blue-killer-bee": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Blue Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF, no drain. Spawned by phase 2's blue sub-phase, despawn-on-exit.",
+      "spawnTiles": { "x": 0, "y": -16.2 },
+      "body": { "shape": "beveled-octagon", "widthTiles": 1, "heightTiles": 1 },
+      "health": { "maxHealthHp": 400, "progression": { "kind": "none" } },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "sole",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "cyan",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 3 },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "single-shot",
+              "projectile": "blue-killer-bee-stinger",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 1,
+                "arcDegrees": 0,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.5
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "yellow-killer-bee": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Yellow Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF, no drain. Spawned by phase 2's yellow sub-phase, despawn-on-exit.",
+      "spawnTiles": { "x": 0, "y": -16.2 },
+      "body": { "shape": "beveled-octagon", "widthTiles": 1, "heightTiles": 1 },
+      "health": { "maxHealthHp": 400, "progression": { "kind": "none" } },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "sole",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 3 },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "single-shot",
+              "projectile": "yellow-killer-bee-stinger",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 1,
+                "arcDegrees": 0,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.5
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "small-worker-bee": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Small Worker Bee. 125 HP/25 DEF has no drain. Its slow is contact damage per K17/step 21.5, not a projectile: the source's only attack is an [Invisible] speed-0/range-0 touch. Spawned by an alive Killer Bee Nest's phase.",
+      "spawnTiles": { "x": 0, "y": -17 },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "health": {
+        "maxHealthHp": 125,
+        "progression": { "kind": "none" }
+      },
+      "contactDamageHp": 40,
+      "contactConditions": [{ "key": "slowed", "seconds": 1.6 }],
+      "contactArmorPiercing": true,
+      "contactCooldownSeconds": 1,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "sole",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.3,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 4 },
+          "progression": null,
+          "attacks": []
+        }
+      ]
+    },
+    "killer-bee-nest-red": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), red row. K06: not destructible here, so no health block - the phase always runs its full 29 seconds and always yields the default Beehemoth set (D03 defers Nest destruction and colour control). K18: two-phase archetype - alive fires radial Hive Spiral Shot and spawns Small Worker Bees (once, on entry, not periodically - a fidelity gap this step records), then breaks open into a corpse that fires Red Balls constantly until the encounter ends.",
+      "spawnTiles": { "x": 0, "y": 17 },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "alive",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": 29,
+          "telegraphSeconds": 1,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": { "kind": "stationary" },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "hive-spiral-burst",
+              "projectile": "nest-hive-spiral-shot-red",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 1
+              }
+            }
+          ],
+          "spawns": [
+            {
+              "archetype": "small-worker-bee",
+              "count": 2,
+              "despawnOnExit": false,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+            }
+          ]
+        },
+        {
+          "id": "corpse",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": { "kind": "stationary" },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "red-ball-burst",
+              "projectile": "nest-red-ball",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "killer-bee-nest-blue": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), blue row. Same K06/K18 notes as killer-bee-nest-red.",
+      "spawnTiles": { "x": -14.7, "y": 8.5 },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "alive",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": 29,
+          "telegraphSeconds": 1,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "cyan",
+          "movement": { "kind": "stationary" },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "hive-range-burst",
+              "projectile": "nest-hive-range-shot-blue",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 1
+              }
+            }
+          ],
+          "spawns": [
+            {
+              "archetype": "small-worker-bee",
+              "count": 2,
+              "despawnOnExit": false,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+            }
+          ]
+        },
+        {
+          "id": "corpse",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "cyan",
+          "movement": { "kind": "stationary" },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "blue-ball-burst",
+              "projectile": "nest-blue-ball",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "killer-bee-nest-yellow": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), yellow row. Same K06/K18 notes as killer-bee-nest-red.",
+      "spawnTiles": { "x": 14.7, "y": 8.5 },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "alive",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": 29,
+          "telegraphSeconds": 1,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": { "kind": "stationary" },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "hive-burst",
+              "projectile": "nest-hive-shot-yellow",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 1
+              }
+            }
+          ],
+          "spawns": [
+            {
+              "archetype": "small-worker-bee",
+              "count": 2,
+              "despawnOnExit": false,
+              "startPhaseIndex": 0,
+              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+            }
+          ]
+        },
+        {
+          "id": "corpse",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": { "kind": "stationary" },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "yellow-ball-burst",
+              "projectile": "nest-yellow-ball",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "adolescent-red-beehemoth": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Red Beehemoth. 20,000 HP/40 DEF has no drain (not damageable: the player has no attacks, K01); spawned by phase 7 at startPhaseIndex 0 (aimed pairs/spreads), re-spawned by phase 8 at startPhaseIndex 1 (radial bursts and orb spreads) per K18 - despawn-and-respawn at the phase boundary is an approved simplification of 'they persist', chosen over cross-enemy phase coupling; behaviourally equivalent apart from a visible blink. Movement is a static per-colour approximation of 'orbit her closely' (step's own instruction to avoid minion movement scripting): orbit at a small radius around the arena centre, where the Queen herself stays during phases 7-8.",
+      "spawnTiles": { "x": 3, "y": 0 },
+      "body": { "shape": "beveled-octagon", "widthTiles": 2, "heightTiles": 2 },
+      "health": { "maxHealthHp": 20000, "progression": { "kind": "none" } },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "aimed",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": {
+            "kind": "orbit",
+            "radiusTiles": 3,
+            "degreesPerSecond": 20,
+            "direction": "cw",
+            "approachSpeedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "aimed-stinger-pair",
+              "projectile": "beehemoth-red-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 2,
+                "arcDegrees": 10,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.5
+              }
+            }
+          ]
+        },
+        {
+          "id": "final-phase",
+          "enterAtHpFraction": 0.0001,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "red",
+          "movement": {
+            "kind": "orbit",
+            "radiusTiles": 3,
+            "degreesPerSecond": 20,
+            "direction": "cw",
+            "approachSpeedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "radial-stinger-burst",
+              "projectile": "beehemoth-red-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "orb-spread",
+              "projectile": "beehemoth-red-ball",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 40,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "adolescent-blue-beehemoth": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Blue Beehemoth. 20,000 HP/40 DEF has no drain. Movement is a static approximation of 'follows her loosely' (step's own instruction): a slow chase, below the Paladin's speed. Same spawn/re-spawn simplification as the red Beehemoth (K18).",
+      "spawnTiles": { "x": 0, "y": 6 },
+      "body": { "shape": "beveled-octagon", "widthTiles": 2, "heightTiles": 2 },
+      "health": { "maxHealthHp": 20000, "progression": { "kind": "none" } },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "aimed",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "cyan",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 2.5 },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "aimed-stinger-pair",
+              "projectile": "beehemoth-blue-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 2,
+                "arcDegrees": 10,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.5
+              }
+            }
+          ]
+        },
+        {
+          "id": "final-phase",
+          "enterAtHpFraction": 0.0001,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "cyan",
+          "movement": { "kind": "chase", "speedTilesPerSecond": 2.5 },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "radial-stinger-burst",
+              "projectile": "beehemoth-blue-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "glaive-spread",
+              "projectile": "beehemoth-blue-glaive",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 40,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "adolescent-yellow-beehemoth": {
+      "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Yellow Beehemoth. 20,000 HP/40 DEF has no drain. Movement is a static approximation of 'circle along the edges of the room' (step's own instruction): orbit at a large radius, near the arena wall. Same spawn/re-spawn simplification as the red Beehemoth (K18).",
+      "spawnTiles": { "x": 0, "y": -16.2 },
+      "body": { "shape": "beveled-octagon", "widthTiles": 2, "heightTiles": 2 },
+      "health": { "maxHealthHp": 20000, "progression": { "kind": "none" } },
+      "contactDamageHp": 0,
+      "contactConditions": [],
+      "contactArmorPiercing": false,
+      "contactCooldownSeconds": 0,
+      "blocksPlayer": false,
+      "phases": [
+        {
+          "id": "aimed",
+          "enterAtHpFraction": 1,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": {
+            "kind": "orbit",
+            "radiusTiles": 16,
+            "degreesPerSecond": 5,
+            "direction": "ccw",
+            "approachSpeedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "aimed-stinger-pair",
+              "projectile": "beehemoth-yellow-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 2,
+                "arcDegrees": 10,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1.5,
+                "initialDelaySeconds": 0.5
+              }
+            }
+          ]
+        },
+        {
+          "id": "final-phase",
+          "enterAtHpFraction": 0.0001,
+          "exitAfterSeconds": null,
+          "telegraphSeconds": 0.5,
+          "invulnerableOnEnterSeconds": 0,
+          "telegraphColor": "amber",
+          "movement": {
+            "kind": "orbit",
+            "radiusTiles": 16,
+            "degreesPerSecond": 5,
+            "direction": "ccw",
+            "approachSpeedTilesPerSecond": 3
+          },
+          "progression": null,
+          "attacks": [
+            {
+              "id": "radial-stinger-burst",
+              "projectile": "beehemoth-yellow-stinger-large",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "ring",
+                "arms": 6,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 0
+              }
+            },
+            {
+              "id": "glaive-spread",
+              "projectile": "beehemoth-yellow-glaive",
+              "tuningSource": "wiki-prose",
+              "pattern": {
+                "kind": "spread",
+                "shots": 3,
+                "arcDegrees": 40,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 2,
+                "initialDelaySeconds": 1
               }
             }
           ]

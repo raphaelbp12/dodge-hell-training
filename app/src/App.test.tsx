@@ -99,6 +99,9 @@ beforeEach(() => {
 test("debug panel exposes every parameter and sends live flags/sliders without recreating the runtime", async () => {
   const user = userEvent.setup();
   render(<App />);
+  await user.click(
+    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+  );
   await user.click(screen.getByRole("button", { name: "Debug" }));
   for (const parameter of DEBUG_PARAMETERS)
     expect(screen.getByRole("slider", { name: parameter.label })).toBeVisible();
@@ -232,7 +235,7 @@ test("launches and unmounts one effective runtime under Strict Mode", async () =
   );
 
   expect(
-    screen.getByRole("heading", { name: "Crystal Worm Child", level: 1 }),
+    screen.getByRole("heading", { name: "Killer Bee Queen", level: 1 }),
   ).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Start" }));
   expect(adapter.created).toBe(2);
@@ -280,10 +283,30 @@ test("restores zoom before runtime creation and persists only explicit camera ch
   expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull();
 });
 
+test("?encounter= selects a known encounter and ignores an unknown one", () => {
+  window.history.pushState({}, "", "?encounter=crystal-worm");
+  const { unmount } = render(<App />);
+  expect(
+    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+  ).toBeChecked();
+  unmount();
+  window.history.pushState({}, "", "?encounter=not-a-real-encounter");
+  render(<App />);
+  expect(
+    screen.getByRole("radio", { name: "Killer Bee Queen" }),
+  ).toBeChecked();
+  window.history.pushState({}, "", "/");
+});
+
 test("Home includes description, accurate changelog, and delegated links", () => {
   render(<App />);
   expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
-  expect(screen.getByText(/Survive the returning shards/)).toBeVisible();
+  expect(
+    screen.getByRole("radio", { name: "Killer Bee Queen" }),
+  ).toBeChecked();
+  expect(
+    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+  ).not.toBeChecked();
   expect(screen.getByRole("heading", { name: "Changelog" })).toBeVisible();
   expect(screen.getByRole("link", { name: "Enemy reference" })).toHaveAttribute(
     "href",

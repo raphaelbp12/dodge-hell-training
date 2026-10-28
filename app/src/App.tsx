@@ -6,9 +6,14 @@ import {
 } from "./game/phaser/encounter";
 import { PALADIN_STATS } from "./game/config/stats";
 import {
+  DEBUG_TUNABLE_ENCOUNTER_ID,
+  DEFAULT_ENCOUNTER_ID,
   ENCOUNTER_CONFIG,
+  ENCOUNTER_LIST,
+  encounterConfigOf,
   primaryArchetype,
   RULES_VERSION,
+  type EncounterConfig,
 } from "./game/config/encounter";
 import {
   AttemptHistory,
@@ -57,6 +62,17 @@ function readSeedFromLocation(): number | undefined {
   if (raw === null) return undefined;
   const seed = Number(raw);
   return Number.isFinite(seed) ? Math.trunc(seed) : undefined;
+}
+
+/**
+ * K14: `?encounter=<id>` links a specific encounter; an unknown id is ignored
+ * and the default (the Queen) is kept, matching how `?seed=` already handles
+ * bad input.
+ */
+function readEncounterIdFromLocation(): string | undefined {
+  const raw = new URLSearchParams(window.location.search).get("encounter");
+  if (raw === null) return undefined;
+  return ENCOUNTER_LIST.some((entry) => entry.id === raw) ? raw : undefined;
 }
 
 /**
@@ -324,6 +340,8 @@ function Encounter({
   historySnapshot,
   onHistoryChange,
   encounterHandle,
+  config,
+  displayName,
 }: {
   zoomPreference: RefObject<number>;
   zoomStorage: ZoomPreference;
@@ -334,6 +352,8 @@ function Encounter({
   historySnapshot: HistorySnapshot;
   onHistoryChange: (snapshot: HistorySnapshot) => void;
   encounterHandle: RefObject<EncounterHandle | null>;
+  config: EncounterConfig;
+  displayName: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
@@ -346,7 +366,7 @@ function Encounter({
     elapsedSeconds: 0,
     hitsTaken: 0,
     status: "countdown",
-    countdownRemainingSeconds: ENCOUNTER_CONFIG.session.startCountdownSeconds,
+    countdownRemainingSeconds: config.session.startCountdownSeconds,
     zoom: zoomPreference.current,
     result: null,
   });
@@ -365,6 +385,7 @@ function Encounter({
         setView(nextView);
       },
       {
+        config,
         seed: readSeedFromLocation(),
         drill: readDrillFromLocation(),
         initialZoom: zoomPreference.current,
@@ -425,7 +446,9 @@ function Encounter({
         </span>
         <span role="status" aria-label="Session status">
           {view.status === "ended"
-            ? "Defeated"
+            ? view.result?.outcome === "cleared"
+              ? "Boss defeated"
+              : "Defeated"
             : view.status === "paused"
               ? "Paused"
               : view.status === "countdown"
@@ -484,9 +507,11 @@ function Encounter({
         )}
         {view.result && (
           <section className={styles.results} aria-labelledby="result-title">
-            <span className={styles.eyebrow}>Crystal Worm Child Head</span>
+            <span className={styles.eyebrow}>{displayName}</span>
             <h2 id="result-title" ref={resultHeading} tabIndex={-1}>
-              Attempt complete
+              {view.result.outcome === "cleared"
+                ? "Boss defeated"
+                : "Attempt complete"}
             </h2>
             {view.result.rulesVersion === DEBUG_RULES_VERSION && (
               <p className={styles.debugBadge}>Debug attempt / not saved</p>
@@ -548,6 +573,13 @@ export default function App() {
     history.snapshot(),
   );
   const [launched, setLaunched] = useState(false);
+  const [selectedEncounterId, setSelectedEncounterId] = useState(
+    () => readEncounterIdFromLocation() ?? DEFAULT_ENCOUNTER_ID,
+  );
+  const selectedEncounter =
+    ENCOUNTER_LIST.find((entry) => entry.id === selectedEncounterId) ??
+    ENCOUNTER_LIST[0];
+  const isDebugTunable = selectedEncounterId === DEBUG_TUNABLE_ENCOUNTER_ID;
   const [homeControlsOpen, setHomeControlsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -569,20 +601,22 @@ export default function App() {
       <header className={styles.header}>
         <div>
           <span className={styles.eyebrow}>Dodge Hell Training</span>
-          <h1>Crystal Worm Child</h1>
+          <h1>{selectedEncounter.displayName}</h1>
         </div>
         <div className={styles.headerTools}>
-          <button
-            ref={debugButton}
-            type="button"
-            data-debug-tools
-            aria-expanded={debugOpen}
-            aria-controls="debug-tools"
-            onClick={() => setDebugOpen(!debugOpen)}
-          >
-            Debug
-          </button>
-          <span className={styles.encounterLabel}>Head / Survival</span>
+          {isDebugTunable && (
+            <button
+              ref={debugButton}
+              type="button"
+              data-debug-tools
+              aria-expanded={debugOpen}
+              aria-controls="debug-tools"
+              onClick={() => setDebugOpen(!debugOpen)}
+            >
+              Debug
+            </button>
+          )}
+          <span className={styles.encounterLabel}>Survival</span>
           <label className={styles.mute}>
             <input
               type="checkbox"
@@ -608,6 +642,8 @@ export default function App() {
               historySnapshot={historySnapshot}
               onHistoryChange={setHistorySnapshot}
               encounterHandle={encounterHandle}
+              config={encounterConfigOf(selectedEncounterId)}
+              displayName={selectedEncounter.displayName}
             />
           ) : (
             <div className={styles.home}>
@@ -619,12 +655,27 @@ export default function App() {
                   <div className={styles.crystal} />
                 </div>
                 <div>
-                  <span className={styles.eyebrow}>01 / Crystal cavern</span>
-                  <h2 id="practice-title">Crystal Worm Child Head</h2>
+                  <h2 id="practice-title">Choose an encounter</h2>
+                  <fieldset
+                    className={styles.encounterChoice}
+                    aria-label="Encounter"
+                  >
+                    {ENCOUNTER_LIST.map((entry) => (
+                      <label key={entry.id}>
+                        <input
+                          type="radio"
+                          name="encounter"
+                          value={entry.id}
+                          checked={selectedEncounterId === entry.id}
+                          onChange={() => setSelectedEncounterId(entry.id)}
+                        />
+                        {entry.displayName}
+                      </label>
+                    ))}
+                  </fieldset>
                   <p>
-                    Survive the returning shards of a single pursuing head. A
-                    fixed Paladin, one arena, and another attempt whenever you
-                    are ready.
+                    A fixed Paladin, one arena, and another attempt whenever
+                    you are ready.
                   </p>
                   <button
                     ref={startButton}
@@ -734,7 +785,7 @@ export default function App() {
             </div>
           )}
         </div>
-        {debugOpen && (
+        {isDebugTunable && debugOpen && (
           <DebugPanel
             settings={debugSettings}
             onChange={setDebugSettings}

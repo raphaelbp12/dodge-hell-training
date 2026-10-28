@@ -19,6 +19,690 @@
         "reversalAgeSeconds": 1.5,
         "lifetimeSeconds": 3
       }
+    },
+    "red-stinger-large-v1": {
+      "source": "killer-bee-queen-source.md row 2",
+      "damageHp": 130,
+      "speedTilesPerSecond": 7.5,
+      "armorPiercing": true,
+      "conditions": [{ "key": "exposed", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.75 }
+    },
+    "blue-stinger-large": {
+      "source": "killer-bee-queen-source.md row 6",
+      "damageHp": 120,
+      "speedTilesPerSecond": 8,
+      "armorPiercing": false,
+      "conditions": [{ "key": "petStasis", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.4 }
+    },
+    "yellow-stinger-small-v1": {
+      "source": "killer-bee-queen-source.md row 3",
+      "damageHp": 100,
+      "speedTilesPerSecond": 7.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "paralyzed", "seconds": 1.4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.75 }
+    },
+    "yellow-stinger-small-v2": {
+      "source": "killer-bee-queen-source.md row 22",
+      "damageHp": 100,
+      "speedTilesPerSecond": 4.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "paralyzed", "seconds": 1.4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9 }
+    },
+    "white-bomb-v1": {
+      "source": "killer-bee-queen-source.md row 27",
+      "damageHp": 100,
+      "speedTilesPerSecond": 3,
+      "armorPiercing": false,
+      "conditions": [{ "key": "dazed", "seconds": 2 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.6
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": {
+        "kind": "lob",
+        "travelSeconds": 0.6,
+        "detonationRadiusTiles": 2
+      }
+    },
+    "blue-bomb": {
+      "source": "killer-bee-queen-source.md row 30",
+      "damageHp": 80,
+      "speedTilesPerSecond": 3,
+      "armorPiercing": false,
+      "conditions": [{ "key": "quiet", "seconds": 1 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.6
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": {
+        "kind": "lob",
+        "travelSeconds": 0.6,
+        "detonationRadiusTiles": 2
+      }
+    },
+    "red-stinger-small": {
+      "source": "killer-bee-queen-source.md row 1",
+      "damageHp": 100,
+      "speedTilesPerSecond": 8.5,
+      "armorPiercing": true,
+      "conditions": [],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.5 }
+    },
+    "red-bomb-v1": {
+      "source": "killer-bee-queen-source.md row 25",
+      "damageHp": 80,
+      "speedTilesPerSecond": 3,
+      "armorPiercing": false,
+      "conditions": [{ "key": "confused", "seconds": 3 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.6
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": {
+        "kind": "lob",
+        "travelSeconds": 0.6,
+        "detonationRadiusTiles": 2
+      }
+    },
+    "blue-stinger-small-v1": {
+      "source": "killer-bee-queen-source.md row 5",
+      "damageHp": 100,
+      "speedTilesPerSecond": 8.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "silenced", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 11.05 }
+    },
+    "blue-ball-v2": {
+      "source": "killer-bee-queen-source.md row 9",
+      "damageHp": 90,
+      "speedTilesPerSecond": 6,
+      "armorPiercing": false,
+      "conditions": [{ "key": "petStasis", "seconds": 4 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "yellow-stinger-large": {
+      "source": "killer-bee-queen-source.md row 4",
+      "damageHp": 140,
+      "speedTilesPerSecond": 5.5,
+      "armorPiercing": true,
+      "conditions": [{ "key": "dazed", "seconds": 3 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 7.15 }
+    },
+    "yellow-ball-v1": {
+      "source": "killer-bee-queen-source.md row 10",
+      "damageHp": 90,
+      "speedTilesPerSecond": 4.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "paralyzed", "seconds": 0.8 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9 }
+    },
+    "red-killer-bee-stinger": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Red Killer Bee",
+      "damageHp": 80,
+      "speedTilesPerSecond": 7,
+      "armorPiercing": true,
+      "conditions": [],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "blue-killer-bee-stinger": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Blue Killer Bee",
+      "damageHp": 100,
+      "speedTilesPerSecond": 7.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "silenced", "seconds": 3 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.75 }
+    },
+    "yellow-killer-bee-stinger": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Yellow Killer Bee",
+      "damageHp": 130,
+      "speedTilesPerSecond": 6,
+      "armorPiercing": false,
+      "conditions": [],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "red-ball": {
+      "source": "killer-bee-queen-source.md row 14",
+      "damageHp": 80,
+      "speedTilesPerSecond": 5.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "cursed", "seconds": 3 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 11 }
+    },
+    "bee-shot": {
+      "source": "killer-bee-queen-source.md row 24",
+      "damageHp": 130,
+      "speedTilesPerSecond": 5,
+      "armorPiercing": true,
+      "conditions": [{ "key": "slowed", "seconds": 0.8 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10 }
+    },
+    "red-glaive-v1": {
+      "source": "killer-bee-queen-source.md row 7",
+      "damageHp": 0,
+      "speedTilesPerSecond": 14,
+      "armorPiercing": false,
+      "conditions": [{ "key": "armorBroken", "seconds": 7 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.8 }
+    },
+    "yellow-glaive-v1": {
+      "source": "killer-bee-queen-source.md row 11",
+      "damageHp": 70,
+      "speedTilesPerSecond": 2.5,
+      "armorPiercing": false,
+      "conditions": [
+        { "key": "paralyzed", "seconds": 0.8 },
+        { "key": "dazed", "seconds": 3 }
+      ],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.63 }
+    },
+    "red-glaive-v2": {
+      "source": "killer-bee-queen-source.md row 12",
+      "damageHp": 90,
+      "speedTilesPerSecond": 4,
+      "armorPiercing": true,
+      "conditions": [{ "key": "armorBroken", "seconds": 3 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9 }
+    },
+    "blue-glaive-v1": {
+      "source": "killer-bee-queen-source.md row 13",
+      "damageHp": 80,
+      "speedTilesPerSecond": 6,
+      "armorPiercing": false,
+      "conditions": [
+        { "key": "quiet", "seconds": 2 },
+        { "key": "petStasis", "seconds": 6 }
+      ],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.54 }
+    },
+    "hive-spiral-shot-v1": {
+      "source": "killer-bee-queen-source.md row 15",
+      "damageHp": 200,
+      "speedTilesPerSecond": 8,
+      "armorPiercing": true,
+      "conditions": [],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.6 }
+    },
+    "hive-range-shot-v1": {
+      "source": "killer-bee-queen-source.md row 16",
+      "damageHp": 120,
+      "speedTilesPerSecond": 4,
+      "armorPiercing": false,
+      "conditions": [
+        { "key": "petStasis", "seconds": 5 },
+        { "key": "weak", "seconds": 3 }
+      ],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10 }
+    },
+    "hive-shot-v1": {
+      "source": "killer-bee-queen-source.md row 17",
+      "damageHp": 150,
+      "speedTilesPerSecond": 8,
+      "armorPiercing": false,
+      "conditions": [{ "key": "dazed", "seconds": 3 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.6 }
+    },
+    "blue-stinger-small-v2": {
+      "source": "killer-bee-queen-source.md row 18",
+      "damageHp": 100,
+      "speedTilesPerSecond": 7,
+      "armorPiercing": false,
+      "conditions": [{ "key": "silenced", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.1 }
+    },
+    "blue-ball-v3": {
+      "source": "killer-bee-queen-source.md row 20",
+      "damageHp": 90,
+      "speedTilesPerSecond": 4,
+      "armorPiercing": true,
+      "conditions": [{ "key": "petStasis", "seconds": 4 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 6 }
+    },
+    "red-stinger-large-v2": {
+      "source": "killer-bee-queen-source.md row 21",
+      "damageHp": 130,
+      "speedTilesPerSecond": 3.5,
+      "armorPiercing": true,
+      "conditions": [{ "key": "exposed", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "nest-hive-spiral-shot-red": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), red nest only row",
+      "damageHp": 100,
+      "speedTilesPerSecond": 5,
+      "armorPiercing": true,
+      "conditions": [],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 7 }
+    },
+    "nest-hive-range-shot-blue": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), blue nest only row",
+      "damageHp": 120,
+      "speedTilesPerSecond": 5.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "weak", "seconds": 2 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 7.15 }
+    },
+    "nest-hive-shot-yellow": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), yellow nest only row",
+      "damageHp": 120,
+      "speedTilesPerSecond": 4.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "dazed", "seconds": 2 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.3
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 6.75 }
+    },
+    "nest-red-ball": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), red nest corpse only row",
+      "damageHp": 45,
+      "speedTilesPerSecond": 2.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "cursed", "seconds": 2 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 1.875 }
+    },
+    "nest-blue-ball": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), blue nest corpse only row",
+      "damageHp": 45,
+      "speedTilesPerSecond": 2.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "petStasis", "seconds": 4 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 1.875 }
+    },
+    "nest-yellow-ball": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), yellow nest corpse only row",
+      "damageHp": 45,
+      "speedTilesPerSecond": 2.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "dazed", "seconds": 2 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 1.875 }
+    },
+    "yellow-ball-v2": {
+      "source": "killer-bee-queen-source.md row 19",
+      "damageHp": 90,
+      "speedTilesPerSecond": 5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "paralyzed", "seconds": 0.6 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10 }
+    },
+    "white-bomb-v2": {
+      "source": "killer-bee-queen-source.md row 28",
+      "damageHp": 120,
+      "speedTilesPerSecond": 3,
+      "armorPiercing": false,
+      "conditions": [{ "key": "dazed", "seconds": 2 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.6
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "lob", "travelSeconds": 0.6, "detonationRadiusTiles": 3 }
+    },
+    "red-stinger-large-v3": {
+      "source": "killer-bee-queen-source.md row 23",
+      "damageHp": 100,
+      "speedTilesPerSecond": 5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "exposed", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 11 }
+    },
+    "red-bomb-v2": {
+      "source": "killer-bee-queen-source.md row 26",
+      "damageHp": 80,
+      "speedTilesPerSecond": 3,
+      "armorPiercing": false,
+      "conditions": [{ "key": "armorBroken", "seconds": 3 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.6,
+        "heightTiles": 0.6
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "lob", "travelSeconds": 0.6, "detonationRadiusTiles": 2 }
+    },
+    "blue-ball-v1": {
+      "source": "killer-bee-queen-source.md row 8",
+      "damageHp": 0,
+      "speedTilesPerSecond": 3,
+      "armorPiercing": false,
+      "conditions": [{ "key": "petStasis", "seconds": 3 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "beehemoth-red-stinger-large": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Adolescent Red Beehemoth, EH Red Stinger Large row",
+      "damageHp": 100,
+      "speedTilesPerSecond": 6,
+      "armorPiercing": false,
+      "conditions": [{ "key": "armorBroken", "seconds": 4 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "beehemoth-red-ball": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Adolescent Red Beehemoth, EH Red Ball row",
+      "damageHp": 60,
+      "speedTilesPerSecond": 7,
+      "armorPiercing": false,
+      "conditions": [{ "key": "cursed", "seconds": 2 }],
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.5
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "beehemoth-blue-stinger-large": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Adolescent Blue Beehemoth, EH Blue Stinger Large row",
+      "damageHp": 120,
+      "speedTilesPerSecond": 6.5,
+      "armorPiercing": false,
+      "conditions": [
+        { "key": "weak", "seconds": 2 },
+        { "key": "petStasis", "seconds": 3 }
+      ],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.75 }
+    },
+    "beehemoth-blue-glaive": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Adolescent Blue Beehemoth, EH Blue Glaive row",
+      "damageHp": 60,
+      "speedTilesPerSecond": 7.5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "quiet", "seconds": 3 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 10.5 }
+    },
+    "beehemoth-yellow-stinger-large": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Adolescent Yellow Beehemoth, EH Yellow Stinger Large row",
+      "damageHp": 150,
+      "speedTilesPerSecond": 7,
+      "armorPiercing": false,
+      "conditions": [{ "key": "dazed", "seconds": 2 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.9,
+        "heightTiles": 0.4
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 9.8 }
+    },
+    "beehemoth-yellow-glaive": {
+      "source": "killer-bee-queen-source.md Minion Source Extracts - Adolescent Yellow Beehemoth, EH Yellow Glaive row",
+      "damageHp": 80,
+      "speedTilesPerSecond": 5,
+      "armorPiercing": false,
+      "conditions": [{ "key": "paralyzed", "seconds": 0.8 }],
+      "body": {
+        "shape": "shard-hexagon",
+        "widthTiles": 0.5,
+        "heightTiles": 0.25
+      },
+      "expiration": "lifetime-only",
+      "hitPolicy": "once-per-shard",
+      "motion": { "kind": "linear", "rangeTiles": 8.5 }
     }
   }
 }

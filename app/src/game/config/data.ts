@@ -891,8 +891,6 @@ function validateSubPhase(
   const subPhase = record(value, path);
   if (!Array.isArray(subPhase.attacks))
     reject(`${path}.attacks`, "must be an array of attacks");
-  if (subPhase.attacks.length === 0)
-    reject(`${path}.attacks`, "must define at least one attack");
   return Object.freeze({
     id: text(subPhase.id, `${path}.id`),
     durationSeconds: positiveNumber(
@@ -1049,8 +1047,6 @@ function validatePhase(
   const phase = record(value, path);
   if (!Array.isArray(phase.attacks))
     reject(`${path}.attacks`, "must be an array of attacks");
-  if (phase.attacks.length === 0)
-    reject(`${path}.attacks`, "must define at least one attack");
   const enterAtHpFraction = finiteNumber(
     phase.enterAtHpFraction,
     `${path}.enterAtHpFraction`,
@@ -1132,10 +1128,21 @@ function validatePhases(
   if (phases[0].enterAtHpFraction !== 1)
     reject(`${path}[0].enterAtHpFraction`, "must be exactly 1");
   for (let index = 1; index < phases.length; index++) {
-    if (phases[index].enterAtHpFraction >= phases[index - 1].enterAtHpFraction)
+    const previous = phases[index - 1];
+    const current = phases[index];
+    // A phase costs no health when it exits by duration instead of by
+    // threshold (K08/K09), so the next phase may repeat its entry fraction
+    // only in that case - step 23.2's phase 6 into phase 7.
+    const repeatsAfterScriptedDuration =
+      current.enterAtHpFraction === previous.enterAtHpFraction &&
+      previous.exitAfterSeconds !== null;
+    if (
+      current.enterAtHpFraction >= previous.enterAtHpFraction &&
+      !repeatsAfterScriptedDuration
+    )
       reject(
         `${path}[${index}].enterAtHpFraction`,
-        "must be strictly less than the previous phase's",
+        "must be strictly less than the previous phase's, unless the previous phase exits by duration",
       );
   }
   return Object.freeze(phases);
@@ -1238,7 +1245,8 @@ export function validateArchetypes(
 export type AuthoredSpawns = Readonly<{
   archetype: string;
   firstSpawnSeconds: number;
-  everySeconds: number;
+  /** `null` means the opening spawn is never repeated (K10: a single boss). */
+  everySeconds: number | null;
   maxConcurrent: number;
   placement: Readonly<{
     ringRadiusFraction: number;
@@ -1247,10 +1255,20 @@ export type AuthoredSpawns = Readonly<{
   }>;
 }>;
 
-export type AuthoredEncounter = Readonly<{
+/** The fields one encounter entry owns: everything else in `encounter.json` is shared (K14). */
+export type AuthoredEncounterEntry = Readonly<{
   rulesVersion: string;
+  displayName: string;
   primaryArchetype: string;
   spawns: AuthoredSpawns;
+  session: Readonly<{
+    startCountdownSeconds: number;
+    retryCountdownSeconds: number;
+    historyLimit: number;
+  }>;
+}>;
+
+export type AuthoredEncounterData = Readonly<{
   /** Caps phase/sub-phase-driven minions; a phase spawns fewer than its count rather than exceed it. */
   maxConcurrentMinions: number;
   simulation: Readonly<{ fixedStepSeconds: number; maxStepsPerUpdate: number }>;
@@ -1262,20 +1280,84 @@ export type AuthoredEncounter = Readonly<{
     maxZoom: number;
     zoomStep: number;
   }>;
-  session: Readonly<{
-    startCountdownSeconds: number;
-    retryCountdownSeconds: number;
-    historyLimit: number;
-  }>;
   presentation: Readonly<{ lobTelegraphSeconds: number }>;
+  defaultEncounter: string;
+  encounters: Readonly<Record<string, AuthoredEncounterEntry>>;
 }>;
 
-export function validateEncounterData(value: unknown): AuthoredEncounter {
+function validateSpawns(value: unknown, path: string): AuthoredSpawns {
+  const spawns = record(value, path);
+  const placement = record(spawns.placement, `${path}.placement`);
+  const ringRadiusFraction = positiveNumber(
+    placement.ringRadiusFraction,
+    `${path}.placement.ringRadiusFraction`,
+  );
+  if (ringRadiusFraction >= 1)
+    reject(
+      `${path}.placement.ringRadiusFraction`,
+      "must be inside the arena, below 1",
+    );
+  if (placement.rule !== "farthest-from-player")
+    reject(
+      `${path}.placement.rule`,
+      "must be the approved farthest-from-player rule",
+    );
+  return Object.freeze({
+    archetype: text(spawns.archetype, `${path}.archetype`),
+    firstSpawnSeconds: nonnegativeNumber(
+      spawns.firstSpawnSeconds,
+      `${path}.firstSpawnSeconds`,
+    ),
+    everySeconds:
+      spawns.everySeconds === null
+        ? null
+        : positiveNumber(spawns.everySeconds, `${path}.everySeconds`),
+    maxConcurrent: safeCount(spawns.maxConcurrent, `${path}.maxConcurrent`),
+    placement: Object.freeze({
+      ringRadiusFraction,
+      rule: text(placement.rule, `${path}.placement.rule`),
+      goldenAngleDegrees: finiteNumber(
+        placement.goldenAngleDegrees,
+        `${path}.placement.goldenAngleDegrees`,
+      ),
+    }),
+  });
+}
+
+function validateEncounterEntry(
+  value: unknown,
+  id: string,
+): AuthoredEncounterEntry {
+  const path = `encounter.encounters.${id}`;
+  const data = record(value, path);
+  const session = record(data.session, `${path}.session`);
+  return Object.freeze({
+    rulesVersion: text(data.rulesVersion, `${path}.rulesVersion`),
+    displayName: text(data.displayName, `${path}.displayName`),
+    primaryArchetype: text(data.primaryArchetype, `${path}.primaryArchetype`),
+    spawns: validateSpawns(data.spawns, `${path}.spawns`),
+    session: Object.freeze({
+      startCountdownSeconds: nonnegativeNumber(
+        session.startCountdownSeconds,
+        `${path}.session.startCountdownSeconds`,
+      ),
+      retryCountdownSeconds: nonnegativeNumber(
+        session.retryCountdownSeconds,
+        `${path}.session.retryCountdownSeconds`,
+      ),
+      historyLimit: safeCount(
+        session.historyLimit,
+        `${path}.session.historyLimit`,
+      ),
+    }),
+  });
+}
+
+export function validateEncounterData(value: unknown): AuthoredEncounterData {
   const data = record(value, "encounter");
   const simulation = record(data.simulation, "encounter.simulation");
   const player = record(data.player, "encounter.player");
   const camera = record(data.camera, "encounter.camera");
-  const session = record(data.session, "encounter.session");
   const presentation = record(data.presentation, "encounter.presentation");
   const minZoom = positiveNumber(camera.minZoom, "encounter.camera.minZoom");
   const maxZoom = positiveNumber(camera.maxZoom, "encounter.camera.maxZoom");
@@ -1285,51 +1367,28 @@ export function validateEncounterData(value: unknown): AuthoredEncounter {
   );
   if (minZoom > maxZoom || defaultZoom < minZoom || defaultZoom > maxZoom)
     reject("encounter.camera.defaultZoom", "must be within ordered zoom bounds");
-  const spawns = record(data.spawns, "encounter.spawns");
-  const placement = record(spawns.placement, "encounter.spawns.placement");
-  const ringRadiusFraction = positiveNumber(
-    placement.ringRadiusFraction,
-    "encounter.spawns.placement.ringRadiusFraction",
+  const encountersRecord = record(data.encounters, "encounter.encounters");
+  const encounterIds = Object.keys(encountersRecord);
+  if (encounterIds.length === 0)
+    reject("encounter.encounters", "must define at least one encounter");
+  const encounters = Object.freeze(
+    Object.fromEntries(
+      encounterIds.map((id) => [
+        id,
+        validateEncounterEntry(encountersRecord[id], id),
+      ]),
+    ),
   );
-  if (ringRadiusFraction >= 1)
+  const defaultEncounter = text(
+    data.defaultEncounter,
+    "encounter.defaultEncounter",
+  );
+  if (!encounters[defaultEncounter])
     reject(
-      "encounter.spawns.placement.ringRadiusFraction",
-      "must be inside the arena, below 1",
-    );
-  if (placement.rule !== "farthest-from-player")
-    reject(
-      "encounter.spawns.placement.rule",
-      "must be the approved farthest-from-player rule",
+      "encounter.defaultEncounter",
+      "must name an encounter defined in encounter.encounters",
     );
   return Object.freeze({
-    rulesVersion: text(data.rulesVersion, "encounter.rulesVersion"),
-    spawns: Object.freeze({
-      archetype: text(spawns.archetype, "encounter.spawns.archetype"),
-      firstSpawnSeconds: nonnegativeNumber(
-        spawns.firstSpawnSeconds,
-        "encounter.spawns.firstSpawnSeconds",
-      ),
-      everySeconds: positiveNumber(
-        spawns.everySeconds,
-        "encounter.spawns.everySeconds",
-      ),
-      maxConcurrent: safeCount(
-        spawns.maxConcurrent,
-        "encounter.spawns.maxConcurrent",
-      ),
-      placement: Object.freeze({
-        ringRadiusFraction,
-        rule: text(placement.rule, "encounter.spawns.placement.rule"),
-        goldenAngleDegrees: finiteNumber(
-          placement.goldenAngleDegrees,
-          "encounter.spawns.placement.goldenAngleDegrees",
-        ),
-      }),
-    }),
-    primaryArchetype: text(
-      data.primaryArchetype,
-      "encounter.primaryArchetype",
-    ),
     maxConcurrentMinions: safeCount(
       data.maxConcurrentMinions,
       "encounter.maxConcurrentMinions",
@@ -1356,48 +1415,54 @@ export function validateEncounterData(value: unknown): AuthoredEncounter {
       maxZoom,
       zoomStep: positiveNumber(camera.zoomStep, "encounter.camera.zoomStep"),
     }),
-    session: Object.freeze({
-      startCountdownSeconds: nonnegativeNumber(
-        session.startCountdownSeconds,
-        "encounter.session.startCountdownSeconds",
-      ),
-      retryCountdownSeconds: nonnegativeNumber(
-        session.retryCountdownSeconds,
-        "encounter.session.retryCountdownSeconds",
-      ),
-      historyLimit: safeCount(
-        session.historyLimit,
-        "encounter.session.historyLimit",
-      ),
-    }),
     presentation: Object.freeze({
       lobTelegraphSeconds: positiveNumber(
         presentation.lobTelegraphSeconds,
         "encounter.presentation.lobTelegraphSeconds",
       ),
     }),
+    defaultEncounter,
+    encounters,
   });
 }
 
-export const AUTHORED_ENCOUNTER = validateEncounterData(encounterData);
+export const AUTHORED_ENCOUNTER_DATA = validateEncounterData(encounterData);
+/** The Crystal Worm entry specifically: the only encounter the debug panel ever tunes (K12). */
+export const AUTHORED_ENCOUNTER: AuthoredEncounterEntry &
+  Omit<AuthoredEncounterData, "defaultEncounter" | "encounters"> = Object.freeze(
+  {
+    ...AUTHORED_ENCOUNTER_DATA.encounters["crystal-worm"],
+    maxConcurrentMinions: AUTHORED_ENCOUNTER_DATA.maxConcurrentMinions,
+    simulation: AUTHORED_ENCOUNTER_DATA.simulation,
+    player: AUTHORED_ENCOUNTER_DATA.player,
+    camera: AUTHORED_ENCOUNTER_DATA.camera,
+    presentation: AUTHORED_ENCOUNTER_DATA.presentation,
+  },
+);
+if (!AUTHORED_ENCOUNTER_DATA.encounters["crystal-worm"])
+  reject(
+    "encounter.encounters",
+    'must define a "crystal-worm" entry; the debug panel is hardwired to it',
+  );
 export const AUTHORED_PROJECTILES = validateProjectiles(
   projectilesData,
-  AUTHORED_ENCOUNTER.simulation.fixedStepSeconds,
+  AUTHORED_ENCOUNTER_DATA.simulation.fixedStepSeconds,
 );
 export const AUTHORED_ARCHETYPES = validateArchetypes(
   enemiesData,
   new Set(Object.keys(AUTHORED_PROJECTILES)),
-  AUTHORED_ENCOUNTER.maxConcurrentMinions,
+  AUTHORED_ENCOUNTER_DATA.maxConcurrentMinions,
 );
 
-if (!AUTHORED_ARCHETYPES[AUTHORED_ENCOUNTER.primaryArchetype])
-  reject(
-    "encounter.primaryArchetype",
-    "must name an archetype defined in enemies.json",
-  );
-
-if (!AUTHORED_ARCHETYPES[AUTHORED_ENCOUNTER.spawns.archetype])
-  reject(
-    "encounter.spawns.archetype",
-    "must name an archetype defined in enemies.json",
-  );
+for (const [id, entry] of Object.entries(AUTHORED_ENCOUNTER_DATA.encounters)) {
+  if (!AUTHORED_ARCHETYPES[entry.primaryArchetype])
+    reject(
+      `encounter.encounters.${id}.primaryArchetype`,
+      "must name an archetype defined in enemies.json",
+    );
+  if (!AUTHORED_ARCHETYPES[entry.spawns.archetype])
+    reject(
+      `encounter.encounters.${id}.spawns.archetype`,
+      "must name an archetype defined in enemies.json",
+    );
+}

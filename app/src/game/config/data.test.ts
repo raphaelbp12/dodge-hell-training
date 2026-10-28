@@ -469,6 +469,46 @@ test("validateArchetypes rejects an unknown telegraph colour", () => {
   ).toThrow(RangeError);
 });
 
+// Step 23.2: a harmless skeleton authors phases with no attacks at all.
+test("validateArchetypes accepts a phase with an empty attacks array", () => {
+  expect(() => withPhases([{ ...VALID_PHASE, attacks: [] }])).not.toThrow();
+});
+
+test("validateArchetypes accepts a sub-phase with an empty attacks array", () => {
+  expect(() =>
+    withPhases([
+      {
+        ...VALID_PHASE,
+        attacks: [],
+        subPhases: [
+          { ...VALID_PHASE, id: "sub", durationSeconds: 1, attacks: [] },
+        ],
+      },
+    ]),
+  ).not.toThrow();
+});
+
+// Step 23.2: phase 6 costs no health (exitAfterSeconds) so phase 7 may repeat its threshold.
+test("validateArchetypes accepts a duplicated threshold following a phase with exitAfterSeconds", () => {
+  expect(() =>
+    withPhases([
+      VALID_PHASE,
+      { ...VALID_PHASE, id: "p2", enterAtHpFraction: 0.25, exitAfterSeconds: 29 },
+      { ...VALID_PHASE, id: "p3", enterAtHpFraction: 0.25 },
+    ]),
+  ).not.toThrow();
+});
+
+test("validateArchetypes still rejects a duplicated threshold with no exitAfterSeconds", () => {
+  expect(() =>
+    withPhases([
+      VALID_PHASE,
+      { ...VALID_PHASE, id: "p2", enterAtHpFraction: 0.25 },
+      { ...VALID_PHASE, id: "p3", enterAtHpFraction: 0.25 },
+    ]),
+  ).toThrow(RangeError);
+});
+
 test("validateAttack accepts the authored spiral-shards attack", () => {
   expect(() =>
     validateAttack(VALID_ATTACK, "attacks[0]", CATALOG_IDS, new Set()),

@@ -339,7 +339,7 @@ type ShardState = {
 
 ## Phase 23: Author The Killer Bee Queen Of The Nest
 
-> Step prompts and execution records: [`docs/plan/phase-23.md`](plan/phase-23.md).
+> Step prompts and execution records: [`docs/plan-archive/phase-23.md`](plan-archive/phase-23.md).
 
 - **23.1** - Add Encounter Selection And The Cleared Outcome. Status: pending. Dependencies: 22.5.
 - **23.2** - Author The Queen's Skeleton. Status: pending. Dependencies: 23.1.
@@ -347,10 +347,10 @@ type ShardState = {
 - **23.4** - Author Phase 2 And The Killer Bee Minions. Status: pending. Dependencies: 23.3.
 - **23.5** - Author Phase 3. Status: pending. Dependencies: 23.4.
 - **23.6** - Author Phase 4. Status: pending. Dependencies: 23.5.
-- **23.7** - Author Phase 5. Status: pending. Dependencies: 23.6.
-- **23.8** - Author Phase 6, The Nests And Worker Bees. Status: pending. Dependencies: 23.7.
-- **23.9** - Author Phase 7 And The Beehemoths. Status: pending. Dependencies: 23.8.
-- **23.10** - Author Phase 8 And Complete The Fight. Status: pending. Dependencies: 23.9.
+- **23.7** - Author Phase 5. Status: complete. Dependencies: 23.6.
+- **23.8** - Author Phase 6, The Nests And Worker Bees. Status: complete. Dependencies: 23.7. Authored the gapped, spreading 2-arm stinger machinegun and the three indestructible two-phase Killer Bee Nests with their Worker Bees.
+- **23.9** - Author Phase 7 And The Beehemoths. Status: complete. Dependencies: 23.8. Authored phase 7's three colour sub-phases, the progression-override healing and the three Adolescent Beehemoths spawned at phase index 0.
+- **23.10** - Author Phase 8 And Complete The Fight. Status: complete. Dependencies: 23.9. Authored phase 8's seven radial bursts and re-spawned the Beehemoths at final-phase behaviour; a full seeded run clears all eight phases in 373.43s.
 
 Phase 23 is ten authoring steps against one stable vocabulary, which is the repeated workflow a skill would serve. Reconsider a reusable encounter-authoring skill after step 23.4: by then two phases and one minion family will have been authored and it will be clear whether the repetition is mechanical enough to automate, or whether each phase's source reading is the actual work.
 

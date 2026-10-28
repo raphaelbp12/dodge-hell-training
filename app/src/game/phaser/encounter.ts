@@ -3,6 +3,7 @@ import {
   archetypeOf,
   ENCOUNTER_CONFIG,
   projectileOf,
+  type EncounterConfig,
 } from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
@@ -48,6 +49,8 @@ export type EncounterHandle = {
 };
 
 type EncounterOptions = {
+  /** Which encounter to run (K14); omitted means the shipped Crystal Worm default. */
+  config?: EncounterConfig;
   /** Pins spawn placement so a run can be reproduced; omitted means varied. */
   seed?: number;
   /** Drill mode (step 22.5): starts the primary enemy in one phase, optionally looping it. */
@@ -163,13 +166,11 @@ class EncounterScene extends Phaser.Scene {
     options: EncounterOptions,
   ) {
     super("Encounter");
-    this.session =
-      options.seed === undefined && !options.drill
-        ? new SessionController()
-        : new SessionController(
-            options.seed === undefined ? arbitrarySeed : () => options.seed!,
-            options.drill ?? {},
-          );
+    this.session = new SessionController(
+      options.seed === undefined ? arbitrarySeed : () => options.seed!,
+      options.drill ?? {},
+      options.config ?? ENCOUNTER_CONFIG,
+    );
     this.host = host;
     this.publish = publish;
     this.zoom = options.initialZoom ?? ENCOUNTER_CONFIG.camera.defaultZoom;

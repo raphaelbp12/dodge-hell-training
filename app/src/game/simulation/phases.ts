@@ -270,10 +270,18 @@ function tryAdvancePhase(
   if (nextIndex >= archetype.phases.length) return false;
   const phase = currentPhaseOf(archetype, enemy);
   const nextPhase = archetype.phases[nextIndex];
-  const byHealth = healthFraction(enemy) <= nextPhase.enterAtHpFraction;
   const byDuration =
     phase.exitAfterSeconds !== null &&
     state.elapsedSeconds - enemy.phaseEnteredAtSeconds >= phase.exitAfterSeconds;
+  // A scripted phase's own exitAfterSeconds is a minimum dwell time, not just
+  // an alternate trigger: health-based advance is gated on it too, so a
+  // duplicated threshold (K09, e.g. the Killer Bee Queen's phase 6 into 7)
+  // cannot fire the instant the next phase's fraction happens to already
+  // match. A phase with no exitAfterSeconds is ungated, unchanged from before.
+  const minimumDurationElapsed = phase.exitAfterSeconds === null || byDuration;
+  const byHealth =
+    minimumDurationElapsed &&
+    healthFraction(enemy) <= nextPhase.enterAtHpFraction;
   if (!byHealth && !byDuration) return false;
   // K01/step 22.5: the one approved exception to the monotonic rule. Only the
   // primary enemy can be drilled, and only when its current phase is the

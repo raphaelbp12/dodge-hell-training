@@ -8,7 +8,7 @@ export type AttemptRecord = Readonly<{
   rulesVersion: string;
   elapsedSeconds: number;
   hitsTaken: number;
-  outcome: "death";
+  outcome: "death" | "cleared";
 }>;
 
 export type HistorySnapshot = Readonly<{
@@ -32,7 +32,7 @@ function isAttemptRecord(value: unknown): value is AttemptRecord {
     value.id.trim().length > 0 &&
     typeof value.rulesVersion === "string" &&
     value.rulesVersion.trim().length > 0 &&
-    value.outcome === "death" &&
+    (value.outcome === "death" || value.outcome === "cleared") &&
     typeof value.elapsedSeconds === "number" &&
     Number.isFinite(value.elapsedSeconds) &&
     value.elapsedSeconds >= 0 &&
