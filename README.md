@@ -2,44 +2,64 @@
 
 A pure-frontend bullet-hell practice game targeting repeated survival training against the Crystal Worm Child Head from Realm of the Mad God.
 
-## Current V4 State
+## Current V5 State
 
-The preset is `crystal-worm-child-swarm-paladin-v4`. On 2026-10-26 the user approved timed enemy spawning: the opening enemy arrives at `t = 0` and further Crystal Worm Child Heads join every 10 seconds up to four at once, each on the spawn ring at `0.84375` of the arena radius - exactly 16.2 tiles, the historical spawn distance. Each arrival is placed diametrically opposite the player's bearing from the arena centre, offset by the golden angle per concurrent spawn so two never share a point. Enemies pass through each other, never despawn, and each fires on its own clock from its own spawn time, serving its own initial cooldown. Death remains the only end condition.
+Two selectable encounters ship side by side, chosen from a plain radio list on Home (`?encounter=crystal-worm` or `?encounter=killer-bee-queen` links one directly; an unknown id falls back to the default). Each encounter has its own rules version, arena spawn rule and session values, and attempt history/bests never compare across them.
 
-**The opening bearing is now random.** The player stands exactly at the arena centre at `t = 0`, so "farthest from the player" is undefined there, and the direction is drawn from a seeded generator. This supersedes the v2/v3 statement that the enemy starts due north at `(0, -16.2)`; the distance is unchanged and only the bearing varies. Append `?seed=<integer>` to the URL to pin placement and reproduce or share a run.
+- **Crystal Worm Swarm** (`crystal-worm-child-swarm-paladin-v4`) is the unchanged v4 encounter: proven identical to its pre-v5 behaviour by a regression test covering cadence, positions, death times and the 671-volley/30-60-120 Hz equivalence.
+- **Killer Bee Queen** (`killer-bee-queen-nest-paladin-v6`, the default) is the new encounter: a single boss with eight timed phases, driven by a simulated 375 HP/second drain rather than player damage (the project has no player attack). Each phase teaches a different dodging skill:
+  1. **Honey pond orbit** - radial Blue Bomb spreads around the pond plus targeted White Bombs and stacked tri-colour stinger volleys while the Queen orbits.
+  2. **Colour chase, red/blue/yellow** - the Queen chases while cycling three colour-themed attack sets, each spawning its own Killer Bee minion colour.
+  3. **Stationary ring barrage** - a dense omnidirectional ball/bee barrage from a centred, immobile Queen, plus a 7-second Red Glaive wave; the one phase whose cadence is sourced, not authored.
+  4. **Glaive circle** - four-directional Yellow/Red/Blue Glaive spreads at a rapid, near-floor-cooldown pace while the Queen slowly circles; Yellow Glaives paralyze and daze.
+  5. **Colour return, red/blue/yellow** - the densest colour rotation, layering ball streams, glaive rings and Hive-pattern shots per colour.
+  6. **The Nests** - the "most likely instant death" phase: a rotating two-gap stinger machinegun for 29 seconds while three Killer Bee Nests spawn Worker Bees and swell toward the Beehemoths.
+  7. **Beehemoth colour rotation** - the last colour cycle, now escorted by three Adolescent Beehemoths that heal the Queen.
+  8. **Final phase** - slow radial bursts of every remaining attack type until the Queen's HP reaches zero, ending the fight.
 
-Weapon, body, arena, Paladin stats, camera and collision policies are unchanged from v3: player and head 1.25x1.25 tiles; six emitters at 0.35 tiles; eleven shots at 0.19-second intervals; 3-second cooldown after the last shot; 2-second initial cooldown; projectiles 1.45x0.65 tiles, 160 HP damage, 8 tiles/s, reversing at 1.5 seconds and expiring at 3 seconds; phase zero and clockwise rotation 45 degrees/s. The arena stays 19.2 tiles: the `fixes.md` request for an arena at double the enemy's reach is superseded, since shipped reach is `0.35 + 8 * 1.5 = 12.35` tiles. These are user-selected trainer values, not new ROTMG fidelity claims.
+  Append `?seed=<integer>` to pin the opening spawn bearing and reproduce a run, exactly as in v4.
 
-v1, v2 and v3 records are retained, shown as **Other rules** and excluded from the v4 personal best. No history schema change was needed.
+**Drill mode** (`?phase=<index>&loop=1`) starts the Queen in one phase by index instead of phase 1, skipping the lead-up; an out-of-range or malformed `phase` value is ignored and the full fight starts normally. `?loop=1` re-enters that same phase on its own exit instead of advancing, for repeated single-phase practice.
+
+**The condition model** tracks all thirteen ROTMG status effects the Queen's attacks can inflict, split into two groups: seven **active** conditions that change dodging or survival - Paralyzed, Slowed, Confused, Armor Broken, Exposed, Curse, Sick - and six **inert** conditions tracked faithfully but with no effect here - Dazed, Silenced, Quiet, Weak, Unstable, Pet Stasis - because they affect attacking, abilities, mana or pets, none of which exist in this project. The HUD's condition chips show both, labelling inert ones `(inert)` so a reader never mistakes "tracked" for "does something."
+
+**Comparison identities** are per encounter: `crystal-worm-child-swarm-paladin-v4` and `killer-bee-queen-nest-paladin-v6`. A record from an earlier rules version of either encounter is retained and shown as **Other rules**, excluded from that encounter's personal best; Crystal Worm and Killer Bee Queen records never compare against each other.
 
 ### Authored Data
 
-Gameplay values are authored as JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`, because `strict` is not enabled and the compiler cannot reject a missing or mistyped field. A malformed data file throws at module load rather than falling back.
+Gameplay values are authored as JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`, because `strict` is not enabled and the compiler cannot reject a missing or mistyped field. A malformed data file throws at module load rather than falling back. Step 23.1 restructured `encounter.json` into a keyed `encounters` map (one entry per encounter: rules version, display name, primary archetype, spawns, session) but added no new file - the arena stays one shared `arena.json` under K05, so the authored files remain the same five.
 
-| File             | Holds                                                                         |
-| ---------------- | ----------------------------------------------------------------------------- |
-| `shapes.json`    | Named convex outlines normalized to a 1x1 tile box                            |
-| `arena.json`     | Circular arena centre and radius, in tiles                                    |
-| `enemies.json`   | Enemy archetypes keyed by id: body, movement and weapon                       |
-| `encounter.json` | Rules version, primary archetype, simulation, player, spawns, camera, session |
+| File                | Holds                                                                                            | Edit to...                              |
+| ------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `shapes.json`       | Named convex outlines normalized to a 1x1 tile box                                                 | change a body's silhouette               |
+| `arena.json`        | Circular arena centre and radius, in tiles                                                         | change the arena                         |
+| `projectiles.json`  | Projectile catalog keyed by id: motion kind, damage, speed/range, condition, source provenance     | change a projectile's own stats          |
+| `enemies.json`      | Enemy archetypes keyed by id: body, health, progression, phases/sub-phases, attacks and spawns     | retune an enemy or its phases            |
+| `encounter.json`    | Shared simulation/player/camera values, plus per-encounter rules version, spawns and session       | change spawning or add/select an encounter |
 
-**To change the arena,** edit `arena.json`. **To retune the enemy,** edit its archetype in `enemies.json`. **To change spawning,** edit `encounter.json`'s `spawns` block. All derivation - outline scaling, degrees to radians, derived bounds - happens in one loader, so there is no second mapping to keep in sync.
+**To add a second enemy kind,** add another entry to `enemies.json` and point an encounter's `spawns.archetype` at it. **No second archetype's gameplay values are approved** beyond what is already shipped: a new enemy needs its own research and approval before it ships, exactly as the head and the Queen both did.
 
-**To add a second enemy kind,** add another entry to `enemies.json` and point `spawns.archetype` at it. The data layer already models archetypes as a keyed collection and the simulation already carries per-enemy archetype references, so this is pure data. **No second archetype's gameplay values are approved**: a new enemy needs its own research and approval before it ships, exactly as the head did.
+The pixel-measurement geometry study that originally derived these shapes is retired. Its conclusions remain recorded in [the mechanics contract](docs/mechanics.md); only the code is gone.
 
-The pixel-measurement geometry study that originally derived these shapes is retired. Its source dimensions never affected a shipped vertex, because bodies scale from a normalized outline, so the measurements cancelled out. Its conclusions remain recorded in [the mechanics contract](docs/mechanics.md); only the code is gone.
+### V5 Verification
 
-### V4 Verification
+Step 24.3 ran the full acceptance matrix on the pinned toolchain (`node v24.22.1`, `npm 12.2.1`): all four routine gates passed (656 tests across 16 files, 29.33s); the full `npm run test:e2e` Chromium suite passed 36/36 in 3m31s; the pre-existing Crystal Worm regression (671 volleys, 30/60/120 Hz equivalence) remained unchanged; a new determinism test reproduced a full Killer Bee Queen fight identically at 30, 60 and 120 Hz and under multi-step batching; storage compatibility held for v1-v4 Crystal Worm records, the v5->v6 Queen transition, and corrupt/blocked/quota storage; session safety (pause, resume, retry, Controls, zoom, countdown) held identically in both encounters and in drill mode. Both encounters were proven to reach their end screen except one case: a full real-browser Queen clear to the win screen is unverified, because a full fight takes about six minutes of real browser time and no test runs that long (tracked as [D12](docs/deferred-work.md#d12---full-browser-win-screen-coverage-for-the-killer-bee-queen)); the headless-simulation clear and the Crystal Worm's own browser win-screen path are proven instead.
 
-Local v4 verification on 2026-10-26 ran all five gates on the pinned toolchain, Node 24.22.1 and npm 12.2.1: 356 unit/component tests across eleven files, typecheck, lint, production build and all 34 Chromium cases. A 60-second sustained browser run with spawning active and 25 retries measured a peak of 162 live shards against a derived bound of 264, a peak of 3 concurrent enemies against the cap of 4, 7 hit texts against 16 and 1 audio voice against 4, with one canvas and one keyboard listener throughout.
+## Fidelity And Limitations
 
-Frame timing measured median 16 ms, p95 19 ms and a worst gap of 113 ms over 3709 frames. For a fair comparison the pre-change commit `3857e5c` was measured on the same machine and toolchain: median 16 ms, p95 18 ms, worst gap 98 ms over 3735 frames at a peak of 66 shards. The median is unchanged and the worst gap is about 15 percent higher while carrying 2.45 times the live shards, so the roughly 100 ms worst case is a property of this machine rather than of spawning. The earlier recorded 33.3 ms maximum came from a different machine and is not comparable.
+This trainer is not a complete recreation of the live fight. Every gap below is deliberate and tracked, not an oversight:
 
-No human visual or audible acceptance was performed in this run, and no deployment is claimed. Firefox, WebKit, touch input, screen readers and an axe audit remain unverified. These v4 changes are committed and pushed; the v2 deployment evidence below does not verify v4 publication.
+- **Phases 2 and 5 are easier here than live**, because the arena does not flood: the real fight floods the outer floor with Killer Honey at 90% HP and hardens the entrance tiles at 45% HP, confining players to a narrow ring around the Queen. This trainer's arena stays the full static 19.2 tiles throughout ([D01](docs/deferred-work.md#d01---killer-honey-flooding-and-hardening-tiles)).
+- **Phases 1, 3 and 8 are harder here than live**, because a real group suppresses those attacks: the Queen is vulnerable to Stun and Daze specifically during phase 1, during phase 3's white-flash window, and throughout phase 8, and a group can skip attacks outright by stunning her. This project has no player attack, so nothing can suppress anything ([D04](docs/deferred-work.md#d04---player-attacks), [D05](docs/deferred-work.md#d05---stun-and-daze-vulnerability-windows)).
+- **The Plagued Nest variant is not implemented** - green projectiles, a 3-way machinegun, a fourth Nest and Beehemoth. Only The Nest location ships ([D02](docs/deferred-work.md#d02---plagued-nest-variant)).
+- **Killer Bee Nests cannot be destroyed.** Phase 6 always runs its full 29 seconds and always yields one Beehemoth of each colour in phase 7, rather than letting the player choose which Nests to destroy ([D03](docs/deferred-work.md#d03---killer-bee-nest-destruction-and-beehemoth-colour-control)).
+- **The Queen's authored 112,500 HP does not scale with player count**, since that figure is meaningless for a single-player trainer ([D06](docs/deferred-work.md#d06---boss-adaptive-hp-scaling)).
+- **Phase 4's Red Glaive wave is dodgeable here**, though the source calls it "unavoidable" - true only in the real fight's small room; this project's 19.2-tile arena lets a player dodge it near the wall.
+- **ROTMG's "Hitbox Size" to tile width/height is this project's own interpretation** (step 23.1), not a published equivalence.
+- **Phases 2, 7 and 8 are proven damaging when stationary but not yet proven survivable with correct movement**: every scripted dodge tried so far dies to a stacked volley within 6-16 seconds. This is a verification gap, not a known-unfair design; it needs a bearing-aware dodge script ([D11](docs/deferred-work.md#d11---bearing-aware-dodge-verification-for-phases-2-7-and-8)).
+- **A full real-browser clear of the Queen to the win screen is unverified** - a full fight takes about six minutes of real browser time ([D12](docs/deferred-work.md#d12---full-browser-win-screen-coverage-for-the-killer-bee-queen)).
 
-[The v2 archive](docs/implementation-plan-v2.md) records phases 8-14. Geometry G01-G04 was explicitly approved; the user delegated remaining technical acceptance and sequential publication. No fresh human playtest/listening approval, exact ROTMG fidelity, Firefox/WebKit certification or touch support is claimed.
-
-Site: https://raphaelbp12.github.io/dodge-hell-training/. **V2 live-verified on 2026-10-25** at runtime commit `e12f3fe4742cb9d02374f07563192dcc5a727b72`: [Actions run 40193885409](https://github.com/raphaelbp12/dodge-hell-training/actions/runs/40193885409), all six jobs successful, Pages deployment `7313260767` and both hosted Chromium checks passed. All four emitted files match the tested local build byte-for-byte. Historical v1 evidence below is not evidence for a newer build. Use the local server's printed URL with the `/dodge-hell-training/` prefix; origins/ports have separate storage. Fresh local preview: http://127.0.0.1:5177/dodge-hell-training/.
+A training tool that misrepresents its own fidelity is worse than one that admits the gap, so every limitation above is linked to its tracked deferred-register item rather than silently accepted.
 
 ## Debug Tools
 
@@ -479,7 +499,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Active implementation plan](implementation-plan.md): pending phases 15-18. Completed phases are archived in the [v1](docs/implementation-plan-v1.md) and [v2](docs/implementation-plan-v2.md) archives, which hold the phased prompts, dependencies, acceptance criteria and execution records. Steps 7.1 and 7.2 are complete; release evidence and delegated acceptance limitations are recorded explicitly.
+- [Active implementation plan](implementation-plan.md): the reusable planning process and the current plan table. Completed plans are archived in the [v1](docs/implementation-plan-v1.md), [v2](docs/implementation-plan-v2.md), [v4](docs/implementation-plan-v4.md) and [v5](docs/implementation-plan-v5.md) archives, which hold the phased prompts, dependencies, acceptance criteria and execution records.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 

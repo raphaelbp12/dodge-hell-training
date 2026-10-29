@@ -1,3 +1,11 @@
+# V5 Implementation Plan Archive
+
+Historical v5 design, completed phases 19-24 and their execution evidence, archived on 2026-10-29. Read [the active implementation plan](../implementation-plan.md) for pending work and current decisions. This archive is evidence, not a queue of steps to rerun.
+
+Phases 19-24 generalized the single-weapon simulation into a projectile catalog, an emission-pattern vocabulary and a player condition model, added a multi-phase boss machine, and authored the Killer Bee Queen of The Nest on top of it, shipping `killer-bee-queen-nest-paladin-v6` alongside the unchanged `crystal-worm-child-swarm-paladin-v4`. Decisions K01-K18 recorded below remain in force wherever a later plan does not supersede them.
+
+Earlier phases are preserved separately in [the v1 archive](implementation-plan-v1.md), [the v2 archive](implementation-plan-v2.md) and [the v4 archive](implementation-plan-v4.md).
+
 # Plan V5: Projectile Catalog, Patterns, Conditions And The Killer Bee Queen
 
 This is the plan-specific record for the current planning effort. [`implementation-plan.md`](../implementation-plan.md) holds the reusable process (execution modes, phase lifecycle, how to read a phase prompt) that governs every plan version, including this one; read it first if you have not already this session.
@@ -295,7 +303,7 @@ type ShardState = {
 | 21 | 21.1-21.5 | Player conditions, the condition-aware damage model, HUD readout and contact damage | G7 |
 | 22 | 22.1-22.5 | Movement vocabulary, enemy health, the phase machine and drill mode | G8 |
 | 23 | 23.1-23.10 | The Killer Bee Queen of The Nest, authored one phase at a time | G9 |
-| 24 | 24.1-24.4 | Bounds, trainability tuning, full regression and handoff | G10 |
+| 24 | 24.1-24.4 | Re-derived performance bounds; tuned cadences 15-30% for trainability; ran the full acceptance matrix (656 tests, 36 Chromium cases); updated README/mechanics/deferred-work and archived this plan | G10 |
 
 ## Phase 19: The Projectile Catalog And Motion Kinds
 
@@ -319,7 +327,7 @@ type ShardState = {
 
 ## Phase 21: Player Conditions And The Damage Model
 
-> Step prompts and execution records: [`docs/plan/phase-21.md`](plan/phase-21.md).
+> Step prompts and execution records archived: [`docs/plan-archive/phase-21.md`](plan-archive/phase-21.md).
 
 - **21.1** - Add Condition State, Application And Ticking. Status: complete. Dependencies: 20.5.
 - **21.2** - Apply The Movement Conditions. Status: complete. Dependencies: 21.1.
@@ -356,7 +364,7 @@ Phase 23 is ten authoring steps against one stable vocabulary, which is the repe
 
 ## Phase 24: Bounds, Tuning, Regression And Handoff
 
-> Step prompts and execution records: [`docs/plan/phase-24.md`](plan/phase-24.md).
+> Step prompts and execution records archived: [`docs/plan-archive/phase-24.md`](plan-archive/phase-24.md).
 
 - **24.1** - Re-Derive And Re-Measure The Performance Bounds. Status: pending. Dependencies: 23.10.
 - **24.2** - Tune The Fight For Trainability. Status: pending. Dependencies: 24.1.

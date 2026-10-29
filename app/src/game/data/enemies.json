@@ -99,7 +99,7 @@
             {
               "id": "blue-bomb-ring",
               "projectile": "blue-bomb",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 8,
@@ -110,14 +110,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 4,
-                "initialDelaySeconds": 1
+                "cooldownAfterLastShotSeconds": 2.8,
+                "initialDelaySeconds": 0.85
               }
             },
             {
               "id": "white-bomb-targeted",
               "projectile": "white-bomb-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "spread",
                 "shots": 1,
@@ -128,14 +128,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 1.5
+                "cooldownAfterLastShotSeconds": 2.1,
+                "initialDelaySeconds": 1.27
               }
             },
             {
               "id": "red-stinger-spread",
               "projectile": "red-stinger-large-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "spread",
                 "shots": 3,
@@ -146,14 +146,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.5,
-                "initialDelaySeconds": 2
+                "cooldownAfterLastShotSeconds": 1.75,
+                "initialDelaySeconds": 1.7
               }
             },
             {
               "id": "blue-stinger-spread",
               "projectile": "blue-stinger-large",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "spread",
                 "shots": 3,
@@ -164,14 +164,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.5,
-                "initialDelaySeconds": 2
+                "cooldownAfterLastShotSeconds": 1.75,
+                "initialDelaySeconds": 1.7
               }
             },
             {
               "id": "yellow-stinger-spread",
               "projectile": "yellow-stinger-small-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "spread",
                 "shots": 3,
@@ -182,8 +182,8 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.5,
-                "initialDelaySeconds": 2
+                "cooldownAfterLastShotSeconds": 1.75,
+                "initialDelaySeconds": 1.7
               }
             }
           ],
@@ -244,7 +244,7 @@
                 {
                   "id": "red-stinger-spread",
                   "projectile": "red-stinger-small",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 3,
@@ -255,14 +255,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 1.7,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "red-stinger-large-directed",
                   "projectile": "red-stinger-large-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 1,
@@ -273,14 +273,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 1.5
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 1.27
                   }
                 },
                 {
                   "id": "red-bomb-ring",
                   "projectile": "red-bomb-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -291,8 +291,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 3.4,
+                    "initialDelaySeconds": 1.7
                   }
                 }
               ],
@@ -302,7 +302,10 @@
                   "count": 3,
                   "despawnOnExit": true,
                   "startPhaseIndex": 0,
-                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                  "placement": {
+                    "kind": "ring-around-owner",
+                    "radiusTiles": 4
+                  }
                 }
               ]
             },
@@ -317,7 +320,7 @@
                 {
                   "id": "blue-stinger-large-directed",
                   "projectile": "blue-stinger-large",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 1,
@@ -328,14 +331,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "blue-stinger-spiral",
                   "projectile": "blue-stinger-small-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 2,
@@ -346,14 +349,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1,
-                    "initialDelaySeconds": 1.5
+                    "cooldownAfterLastShotSeconds": 0.85,
+                    "initialDelaySeconds": 1.27
                   }
                 },
                 {
                   "id": "blue-ball-scatter",
                   "projectile": "blue-ball-v2",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "scatter",
                     "shots": 10,
@@ -365,14 +368,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 1.7,
+                    "initialDelaySeconds": 1.7
                   }
                 },
                 {
                   "id": "blue-bomb-ring",
                   "projectile": "blue-bomb",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -383,8 +386,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 2.5
+                    "cooldownAfterLastShotSeconds": 3.4,
+                    "initialDelaySeconds": 2.12
                   }
                 }
               ],
@@ -394,7 +397,10 @@
                   "count": 3,
                   "despawnOnExit": true,
                   "startPhaseIndex": 0,
-                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                  "placement": {
+                    "kind": "ring-around-owner",
+                    "radiusTiles": 4
+                  }
                 }
               ]
             },
@@ -409,7 +415,7 @@
                 {
                   "id": "yellow-stinger-spread",
                   "projectile": "yellow-stinger-large",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 3,
@@ -420,14 +426,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 1.7,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "yellow-ball-spiral",
                   "projectile": "yellow-ball-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 3,
@@ -438,14 +444,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 1.5
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 1.27
                   }
                 },
                 {
                   "id": "white-bomb-ring",
                   "projectile": "white-bomb-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 12,
@@ -456,8 +462,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 3.4,
+                    "initialDelaySeconds": 1.7
                   }
                 }
               ],
@@ -467,7 +473,10 @@
                   "count": 3,
                   "despawnOnExit": true,
                   "startPhaseIndex": 0,
-                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                  "placement": {
+                    "kind": "ring-around-owner",
+                    "radiusTiles": 4
+                  }
                 }
               ]
             }
@@ -491,7 +500,7 @@
             {
               "id": "blue-ball-spiral-cw",
               "projectile": "blue-ball-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 3,
@@ -502,14 +511,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.2,
-                "initialDelaySeconds": 0.5
+                "cooldownAfterLastShotSeconds": 0.84,
+                "initialDelaySeconds": 0.42
               }
             },
             {
               "id": "blue-ball-spiral-ccw",
               "projectile": "blue-ball-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 3,
@@ -520,14 +529,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.2,
-                "initialDelaySeconds": 0.5
+                "cooldownAfterLastShotSeconds": 0.84,
+                "initialDelaySeconds": 0.42
               }
             },
             {
               "id": "red-ball-spiral-cw",
               "projectile": "red-ball",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 2,
@@ -538,14 +547,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.5,
-                "initialDelaySeconds": 0.75
+                "cooldownAfterLastShotSeconds": 1.05,
+                "initialDelaySeconds": 0.64
               }
             },
             {
               "id": "yellow-ball-ring-frequent",
               "projectile": "yellow-ball-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -556,14 +565,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1,
-                "initialDelaySeconds": 0.25
+                "cooldownAfterLastShotSeconds": 0.7,
+                "initialDelaySeconds": 0.21
               }
             },
             {
               "id": "bee-shot-burst-occasional",
               "projectile": "bee-shot",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 4,
@@ -581,7 +590,7 @@
             {
               "id": "white-bomb-compass-ring",
               "projectile": "white-bomb-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 8,
@@ -592,8 +601,8 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 4,
-                "initialDelaySeconds": 2
+                "cooldownAfterLastShotSeconds": 2.8,
+                "initialDelaySeconds": 1.7
               }
             },
             {
@@ -636,7 +645,7 @@
             {
               "id": "yellow-glaive-spread-ring",
               "projectile": "yellow-glaive-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 4,
@@ -649,13 +658,13 @@
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
                 "cooldownAfterLastShotSeconds": 0.3,
-                "initialDelaySeconds": 0
+                "initialDelaySeconds": 0.0
               }
             },
             {
               "id": "red-glaive-spread-ring",
               "projectile": "red-glaive-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 4,
@@ -668,13 +677,13 @@
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
                 "cooldownAfterLastShotSeconds": 0.3,
-                "initialDelaySeconds": 0
+                "initialDelaySeconds": 0.0
               }
             },
             {
               "id": "blue-glaive-spread-ring",
               "projectile": "blue-glaive-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 4,
@@ -687,13 +696,13 @@
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
                 "cooldownAfterLastShotSeconds": 0.3,
-                "initialDelaySeconds": 0
+                "initialDelaySeconds": 0.0
               }
             },
             {
               "id": "hive-spiral-shot-shotgun",
               "projectile": "hive-spiral-shot-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "spread",
                 "shots": 3,
@@ -704,8 +713,8 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 4,
-                "initialDelaySeconds": 2
+                "cooldownAfterLastShotSeconds": 2.8,
+                "initialDelaySeconds": 1.7
               }
             }
           ]
@@ -741,7 +750,7 @@
                 {
                   "id": "red-ball-stream-scatter",
                   "projectile": "red-ball",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "scatter",
                     "shots": 6,
@@ -753,14 +762,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 0.5
+                    "cooldownAfterLastShotSeconds": 1.05,
+                    "initialDelaySeconds": 0.42
                   }
                 },
                 {
                   "id": "red-glaive-ring",
                   "projectile": "red-glaive-v2",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -771,14 +780,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "red-hive-spiral-shotgun",
                   "projectile": "hive-spiral-shot-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 3,
@@ -789,14 +798,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 1.7
                   }
                 },
                 {
                   "id": "red-stinger-large-ring",
                   "projectile": "red-stinger-large-v2",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -807,8 +816,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 3
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 2.55
                   }
                 }
               ],
@@ -818,7 +827,10 @@
                   "count": 3,
                   "despawnOnExit": true,
                   "startPhaseIndex": 0,
-                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                  "placement": {
+                    "kind": "ring-around-owner",
+                    "radiusTiles": 4
+                  }
                 }
               ]
             },
@@ -835,7 +847,7 @@
                 {
                   "id": "blue-ball-all-directions-scatter",
                   "projectile": "blue-ball-v3",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "scatter",
                     "shots": 12,
@@ -847,14 +859,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 0.5
+                    "cooldownAfterLastShotSeconds": 1.05,
+                    "initialDelaySeconds": 0.42
                   }
                 },
                 {
                   "id": "blue-glaive-ring",
                   "projectile": "blue-glaive-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -865,14 +877,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "blue-stinger-small-ring",
                   "projectile": "blue-stinger-small-v2",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 4,
@@ -883,14 +895,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 1.4,
+                    "initialDelaySeconds": 1.7
                   }
                 },
                 {
                   "id": "blue-hive-range-shotgun",
                   "projectile": "hive-range-shot-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 5,
@@ -901,8 +913,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 3
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 2.55
                   }
                 }
               ],
@@ -912,7 +924,10 @@
                   "count": 3,
                   "despawnOnExit": true,
                   "startPhaseIndex": 0,
-                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                  "placement": {
+                    "kind": "ring-around-owner",
+                    "radiusTiles": 4
+                  }
                 }
               ]
             },
@@ -931,7 +946,7 @@
                 {
                   "id": "yellow-bee-shot-spiral",
                   "projectile": "bee-shot",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 2,
@@ -942,14 +957,14 @@
                   "cadence": {
                     "shotsPerBurst": 3,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 0.5
+                    "cooldownAfterLastShotSeconds": 1.4,
+                    "initialDelaySeconds": 0.42
                   }
                 },
                 {
                   "id": "yellow-glaive-ring",
                   "projectile": "yellow-glaive-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 4,
@@ -960,14 +975,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 1.4,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "yellow-stinger-large-ring",
                   "projectile": "yellow-stinger-large",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -978,14 +993,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 1.7
                   }
                 },
                 {
                   "id": "yellow-hive-shot-ring",
                   "projectile": "hive-shot-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 4,
@@ -996,8 +1011,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 4,
-                    "initialDelaySeconds": 3
+                    "cooldownAfterLastShotSeconds": 2.8,
+                    "initialDelaySeconds": 2.55
                   }
                 }
               ],
@@ -1007,7 +1022,10 @@
                   "count": 3,
                   "despawnOnExit": true,
                   "startPhaseIndex": 0,
-                  "placement": { "kind": "ring-around-owner", "radiusTiles": 4 }
+                  "placement": {
+                    "kind": "ring-around-owner",
+                    "radiusTiles": 4
+                  }
                 }
               ]
             }
@@ -1031,7 +1049,7 @@
             {
               "id": "stinger-machinegun",
               "projectile": "red-stinger-small",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 2,
@@ -1039,8 +1057,14 @@
                 "initialPhaseDegrees": 90,
                 "clockwiseDegreesPerSecond": 12,
                 "gapSectorsDegrees": [
-                  [90, 180],
-                  [270, 0]
+                  [
+                    90,
+                    180
+                  ],
+                  [
+                    270,
+                    0
+                  ]
                 ],
                 "armSpreadDegreesPerSecond": 15,
                 "maxArmSpreadDegrees": 45
@@ -1049,7 +1073,7 @@
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
                 "cooldownAfterLastShotSeconds": 0.1,
-                "initialDelaySeconds": 0
+                "initialDelaySeconds": 0.0
               }
             }
           ],
@@ -1059,21 +1083,30 @@
               "count": 1,
               "despawnOnExit": false,
               "startPhaseIndex": 0,
-              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+              "placement": {
+                "kind": "arena-ring",
+                "ringRadiusFraction": 0.84375
+              }
             },
             {
               "archetype": "killer-bee-nest-blue",
               "count": 1,
               "despawnOnExit": false,
               "startPhaseIndex": 0,
-              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+              "placement": {
+                "kind": "arena-ring",
+                "ringRadiusFraction": 0.84375
+              }
             },
             {
               "archetype": "killer-bee-nest-yellow",
               "count": 1,
               "despawnOnExit": false,
               "startPhaseIndex": 0,
-              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+              "placement": {
+                "kind": "arena-ring",
+                "ringRadiusFraction": 0.84375
+              }
             }
           ]
         },
@@ -1089,7 +1122,10 @@
             "kind": "chase",
             "speedTilesPerSecond": 3
           },
-          "progression": { "kind": "simulated-dps", "hpPerSecond": 195 },
+          "progression": {
+            "kind": "simulated-dps",
+            "hpPerSecond": 195
+          },
           "attacks": [],
           "spawns": [
             {
@@ -1097,21 +1133,30 @@
               "count": 1,
               "despawnOnExit": true,
               "startPhaseIndex": 0,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 3
+              }
             },
             {
               "archetype": "adolescent-blue-beehemoth",
               "count": 1,
               "despawnOnExit": true,
               "startPhaseIndex": 0,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 6 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 6
+              }
             },
             {
               "archetype": "adolescent-yellow-beehemoth",
               "count": 1,
               "despawnOnExit": true,
               "startPhaseIndex": 0,
-              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+              "placement": {
+                "kind": "arena-ring",
+                "ringRadiusFraction": 0.84375
+              }
             }
           ],
           "subPhases": [
@@ -1127,7 +1172,7 @@
                 {
                   "id": "slowing-bee-spiral",
                   "projectile": "bee-shot",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 1,
@@ -1138,14 +1183,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 0.4,
-                    "initialDelaySeconds": 0
+                    "cooldownAfterLastShotSeconds": 0.36,
+                    "initialDelaySeconds": 0.0
                   }
                 },
                 {
                   "id": "yellow-ball-spiral",
                   "projectile": "yellow-ball-v2",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 1,
@@ -1156,14 +1201,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 0.4,
-                    "initialDelaySeconds": 0.2
+                    "cooldownAfterLastShotSeconds": 0.36,
+                    "initialDelaySeconds": 0.17
                   }
                 },
                 {
                   "id": "yellow-stinger-burst",
                   "projectile": "yellow-stinger-large",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 6,
@@ -1174,14 +1219,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 0.5
+                    "cooldownAfterLastShotSeconds": 1.7,
+                    "initialDelaySeconds": 0.42
                   }
                 },
                 {
                   "id": "yellow-blast-burst",
                   "projectile": "hive-shot-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 6,
@@ -1192,8 +1237,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 1.7,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
@@ -1233,7 +1278,7 @@
                 {
                   "id": "red-ball-ring",
                   "projectile": "red-ball",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 6,
@@ -1244,14 +1289,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 0
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 0.0
                   }
                 },
                 {
                   "id": "hive-spiral-ring",
                   "projectile": "hive-spiral-shot-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 6,
@@ -1262,14 +1307,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 0.75
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 0.64
                   }
                 },
                 {
                   "id": "red-stinger-wide-spread",
                   "projectile": "red-stinger-large-v3",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 5,
@@ -1280,14 +1325,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 1.5
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 1.27
                   }
                 },
                 {
                   "id": "red-bomb-ring",
                   "projectile": "red-bomb-v2",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 6,
@@ -1298,8 +1343,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2,
-                    "initialDelaySeconds": 2.25
+                    "cooldownAfterLastShotSeconds": 1.7,
+                    "initialDelaySeconds": 1.91
                   }
                 }
               ]
@@ -1317,7 +1362,7 @@
                 {
                   "id": "blue-glaive-spiral",
                   "projectile": "blue-glaive-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 2,
@@ -1328,14 +1373,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 0.5,
-                    "initialDelaySeconds": 0
+                    "cooldownAfterLastShotSeconds": 0.43,
+                    "initialDelaySeconds": 0.0
                   }
                 },
                 {
                   "id": "blue-ball-ring",
                   "projectile": "blue-ball-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 8,
@@ -1346,14 +1391,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 0.5
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 0.42
                   }
                 },
                 {
                   "id": "blue-stinger-small-spread",
                   "projectile": "blue-stinger-small-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 3,
@@ -1364,14 +1409,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 1
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 0.85
                   }
                 },
                 {
                   "id": "blue-stinger-large-spread",
                   "projectile": "blue-stinger-large",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "spread",
                     "shots": 3,
@@ -1382,14 +1427,14 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 1.5,
-                    "initialDelaySeconds": 1.5
+                    "cooldownAfterLastShotSeconds": 1.28,
+                    "initialDelaySeconds": 1.27
                   }
                 },
                 {
                   "id": "hive-range-ring",
                   "projectile": "hive-range-shot-v1",
-                  "tuningSource": "wiki-prose",
+                  "tuningSource": "trainer-authored",
                   "pattern": {
                     "kind": "ring",
                     "arms": 12,
@@ -1400,8 +1445,8 @@
                   "cadence": {
                     "shotsPerBurst": 1,
                     "shotIntervalSeconds": 0.1,
-                    "cooldownAfterLastShotSeconds": 2.5,
-                    "initialDelaySeconds": 2
+                    "cooldownAfterLastShotSeconds": 2.12,
+                    "initialDelaySeconds": 1.7
                   }
                 }
               ]
@@ -1428,28 +1473,37 @@
               "count": 1,
               "despawnOnExit": false,
               "startPhaseIndex": 1,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 3
+              }
             },
             {
               "archetype": "adolescent-blue-beehemoth",
               "count": 1,
               "despawnOnExit": false,
               "startPhaseIndex": 1,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 6 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 6
+              }
             },
             {
               "archetype": "adolescent-yellow-beehemoth",
               "count": 1,
               "despawnOnExit": false,
               "startPhaseIndex": 1,
-              "placement": { "kind": "arena-ring", "ringRadiusFraction": 0.84375 }
+              "placement": {
+                "kind": "arena-ring",
+                "ringRadiusFraction": 0.84375
+              }
             }
           ],
           "attacks": [
             {
               "id": "final-red-stinger-burst",
               "projectile": "red-stinger-large-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1460,14 +1514,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 0
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 0.0
               }
             },
             {
               "id": "final-yellow-stinger-burst",
               "projectile": "yellow-stinger-small-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1478,14 +1532,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 0.5
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 0.42
               }
             },
             {
               "id": "final-blue-ball-burst",
               "projectile": "blue-ball-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1496,14 +1550,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 1
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 0.85
               }
             },
             {
               "id": "final-hive-range-burst",
               "projectile": "hive-range-shot-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1514,14 +1568,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 1.5
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 1.27
               }
             },
             {
               "id": "final-yellow-glaive-burst",
               "projectile": "yellow-glaive-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1532,14 +1586,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 2
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 1.7
               }
             },
             {
               "id": "final-red-glaive-burst",
               "projectile": "red-glaive-v2",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1550,14 +1604,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 2.5
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 2.12
               }
             },
             {
               "id": "final-blue-glaive-burst",
               "projectile": "blue-glaive-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "trainer-authored",
               "pattern": {
                 "kind": "ring",
                 "arms": 6,
@@ -1568,8 +1622,8 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3,
-                "initialDelaySeconds": 3
+                "cooldownAfterLastShotSeconds": 2.55,
+                "initialDelaySeconds": 2.55
               }
             }
           ]
@@ -1578,9 +1632,21 @@
     },
     "red-killer-bee": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Red Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF has no drain (K16's minions are not timed-progression enemies). Spawned by phase 2's red sub-phase, despawn-on-exit.",
-      "spawnTiles": { "x": 0, "y": -16.2 },
-      "body": { "shape": "beveled-octagon", "widthTiles": 1, "heightTiles": 1 },
-      "health": { "maxHealthHp": 400, "progression": { "kind": "none" } },
+      "spawnTiles": {
+        "x": 0,
+        "y": -16.2
+      },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 1,
+        "heightTiles": 1
+      },
+      "health": {
+        "maxHealthHp": 400,
+        "progression": {
+          "kind": "none"
+        }
+      },
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,
@@ -1594,7 +1660,10 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "red",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 3 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 3
+          },
           "progression": null,
           "attacks": [
             {
@@ -1621,9 +1690,21 @@
     },
     "blue-killer-bee": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Blue Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF, no drain. Spawned by phase 2's blue sub-phase, despawn-on-exit.",
-      "spawnTiles": { "x": 0, "y": -16.2 },
-      "body": { "shape": "beveled-octagon", "widthTiles": 1, "heightTiles": 1 },
-      "health": { "maxHealthHp": 400, "progression": { "kind": "none" } },
+      "spawnTiles": {
+        "x": 0,
+        "y": -16.2
+      },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 1,
+        "heightTiles": 1
+      },
+      "health": {
+        "maxHealthHp": 400,
+        "progression": {
+          "kind": "none"
+        }
+      },
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,
@@ -1637,7 +1718,10 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "cyan",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 3 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 3
+          },
           "progression": null,
           "attacks": [
             {
@@ -1664,9 +1748,21 @@
     },
     "yellow-killer-bee": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Yellow Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF, no drain. Spawned by phase 2's yellow sub-phase, despawn-on-exit.",
-      "spawnTiles": { "x": 0, "y": -16.2 },
-      "body": { "shape": "beveled-octagon", "widthTiles": 1, "heightTiles": 1 },
-      "health": { "maxHealthHp": 400, "progression": { "kind": "none" } },
+      "spawnTiles": {
+        "x": 0,
+        "y": -16.2
+      },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 1,
+        "heightTiles": 1
+      },
+      "health": {
+        "maxHealthHp": 400,
+        "progression": {
+          "kind": "none"
+        }
+      },
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,
@@ -1680,7 +1776,10 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 3 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 3
+          },
           "progression": null,
           "attacks": [
             {
@@ -1707,7 +1806,10 @@
     },
     "small-worker-bee": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Small Worker Bee. 125 HP/25 DEF has no drain. Its slow is contact damage per K17/step 21.5, not a projectile: the source's only attack is an [Invisible] speed-0/range-0 touch. Spawned by an alive Killer Bee Nest's phase.",
-      "spawnTiles": { "x": 0, "y": -17 },
+      "spawnTiles": {
+        "x": 0,
+        "y": -17
+      },
       "body": {
         "shape": "beveled-octagon",
         "widthTiles": 0.5,
@@ -1715,10 +1817,17 @@
       },
       "health": {
         "maxHealthHp": 125,
-        "progression": { "kind": "none" }
+        "progression": {
+          "kind": "none"
+        }
       },
       "contactDamageHp": 40,
-      "contactConditions": [{ "key": "slowed", "seconds": 1.6 }],
+      "contactConditions": [
+        {
+          "key": "slowed",
+          "seconds": 1.6
+        }
+      ],
       "contactArmorPiercing": true,
       "contactCooldownSeconds": 1,
       "blocksPlayer": false,
@@ -1730,7 +1839,10 @@
           "telegraphSeconds": 0.3,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 4 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 4
+          },
           "progression": null,
           "attacks": []
         }
@@ -1738,7 +1850,10 @@
     },
     "killer-bee-nest-red": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), red row. K06: not destructible here, so no health block - the phase always runs its full 29 seconds and always yields the default Beehemoth set (D03 defers Nest destruction and colour control). K18: two-phase archetype - alive fires radial Hive Spiral Shot and spawns Small Worker Bees (once, on entry, not periodically - a fidelity gap this step records), then breaks open into a corpse that fires Red Balls constantly until the encounter ends.",
-      "spawnTiles": { "x": 0, "y": 17 },
+      "spawnTiles": {
+        "x": 0,
+        "y": 17
+      },
       "body": {
         "shape": "beveled-octagon",
         "widthTiles": 2,
@@ -1757,7 +1872,9 @@
           "telegraphSeconds": 1,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "red",
-          "movement": { "kind": "stationary" },
+          "movement": {
+            "kind": "stationary"
+          },
           "progression": null,
           "attacks": [
             {
@@ -1785,7 +1902,10 @@
               "count": 2,
               "despawnOnExit": false,
               "startPhaseIndex": 0,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 3
+              }
             }
           ]
         },
@@ -1796,7 +1916,9 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "red",
-          "movement": { "kind": "stationary" },
+          "movement": {
+            "kind": "stationary"
+          },
           "progression": null,
           "attacks": [
             {
@@ -1823,7 +1945,10 @@
     },
     "killer-bee-nest-blue": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), blue row. Same K06/K18 notes as killer-bee-nest-red.",
-      "spawnTiles": { "x": -14.7, "y": 8.5 },
+      "spawnTiles": {
+        "x": -14.7,
+        "y": 8.5
+      },
       "body": {
         "shape": "beveled-octagon",
         "widthTiles": 2,
@@ -1842,7 +1967,9 @@
           "telegraphSeconds": 1,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "cyan",
-          "movement": { "kind": "stationary" },
+          "movement": {
+            "kind": "stationary"
+          },
           "progression": null,
           "attacks": [
             {
@@ -1870,7 +1997,10 @@
               "count": 2,
               "despawnOnExit": false,
               "startPhaseIndex": 0,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 3
+              }
             }
           ]
         },
@@ -1881,7 +2011,9 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "cyan",
-          "movement": { "kind": "stationary" },
+          "movement": {
+            "kind": "stationary"
+          },
           "progression": null,
           "attacks": [
             {
@@ -1908,7 +2040,10 @@
     },
     "killer-bee-nest-yellow": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Killer Bee Nest (Queen), yellow row. Same K06/K18 notes as killer-bee-nest-red.",
-      "spawnTiles": { "x": 14.7, "y": 8.5 },
+      "spawnTiles": {
+        "x": 14.7,
+        "y": 8.5
+      },
       "body": {
         "shape": "beveled-octagon",
         "widthTiles": 2,
@@ -1927,7 +2062,9 @@
           "telegraphSeconds": 1,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
-          "movement": { "kind": "stationary" },
+          "movement": {
+            "kind": "stationary"
+          },
           "progression": null,
           "attacks": [
             {
@@ -1955,7 +2092,10 @@
               "count": 2,
               "despawnOnExit": false,
               "startPhaseIndex": 0,
-              "placement": { "kind": "ring-around-owner", "radiusTiles": 3 }
+              "placement": {
+                "kind": "ring-around-owner",
+                "radiusTiles": 3
+              }
             }
           ]
         },
@@ -1966,7 +2106,9 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
-          "movement": { "kind": "stationary" },
+          "movement": {
+            "kind": "stationary"
+          },
           "progression": null,
           "attacks": [
             {
@@ -1993,9 +2135,21 @@
     },
     "adolescent-red-beehemoth": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Red Beehemoth. 20,000 HP/40 DEF has no drain (not damageable: the player has no attacks, K01); spawned by phase 7 at startPhaseIndex 0 (aimed pairs/spreads), re-spawned by phase 8 at startPhaseIndex 1 (radial bursts and orb spreads) per K18 - despawn-and-respawn at the phase boundary is an approved simplification of 'they persist', chosen over cross-enemy phase coupling; behaviourally equivalent apart from a visible blink. Movement is a static per-colour approximation of 'orbit her closely' (step's own instruction to avoid minion movement scripting): orbit at a small radius around the arena centre, where the Queen herself stays during phases 7-8.",
-      "spawnTiles": { "x": 3, "y": 0 },
-      "body": { "shape": "beveled-octagon", "widthTiles": 2, "heightTiles": 2 },
-      "health": { "maxHealthHp": 20000, "progression": { "kind": "none" } },
+      "spawnTiles": {
+        "x": 3,
+        "y": 0
+      },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "health": {
+        "maxHealthHp": 20000,
+        "progression": {
+          "kind": "none"
+        }
+      },
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,
@@ -2096,9 +2250,21 @@
     },
     "adolescent-blue-beehemoth": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Blue Beehemoth. 20,000 HP/40 DEF has no drain. Movement is a static approximation of 'follows her loosely' (step's own instruction): a slow chase, below the Paladin's speed. Same spawn/re-spawn simplification as the red Beehemoth (K18).",
-      "spawnTiles": { "x": 0, "y": 6 },
-      "body": { "shape": "beveled-octagon", "widthTiles": 2, "heightTiles": 2 },
-      "health": { "maxHealthHp": 20000, "progression": { "kind": "none" } },
+      "spawnTiles": {
+        "x": 0,
+        "y": 6
+      },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "health": {
+        "maxHealthHp": 20000,
+        "progression": {
+          "kind": "none"
+        }
+      },
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,
@@ -2112,7 +2278,10 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "cyan",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 2.5 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 2.5
+          },
           "progression": null,
           "attacks": [
             {
@@ -2142,7 +2311,10 @@
           "telegraphSeconds": 0.5,
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "cyan",
-          "movement": { "kind": "chase", "speedTilesPerSecond": 2.5 },
+          "movement": {
+            "kind": "chase",
+            "speedTilesPerSecond": 2.5
+          },
           "progression": null,
           "attacks": [
             {
@@ -2187,9 +2359,21 @@
     },
     "adolescent-yellow-beehemoth": {
       "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Yellow Beehemoth. 20,000 HP/40 DEF has no drain. Movement is a static approximation of 'circle along the edges of the room' (step's own instruction): orbit at a large radius, near the arena wall. Same spawn/re-spawn simplification as the red Beehemoth (K18).",
-      "spawnTiles": { "x": 0, "y": -16.2 },
-      "body": { "shape": "beveled-octagon", "widthTiles": 2, "heightTiles": 2 },
-      "health": { "maxHealthHp": 20000, "progression": { "kind": "none" } },
+      "spawnTiles": {
+        "x": 0,
+        "y": -16.2
+      },
+      "body": {
+        "shape": "beveled-octagon",
+        "widthTiles": 2,
+        "heightTiles": 2
+      },
+      "health": {
+        "maxHealthHp": 20000,
+        "progression": {
+          "kind": "none"
+        }
+      },
       "contactDamageHp": 0,
       "contactConditions": [],
       "contactArmorPiercing": false,

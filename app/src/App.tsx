@@ -707,6 +707,22 @@ export default function App() {
                 aria-labelledby="changelog-title"
               >
                 <h2 id="changelog-title">Changelog</h2>
+                <time dateTime="2026-10-29">29 Oct 2026</time>
+                <ul>
+                  <li>
+                    New boss: the Killer Bee Queen, with eight phases to
+                    practice.
+                  </li>
+                  <li>
+                    Status effects like Paralyzed, Slowed and Confused now
+                    change how you move.
+                  </li>
+                  <li>
+                    Add <code>?phase=</code> and <code>?loop=1</code> to
+                    practice a single phase.
+                  </li>
+                  <li>Choose which encounter to train on the home screen.</li>
+                </ul>
                 <time dateTime="2026-10-26">26 Oct 2026</time>
                 <ul>
                   <li>

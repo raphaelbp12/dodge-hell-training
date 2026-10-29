@@ -15,10 +15,12 @@ import {
 import type { ShardState } from "../models";
 import {
   archetypeOf,
+  attackShardBound,
   AUTHORED_TUNING,
   bodyExtentTiles,
   buildEncounterConfig,
   ENCOUNTER_CONFIG,
+  liveShardBoundForEncounter,
   liveShardBoundPerEnemy,
   primaryArchetype,
   projectileOf,
@@ -41,6 +43,7 @@ import {
   effectiveDefenseFor,
   hasCondition,
 } from "../simulation/conditions";
+import { retainedBestSeconds } from "../../storage/attempts";
 import {
   PALADIN_BASE_STATS,
   PALADIN_EQUIPMENT_BONUSES,
@@ -678,6 +681,53 @@ test("the live shard bound derives from configuration, not a literal", () => {
   expect(liveShardBoundPerEnemy(fasterConfig, faster)).toBe(6 * 11 * 3);
 });
 
+test("the live shard bound sums a phase's concurrent attacks and maxes across sub-phases", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const queen = primaryArchetype(queenConfig);
+  const expected = Math.max(
+    ...queen.phases.map((phase) => {
+      const attacksTotal = phase.attacks.reduce(
+        (total, attack) => total + attackShardBound(queenConfig, attack),
+        0,
+      );
+      const subPhaseMax = phase.subPhases?.length
+        ? Math.max(
+            ...phase.subPhases.map((subPhase) =>
+              subPhase.attacks.reduce(
+                (total, attack) => total + attackShardBound(queenConfig, attack),
+                0,
+              ),
+            ),
+          )
+        : 0;
+      return attacksTotal + subPhaseMax;
+    }),
+  );
+  expect(liveShardBoundPerEnemy(queenConfig, queen)).toBe(expected);
+});
+
+test("the encounter-wide live shard bound includes the primary archetype and every minion", () => {
+  const config = ENCOUNTER_CONFIG;
+  const expected =
+    liveShardBoundPerEnemy(config, PRIMARY) * config.spawns.maxConcurrent;
+  expect(liveShardBoundForEncounter(config)).toBe(expected);
+
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const queen = primaryArchetype(queenConfig);
+  const minionBound = Object.entries(queenConfig.archetypes)
+    .filter(([id]) => id !== queenConfig.primaryArchetypeId)
+    .reduce(
+      (total, [, archetype]) =>
+        total + liveShardBoundPerEnemy(queenConfig, archetype),
+      0,
+    );
+  expect(liveShardBoundForEncounter(queenConfig)).toBe(
+    liveShardBoundPerEnemy(queenConfig, queen) *
+      queenConfig.spawns.maxConcurrent +
+      minionBound * queenConfig.maxConcurrentMinions,
+  );
+});
+
 test("debug parameter groups and toggles are derived from the registry", () => {
   expect(DEBUG_GROUPS).toEqual([
     "Enemy",
@@ -787,13 +837,43 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v5");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v6");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
   for (let tick = 0; tick < 600; tick++)
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
   expect(state.enemies).toHaveLength(1);
+});
+
+// Step 24.2 (G19-style): the Queen's rules version advanced from v5 to v6
+// because tuning changed gameplay enough to invalidate comparison with
+// pre-24.2 attempts. A v5 record must be retained in storage but excluded
+// from the new rules version's best, exactly as G19 excluded v1-v3 records
+// when the Crystal Worm moved to v4.
+test("a pre-24.2 Killer Bee Queen attempt record is retained but excluded from the v6 best", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v6");
+  const records = [
+    {
+      id: "a",
+      rulesVersion: "killer-bee-queen-nest-paladin-v5",
+      elapsedSeconds: 500,
+      hitsTaken: 2,
+      outcome: "death" as const,
+    },
+    {
+      id: "b",
+      rulesVersion: queenConfig.rulesVersion,
+      elapsedSeconds: 120,
+      hitsTaken: 5,
+      outcome: "death" as const,
+    },
+  ];
+  expect(retainedBestSeconds(records, queenConfig.rulesVersion)).toBe(120);
+  expect(
+    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v5"),
+  ).toBe(500);
 });
 
 // Step 23.2/23.3: the harmless eight-phase skeleton loads with no attacks
@@ -1850,5 +1930,311 @@ test("the Killer Bee Queen's full fight clears through all eight phases", () => 
   expect(state.phase).toBe("cleared");
   expect(observedPhaseIndices).toEqual(
     new Set([0, 1, 2, 3, 4, 5, 6, 7]),
+  );
+});
+
+// Step 24.1: the derived encounter bound must never be exceeded by a real run.
+test("the Killer Bee Queen's full fight never exceeds the derived live-shard bound", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const bound = liveShardBoundForEncounter(queenConfig);
+  const state = createSimulation(queenConfig, 1);
+  state.debugSettings = { ...state.debugSettings, godMode: true };
+  const idle = { north: false, south: false, east: false, west: false };
+  let peakShards = 0;
+  let peakEnemies = 0;
+  for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++) {
+    advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
+    peakShards = Math.max(peakShards, state.shards.length);
+    peakEnemies = Math.max(peakEnemies, state.enemies.length);
+  }
+  expect(state.phase).toBe("cleared");
+  expect(peakShards).toBeLessThanOrEqual(bound);
+  expect(peakShards).toBeGreaterThan(0);
+  console.log(
+    `Queen full fight: peak shards ${peakShards} (bound ${bound}), peak enemies ${peakEnemies}, cleared at ${state.elapsedSeconds.toFixed(2)}s`,
+  );
+});
+
+// Step 24.3: the same seed and input reproduce a full Queen fight
+// identically (every scatter bearing, wander target and spawn placement)
+// regardless of frame rate or whether frames arrive one fixed step at a
+// time or batched up to `maxStepsPerUpdate`, mirroring the Crystal Worm's
+// own cross-rate equivalence test in simulation.test.ts.
+test("the Killer Bee Queen's full fight is deterministic across frame rates and step batching", () => {
+  // Four full fights (~373s of simulated time each) run here sequentially.
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const idle = { north: false, south: false, east: false, west: false };
+  const runToCleared = (
+    advance: (state: ReturnType<typeof createSimulation>) => void,
+  ) => {
+    const state = createSimulation(queenConfig, 1);
+    state.debugSettings = { ...state.debugSettings, godMode: true };
+    for (let frame = 0; frame < 200_000 && state.phase === "playing"; frame++) {
+      advance(state);
+    }
+    expect(state.phase).toBe("cleared");
+    return state;
+  };
+  const stepSeconds = queenConfig.simulation.fixedStepSeconds;
+  const reference = runToCleared((state) =>
+    advanceSimulation(state, stepSeconds, idle),
+  );
+  for (const frameRate of [30, 120]) {
+    const state = runToCleared((state) =>
+      advanceSimulation(state, 1 / frameRate, idle),
+    );
+    expect(state).toEqual(reference);
+  }
+  const burstSeconds = queenConfig.simulation.maxStepsPerUpdate * stepSeconds;
+  const burstState = runToCleared((state) =>
+    advanceSimulation(state, burstSeconds, idle),
+  );
+  expect(burstState).toEqual(reference);
+}, 30_000);
+
+// Step 24.1: every fixed step advances alone here, so this cannot exercise
+// the catch-up path; it only proves the densest phases never discard a
+// step's worth of time when driven one `maxStepsPerUpdate`-sized burst at a
+// time, which is the shape a slow frame produces in the browser.
+test("a stalled frame during the densest phases catches up within maxStepsPerUpdate without discarding time", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  for (const startPhaseIndex of [2, 5]) {
+    const state = createSimulation(queenConfig, 1, {
+      startPhaseIndex,
+      loopPhase: true,
+    });
+    state.debugSettings = { ...state.debugSettings, godMode: true };
+    const idle = { north: false, south: false, east: false, west: false };
+    const stepSeconds = queenConfig.simulation.fixedStepSeconds;
+    const stalledFrameSeconds =
+      queenConfig.simulation.maxStepsPerUpdate * stepSeconds;
+    for (let frame = 0; frame < Math.round(60 / stalledFrameSeconds); frame++) {
+      const result = advanceSimulation(state, stalledFrameSeconds, idle);
+      expect(result.discardedSeconds).toBe(0);
+    }
+  }
+});
+
+// Step 24.1: the two densest phases drilled in isolation for 60s.
+for (const [phase, label] of [[2, "phase 3"], [5, "phase 6"]] as const) {
+  test(`drilling ${label} for 60s never exceeds the derived live-shard bound`, () => {
+    const queenConfig = encounterConfigOf("killer-bee-queen");
+    const bound = liveShardBoundForEncounter(queenConfig);
+    const state = createSimulation(queenConfig, 1, {
+      startPhaseIndex: phase,
+      loopPhase: true,
+    });
+    state.debugSettings = { ...state.debugSettings, godMode: true };
+    const idle = { north: false, south: false, east: false, west: false };
+    const ticks = Math.round(60 / queenConfig.simulation.fixedStepSeconds);
+    let peakShards = 0;
+    for (let tick = 0; tick < ticks; tick++) {
+      advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
+      peakShards = Math.max(peakShards, state.shards.length);
+    }
+    expect(peakShards).toBeLessThanOrEqual(bound);
+    console.log(`Drilling ${label} for 60s: peak shards ${peakShards} (bound ${bound})`);
+  });
+}
+
+// Step 24.2: a player who flees the nearest threat, sliding tangentially
+// along the wall once pushed near it (the same shape phase 5's own 23.7
+// survivability test uses, with hysteresis so the two modes do not cancel
+// each other out tick to tick), survives a phase whose Queen orbits or
+// holds at distance; one who stands still does not.
+function fleeNearestThreat(
+  state: ReturnType<typeof createSimulation>,
+  stepSeconds: number,
+  ticks: number,
+  phaseIndex: number,
+) {
+  const enemy = state.enemies.find((e) => e.spawnedByEnemyId === null)!;
+  let tangentMode = false;
+  for (let tick = 0; tick < ticks; tick++) {
+    if (state.phase !== "playing" || enemy.phaseIndex !== phaseIndex) break;
+    const { x, y } = state.player.positionTiles;
+    const r = Math.hypot(x, y);
+    if (r > 18) tangentMode = true;
+    else if (r < 15) tangentMode = false;
+    let dx: number;
+    let dy: number;
+    if (tangentMode) {
+      dx = -y;
+      dy = x;
+    } else {
+      let nearestDistance = Infinity;
+      let nearestX = 0;
+      let nearestY = 0;
+      for (const other of state.enemies) {
+        const distance = Math.hypot(
+          other.positionTiles.x - x,
+          other.positionTiles.y - y,
+        );
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestX = other.positionTiles.x;
+          nearestY = other.positionTiles.y;
+        }
+      }
+      dx = x - nearestX;
+      dy = y - nearestY;
+    }
+    const input = {
+      north: dy < 0,
+      south: dy > 0,
+      east: dx > 0,
+      west: dx < 0,
+    };
+    advanceSimulation(state, stepSeconds, input);
+  }
+}
+
+test("the Killer Bee Queen's phase 1 is survivable with correct movement and damaging when stationary", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const idle = { north: false, south: false, east: false, west: false };
+
+  const moving = createSimulation(queenConfig, 1);
+  moving.player.positionTiles = { x: 16, y: 0 };
+  fleeNearestThreat(moving, queenConfig.simulation.fixedStepSeconds, 2700, 0);
+  expect(moving.player.healthHp).toBeGreaterThan(PALADIN_STATS.healthHp * 0.5);
+
+  const stationary = createSimulation(queenConfig, 1);
+  for (let tick = 0; tick < 600; tick++)
+    advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+test("the Killer Bee Queen's phase 3 is survivable at range and damaging up close", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const idle = { north: false, south: false, east: false, west: false };
+
+  const distantState = createSimulation(queenConfig, 1, { startPhaseIndex: 2 });
+  distantState.player.positionTiles = { x: 18, y: 0 };
+  for (let tick = 0; tick < 2700; tick++) {
+    advanceSimulation(distantState, queenConfig.simulation.fixedStepSeconds, idle);
+    if (distantState.enemies[0]?.phaseIndex !== 2) break;
+  }
+  expect(distantState.player.healthHp).toBe(PALADIN_STATS.healthHp);
+
+  const closeState = createSimulation(queenConfig, 1, { startPhaseIndex: 2 });
+  for (let tick = 0; tick < 600; tick++)
+    advanceSimulation(closeState, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(closeState.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+// Step 24.2 finding (not a feature, reported rather than fixed per the
+// step's own prompt): phases 2, 7 and 8 stack several simultaneously-active
+// attacks per sub-phase (up to four, each up to a 6-shot burst) on top of a
+// chasing Queen and/or chasing minions. Every generic scripted dodge tried
+// this step - tangential strafing at several radii, fleeing the nearest
+// threat with wall hysteresis, fleeing the enemy centroid - dies to a
+// stacked volley within 6-16 seconds, including at cadences close to their
+// original (pre-24.2) values, so this is not a regression this step
+// introduced. Demonstrating survivability for these three phases needs a
+// bearing-aware dodge (reading each attack's actual angular gap, the way
+// the phase 6 machinegun test already does) rather than a positional
+// heuristic, which this step did not have the budget to build. Only the
+// "damaging when stationary" half of each is asserted below; the
+// "survivable with correct movement" half is left for a follow-up.
+test("the Killer Bee Queen's phase 2 is damaging when stationary", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const idle = { north: false, south: false, east: false, west: false };
+  const stationary = createSimulation(queenConfig, 1, { startPhaseIndex: 1 });
+  for (let tick = 0; tick < 600; tick++)
+    advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+test("the Killer Bee Queen's phase 7 is damaging when stationary", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const idle = { north: false, south: false, east: false, west: false };
+  const stationary = createSimulation(queenConfig, 1, { startPhaseIndex: 6 });
+  for (let tick = 0; tick < 900; tick++)
+    advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+test("the Killer Bee Queen's phase 8 is damaging when stationary", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const idle = { north: false, south: false, east: false, west: false };
+  const stationary = createSimulation(queenConfig, 1, { startPhaseIndex: 7 });
+  for (let tick = 0; tick < 900; tick++)
+    advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
+});
+
+// Step 24.2: the phase 6 machinegun's gap-survivability assertion (step 23.8)
+// must still hold after tightening cadences elsewhere in the fight. Not a
+// new test - a guard that the existing one above still exists and passes
+// is enough, since this file runs it unmodified; this test instead checks
+// that tightening did not change the gap geometry itself, which is what
+// that assertion actually depends on.
+test("the Killer Bee Queen's phase 6 machinegun gap geometry is unchanged by the 24.2 tuning pass", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const archetype = primaryArchetype(queenConfig);
+  const phase6 = archetype.phases[5];
+  const machinegun = phase6.attacks.find(
+    (attack) => attack.projectileId === "red-stinger-small",
+  )!;
+  if (machinegun.pattern.kind !== "ring") throw new Error("expected ring");
+  expect(machinegun.pattern.gapSectorsDegrees).toEqual([
+    [90, 180],
+    [270, 0],
+  ]);
+  expect(machinegun.pattern.maxArmSpreadDegrees).toBe(45);
+});
+
+// Step 24.2: every value whose provenance is "wiki-prose" or "approved-v3"
+// must be untouched by this tuning pass. Checked against the source
+// extract's own "Quantitative Facts Present In The Prose" table
+// (docs/killer-bee-queen-source.md) for the two Queen attacks that carry a
+// real sourced number, plus a spot check of sourced projectile stats that
+// tuning never touches regardless of tuningSource.
+test("the 24.2 tuning pass changed no wiki-prose or approved-v3 value", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const archetype = primaryArchetype(queenConfig);
+
+  const phase3 = archetype.phases[2];
+  const glaiveWave = phase3.attacks.find(
+    (attack) => attack.projectileId === "red-glaive-v1",
+  )!;
+  expect(glaiveWave.tuningSource).toBe("wiki-prose");
+  expect(glaiveWave.cadence.cooldownAfterLastShotSeconds).toBe(7);
+  expect(glaiveWave.cadence.initialDelaySeconds).toBe(0);
+
+  const phase7 = archetype.phases[6];
+  const yellowSub = phase7.subPhases!.find((sub) => sub.id === "yellow")!;
+  const bombAdvance = yellowSub.attacks.find(
+    (attack) => attack.projectileId === "white-bomb-v2",
+  )!;
+  expect(bombAdvance.tuningSource).toBe("wiki-prose");
+  if (bombAdvance.pattern.kind !== "ring") throw new Error("expected ring");
+  expect(bombAdvance.pattern.perBurstAdvanceDegrees).toBe(15);
+
+  // Sourced projectile stats this tuning pass never touches (23.6/23.7
+  // assertions, repeated here as a regression guard specific to this step).
+  const yellowGlaive = projectileOf(queenConfig, "yellow-glaive-v1");
+  expect(yellowGlaive.damageHp).toBe(70);
+  const hiveSpiralShot = projectileOf(queenConfig, "hive-spiral-shot-v1");
+  expect(hiveSpiralShot.damageHp).toBe(200);
+  expect(hiveSpiralShot.armorPiercing).toBe(true);
+});
+
+// Step 24.2 (K13/K04): the full fight's length is governed entirely by the
+// HP-threshold progression and telegraph/invulnerability overhead, never by
+// attack cadence - so tightening trainer-authored cadences must leave the
+// measured full-fight length unchanged from step 24.1's reported 373.43s,
+// confirming the length still lands where K15's 375 HP/second implies.
+test("the Killer Bee Queen's full fight length is unchanged by the 24.2 cadence tuning", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, 1);
+  state.debugSettings = { ...state.debugSettings, godMode: true };
+  const idle = { north: false, south: false, east: false, west: false };
+  for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++)
+    advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(state.phase).toBe("cleared");
+  expect(state.elapsedSeconds).toBeCloseTo(373.43, 0);
+  console.log(
+    `Queen full fight after 24.2 tuning: cleared at ${state.elapsedSeconds.toFixed(2)}s (24.1 baseline: 373.43s)`,
   );
 });

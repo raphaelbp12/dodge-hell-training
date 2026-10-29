@@ -821,32 +821,75 @@ function shotsPerVolley(pattern: AttackPattern): number {
   return pattern.kind === "ring" ? pattern.arms : pattern.shots;
 }
 
+/** Worst-case concurrently-live shards one authored attack can sustain. */
+export function attackShardBound(
+  config: EncounterConfig,
+  attack: AttackSpec,
+): number {
+  const { pattern, cadence } = attack;
+  const projectile = projectileOf(config, attack.projectileId);
+  const groupSeconds =
+    (cadence.shotsPerBurst - 1) * cadence.shotIntervalSeconds +
+    cadence.cooldownAfterLastShotSeconds;
+  return (
+    shotsPerVolley(pattern) *
+    cadence.shotsPerBurst *
+    Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
+  );
+}
+
+/** Sum across a concurrently-firing attack set (phase or sub-phase). */
+function attackSetShardBound(
+  config: EncounterConfig,
+  attacks: readonly AttackSpec[],
+): number {
+  return attacks.reduce(
+    (total, attack) => total + attackShardBound(config, attack),
+    0,
+  );
+}
+
 /**
  * Only one phase is ever active per enemy at a time, so the bound is the
- * worst case across an enemy's own phase - the max over phases, not a sum
- * (unlike the sum across one phase's concurrently-firing attacks, below).
+ * worst case across an enemy's own phase - the max over phases. Within a
+ * phase its own attacks and at most one sub-phase fire concurrently, so a
+ * phase's bound sums its own attacks with the max across its sub-phases.
  */
 export function liveShardBoundPerEnemy(
   config: EncounterConfig,
   archetype: EnemyArchetype,
 ): number {
   return Math.max(
-    ...archetype.phases.map((phase) =>
-      phase.attacks.reduce((total, attack) => {
-        const { pattern, cadence } = attack;
-        const projectile = projectileOf(config, attack.projectileId);
-        const groupSeconds =
-          (cadence.shotsPerBurst - 1) * cadence.shotIntervalSeconds +
-          cadence.cooldownAfterLastShotSeconds;
-        return (
-          total +
-          shotsPerVolley(pattern) *
-            cadence.shotsPerBurst *
-            Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
-        );
-      }, 0),
-    ),
+    ...archetype.phases.map((phase) => {
+      const subPhaseMax = phase.subPhases?.length
+        ? Math.max(
+            ...phase.subPhases.map((subPhase) =>
+              attackSetShardBound(config, subPhase.attacks),
+            ),
+          )
+        : 0;
+      return attackSetShardBound(config, phase.attacks) + subPhaseMax;
+    }),
   );
+}
+
+/**
+ * Per encounter: the primary archetype's own bound times its max concurrent
+ * enemy count, plus every minion archetype's bound times the shared
+ * `maxConcurrentMinions` cap (step 24.1).
+ */
+export function liveShardBoundForEncounter(config: EncounterConfig): number {
+  const primaryBound =
+    liveShardBoundPerEnemy(config, primaryArchetype(config)) *
+    config.spawns.maxConcurrent;
+  const minionBound = Object.entries(config.archetypes)
+    .filter(([id]) => id !== config.primaryArchetypeId)
+    .reduce(
+      (total, [, archetype]) =>
+        total + liveShardBoundPerEnemy(config, archetype),
+      0,
+    );
+  return primaryBound + minionBound * config.maxConcurrentMinions;
 }
 
 /** Resolves an archetype by id, rejecting an unknown one. */

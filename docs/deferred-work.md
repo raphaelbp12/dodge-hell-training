@@ -93,7 +93,29 @@ Rules for this register:
 
 **Why deferred.** Each was measured and judged not worth its churn at the time.
 
-**Blocked on.** Nothing - but note that **F5 stops being latent the moment a second encounter exists.** `constrainToArena` and `advanceSimulation` read the module-level `ENCOUNTER_CONFIG` rather than `state.config`, which is harmless while every simulation shares one arena and one fixed step, and wrong as soon as two encounters differ in either. The active plan fixes F5 inside the step that introduces encounter selection rather than leaving it here.
+**F5 fixed.** Step 23.1 moved the per-encounter arena/step reads onto `state.config` when it introduced encounter selection, so `advanceSimulation` and `constrainToArena` no longer read the module-level `ENCOUNTER_CONFIG`. The remaining findings below are still open.
+
+**Blocked on.** Nothing for F4, F6, F8 and F9; each remains deferred on the same basis as before.
+
+### D11 - Bearing-Aware Dodge Verification For Phases 2, 7 And 8
+
+**What.** A scripted-movement test proving the Killer Bee Queen's phases 2, 7 and 8 are survivable with correct dodging, not just damaging when stationary.
+
+**Why deferred.** Step 24.2 tried several scripted dodges for these phases and every one died to a stacked volley within 6-16 seconds. Writing a dodge script good enough to prove survivability needs bearing-aware movement logic (steering away from the densest incoming volley), which was out of that step's budget.
+
+**Blocked on.** A bearing-aware scripted-dodge helper for the acceptance suite. Until one exists, these three phases are proven dangerous but not proven fair.
+
+**Fidelity gap this leaves.** None to the shipped rules; this is a verification gap. The authored attacks themselves are unchanged from their sourced/trainer-authored cadences.
+
+### D12 - Full Browser Win-Screen Coverage For The Killer Bee Queen
+
+**What.** A Playwright case that drives a real browser through a full Killer Bee Queen fight to the win screen.
+
+**Why deferred.** Step 24.3 found that a full Queen fight takes about six minutes of real browser time, and no existing test runs that long. The headless-simulation clear (`src/game/config/config.test.ts`, "the Killer Bee Queen's full fight clears through all eight phases") proves the cleared path exists; only the real-browser rendering/session path to the win screen is unverified.
+
+**Blocked on.** A decision to accept a multi-minute Playwright case, or a faster way to drive a full clear (for example a debug-only HP-drain multiplier) that does not change shipped tuning.
+
+**Fidelity gap this leaves.** None to the trainer's rules; this is a test-coverage gap. The Crystal Worm encounter's own browser win-screen path is already proven.
 
 ### D10 - Playwright Coverage For The Condition Chip Display
 

@@ -684,3 +684,24 @@ Defence is resolved first and may go negative (Exposed stacked on armour-piercin
 | Curse only | 32 | 85 |
 
 The source's statement about Armor Broken against an already-negative defence cannot hold in this linear formula below a defence of 20; the only player preset has 32 defence, so that sub-20 case is explicitly not modelled.
+
+## Implemented V5 Handoff - Step 24.4
+
+Final record of the shipped Killer Bee Queen, `killer-bee-queen-nest-paladin-v6`, closing out the K01-K18 contract above. Nothing here overrides a decision above; it records what the fight settled on.
+
+### Final Tuned Values
+
+Step 24.2 tightened every `trainer-authored` cadence by 15-30% (cooldowns `x0.7`-`x0.85` floored at 0.3s, `initialDelaySeconds` at `x0.85`) across phases 1, 2, 3, 4, 5, 7 and 8; phase 6's machinegun cooldown and every sub-phase `durationSeconds` were left untouched (the machinegun was already below the floor, and durations are load-bearing for existing tick assertions). The 375 HP/second progression rate (K15) was not changed; the full fight still measures 373.43 seconds. The complete before/after table lives in [step 24.2's execution record](plan-archive/phase-24.md#step-242---tune-the-fight-for-trainability). The two sourced cadence numbers - `red-glaive-wave`'s 7-second cooldown and `white-bomb-advance`'s 15 degrees/burst - were never touched by tuning and are asserted by a regression test against the source extract.
+
+### Sourced-Versus-Authored Split
+
+A provenance defect was found and corrected before tuning: 76 of the Queen's 78 `wiki-prose`-tagged attack cadences were actually invented by phase 23 and had never been sourced numbers. The user approved relabelling 58 of the queen-archetype's own attacks (those whose entire cadence is invented) to `trainer-authored`, keeping only the two genuinely sourced cadences (`red-glaive-wave`, `white-bomb-advance`) as `wiki-prose`, and leaving the minion archetypes - sourced separately under K16 - untouched. Every attack still carries an explicit `tuningSource` (K13); the loader still rejects one with neither tag.
+
+### The Two Unsourced Interpretations
+
+- **Phase-to-projectile-variant bindings (K-era interpretation, step 23.x).** The wiki's attack table never states which phase fires which variant of a repeated sprite (for example, which stinger size appears in which phase); each phase's step authored this binding as a `trainer-authored` interpretation, not a sourced fact.
+- **ROTMG "Hitbox Size" to tile width/height (step 23.1).** The mapping from the wiki's unitless hitbox size of 2 to this project's 2x2-tile body is this project's own interpretation, not a published equivalence.
+
+### Closing Verification
+
+Step 24.3's full matrix: four routine gates PASS (656 tests, 29.33s); full Chromium suite 36/36 passed; the pre-existing Crystal Worm regression (671 volleys, 30/60/120 Hz equivalence) unchanged; a new determinism test reproduces a full Queen fight identically at 30/60/120 Hz and under step batching; storage compatibility holds for v1-v4 Crystal Worm records and the v5->v6 Queen transition; session safety holds in both encounters and drill mode. A full real-browser Queen clear to the win screen is unverified (D12); the headless-simulation clear and the Crystal Worm's own browser win-screen path are proven instead.

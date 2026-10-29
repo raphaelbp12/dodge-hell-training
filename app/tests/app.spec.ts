@@ -991,6 +991,21 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     positionTiles: { x: 0, y: 0 },
     healthHp: 775,
     combatRemainingSeconds: 0,
+    conditionSeconds: {
+      armorBroken: 0,
+      confused: 0,
+      cursed: 0,
+      dazed: 0,
+      exposed: 0,
+      paralyzed: 0,
+      petStasis: 0,
+      quiet: 0,
+      sick: 0,
+      silenced: 0,
+      slowed: 0,
+      unstable: 0,
+      weak: 0,
+    },
   });
   expect(reset.enemies).toHaveLength(1);
   expect(reset.enemies[0]).toEqual({
@@ -1010,6 +1025,19 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
         volleysFired: 0,
       },
     ],
+    nextContactEligibleSeconds: 0,
+    movementPhaseRadians: 0,
+    wanderTargetTiles: null,
+    wanderRetargetAtSeconds: 0,
+    healthHp: null,
+    maxHealthHp: null,
+    invulnerableUntilSeconds: 0,
+    phaseIndex: 0,
+    phaseEnteredAtSeconds: 0,
+    subPhaseIndex: 0,
+    subPhaseEnteredAtSeconds: 0,
+    spawnedByEnemyId: null,
+    despawnOnExit: false,
   });
   // A retry re-randomises the opening bearing, so pin the ring distance.
   expect(centreDistance(reset.enemies[0].positionTiles)).toBeCloseTo(
@@ -1523,6 +1551,124 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
   await expect(page.locator("canvas")).toHaveCount(0);
 });
 
+// Step 24.1: the Queen's phases 3 (index 2) and 6 (index 5) are the two
+// densest. Drilled with god mode so the run never ends early, each gets its
+// own real-browser frame-timing sample, compared against step 17.4's v4
+// baseline (median 16ms, p95 19ms, max 113ms over 3709 frames at a peak of
+// 162 shards - docs/implementation-plan-v4.md) rather than only simulated.
+for (const [phaseIndex, label] of [
+  [2, "phase-3"],
+  [5, "phase-6"],
+] as const) {
+  test(`Queen ${label} drilled for 60 seconds stays within the derived shard bound and reports frame timing`, async ({
+    page,
+  }, testInfo) => {
+    const browserSeconds = 60;
+    const millisecondsPerSecond = 1000;
+    const movementSegmentSeconds = 4;
+    const sampleMilliseconds = 250;
+    test.setTimeout((browserSeconds + 30) * millisecondsPerSecond);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await page.goto(
+      `${seededUrl()}&encounter=killer-bee-queen&phase=${phaseIndex}&loop=1`,
+    );
+    await page.getByRole("button", { name: "Debug", exact: true }).click();
+    await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
+    await page.getByRole("button", { name: "Close debug" }).click();
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await finishCountdown(page);
+
+    const bound = await page.evaluate(async () => {
+      const modulePath = new URL(
+        "src/game/config/encounter.ts",
+        document.baseURI,
+      ).href;
+      const configModule = await import(/* @vite-ignore */ modulePath);
+      return configModule.liveShardBoundForEncounter(
+        configModule.encounterConfigOf("killer-bee-queen"),
+      );
+    });
+
+    const animationFrames = page.evaluate(
+      (durationMilliseconds) =>
+        new Promise<{
+          frameCount: number;
+          medianGapMilliseconds: number;
+          p95GapMilliseconds: number;
+          maximumGapMilliseconds: number;
+        }>((resolve) => {
+          const started = performance.now();
+          let previous = started;
+          const gaps: number[] = [];
+          function measure(now: number) {
+            gaps.push(now - previous);
+            previous = now;
+            if (now - started < durationMilliseconds)
+              requestAnimationFrame(measure);
+            else {
+              gaps.sort((first, second) => first - second);
+              resolve({
+                frameCount: gaps.length,
+                medianGapMilliseconds: gaps[Math.floor(gaps.length / 2)]!,
+                p95GapMilliseconds: gaps[Math.floor(gaps.length * 0.95)]!,
+                maximumGapMilliseconds: gaps[gaps.length - 1]!,
+              });
+            }
+          }
+          requestAnimationFrame(measure);
+        }),
+      browserSeconds * millisecondsPerSecond,
+    );
+
+    const route = ["d", "s", "a", "w"];
+    const started = Date.now();
+    let heldKey = "";
+    let peakShards = 0;
+    let peakEnemies = 0;
+    while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
+      const state = await inspect(page);
+      peakShards = Math.max(peakShards, state.shards.length);
+      peakEnemies = Math.max(peakEnemies, state.enemies.length);
+      expect(state.shards.length).toBeLessThanOrEqual(bound);
+      const nextKey =
+        route[
+          Math.floor(
+            (Date.now() - started) /
+              (movementSegmentSeconds * millisecondsPerSecond),
+          ) % route.length
+        ]!;
+      if (heldKey !== nextKey) {
+        if (heldKey) await page.keyboard.up(heldKey);
+        heldKey = nextKey;
+        await page.keyboard.down(heldKey);
+      }
+      await page.waitForTimeout(sampleMilliseconds);
+    }
+    if (heldKey) await page.keyboard.up(heldKey);
+    const frames = await animationFrames;
+    expect(frames.frameCount).toBeGreaterThan(0);
+    expect(errors).toEqual([]);
+    expect(peakShards).toBeGreaterThan(0);
+    expect(peakShards).toBeLessThanOrEqual(bound);
+
+    const metricsPath = testInfo.outputPath(`queen-${label}-drill.json`);
+    await writeFile(
+      metricsPath,
+      JSON.stringify(
+        { phaseIndex, label, bound, peakShards, peakEnemies, ...frames },
+        null,
+        2,
+      ),
+    );
+    await testInfo.attach(`queen-${label}-drill`, {
+      path: metricsPath,
+      contentType: "application/json",
+    });
+  });
+}
+
 test("launches one Phaser canvas and cleans it up across repeated mounts", async ({
   page,
 }) => {
@@ -1531,7 +1677,7 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
 
   await page.goto(seededUrl());
   await expect(
-    page.getByRole("heading", { name: "Crystal Worm Child", level: 1 }),
+    page.getByRole("heading", { name: "Crystal Worm Swarm", level: 1 }),
   ).toBeVisible();
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.getByRole("button", { name: "Start", exact: true }).click();
