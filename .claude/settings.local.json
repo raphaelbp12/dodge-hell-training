@@ -1,8 +1,5 @@
 {
   "enabledMcpjsonServers": [
     "codegraph"
-  ],
-  "env": {
-    "PATH": "/Users/dkrabapa/.nvm/versions/node/v24.22.1/bin:${PATH}"
-  }
+  ]
 }
