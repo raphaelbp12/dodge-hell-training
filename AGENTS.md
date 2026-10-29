@@ -6,7 +6,14 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 
 - Do not read `implementation-plan.md`, `docs/plan-v*.md`, `first-draft.md`, `docs/plan/`, `docs/mechanics.md`, the plan archives or `README.md` unless the user asks, `/implement-phase` or `/brainstorm` runs, or the task changes gameplay rules. Even then, grep for the relevant heading and read that section, not the whole file.
 - If a request conflicts with a recorded decision in the plan, ask rather than silently choosing.
-- Do not re-read a file already in context this session. Prefer `grep` and line-range reads over full reads of large files.
+- Do not re-read a file already in context this session.
+- For code under `app/src`, query the codegraph index first when it is available (`codegraph_explore`, or the `codegraph` CLI): one call returns a symbol's source, its call paths and what depends on it, and the source it returns counts as already read. Use `grep` or a line-range read only for a single known line, or when the index is unavailable. Do not call it before an edit merely to survey blast radius.
+- codegraph does not index Markdown, JSON or configuration. For those, grep for the relevant heading or key and read that range, never the whole file.
+
+## Tool use and replies
+
+- Create and change repository files with the Write and Edit tools, never with `cat >` heredocs, `sed -i` or other shell rewrites: those bypass file tracking and echo whole files back into context. Throwaway scripts outside the repository, for example under `/tmp`, may still be written with a heredoc.
+- Default to terse chat replies: answer first, drop preamble and restatement, keep every technical fact. Anything persisted stays in full prose - commit messages, plan and phase files, code comments and deferred-register entries - as do questions, warnings and confirmations.
 
 ## Scope and design
 
