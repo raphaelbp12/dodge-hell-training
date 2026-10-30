@@ -1,5 +1,6 @@
 import {
   constrainBodyToArena,
+  convexPartsBoundingRadiusTiles,
   pointOnRing,
   pursueBody,
   sweptConvexOverlap,
@@ -20,6 +21,7 @@ import {
   degreesToRadians,
   ENCOUNTER_CONFIG,
   movementSpeedTilesPerSecond,
+  PRIMARY_ARCHETYPE_ID,
   projectileOf,
   type AttackSpec,
   type EncounterConfig,
@@ -38,6 +40,7 @@ import {
   DEBUG_RULES_VERSION,
   debugEncounterConfig,
   isDefaultDebugSettings,
+  validateDebugSettings,
   type DebugSettings,
 } from "../config/debug";
 import {
@@ -95,17 +98,24 @@ export type SimulationState = {
   accumulatorSeconds: number;
 };
 
+export type DetonationEvent = Readonly<{
+  projectileId: string;
+  positionTiles: Vector2;
+  radiusTiles: number;
+}>;
+
 export type AdvanceResult = Readonly<{
   stepsExecuted: number;
   discardedSeconds: number;
   acceptedHits: readonly AcceptedHit[];
+  detonations: readonly DetonationEvent[];
 }>;
 
 const timeRoundingToleranceSeconds =
   ENCOUNTER_CONFIG.simulation.fixedStepSeconds * Number.EPSILON * 16;
 const fullTurnRadians = 2 * Math.PI;
 
-/** Broadphase bound: player body plus the largest body across the projectile catalog. */
+/** Broadphase bound: player body plus the largest compound body across the projectile catalog. */
 function boundingRadiusTiles(config: EncounterConfig): number {
   const radius = (vertices: readonly Vector2[]): number =>
     Math.max(...vertices.map((vertex) => Math.hypot(vertex.x, vertex.y)));
@@ -113,7 +123,7 @@ function boundingRadiusTiles(config: EncounterConfig): number {
     radius(config.player.verticesTiles) +
     Math.max(
       ...Object.values(config.projectiles).map((projectile) =>
-        radius(projectile.verticesTiles),
+        convexPartsBoundingRadiusTiles(projectile.collisionPartsTiles),
       ),
     )
   );
@@ -304,7 +314,17 @@ export function setDebugSettings(
   state: SimulationState,
   settings: DebugSettings,
 ): void {
-  const config = debugEncounterConfig(settings);
+  validateDebugSettings(settings);
+  const defaults = isDefaultDebugSettings(settings);
+  // Only the Crystal Worm has a debug tuning config. Other encounters may still
+  // carry the debug toggle state - god mode is the non-tuning case - but their
+  // config must not be replaced by the Crystal Worm debug config.
+  if (state.config.primaryArchetypeId !== PRIMARY_ARCHETYPE_ID) {
+    state.debugSettings = { ...settings };
+    if (!defaults) state.rulesVersion = DEBUG_RULES_VERSION;
+    return;
+  }
+  const config = defaults ? ENCOUNTER_CONFIG : debugEncounterConfig(settings);
   const previous = state.debugSettings;
   const changed = Object.keys(settings).some(
     (key) =>
@@ -314,8 +334,7 @@ export function setDebugSettings(
   if (!changed) return;
   state.config = config;
   state.debugSettings = { ...settings };
-  if (!isDefaultDebugSettings(settings))
-    state.rulesVersion = DEBUG_RULES_VERSION;
+  if (!defaults) state.rulesVersion = DEBUG_RULES_VERSION;
   const rotationChanged =
     settings.rotationDegreesPerSecond !== previous.rotationDegreesPerSecond ||
     settings.initialPhaseDegrees !== previous.initialPhaseDegrees;
@@ -789,8 +808,14 @@ export function advanceSimulation(
 ): AdvanceResult {
   assertNonnegative(elapsedSeconds, "elapsedSeconds");
   const acceptedHits: AcceptedHit[] = [];
+  const detonations: DetonationEvent[] = [];
   if (currentPhase(state) !== "playing")
-    return { stepsExecuted: 0, discardedSeconds: elapsedSeconds, acceptedHits };
+    return {
+      stepsExecuted: 0,
+      discardedSeconds: elapsedSeconds,
+      acceptedHits,
+      detonations,
+    };
   const pendingSeconds = state.accumulatorSeconds + elapsedSeconds;
   assertNonnegative(pendingSeconds, "pendingSeconds");
   const { fixedStepSeconds, maxStepsPerUpdate } = state.config.simulation;
@@ -845,6 +870,17 @@ export function advanceSimulation(
         state.player.positionTiles,
       );
       if (result.hitPlayer) registerShardHit(state, shard, acceptedHits);
+      if (result.detonated && shard.detonationTargetTiles) {
+        const projectile = projectileOf(state.config, shard.projectileId);
+        if (projectile.motion.kind === "lob")
+          detonations.push(
+            Object.freeze({
+              projectileId: shard.projectileId,
+              positionTiles: { ...shard.detonationTargetTiles },
+              radiusTiles: projectile.motion.detonationRadiusTiles,
+            }),
+          );
+      }
       return result.alive;
     });
     if (state.player.healthHp > 0 && currentPhase(state) === "playing") {
@@ -852,6 +888,9 @@ export function advanceSimulation(
       const existingCount = state.shards.length;
       updateAttacks(state);
       for (const shard of state.shards.slice(existingCount)) {
+        // A lob only ever hits by detonating; its body is visual-only.
+        if (projectileOf(state.config, shard.projectileId).motion.kind === "lob")
+          continue;
         if (
           shardOverlapsPlayer(
             state,
@@ -873,6 +912,7 @@ export function advanceSimulation(
       return {
         stepsExecuted,
         acceptedHits,
+        detonations,
         discardedSeconds: Math.max(
           0,
           pendingSeconds - stepsExecuted * fixedStepSeconds,
@@ -881,5 +921,5 @@ export function advanceSimulation(
     }
   }
   state.accumulatorSeconds = remainderSeconds;
-  return { stepsExecuted, discardedSeconds, acceptedHits };
+  return { stepsExecuted, discardedSeconds, acceptedHits, detonations };
 }

@@ -15,6 +15,7 @@ import shapesData from "../data/shapes.json";
 import enemiesData from "../data/enemies.json";
 import encounterData from "../data/encounter.json";
 import projectilesData from "../data/projectiles.json";
+import appearancesData from "../data/projectile-appearances.json";
 
 // Boundary between authored JSON and the derived runtime configuration.
 //
@@ -171,6 +172,193 @@ export function validateBody(value: unknown, path: string): AuthoredBody {
   });
 }
 
+export type AuthoredAppearanceTemplate =
+  | Readonly<{
+      kind: "pixels";
+      widthPixels: number;
+      heightPixels: number;
+      rows: readonly string[];
+    }>
+  | Readonly<{
+      kind: "bomb";
+      frameOuterPixels: readonly number[];
+      borderPixels: number;
+    }>;
+
+export type AuthoredAppearance = Readonly<{
+  id: string;
+  templateId: string;
+  palette: Readonly<Record<string, string>>;
+  bodyColor?: string;
+  source: string;
+}>;
+
+export type AuthoredAppearances = Readonly<{
+  pixelsPerTile: number;
+  templates: Readonly<Record<string, AuthoredAppearanceTemplate>>;
+  appearances: Readonly<Record<string, AuthoredAppearance>>;
+}>;
+
+const expectedAppearanceCount = 19;
+const expectedAppearanceTemplateCount = 7;
+
+function positiveSafeInteger(value: unknown, path: string): number {
+  const number = positiveNumber(value, path);
+  if (!Number.isSafeInteger(number)) reject(path, "must be a safe integer");
+  return number;
+}
+
+function colour(value: unknown, path: string): string {
+  const colourText = text(value, path);
+  if (!/^#[0-9a-fA-F]{6}$/.test(colourText))
+    reject(path, "must be a #rrggbb colour");
+  return colourText;
+}
+
+function validateAppearanceTemplate(
+  value: unknown,
+  path: string,
+): AuthoredAppearanceTemplate {
+  const template = record(value, path);
+  const hasRows = "rows" in template;
+  const hasBombFrames = "frameOuterPixels" in template;
+  if (hasRows === hasBombFrames)
+    reject(path, "must define exactly one of rows or frameOuterPixels");
+  if (hasRows) {
+    const widthPixels = positiveSafeInteger(
+      template.widthPixels,
+      `${path}.widthPixels`,
+    );
+    const heightPixels = positiveSafeInteger(
+      template.heightPixels,
+      `${path}.heightPixels`,
+    );
+    if (!Array.isArray(template.rows))
+      reject(`${path}.rows`, "must be an array");
+    if (template.rows.length !== heightPixels)
+      reject(`${path}.rows`, "must have one row per height pixel");
+    const rows = template.rows.map((row, index) => {
+      const rowText = text(row, `${path}.rows[${index}]`);
+      if (rowText.length !== widthPixels)
+        reject(
+          `${path}.rows[${index}]`,
+          `must be exactly ${widthPixels} characters`,
+        );
+      if (/[^A-Z.]/.test(rowText))
+        reject(
+          `${path}.rows[${index}]`,
+          "must contain only palette letters or transparent dots",
+        );
+      return rowText;
+    });
+    return Object.freeze({
+      kind: "pixels" as const,
+      widthPixels,
+      heightPixels,
+      rows: Object.freeze(rows),
+    });
+  }
+  if (!Array.isArray(template.frameOuterPixels) || template.frameOuterPixels.length === 0)
+    reject(`${path}.frameOuterPixels`, "must be a nonempty array");
+  const frameOuterPixels = template.frameOuterPixels.map((outer, index) =>
+    positiveSafeInteger(outer, `${path}.frameOuterPixels[${index}]`),
+  );
+  const borderPixels = positiveSafeInteger(
+    template.borderPixels,
+    `${path}.borderPixels`,
+  );
+  if (frameOuterPixels.some((outer) => borderPixels * 2 >= outer))
+    reject(
+      `${path}.borderPixels`,
+      "must leave a positive interior in every frame",
+    );
+  return Object.freeze({
+    kind: "bomb" as const,
+    frameOuterPixels: Object.freeze(frameOuterPixels),
+    borderPixels,
+  });
+}
+
+export function validateAppearances(value: unknown): AuthoredAppearances {
+  const data = record(value, "appearances");
+  const pixelsPerTile = positiveNumber(
+    data.pixelsPerTile,
+    "appearances.pixelsPerTile",
+  );
+  const templatesRecord = record(data.templates, "appearances.templates");
+  const templates = Object.freeze(
+    Object.fromEntries(
+      Object.entries(templatesRecord).map(([id, template]) => [
+        id,
+        validateAppearanceTemplate(template, `appearances.templates.${id}`),
+      ]),
+    ),
+  );
+  const templateIds = Object.keys(templates);
+  if (templateIds.length !== expectedAppearanceTemplateCount)
+    reject(
+      "appearances.templates",
+      `must define exactly ${expectedAppearanceTemplateCount} templates`,
+    );
+
+  const appearancesRecord = record(data.appearances, "appearances.appearances");
+  const appearances = Object.freeze(
+    Object.fromEntries(
+      Object.entries(appearancesRecord).map(([id, value]) => {
+        const path = `appearances.appearances.${id}`;
+        const appearance = record(value, path);
+        const templateId = text(appearance.template, `${path}.template`);
+        const template = templates[templateId];
+        if (!template)
+          reject(`${path}.template`, "must name a defined template");
+        const paletteRecord = record(appearance.palette, `${path}.palette`);
+        const palette = Object.freeze(
+          Object.fromEntries(
+            Object.entries(paletteRecord).map(([key, colourValue]) => {
+              if (!/^[A-Z]$/.test(key))
+                reject(`${path}.palette.${key}`, "must be a single uppercase letter");
+              return [key, colour(colourValue, `${path}.palette.${key}`)];
+            }),
+          ),
+        );
+        if (Object.keys(palette).length === 0)
+          reject(`${path}.palette`, "must define at least one colour");
+        const source = text(appearance.source, `${path}.source`);
+        if (template.kind === "pixels") {
+          for (const [rowIndex, row] of template.rows.entries()) {
+            for (const [columnIndex, character] of [...row].entries()) {
+              if (character !== "." && !(character in palette))
+                reject(
+                  `${path}.palette`,
+                  `is missing colour ${character} used at ${templateId}.rows[${rowIndex}][${columnIndex}]`,
+                );
+            }
+          }
+          return [
+            id,
+            Object.freeze({ id, templateId, palette, source }),
+          ];
+        }
+        if (!("A" in palette) || !("B" in palette))
+          reject(`${path}.palette`, "bomb appearances require A and B colours");
+        if (!("bodyColor" in appearance))
+          reject(`${path}.bodyColor`, "bomb appearances require a body colour");
+        const bodyColor = colour(appearance.bodyColor, `${path}.bodyColor`);
+        return [
+          id,
+          Object.freeze({ id, templateId, palette, source, bodyColor }),
+        ];
+      }),
+    ),
+  );
+  if (Object.keys(appearances).length !== expectedAppearanceCount)
+    reject(
+      "appearances.appearances",
+      `must define exactly ${expectedAppearanceCount} appearances`,
+    );
+  return Object.freeze({ pixelsPerTile, templates, appearances });
+}
+
 export type AuthoredProjectileMotion =
   | Readonly<{
       kind: "boomerang";
@@ -262,7 +450,8 @@ export type AuthoredProjectile = Readonly<{
   speedTilesPerSecond: number;
   armorPiercing: boolean;
   conditions: readonly ConditionApplication[];
-  body: AuthoredBody;
+  body?: AuthoredBody;
+  appearance?: string;
   expiration: string;
   hitPolicy: string;
   motion: AuthoredProjectileMotion;
@@ -349,9 +538,19 @@ export function validateProjectile(
   value: unknown,
   id: string,
   stepSeconds: number,
+  appearanceIds: ReadonlySet<string> = new Set(),
 ): AuthoredProjectile {
   const path = `projectiles.projectiles.${id}`;
   const projectile = record(value, path);
+  const hasBody = "body" in projectile;
+  const hasAppearance = "appearance" in projectile;
+  if (hasBody === hasAppearance)
+    reject(path, "must define exactly one of body or appearance");
+  const appearance = hasAppearance
+    ? text(projectile.appearance, `${path}.appearance`)
+    : undefined;
+  if (appearance !== undefined && !appearanceIds.has(appearance))
+    reject(`${path}.appearance`, "must name a defined appearance");
   const motion = validateProjectileMotion(projectile.motion, `${path}.motion`);
   const speedTilesPerSecond = positiveNumber(
     projectile.speedTilesPerSecond,
@@ -391,7 +590,8 @@ export function validateProjectile(
       `${path}.armorPiercing`,
     ),
     conditions: validateConditions(projectile.conditions, `${path}.conditions`),
-    body: validateBody(projectile.body, `${path}.body`),
+    ...(hasBody ? { body: validateBody(projectile.body, `${path}.body`) } : {}),
+    ...(appearance !== undefined ? { appearance } : {}),
     expiration: text(projectile.expiration, `${path}.expiration`),
     hitPolicy: text(projectile.hitPolicy, `${path}.hitPolicy`),
     motion,
@@ -401,6 +601,7 @@ export function validateProjectile(
 export function validateProjectiles(
   value: unknown,
   stepSeconds: number,
+  appearanceIds: ReadonlySet<string> = new Set(),
 ): Readonly<Record<string, AuthoredProjectile>> {
   const data = record(value, "projectiles");
   const projectiles = record(data.projectiles, "projectiles.projectiles");
@@ -409,7 +610,10 @@ export function validateProjectiles(
     reject("projectiles.projectiles", "must define at least one projectile");
   return Object.freeze(
     Object.fromEntries(
-      ids.map((id) => [id, validateProjectile(projectiles[id], id, stepSeconds)]),
+      ids.map((id) => [
+        id,
+        validateProjectile(projectiles[id], id, stepSeconds, appearanceIds),
+      ]),
     ),
   );
 }
@@ -1444,9 +1648,11 @@ if (!AUTHORED_ENCOUNTER_DATA.encounters["crystal-worm"])
     "encounter.encounters",
     'must define a "crystal-worm" entry; the debug panel is hardwired to it',
   );
+export const AUTHORED_APPEARANCES = validateAppearances(appearancesData);
 export const AUTHORED_PROJECTILES = validateProjectiles(
   projectilesData,
   AUTHORED_ENCOUNTER_DATA.simulation.fixedStepSeconds,
+  new Set(Object.keys(AUTHORED_APPEARANCES.appearances)),
 );
 export const AUTHORED_ARCHETYPES = validateArchetypes(
   enemiesData,

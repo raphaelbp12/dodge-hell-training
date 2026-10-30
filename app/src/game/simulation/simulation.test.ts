@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   ENCOUNTER_CONFIG,
+  encounterConfigOf,
   liveShardBoundPerEnemy,
   primaryArchetype,
   projectileOf,
@@ -17,6 +18,7 @@ import {
 } from "./simulation.ts";
 import { createShard, restampLiveShards } from "./projectiles.ts";
 import {
+  DEBUG_RULES_VERSION,
   DEFAULT_DEBUG_SETTINGS,
   updateDebugParameter,
   loadSelectedDebugValues,
@@ -315,6 +317,7 @@ test("does not advance movement or survival time without a full tick", () => {
     stepsExecuted: 0,
     discardedSeconds: 0,
     acceptedHits: [],
+    detonations: [],
   });
   advanceSimulation(state, stepSeconds / 4, east);
   expect(state.player.positionTiles).toEqual({ x: 0, y: 0 });
@@ -1750,6 +1753,8 @@ test("a lob shard's detonation goes through the shared registerShardHit path, pr
         armorPiercing: false,
         conditions: [],
         verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
+        collisionPartsTiles: [PRIMARY_PROJECTILE.verticesTiles],
+        appearance: null,
         expiration: "lifetime-only",
         hitPolicy: "once-per-shard",
         motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
@@ -1796,6 +1801,8 @@ test("a lob shard whose detonation misses the player applies nothing", () => {
         armorPiercing: false,
         conditions: [],
         verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
+        collisionPartsTiles: [PRIMARY_PROJECTILE.verticesTiles],
+        appearance: null,
         expiration: "lifetime-only",
         hitPolicy: "once-per-shard",
         motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
@@ -1815,6 +1822,71 @@ test("a lob shard whose detonation misses the player applies nothing", () => {
   }
   expect(state.player.healthHp).toBe(healthBefore);
   expect(state.shards).toEqual([]);
+});
+
+test("Crystal Worm debug reset restores the base config and rules", () => {
+  const state = createSimulation(ENCOUNTER_CONFIG, 1);
+  setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
+  expect(state.config).not.toBe(ENCOUNTER_CONFIG);
+  setDebugSettings(state, DEFAULT_DEBUG_SETTINGS);
+  expect(state.config).toBe(ENCOUNTER_CONFIG);
+  // Eligibility stays tainted until a retry rebuilds the simulation.
+  expect(state.rulesVersion).toBe(DEBUG_RULES_VERSION);
+});
+
+test("Queen god mode keeps the Queen config and taints the attempt until retry", () => {
+  const queen = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queen, 1);
+  setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
+  expect(state.config).toBe(queen);
+  expect(state.config.primaryArchetypeId).toBe("killer-bee-queen");
+  expect(state.debugSettings.godMode).toBe(true);
+  expect(state.rulesVersion).toBe(DEBUG_RULES_VERSION);
+  setDebugSettings(state, DEFAULT_DEBUG_SETTINGS);
+  expect(state.config).toBe(queen);
+  // Debug eligibility stays tainted until retry, matching the session policy.
+  expect(state.rulesVersion).toBe(DEBUG_RULES_VERSION);
+  expect(state.debugSettings.godMode).toBe(false);
+});
+
+test("a lob shard reports exactly one detonation event at its target, even when it misses", () => {
+  const LOB_PROJECTILE_ID = "test-lob-detonation";
+  const state = freshSimulation();
+  state.config = {
+    ...state.config,
+    projectiles: {
+      ...state.config.projectiles,
+      [LOB_PROJECTILE_ID]: {
+        id: LOB_PROJECTILE_ID,
+        damageHp: 200,
+        speedTilesPerSecond: 5,
+        armorPiercing: false,
+        conditions: [],
+        verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
+        collisionPartsTiles: [PRIMARY_PROJECTILE.verticesTiles],
+        appearance: null,
+        expiration: "lifetime-only",
+        hitPolicy: "once-per-shard",
+        motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
+      },
+    },
+  };
+  state.enemies = [];
+  state.shards = [];
+  state.player.positionTiles = { x: 20, y: 0 };
+  const lobProjectile = state.config.projectiles[LOB_PROJECTILE_ID];
+  state.shards.push(createShard(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
+
+  const detonations = [];
+  for (let tick = 0; tick < 120; tick++) {
+    detonations.push(...advanceSimulation(state, stepSeconds, idle).detonations);
+  }
+  expect(detonations).toHaveLength(1);
+  expect(detonations[0]).toMatchObject({
+    projectileId: LOB_PROJECTILE_ID,
+    positionTiles: { x: 10, y: 0 },
+    radiusTiles: 1.5,
+  });
 });
 
 test("a two-attack archetype fires each attack on its own independent cadence, with shard ids ordered by attack", () => {

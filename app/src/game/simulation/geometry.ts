@@ -111,6 +111,149 @@ function project(
   };
 }
 
+/**
+ * Fixed validation ceiling for a compound projectile body. The largest
+ * authored template currently produces 58 parts (the hive); a focused test
+ * asserts the catalog never exceeds this value. It is not recomputed at
+ * runtime, so changing the templates requires updating the ceiling and its
+ * assertion together.
+ */
+export const MAXIMUM_BODY_PART_COUNT = 58;
+
+export type ConvexPart = readonly Vector2[];
+
+export function validateConvexParts(parts: readonly ConvexPart[]): void {
+  if (parts.length === 0)
+    throw new RangeError("Compound bodies require at least one part");
+  if (parts.length > MAXIMUM_BODY_PART_COUNT)
+    throw new RangeError(
+      `Compound bodies may contain at most ${MAXIMUM_BODY_PART_COUNT} parts`,
+    );
+  for (const part of parts) validatedAxes(part);
+}
+
+/**
+ * Fast rigid transform for already-validated rectangular parts. It performs
+ * the same `translate(position) * rotate(orientation)` operation as
+ * `transformBodyVertices` without re-validating every part on every step.
+ */
+export function transformBodyParts(
+  parts: readonly ConvexPart[],
+  positionTiles: Vector2,
+  orientationRadians = 0,
+): readonly (readonly Vector2[])[] {
+  const cos = Math.cos(orientationRadians);
+  const sin = Math.sin(orientationRadians);
+  return Object.freeze(
+    parts.map((part) =>
+      Object.freeze(
+        part.map((vertex) => ({
+          x: vertex.x * cos - vertex.y * sin + positionTiles.x,
+          y: vertex.x * sin + vertex.y * cos + positionTiles.y,
+        })),
+      ),
+    ),
+  );
+}
+
+function uncheckedAxes(verticesTiles: readonly Vector2[]): Vector2[] {
+  return verticesTiles.map((start, index) => {
+    const end = verticesTiles[(index + 1) % verticesTiles.length];
+    const vertical = end.y - start.y;
+    const horizontal = end.x - start.x;
+    const lengthTiles = Math.hypot(horizontal, vertical);
+    return { x: -vertical / lengthTiles, y: horizontal / lengthTiles };
+  });
+}
+
+function sweptConvexOverlapPrepared(
+  firstStartVerticesTiles: readonly Vector2[],
+  firstAxes: readonly Vector2[],
+  secondStartVerticesTiles: readonly Vector2[],
+  secondAxes: readonly Vector2[],
+  firstDisplacementTiles: Vector2,
+  secondDisplacementTiles: Vector2,
+  toleranceTiles: number,
+): boolean {
+  const axes = [...firstAxes, ...secondAxes];
+  const relativeDisplacementTiles = {
+    x: firstDisplacementTiles.x - secondDisplacementTiles.x,
+    y: firstDisplacementTiles.y - secondDisplacementTiles.y,
+  };
+  const originTiles = firstStartVerticesTiles[0];
+  let entryFraction = 0;
+  let exitFraction = 1;
+  for (const axis of axes) {
+    const first = project(firstStartVerticesTiles, axis, originTiles);
+    const second = project(secondStartVerticesTiles, axis, originTiles);
+    const displacement =
+      relativeDisplacementTiles.x * axis.x +
+      relativeDisplacementTiles.y * axis.y;
+    if (displacement === 0) {
+      if (
+        second.minimum - first.maximum - toleranceTiles > 0 ||
+        second.maximum - first.minimum + toleranceTiles < 0
+      )
+        return false;
+      continue;
+    }
+    const firstFraction =
+      (second.minimum - first.maximum - toleranceTiles) / displacement;
+    const secondFraction =
+      (second.maximum - first.minimum + toleranceTiles) / displacement;
+    entryFraction = Math.max(
+      entryFraction,
+      Math.min(firstFraction, secondFraction),
+    );
+    exitFraction = Math.min(
+      exitFraction,
+      Math.max(firstFraction, secondFraction),
+    );
+    if (entryFraction > exitFraction) return false;
+  }
+  return true;
+}
+
+export function sweptConvexPartsOverlap(
+  firstStartPartsTiles: readonly ConvexPart[],
+  firstDisplacementTiles: Vector2,
+  secondStartVerticesTiles: readonly Vector2[],
+  secondDisplacementTiles: Vector2,
+): boolean {
+  assertFiniteVector(firstDisplacementTiles);
+  assertFiniteVector(secondDisplacementTiles);
+  const secondAxes = uncheckedAxes(secondStartVerticesTiles);
+  const toleranceTiles = coordinateTolerance([
+    ...firstStartPartsTiles.flatMap((part) => part),
+    ...secondStartVerticesTiles,
+  ]);
+  for (const part of firstStartPartsTiles) {
+    if (
+      sweptConvexOverlapPrepared(
+        part,
+        uncheckedAxes(part),
+        secondStartVerticesTiles,
+        secondAxes,
+        firstDisplacementTiles,
+        secondDisplacementTiles,
+        toleranceTiles,
+      )
+    )
+      return true;
+  }
+  return false;
+}
+
+export function convexPartsBoundingRadiusTiles(
+  parts: readonly ConvexPart[],
+): number {
+  return Math.max(
+    ...parts.flatMap((part) =>
+      part.map((vertex) => Math.hypot(vertex.x, vertex.y)),
+    ),
+  );
+}
+
 export function sweptConvexOverlap(
   firstStartVerticesTiles: readonly Vector2[],
   firstDisplacementTiles: Vector2,

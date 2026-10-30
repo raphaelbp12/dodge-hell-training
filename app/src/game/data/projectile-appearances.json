@@ -1,0 +1,279 @@
+{
+  "comment": "Code-generated pixel appearances transcribed from the RealmEye Killer Bee Queen projectile table. Provenance: docs/projectile-appearance-source.md. No third-party image file is shipped.",
+  "pixelsPerTile": 12.8,
+  "templates": {
+    "stinger-small": {
+      "widthPixels": 7,
+      "heightPixels": 1,
+      "rows": ["AAABCDE"]
+    },
+    "stinger-large": {
+      "widthPixels": 8,
+      "heightPixels": 5,
+      "rows": ["AB......", ".CDEA...", "..CCDEAB", ".CDEA...", "AB......"]
+    },
+    "ball": {
+      "widthPixels": 8,
+      "heightPixels": 8,
+      "rows": [
+        "...AA...",
+        "..ABBA..",
+        ".ABCCBA.",
+        "ABCDDCBA",
+        "ABCDDCBA",
+        ".ABCCBA.",
+        "..ABBA..",
+        "...AA..."
+      ]
+    },
+    "glaive": {
+      "widthPixels": 8,
+      "heightPixels": 8,
+      "rows": [
+        "A......A",
+        ".BC..CB.",
+        ".CB..DC.",
+        "...DB...",
+        "...BD...",
+        ".CD..BC.",
+        ".BC..CB.",
+        "A......A"
+      ]
+    },
+    "hive-shot": {
+      "widthPixels": 49,
+      "heightPixels": 28,
+      "rows": [
+        "...............................A......A..........",
+        "..............................AAA....AAA.........",
+        ".............................AAAAA..AAAAA........",
+        "............................AAAAAAAAAAAAAA.......",
+        ".............AA.....AA.....BBAAAAABBAAAAAAA......",
+        "............AAAA...AAAA...BBBBAAABBBBAAAAAAA.....",
+        "...........AAAAAA.AAAAAA.BBBBBBABBBBBBAAAAAAA....",
+        "..........BAAAAAABAAAAAABBBBBBBBBBBBBBBAAAAAAA...",
+        ".........BBBAAAABBBAAAABBBBBBBBBBBBBBBBBAAAAAAA..",
+        "........BBBBBAABBBBBAABBBBBBBBBBBBBBBBBBBAAAAAAA.",
+        ".......BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBAAAAAAA",
+        "........BBBBB..BBBBBCCBBBBBCCBBBBBBBBBBBBAAAAAAA.",
+        ".........BBB....BBBCCCCBBBCCCCBBBBBBBBBBAAAAAAA..",
+        "..........B......BCCCCCCBCCCCCCBBBBBBBBAAAAAAA...",
+        "...A......A......ACCCCCCACCCCCCBBBBBBBBAAAAAAA...",
+        "..AAA....AAA....AAACCCCAAACCCCBBBBBBBBBBAAAAAAA..",
+        ".AAAAA..AAAAA..AAAAACCAAAAACCBBBBBBBBBBBBAAAAAAA.",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBAAAAAAA",
+        ".AAAAA..AAAAA..AAAAABBAAAAABBBBBBBBBBBBBBAAAAAAA.",
+        "..AAA....AAA....AAABBBBAAABBBBBBBBBBBBBBAAAAAAA..",
+        "...A......A......ABBBBBBABBBBBBBBBBBBBBAAAAAAA...",
+        "..................BBBBBB.BBBBBBABBBBBBAAAAAAA....",
+        "...................BBBB...BBBBAAABBBBAAAAAAA.....",
+        "....................BB.....BBAAAAABBAAAAAAA......",
+        "............................AAAAAAAAAAAAAA.......",
+        ".............................AAAAA..AAAAA........",
+        "..............................AAA....AAA.........",
+        "...............................A......A.........."
+      ]
+    },
+    "bee-shot": {
+      "widthPixels": 8,
+      "heightPixels": 6,
+      "rows": ["AA.AA...", "AABCA...", ".DBD....", "...AA.AA", "...AABCA", "....DBD."]
+    },
+    "bomb-explosion": {
+      "frameOuterPixels": [4, 5, 7, 9, 13],
+      "borderPixels": 1
+    }
+  },
+  "appearances": {
+    "red-stinger-small": {
+      "template": "stinger-small",
+      "palette": {
+        "A": "#191919",
+        "B": "#333333",
+        "C": "#A60F0F",
+        "D": "#C32416",
+        "E": "#F75B28"
+      },
+      "source": "row 1; EH Queen Red Stinger Small; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "red-stinger-large": {
+      "template": "stinger-large",
+      "palette": {
+        "A": "#C32416",
+        "B": "#F75B28",
+        "C": "#191919",
+        "D": "#333333",
+        "E": "#A60F0F"
+      },
+      "source": "rows 2, 21 and 23; EH Queen Red Stinger Large; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "yellow-stinger-small": {
+      "template": "stinger-small",
+      "palette": {
+        "A": "#191919",
+        "B": "#333333",
+        "C": "#CC9220",
+        "D": "#FFCF3F",
+        "E": "#FFE9AA"
+      },
+      "source": "rows 3 and 22; EH Queen Yellow Stinger Small; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "yellow-stinger-large": {
+      "template": "stinger-large",
+      "palette": {
+        "A": "#FFCF3F",
+        "B": "#FFE9AA",
+        "C": "#191919",
+        "D": "#333333",
+        "E": "#E5B42D"
+      },
+      "source": "row 4; EH Queen Yellow Stinger Large; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "blue-stinger-small": {
+      "template": "stinger-small",
+      "palette": {
+        "A": "#191919",
+        "B": "#333333",
+        "C": "#002E8C",
+        "D": "#004C99",
+        "E": "#006599"
+      },
+      "source": "rows 5 and 18; EH Queen Blue Stinger Small; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "blue-stinger-large": {
+      "template": "stinger-large",
+      "palette": {
+        "A": "#004C99",
+        "B": "#006599",
+        "C": "#191919",
+        "D": "#333333",
+        "E": "#002E8C"
+      },
+      "source": "row 6; EH Queen Blue Stinger Large; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "red-ball": {
+      "template": "ball",
+      "palette": {
+        "A": "#84000B",
+        "B": "#BE000E",
+        "C": "#F1442E",
+        "D": "#EE773D"
+      },
+      "source": "row 14; EH Red Ball; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "yellow-ball": {
+      "template": "ball",
+      "palette": {
+        "A": "#FFE97F",
+        "B": "#FFE9AA",
+        "C": "#FFBA20",
+        "D": "#FFFFFF"
+      },
+      "source": "rows 10 and 19; EH Yellow Ball; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "blue-ball": {
+      "template": "ball",
+      "palette": {
+        "A": "#00143C",
+        "B": "#0025B4",
+        "C": "#157EA2",
+        "D": "#1EAAA1"
+      },
+      "source": "rows 8, 9 and 20; EH Blue Ball; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "red-glaive": {
+      "template": "glaive",
+      "palette": {
+        "A": "#84000B",
+        "B": "#F1442E",
+        "C": "#BE000E",
+        "D": "#FFCEC9"
+      },
+      "source": "rows 7 and 12; EH Red Glaive; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "yellow-glaive": {
+      "template": "glaive",
+      "palette": {
+        "A": "#FFBA20",
+        "B": "#FFE9AA",
+        "C": "#FFDF7F",
+        "D": "#FFFFFF"
+      },
+      "source": "row 11; EH Yellow Glaive; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "blue-glaive": {
+      "template": "glaive",
+      "palette": {
+        "A": "#00143C",
+        "B": "#157EA2",
+        "C": "#0025B4",
+        "D": "#CCF2FF"
+      },
+      "source": "row 13; EH Blue Glaive; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "hive-spiral-shot": {
+      "template": "hive-shot",
+      "palette": {
+        "A": "#84000B",
+        "B": "#F1442E",
+        "C": "#ED7842"
+      },
+      "source": "row 15; EH Hive Spiral Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "hive-range-shot": {
+      "template": "hive-shot",
+      "palette": {
+        "A": "#00143C",
+        "B": "#004F9F",
+        "C": "#1EA9A1"
+      },
+      "source": "row 16; EH Hive Range Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "hive-shot": {
+      "template": "hive-shot",
+      "palette": {
+        "A": "#FFBA20",
+        "B": "#FFDF7F",
+        "C": "#FFFFFF"
+      },
+      "source": "row 17; EH Hive Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "bee-shot": {
+      "template": "bee-shot",
+      "palette": {
+        "A": "#F2F2F2",
+        "B": "#0C0C0C",
+        "C": "#FF9B18",
+        "D": "#E57711"
+      },
+      "source": "row 24; EH Bee Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "red-bomb": {
+      "template": "bomb-explosion",
+      "palette": {
+        "A": "#000000",
+        "B": "#FF0000"
+      },
+      "bodyColor": "#FF0000",
+      "source": "rows 25 and 26; Red Bomb; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "white-bomb": {
+      "template": "bomb-explosion",
+      "palette": {
+        "A": "#000000",
+        "B": "#FFFFFF"
+      },
+      "bodyColor": "#FFFFFF",
+      "source": "rows 27 and 28; White Bomb; https://www.realmeye.com/wiki/killer-bee-queen"
+    },
+    "blue-bomb": {
+      "template": "bomb-explosion",
+      "palette": {
+        "A": "#000000",
+        "B": "#0000FF"
+      },
+      "bodyColor": "#0000FF",
+      "source": "row 30; Blue Bomb; https://www.realmeye.com/wiki/killer-bee-queen"
+    }
+  }
+}

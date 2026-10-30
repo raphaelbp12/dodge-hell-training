@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 import {
+  AUTHORED_APPEARANCES,
   AUTHORED_ARCHETYPES,
   AUTHORED_ARENA,
   AUTHORED_PROJECTILES,
   AUTHORED_SHAPES,
+  validateAppearances,
   turningDeviationTiles,
   validateArchetypes,
   validateAttack,
@@ -680,4 +682,204 @@ test.each([
   expect(() =>
     validateAttack(bad, "attacks[0]", CATALOG_IDS, new Set()),
   ).toThrow(RangeError);
+});
+
+test("the appearance catalog covers 19 families with 7 templates at 12.8 pixels per tile", () => {
+  expect(AUTHORED_APPEARANCES.pixelsPerTile).toBe(12.8);
+  expect(Object.keys(AUTHORED_APPEARANCES.appearances)).toHaveLength(19);
+  expect(Object.keys(AUTHORED_APPEARANCES.templates)).toHaveLength(7);
+});
+
+test("every Killer Bee Queen projectile names an appearance, and the Crystal Worm keeps its body", () => {
+  const queenIds = Object.keys(AUTHORED_PROJECTILES).filter(
+    (id) => id !== "crystal-worm-child-shard",
+  );
+  expect(queenIds).toHaveLength(44);
+  for (const id of queenIds) {
+    expect(AUTHORED_PROJECTILES[id]!.appearance).toBeDefined();
+    expect(AUTHORED_PROJECTILES[id]!.body).toBeUndefined();
+  }
+  expect(AUTHORED_PROJECTILES["crystal-worm-child-shard"]!.appearance).toBeUndefined();
+  expect(AUTHORED_PROJECTILES["crystal-worm-child-shard"]!.body).toEqual({
+    shape: "shard-hexagon",
+    widthTiles: 1.45,
+    heightTiles: 0.65,
+  });
+});
+
+test("validateAppearances rejects a grid that uses an undeclared palette letter", () => {
+  const bad = {
+    pixelsPerTile: 12.8,
+    templates: {
+      "stinger-small": { widthPixels: 1, heightPixels: 1, rows: ["B"] },
+      "stinger-large": { widthPixels: 1, heightPixels: 1, rows: ["."] },
+      ball: { widthPixels: 1, heightPixels: 1, rows: ["."] },
+      glaive: { widthPixels: 1, heightPixels: 1, rows: ["."] },
+      "hive-shot": { widthPixels: 1, heightPixels: 1, rows: ["."] },
+      "bee-shot": { widthPixels: 1, heightPixels: 1, rows: ["."] },
+      "bomb-explosion": { frameOuterPixels: [3], borderPixels: 1 },
+    },
+    appearances: Object.fromEntries(
+      [
+        "red-stinger-small",
+        "red-stinger-large",
+        "yellow-stinger-small",
+        "yellow-stinger-large",
+        "blue-stinger-small",
+        "blue-stinger-large",
+        "red-ball",
+        "yellow-ball",
+        "blue-ball",
+        "red-glaive",
+        "yellow-glaive",
+        "blue-glaive",
+        "hive-spiral-shot",
+        "hive-range-shot",
+        "hive-shot",
+        "bee-shot",
+        "red-bomb",
+        "white-bomb",
+        "blue-bomb",
+      ].map((id) => [
+        id,
+        {
+          template: id.endsWith("bomb") || id.includes("bomb") ? "bomb-explosion" : "stinger-small",
+          palette: { A: "#000000" },
+          source: "test",
+          ...(id.includes("bomb") ? { bodyColor: "#000000" } : {}),
+        },
+      ]),
+    ),
+  };
+  expect(() => validateAppearances(bad)).toThrow(/missing colour B/);
+});
+
+const EXPECTED_APPEARANCE_BY_PROJECTILE: Readonly<Record<string, string>> = {
+  "red-stinger-small": "red-stinger-small",
+  "red-killer-bee-stinger": "red-stinger-small",
+  "red-stinger-large-v1": "red-stinger-large",
+  "red-stinger-large-v2": "red-stinger-large",
+  "red-stinger-large-v3": "red-stinger-large",
+  "beehemoth-red-stinger-large": "red-stinger-large",
+  "yellow-stinger-small-v1": "yellow-stinger-small",
+  "yellow-stinger-small-v2": "yellow-stinger-small",
+  "yellow-killer-bee-stinger": "yellow-stinger-small",
+  "yellow-stinger-large": "yellow-stinger-large",
+  "beehemoth-yellow-stinger-large": "yellow-stinger-large",
+  "blue-stinger-small-v1": "blue-stinger-small",
+  "blue-stinger-small-v2": "blue-stinger-small",
+  "blue-killer-bee-stinger": "blue-stinger-small",
+  "blue-stinger-large": "blue-stinger-large",
+  "beehemoth-blue-stinger-large": "blue-stinger-large",
+  "red-ball": "red-ball",
+  "beehemoth-red-ball": "red-ball",
+  "nest-red-ball": "red-ball",
+  "yellow-ball-v1": "yellow-ball",
+  "yellow-ball-v2": "yellow-ball",
+  "nest-yellow-ball": "yellow-ball",
+  "blue-ball-v1": "blue-ball",
+  "blue-ball-v2": "blue-ball",
+  "blue-ball-v3": "blue-ball",
+  "nest-blue-ball": "blue-ball",
+  "red-glaive-v1": "red-glaive",
+  "red-glaive-v2": "red-glaive",
+  "yellow-glaive-v1": "yellow-glaive",
+  "beehemoth-yellow-glaive": "yellow-glaive",
+  "blue-glaive-v1": "blue-glaive",
+  "beehemoth-blue-glaive": "blue-glaive",
+  "hive-spiral-shot-v1": "hive-spiral-shot",
+  "nest-hive-spiral-shot-red": "hive-spiral-shot",
+  "hive-range-shot-v1": "hive-range-shot",
+  "nest-hive-range-shot-blue": "hive-range-shot",
+  "hive-shot-v1": "hive-shot",
+  "nest-hive-shot-yellow": "hive-shot",
+  "bee-shot": "bee-shot",
+  "red-bomb-v1": "red-bomb",
+  "red-bomb-v2": "red-bomb",
+  "white-bomb-v1": "white-bomb",
+  "white-bomb-v2": "white-bomb",
+  "blue-bomb": "blue-bomb",
+};
+
+test.each(Object.entries(EXPECTED_APPEARANCE_BY_PROJECTILE))(
+  "%s is linked to the %s appearance",
+  (id, appearance) => {
+    expect(AUTHORED_PROJECTILES[id]!.appearance).toBe(appearance);
+  },
+);
+
+test("the appearance loader rejects malformed catalogs", () => {
+  const clone = () =>
+    JSON.parse(JSON.stringify(AUTHORED_APPEARANCES)) as Record<string, any>;
+  const cases: [string, (catalog: Record<string, any>) => void][] = [
+    [
+      "an unknown template",
+      (catalog) => {
+        catalog.appearances["red-stinger-small"].template = "missing";
+      },
+    ],
+    [
+      "a row with the wrong width",
+      (catalog) => {
+        catalog.templates["stinger-small"].rows[0] = "AA";
+      },
+    ],
+    [
+      "an invalid palette colour",
+      (catalog) => {
+        catalog.appearances["red-stinger-small"].palette.A = "red";
+      },
+    ],
+    [
+      "an empty source",
+      (catalog) => {
+        catalog.appearances["red-stinger-small"].source = " ";
+      },
+    ],
+    [
+      "a missing family",
+      (catalog) => {
+        delete catalog.appearances["blue-bomb"];
+      },
+    ],
+    [
+      "a bomb without its fill colour",
+      (catalog) => {
+        delete catalog.appearances["red-bomb"].palette.B;
+      },
+    ],
+  ];
+  for (const [, mutate] of cases) {
+    const catalog = clone();
+    mutate(catalog);
+    expect(() => validateAppearances(catalog)).toThrow(RangeError);
+  }
+});
+
+test("validateProjectile requires exactly one of body or appearance", () => {
+  const withBoth = {
+    ...VALID_PROJECTILE,
+    appearance: "red-stinger-small",
+  };
+  const withNeither = { ...VALID_PROJECTILE };
+  delete (withNeither as { body?: unknown }).body;
+  expect(() =>
+    validateProjectile(withBoth, "test", TEST_STEP_SECONDS, new Set(["red-stinger-small"])),
+  ).toThrow(/exactly one/);
+  expect(() =>
+    validateProjectile(withNeither, "test", TEST_STEP_SECONDS, new Set()),
+  ).toThrow(/exactly one/);
+  const missingAppearance = {
+    ...VALID_PROJECTILE,
+    appearance: "missing",
+  } as Record<string, unknown>;
+  delete missingAppearance.body;
+  expect(() =>
+    validateProjectile(
+      missingAppearance,
+      "test",
+      TEST_STEP_SECONDS,
+      new Set(["red-stinger-small"]),
+    ),
+  ).toThrow(/defined appearance/);
 });

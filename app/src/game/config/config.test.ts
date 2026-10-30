@@ -20,6 +20,7 @@ import {
   bodyExtentTiles,
   buildEncounterConfig,
   ENCOUNTER_CONFIG,
+  liveCollisionPartBoundForEncounter,
   liveShardBoundForEncounter,
   liveShardBoundPerEnemy,
   primaryArchetype,
@@ -502,6 +503,8 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
       armorPiercing: false,
       conditions: [],
       verticesTiles: SHARD_BODY_TILES,
+      collisionPartsTiles: [SHARD_BODY_TILES],
+      appearance: null,
       expiration: "lifetime-only",
       hitPolicy: "once-per-shard",
       motion: {
@@ -837,7 +840,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v6");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v7");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -846,14 +849,13 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   expect(state.enemies).toHaveLength(1);
 });
 
-// Step 24.2 (G19-style): the Queen's rules version advanced from v5 to v6
-// because tuning changed gameplay enough to invalidate comparison with
-// pre-24.2 attempts. A v5 record must be retained in storage but excluded
-// from the new rules version's best, exactly as G19 excluded v1-v3 records
-// when the Crystal Worm moved to v4.
-test("a pre-24.2 Killer Bee Queen attempt record is retained but excluded from the v6 best", () => {
+// G19-style: the Queen's rules version advanced to v7 because the
+// sprite-derived hitboxes change gameplay enough to invalidate comparison
+// with earlier attempts. Older records must be retained in storage but
+// excluded from the new rules version's best.
+test("an older Killer Bee Queen attempt record is retained but excluded from the v7 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v6");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v7");
   const records = [
     {
       id: "a",
@@ -1942,16 +1944,42 @@ test("the Killer Bee Queen's full fight never exceeds the derived live-shard bou
   const idle = { north: false, south: false, east: false, west: false };
   let peakShards = 0;
   let peakEnemies = 0;
+  let peakParts = 0;
   for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
     peakShards = Math.max(peakShards, state.shards.length);
     peakEnemies = Math.max(peakEnemies, state.enemies.length);
+    peakParts = Math.max(
+      peakParts,
+      state.shards.reduce(
+        (total, shard) =>
+          total +
+          projectileOf(queenConfig, shard.projectileId).collisionPartsTiles.length,
+        0,
+      ),
+    );
   }
   expect(state.phase).toBe("cleared");
   expect(peakShards).toBeLessThanOrEqual(bound);
   expect(peakShards).toBeGreaterThan(0);
+  expect(peakParts).toBeLessThanOrEqual(
+    liveCollisionPartBoundForEncounter(queenConfig),
+  );
   console.log(
-    `Queen full fight: peak shards ${peakShards} (bound ${bound}), peak enemies ${peakEnemies}, cleared at ${state.elapsedSeconds.toFixed(2)}s`,
+    `Queen full fight: peak shards ${peakShards} (bound ${bound}), peak parts ${peakParts}, peak enemies ${peakEnemies}, cleared at ${state.elapsedSeconds.toFixed(2)}s`,
+  );
+});
+
+test("the live collision-part bound is the shard bound times the largest compound body", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const largestBody = Math.max(
+    ...Object.values(queenConfig.projectiles).map(
+      (projectile) => projectile.collisionPartsTiles.length,
+    ),
+  );
+  expect(largestBody).toBe(58);
+  expect(liveCollisionPartBoundForEncounter(queenConfig)).toBe(
+    liveShardBoundForEncounter(queenConfig) * largestBody,
   );
 });
 

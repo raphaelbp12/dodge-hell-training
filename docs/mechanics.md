@@ -705,3 +705,36 @@ A provenance defect was found and corrected before tuning: 76 of the Queen's 78 
 ### Closing Verification
 
 Step 24.3's full matrix: four routine gates PASS (656 tests, 29.33s); full Chromium suite 36/36 passed; the pre-existing Crystal Worm regression (671 volleys, 30/60/120 Hz equivalence) unchanged; a new determinism test reproduces a full Queen fight identically at 30/60/120 Hz and under step batching; storage compatibility holds for v1-v4 Crystal Worm records and the v5->v6 Queen transition; session safety holds in both encounters and drill mode. A full real-browser Queen clear to the win screen is unverified (D12); the headless-simulation clear and the Crystal Worm's own browser win-screen path are proven instead.
+
+## Implemented V6 Handoff - Projectile Appearance And Hitboxes
+
+Final record of `killer-bee-queen-nest-paladin-v7`. This section adds the V6 appearance and collision contract; it does not reopen K01-K18 or the V5 handoff above.
+
+### Appearance Catalog
+
+- Nineteen colour families cover the 44 Killer Bee Queen projectile entries; seven code-generated pixel templates cover their shapes. The source record is [the projectile appearance source](projectile-appearance-source.md).
+- The wiki projectile table has columns **Aesthetics, Damage, Condition effects, Speed, Range, Comments**. It publishes **no projectile hitbox or size column**; the sprite image is the only size evidence.
+- The wiki renders the stingers, balls, glaives and bee at 5x; the hive images are 1x. Native grids are 7 x 1, 8 x 5, 8 x 8, 8 x 8, 49 x 28 and 8 x 6.
+- The conversion is **12.8 native sprite pixels per world tile**, derived from the 16 x 16 player sprite over the 1.25-tile player body. This is a trainer interpretation (P04), not a client-verified hitbox.
+- No ROTMG PNG is committed or shipped. The pixel grids and palettes are code and data; licensing review is D15.
+
+### Compound Hitboxes
+
+- A projectile's collision body is the union of four-vertex convex rectangles derived from its opaque horizontal pixel runs. The union exactly covers every opaque cell, and every opaque pixel is hittable (P05/P06).
+- The same pixel grid drives drawing and collision, so a visible pixel and a hittable pixel cannot diverge (P03/P07).
+- The simulation tests every part through the swept convex-overlap path. The largest authored template is the 49 x 28 hive shot with 58 parts; `MAXIMUM_BODY_PART_COUNT` is a fixed 58-part validation ceiling, asserted against the catalog by a focused test rather than recomputed at runtime.
+- The old authored `body` values are removed from the 44 Queen entries. The Crystal Worm shard keeps `body` and its 1.45 x 0.65 tile hitbox (P11/P14).
+- Bomb projectiles never body-collide in flight; their hitbox remains the sourced detonation radius of 2 or 3 tiles.
+
+### Rendering And Bombs
+
+- Each non-bomb appearance is pre-rendered once at native resolution and drawn from pooled nearest-neighbour images. A spent shard uses a dimmed variant of its own palette; the lob telegraph stays red.
+- A bomb keeps the existing coloured 0.6 x 0.6 octagon in flight and plays a one-shot five-frame explosion at detonation, using the wiki strip's outer widths (4, 5, 7, 9, 13 px), 1 px border and family palette. The wiki frames are 4 x 4, 5 x 5, 7 x 8, 9 x 10 and 13 x 12; the runtime deliberately uses square frames as a decorative simplification scaled to the detonation radius. The frame duration is a trainer-authored placeholder (0.04 s per frame), because the wiki gives no timing.
+
+### Rules Identity And Limits
+
+- The Queen's rules identity is now `killer-bee-queen-nest-paladin-v7`; v6 and earlier attempts remain stored and are excluded from the v7 best.
+- The hitbox sizes are derived from the sprite art, not from a wiki hitbox field. The small stinger is 0.547 x 0.078 tiles, the large stinger 0.625 x 0.391, the ball and glaive 0.625 x 0.625, the hive 3.828 x 2.188 and the bee 0.625 x 0.469. Do not describe these as verified client hitboxes.
+- V5 cadences are unchanged. The hitbox-only comparison measured phase 1 at 8 hits / 7.40 s (V5) versus 8 / 7.42 s (V7), phase 3 at 11 / 5.72 s versus 8 / 5.08 s, and phase 6 at 15 / 5.30 s versus 15 / 5.30 s for the same fixed-seed idle scenario. Retuning is D13.
+- The Crystal Worm shard's appearance and hitbox are unchanged (D14). No Plagued Nest content or `white-bomb-v3` was added (P10, D02).
+- God mode is available on the Queen through the shared debug toggle state. It keeps the Queen config, ignores the numeric Crystal Worm tuning fields, and taints the attempt until retry, matching the existing session policy.

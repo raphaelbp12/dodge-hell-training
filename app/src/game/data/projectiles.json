@@ -26,11 +26,7 @@
       "speedTilesPerSecond": 7.5,
       "armorPiercing": true,
       "conditions": [{ "key": "exposed", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "red-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.75 }
@@ -41,11 +37,7 @@
       "speedTilesPerSecond": 8,
       "armorPiercing": false,
       "conditions": [{ "key": "petStasis", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "blue-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.4 }
@@ -56,11 +48,7 @@
       "speedTilesPerSecond": 7.5,
       "armorPiercing": false,
       "conditions": [{ "key": "paralyzed", "seconds": 1.4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "yellow-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.75 }
@@ -71,11 +59,7 @@
       "speedTilesPerSecond": 4.5,
       "armorPiercing": false,
       "conditions": [{ "key": "paralyzed", "seconds": 1.4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "yellow-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9 }
@@ -86,11 +70,7 @@
       "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.6
-      },
+      "appearance": "white-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": {
@@ -105,11 +85,7 @@
       "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "quiet", "seconds": 1 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.6
-      },
+      "appearance": "blue-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": {
@@ -124,11 +100,7 @@
       "speedTilesPerSecond": 8.5,
       "armorPiercing": true,
       "conditions": [],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "red-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.5 }
@@ -139,11 +111,7 @@
       "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "confused", "seconds": 3 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.6
-      },
+      "appearance": "red-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": {
@@ -158,11 +126,7 @@
       "speedTilesPerSecond": 8.5,
       "armorPiercing": false,
       "conditions": [{ "key": "silenced", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "blue-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 11.05 }
@@ -173,11 +137,7 @@
       "speedTilesPerSecond": 6,
       "armorPiercing": false,
       "conditions": [{ "key": "petStasis", "seconds": 4 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "blue-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -188,11 +148,7 @@
       "speedTilesPerSecond": 5.5,
       "armorPiercing": true,
       "conditions": [{ "key": "dazed", "seconds": 3 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "yellow-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 7.15 }
@@ -203,11 +159,7 @@
       "speedTilesPerSecond": 4.5,
       "armorPiercing": false,
       "conditions": [{ "key": "paralyzed", "seconds": 0.8 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "yellow-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9 }
@@ -218,11 +170,7 @@
       "speedTilesPerSecond": 7,
       "armorPiercing": true,
       "conditions": [],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "red-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -233,11 +181,7 @@
       "speedTilesPerSecond": 7.5,
       "armorPiercing": false,
       "conditions": [{ "key": "silenced", "seconds": 3 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "blue-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.75 }
@@ -248,11 +192,7 @@
       "speedTilesPerSecond": 6,
       "armorPiercing": false,
       "conditions": [],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "yellow-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -263,11 +203,7 @@
       "speedTilesPerSecond": 5.5,
       "armorPiercing": false,
       "conditions": [{ "key": "cursed", "seconds": 3 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "red-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 11 }
@@ -278,11 +214,7 @@
       "speedTilesPerSecond": 5,
       "armorPiercing": true,
       "conditions": [{ "key": "slowed", "seconds": 0.8 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "bee-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10 }
@@ -293,11 +225,7 @@
       "speedTilesPerSecond": 14,
       "armorPiercing": false,
       "conditions": [{ "key": "armorBroken", "seconds": 7 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "red-glaive",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.8 }
@@ -311,11 +239,7 @@
         { "key": "paralyzed", "seconds": 0.8 },
         { "key": "dazed", "seconds": 3 }
       ],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "yellow-glaive",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.63 }
@@ -326,11 +250,7 @@
       "speedTilesPerSecond": 4,
       "armorPiercing": true,
       "conditions": [{ "key": "armorBroken", "seconds": 3 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "red-glaive",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9 }
@@ -344,11 +264,7 @@
         { "key": "quiet", "seconds": 2 },
         { "key": "petStasis", "seconds": 6 }
       ],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "blue-glaive",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.54 }
@@ -359,11 +275,7 @@
       "speedTilesPerSecond": 8,
       "armorPiercing": true,
       "conditions": [],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "hive-spiral-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.6 }
@@ -377,11 +289,7 @@
         { "key": "petStasis", "seconds": 5 },
         { "key": "weak", "seconds": 3 }
       ],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "hive-range-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10 }
@@ -392,11 +300,7 @@
       "speedTilesPerSecond": 8,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 3 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "hive-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.6 }
@@ -407,11 +311,7 @@
       "speedTilesPerSecond": 7,
       "armorPiercing": false,
       "conditions": [{ "key": "silenced", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "blue-stinger-small",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.1 }
@@ -422,11 +322,7 @@
       "speedTilesPerSecond": 4,
       "armorPiercing": true,
       "conditions": [{ "key": "petStasis", "seconds": 4 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "blue-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 6 }
@@ -437,11 +333,7 @@
       "speedTilesPerSecond": 3.5,
       "armorPiercing": true,
       "conditions": [{ "key": "exposed", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "red-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -452,11 +344,7 @@
       "speedTilesPerSecond": 5,
       "armorPiercing": true,
       "conditions": [],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "hive-spiral-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 7 }
@@ -467,11 +355,7 @@
       "speedTilesPerSecond": 5.5,
       "armorPiercing": false,
       "conditions": [{ "key": "weak", "seconds": 2 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "hive-range-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 7.15 }
@@ -482,11 +366,7 @@
       "speedTilesPerSecond": 4.5,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.3
-      },
+      "appearance": "hive-shot",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 6.75 }
@@ -497,11 +377,7 @@
       "speedTilesPerSecond": 2.5,
       "armorPiercing": false,
       "conditions": [{ "key": "cursed", "seconds": 2 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "red-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 1.875 }
@@ -512,11 +388,7 @@
       "speedTilesPerSecond": 2.5,
       "armorPiercing": false,
       "conditions": [{ "key": "petStasis", "seconds": 4 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "blue-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 1.875 }
@@ -527,11 +399,7 @@
       "speedTilesPerSecond": 2.5,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "yellow-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 1.875 }
@@ -542,11 +410,7 @@
       "speedTilesPerSecond": 5,
       "armorPiercing": false,
       "conditions": [{ "key": "paralyzed", "seconds": 0.6 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "yellow-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10 }
@@ -557,11 +421,7 @@
       "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.6
-      },
+      "appearance": "white-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "lob", "travelSeconds": 0.6, "detonationRadiusTiles": 3 }
@@ -572,11 +432,7 @@
       "speedTilesPerSecond": 5,
       "armorPiercing": false,
       "conditions": [{ "key": "exposed", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "red-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 11 }
@@ -587,11 +443,7 @@
       "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "armorBroken", "seconds": 3 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.6,
-        "heightTiles": 0.6
-      },
+      "appearance": "red-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "lob", "travelSeconds": 0.6, "detonationRadiusTiles": 2 }
@@ -602,11 +454,7 @@
       "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "petStasis", "seconds": 3 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "blue-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -617,11 +465,7 @@
       "speedTilesPerSecond": 6,
       "armorPiercing": false,
       "conditions": [{ "key": "armorBroken", "seconds": 4 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "red-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -632,11 +476,7 @@
       "speedTilesPerSecond": 7,
       "armorPiercing": false,
       "conditions": [{ "key": "cursed", "seconds": 2 }],
-      "body": {
-        "shape": "beveled-octagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.5
-      },
+      "appearance": "red-ball",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -650,11 +490,7 @@
         { "key": "weak", "seconds": 2 },
         { "key": "petStasis", "seconds": 3 }
       ],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "blue-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.75 }
@@ -665,11 +501,7 @@
       "speedTilesPerSecond": 7.5,
       "armorPiercing": false,
       "conditions": [{ "key": "quiet", "seconds": 3 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "blue-glaive",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 10.5 }
@@ -680,11 +512,7 @@
       "speedTilesPerSecond": 7,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.9,
-        "heightTiles": 0.4
-      },
+      "appearance": "yellow-stinger-large",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 9.8 }
@@ -695,11 +523,7 @@
       "speedTilesPerSecond": 5,
       "armorPiercing": false,
       "conditions": [{ "key": "paralyzed", "seconds": 0.8 }],
-      "body": {
-        "shape": "shard-hexagon",
-        "widthTiles": 0.5,
-        "heightTiles": 0.25
-      },
+      "appearance": "yellow-glaive",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
       "motion": { "kind": "linear", "rangeTiles": 8.5 }

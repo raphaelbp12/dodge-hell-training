@@ -127,6 +127,36 @@ Rules for this register:
 
 **Fidelity gap this leaves.** None to the trainer's rules; this is a test-coverage gap, not a behavior gap. The chip-drawing code path is otherwise exercised by its focused unit tests.
 
+### D13 - Killer Bee Queen Cadence Retuning After Projectile Hitbox Correction
+
+**What.** Re-tune the Killer Bee Queen's authored attack cadences after the sprite-derived projectile hitboxes change.
+
+**Why deferred.** Plan V6's P13 keeps every V5 cadence and deliberately excludes retuning. Step 26.3 captures a pre-change baseline and step 28.2 measures the shift, but correcting it is a separate tuning decision.
+
+**Blocked on.** The measured difficulty shift from step 28.2, and a decision that the shift needs correction. Comparison with real-game footage would strengthen that decision.
+
+**Fidelity gap this leaves.** The trainer may be easier or harder than the real encounter. The cadences were tuned against the old 0.5 x 0.25 to 0.9 x 0.4 tile bodies, while the new hitboxes follow the wiki sprite silhouettes.
+
+### D14 - Crystal Worm Shard Hitbox And Appearance Correction
+
+**What.** Apply the same sprite-derived appearance and compound hitbox to the Crystal Worm child shard, which still uses the gold shard drawing and its 1.45 x 0.65 tile body.
+
+**Why deferred.** Plan V6's P11 preserves V5's protected Crystal Worm behaviour. Changing it requires fetching its own wiki sprite and re-opening a V5-protected value.
+
+**Blocked on.** A decision to re-open the Crystal Worm preset and transcribe its wiki sprite.
+
+**Fidelity gap this leaves.** The Crystal Worm shard's visual and hitbox remain trainer approximations while the Killer Bee Queen's are sprite-derived.
+
+### D15 - Licensing Review For Recreated Projectile Pixel Art
+
+**What.** A licensing review of the recreated ROTMG projectile pixel grids and palettes, and a decision on distribution or replacement art.
+
+**Why deferred.** The user approved exact code-generated recreation for this non-commercial trainer and said copyright can be addressed later. No third-party image file is shipped.
+
+**Blocked on.** A distribution or permission decision, or a decision to replace the recreated grids with clearly original art.
+
+**Fidelity gap this leaves.** None to gameplay. This is a distribution-risk item, not a rules gap; [the appearance source record](projectile-appearance-source.md) keeps the provenance.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.
@@ -136,4 +166,4 @@ These are standing non-goals from the original draft and the confirmed design. T
 - A player-facing tuning UI beyond the existing developer debug panel.
 - Seal activation and the wider ROTMG ability system.
 - Multiplayer mechanics that have no single-player meaning: teleporting all players to the boss room, group-size-scaled Beehemoth healing above 5 players, and other crowd-dependent behaviour.
-- Redistributing third-party artwork. Reference screenshots stay local review material; shipped sprites remain original placeholder geometry.
+- Redistributing third-party artwork files. Reference screenshots stay local review material; the original ROTMG PNGs are not committed or shipped. Code-generated pixel-grid recreations derived from the wiki sprites are approved for this non-commercial trainer by P01 and P02 in [plan V6](implementation-plan-v6.md), with licensing review deferred as D15.

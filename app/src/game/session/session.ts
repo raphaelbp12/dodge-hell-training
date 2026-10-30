@@ -7,6 +7,7 @@ import type {
 } from "../simulation/simulation";
 import {
   advanceSimulation,
+  type DetonationEvent,
   createSimulation,
   setDebugSettings,
 } from "../simulation/simulation";
@@ -109,6 +110,7 @@ export class SessionController {
     elapsedSeconds: number,
     input: SimulationInput,
     onHit?: (hit: AcceptedHit) => void,
+    onDetonation?: (event: DetonationEvent) => void,
   ): AttemptResult | null {
     assertNonnegative(elapsedSeconds, "elapsedSeconds");
     if (this.phase === "countdown") {
@@ -125,6 +127,7 @@ export class SessionController {
     if (this.phase !== "playing") return null;
     const advance = advanceSimulation(this.simulation, elapsedSeconds, input);
     for (const hit of advance.acceptedHits) onHit?.(hit);
+    for (const event of advance.detonations) onDetonation?.(event);
     if (
       this.simulation.phase !== "ended" &&
       this.simulation.phase !== "cleared"

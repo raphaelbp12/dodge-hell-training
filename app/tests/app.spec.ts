@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
+import appearanceData from "../src/game/data/projectile-appearances.json" with { type: "json" };
+import projectileData from "../src/game/data/projectiles.json" with { type: "json" };
 import type {
   EnemyState,
   PlayerState,
@@ -7,6 +9,35 @@ import type {
   ShardState,
   Vector2,
 } from "../src/game/models.ts";
+
+const shardColourValues = (() => {
+  const colours = new Set<string>();
+  for (const appearance of Object.values(appearanceData.appearances)) {
+    // Bombs are drawn through the polygon fallback, not the pixel textures.
+    if (
+      (appearance as { template: string }).template === "bomb-explosion"
+    )
+      continue;
+    for (const colour of Object.values(
+      (appearance as { palette: Record<string, string> }).palette,
+    )) {
+      if (colour === "#000000" || colour === "#FFFFFF") continue;
+      colours.add(colour);
+      const red = Math.round(Number.parseInt(colour.slice(1, 3), 16) * 0.55);
+      const green = Math.round(Number.parseInt(colour.slice(3, 5), 16) * 0.55);
+      const blue = Math.round(Number.parseInt(colour.slice(5, 7), 16) * 0.55);
+      colours.add(
+        `#${red.toString(16).padStart(2, "0")}${green
+          .toString(16)
+          .padStart(2, "0")}${blue.toString(16).padStart(2, "0")}`,
+      );
+    }
+  }
+  // The Crystal Worm shard keeps the original gold fallback.
+  colours.add("#ffdf69");
+  colours.add("#c9a948");
+  return [...colours].map((colour) => Number.parseInt(colour.slice(1), 16));
+})();
 
 const controlledFrameMilliseconds = 250;
 // Spawn geometry (G11-G15), kept in step with app/src/game/data/encounter.json.
@@ -24,6 +55,34 @@ const MAX_CONCURRENT_ENEMIES = 4;
 const LIVE_SHARD_BOUND_PER_ENEMY = 6 * 11 * Math.ceil(3 / 4.9);
 /** Distance of a position from the arena centre, in tiles. */
 const centreDistance = (point: Vector2) => Math.hypot(point.x, point.y);
+
+const bombAppearanceIds = new Set<string>();
+const partsByAppearance = new Map<string, number>();
+for (const [id, appearance] of Object.entries(appearanceData.appearances)) {
+  if ((appearance as { template: string }).template === "bomb-explosion")
+    bombAppearanceIds.add(id);
+  const template = appearanceData.templates[
+    (appearance as { template: keyof typeof appearanceData.templates }).template
+  ];
+  const rows = "rows" in template ? template.rows : [];
+  partsByAppearance.set(
+    id,
+    rows.reduce(
+      (total, row) => total + (row.match(/[^.]+/g)?.length ?? 0),
+      0,
+    ),
+  );
+}
+const partsByProjectile = new Map<string, number>();
+const appearanceByProjectile = new Map<string, string>();
+for (const [id, projectile] of Object.entries(projectileData.projectiles)) {
+  const appearance = (projectile as { appearance?: string }).appearance;
+  if (appearance) appearanceByProjectile.set(id, appearance);
+  partsByProjectile.set(
+    id,
+    Math.max(1, appearance ? partsByAppearance.get(appearance) ?? 1 : 1),
+  );
+}
 
 test.beforeEach(async ({ page }) => {
   await page.clock.install();
@@ -77,6 +136,10 @@ type Inspection = {
     widthCssPixels: number;
     heightCssPixels: number;
   }[];
+  bombsDetonated: number;
+  bombExplosionsActive: number;
+  bombExplosionFramesDrawn: number;
+  fallbackShards: number;
   audio: {
     muted: boolean;
     requests: number;
@@ -128,7 +191,7 @@ async function savedAttempts(page: Page) {
 }
 
 async function renderedPixels(page: Page) {
-  return page.locator("canvas").evaluate((canvas) => {
+  return page.locator("canvas").evaluate((canvas, shardColours) => {
     if (!(canvas instanceof HTMLCanvasElement))
       throw new Error("Expected encounter canvas");
     const copy = document.createElement("canvas");
@@ -137,6 +200,8 @@ async function renderedPixels(page: Page) {
     const context = copy.getContext("2d")!;
     context.drawImage(canvas, 0, 0);
     const data = context.getImageData(0, 0, copy.width, copy.height).data;
+    const shardColourSet = new Set(shardColours);
+    const shardColoursSeen = new Set<number>();
     const counts = {
       player: 0,
       enemy: 0,
@@ -158,7 +223,10 @@ async function renderedPixels(page: Page) {
         enemyX += (offset / 4) % copy.width;
         enemyY += Math.floor(offset / 4 / copy.width);
       }
-      if (red > 230 && green > 180 && blue < 150) counts.shards++;
+      if (shardColourSet.has((red << 16) | (green << 8) | blue)) {
+        counts.shards++;
+        shardColoursSeen.add((red << 16) | (green << 8) | blue);
+      }
       if (red === 28 && green === 48 && blue === 42) counts.ground++;
       if (red === 85 && green === 214 && blue === 160) counts.healthBar++;
       if (red === 89 && green === 46 && blue === 57) counts.missingHealth++;
@@ -173,8 +241,9 @@ async function renderedPixels(page: Page) {
       ),
       enemyX: counts.enemy ? enemyX / counts.enemy : null,
       enemyY: counts.enemy ? enemyY / counts.enemy : null,
+      shardColoursSeen: [...shardColoursSeen],
     };
-  });
+  }, shardColourValues);
 }
 
 async function retrySnapshot(
@@ -1567,28 +1636,31 @@ for (const [phaseIndex, label] of [
     const millisecondsPerSecond = 1000;
     const movementSegmentSeconds = 4;
     const sampleMilliseconds = 250;
-    test.setTimeout((browserSeconds + 30) * millisecondsPerSecond);
+    test.setTimeout((browserSeconds + 90) * millisecondsPerSecond);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
 
     await page.goto(
-      `${seededUrl()}&encounter=killer-bee-queen&phase=${phaseIndex}&loop=1`,
+      `./?seed=${NORTH_SEED}&encounter=crystal-worm&phase=${phaseIndex}&loop=1`,
     );
     await page.getByRole("button", { name: "Debug", exact: true }).click();
     await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
     await page.getByRole("button", { name: "Close debug" }).click();
+    await page.getByRole("radio", { name: "Killer Bee Queen" }).check();
     await page.getByRole("button", { name: "Start", exact: true }).click();
     await finishCountdown(page);
 
-    const bound = await page.evaluate(async () => {
+    const { bound, partBound } = await page.evaluate(async () => {
       const modulePath = new URL(
         "src/game/config/encounter.ts",
         document.baseURI,
       ).href;
       const configModule = await import(/* @vite-ignore */ modulePath);
-      return configModule.liveShardBoundForEncounter(
-        configModule.encounterConfigOf("killer-bee-queen"),
-      );
+      const config = configModule.encounterConfigOf("killer-bee-queen");
+      return {
+        bound: configModule.liveShardBoundForEncounter(config),
+        partBound: configModule.liveCollisionPartBoundForEncounter(config),
+      };
     });
 
     const animationFrames = page.evaluate(
@@ -1627,10 +1699,18 @@ for (const [phaseIndex, label] of [
     let heldKey = "";
     let peakShards = 0;
     let peakEnemies = 0;
+    let peakParts = 0;
     while (Date.now() - started < browserSeconds * millisecondsPerSecond) {
       const state = await inspect(page);
       peakShards = Math.max(peakShards, state.shards.length);
       peakEnemies = Math.max(peakEnemies, state.enemies.length);
+      peakParts = Math.max(
+        peakParts,
+        state.shards.reduce(
+          (total, shard) => total + (partsByProjectile.get(shard.projectileId) ?? 1),
+          0,
+        ),
+      );
       expect(state.shards.length).toBeLessThanOrEqual(bound);
       const nextKey =
         route[
@@ -1648,16 +1728,29 @@ for (const [phaseIndex, label] of [
     }
     if (heldKey) await page.keyboard.up(heldKey);
     const frames = await animationFrames;
+    const finalState = await inspect(page);
+    expect(finalState.phase).toBe("playing");
+    expect(finalState.player.healthHp).toBeGreaterThan(0);
     expect(frames.frameCount).toBeGreaterThan(0);
     expect(errors).toEqual([]);
-    expect(peakShards).toBeGreaterThan(0);
+    expect(peakShards).toBeGreaterThan(20);
     expect(peakShards).toBeLessThanOrEqual(bound);
+    expect(peakParts).toBeLessThanOrEqual(partBound);
 
     const metricsPath = testInfo.outputPath(`queen-${label}-drill.json`);
     await writeFile(
       metricsPath,
       JSON.stringify(
-        { phaseIndex, label, bound, peakShards, peakEnemies, ...frames },
+        {
+          phaseIndex,
+          label,
+          bound,
+          partBound,
+          peakShards,
+          peakParts,
+          peakEnemies,
+          ...frames,
+        },
         null,
         2,
       ),
@@ -2264,3 +2357,94 @@ for (const viewport of [
     });
   });
 }
+
+test("a direct Queen ?phase= link starts the requested phase", async ({
+  page,
+}) => {
+  await page.goto(
+    `./?seed=${NORTH_SEED}&encounter=killer-bee-queen&phase=2&loop=1`,
+  );
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, false);
+  expect((await inspect(page)).enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
+});
+
+test("the Killer Bee Queen renders per-family pixel-art shards", async ({
+  page,
+}, testInfo) => {
+  await page.goto(
+    `./?seed=${NORTH_SEED}&encounter=killer-bee-queen&phase=0&loop=1`,
+  );
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, false);
+  await expect
+    .poll(
+      async () => {
+        await page.clock.runFor(controlledFrameMilliseconds);
+        return (await renderedPixels(page)).shards;
+      },
+      { timeout: 10000, intervals: [0] },
+    )
+    .toBeGreaterThan(10);
+  const pixels = await renderedPixels(page);
+  expect(pixels.shardColoursSeen.length).toBeGreaterThan(2);
+  const pixelState = await inspect(page);
+  const liveFamilies = new Set(
+    pixelState.shards
+      .map((shard) => appearanceByProjectile.get(shard.projectileId))
+      .filter(
+        (family): family is string =>
+          family !== undefined && !bombAppearanceIds.has(family),
+      ),
+  );
+  expect(liveFamilies.size).toBeGreaterThan(1);
+  expect(pixelState.fallbackShards).toBe(0);
+  expect(pixels.shardColoursSeen).not.toContain(0xffdf69);
+  expect(pixels.shardColoursSeen).not.toContain(0xc9a948);
+  await page.screenshot({
+    path: testInfo.outputPath("queen-pixel-shards.png"),
+    fullPage: true,
+  });
+  await testInfo.attach("queen-pixel-shards", {
+    path: testInfo.outputPath("queen-pixel-shards.png"),
+    contentType: "image/png",
+  });
+});
+
+test("the Killer Bee Queen plays a bomb detonation effect", async ({
+  page,
+}, testInfo) => {
+  await page.goto(
+    `./?seed=${NORTH_SEED}&encounter=crystal-worm&phase=6&loop=1`,
+  );
+  await page.getByRole("button", { name: "Debug", exact: true }).click();
+  await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
+  await page.getByRole("button", { name: "Close debug" }).click();
+  await page.getByRole("radio", { name: "Killer Bee Queen" }).check();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, false);
+  await expect
+    .poll(
+      async () => {
+        await page.clock.runFor(50);
+        const state = await inspect(page);
+        return state.bombsDetonated > 0 && state.bombExplosionsActive > 0;
+      },
+      { timeout: 20000, intervals: [0] },
+    )
+    .toBe(true);
+  expect((await inspect(page)).bombExplosionFramesDrawn).toBeGreaterThan(0);
+  await page.screenshot({
+    path: testInfo.outputPath("queen-bomb-detonation.png"),
+    fullPage: true,
+  });
+  await testInfo.attach("queen-bomb-detonation", {
+    path: testInfo.outputPath("queen-bomb-detonation.png"),
+    contentType: "image/png",
+  });
+  await page.clock.runFor(300);
+  const afterCleanup = await inspect(page);
+  expect(afterCleanup.bombExplosionsActive).toBe(0);
+  expect(afterCleanup.phase).toBe("playing");
+  expect(afterCleanup.player.healthHp).toBeGreaterThan(0);
+});

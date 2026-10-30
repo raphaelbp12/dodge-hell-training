@@ -2,12 +2,12 @@
 
 A pure-frontend bullet-hell practice game targeting repeated survival training against the Crystal Worm Child Head from Realm of the Mad God.
 
-## Current V5 State
+## Current V6 State
 
 Two selectable encounters ship side by side, chosen from a plain radio list on Home (`?encounter=crystal-worm` or `?encounter=killer-bee-queen` links one directly; an unknown id falls back to the default). Each encounter has its own rules version, arena spawn rule and session values, and attempt history/bests never compare across them.
 
 - **Crystal Worm Swarm** (`crystal-worm-child-swarm-paladin-v4`) is the unchanged v4 encounter: proven identical to its pre-v5 behaviour by a regression test covering cadence, positions, death times and the 671-volley/30-60-120 Hz equivalence.
-- **Killer Bee Queen** (`killer-bee-queen-nest-paladin-v6`, the default) is the new encounter: a single boss with eight timed phases, driven by a simulated 375 HP/second drain rather than player damage (the project has no player attack). Each phase teaches a different dodging skill:
+- **Killer Bee Queen** (`killer-bee-queen-nest-paladin-v7`, the default) is the new encounter: a single boss with eight timed phases, driven by a simulated 375 HP/second drain rather than player damage (the project has no player attack). Each phase teaches a different dodging skill:
   1. **Honey pond orbit** - radial Blue Bomb spreads around the pond plus targeted White Bombs and stacked tri-colour stinger volleys while the Queen orbits.
   2. **Colour chase, red/blue/yellow** - the Queen chases while cycling three colour-themed attack sets, each spawning its own Killer Bee minion colour.
   3. **Stationary ring barrage** - a dense omnidirectional ball/bee barrage from a centred, immobile Queen, plus a 7-second Red Glaive wave; the one phase whose cadence is sourced, not authored.
@@ -23,17 +23,20 @@ Two selectable encounters ship side by side, chosen from a plain radio list on H
 
 **The condition model** tracks all thirteen ROTMG status effects the Queen's attacks can inflict, split into two groups: seven **active** conditions that change dodging or survival - Paralyzed, Slowed, Confused, Armor Broken, Exposed, Curse, Sick - and six **inert** conditions tracked faithfully but with no effect here - Dazed, Silenced, Quiet, Weak, Unstable, Pet Stasis - because they affect attacking, abilities, mana or pets, none of which exist in this project. The HUD's condition chips show both, labelling inert ones `(inert)` so a reader never mistakes "tracked" for "does something."
 
-**Comparison identities** are per encounter: `crystal-worm-child-swarm-paladin-v4` and `killer-bee-queen-nest-paladin-v6`. A record from an earlier rules version of either encounter is retained and shown as **Other rules**, excluded from that encounter's personal best; Crystal Worm and Killer Bee Queen records never compare against each other.
+**Comparison identities** are per encounter: `crystal-worm-child-swarm-paladin-v4` and `killer-bee-queen-nest-paladin-v7`. A record from an earlier rules version of either encounter is retained and shown as **Other rules**, excluded from that encounter's personal best; Crystal Worm and Killer Bee Queen records never compare against each other.
+
+**Per-projectile appearance and hitboxes.** The Queen's 44 projectiles draw code-generated pixel art transcribed from the wiki sprite images: 19 colour families over seven shape templates, with a dimmed spent state. Each non-bomb projectile's collision body is the union of convex rectangles derived from the same opaque pixels at 12.8 native sprite pixels per tile, so the visible art and the hitbox agree; bombs keep their sourced 2/3-tile detonation-radius hitbox and never body-collide in flight. The wiki publishes no projectile hitbox column; the conversion is this project's documented interpretation, not a verified client value. The Crystal Worm shard keeps its gold look and original hitbox. See [the appearance source record](docs/projectile-appearance-source.md).
 
 ### Authored Data
 
-Gameplay values are authored as JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`, because `strict` is not enabled and the compiler cannot reject a missing or mistyped field. A malformed data file throws at module load rather than falling back. Step 23.1 restructured `encounter.json` into a keyed `encounters` map (one entry per encounter: rules version, display name, primary archetype, spawns, session) but added no new file - the arena stays one shared `arena.json` under K05, so the authored files remain the same five.
+Gameplay values are authored as JSON under `app/src/game/data/` and validated at runtime by `app/src/game/config/data.ts`, because `strict` is not enabled and the compiler cannot reject a missing or mistyped field. A malformed data file throws at module load rather than falling back. Step 23.1 restructured `encounter.json` into a keyed `encounters` map (one entry per encounter: rules version, display name, primary archetype, spawns, session). V6 adds `projectile-appearances.json`; the arena stays one shared `arena.json` under K05, so the authored files are now six.
 
 | File                | Holds                                                                                            | Edit to...                              |
 | ------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `shapes.json`       | Named convex outlines normalized to a 1x1 tile box                                                 | change a body's silhouette               |
 | `arena.json`        | Circular arena centre and radius, in tiles                                                         | change the arena                         |
 | `projectiles.json`  | Projectile catalog keyed by id: motion kind, damage, speed/range, condition, source provenance     | change a projectile's own stats          |
+| `projectile-appearances.json` | 19 pixel-art families over 7 shape templates, palettes, bomb frames and source provenance | change a projectile's look or hitbox |
 | `enemies.json`      | Enemy archetypes keyed by id: body, health, progression, phases/sub-phases, attacks and spawns     | retune an enemy or its phases            |
 | `encounter.json`    | Shared simulation/player/camera values, plus per-encounter rules version, spawns and session       | change spawning or add/select an encounter |
 
@@ -45,6 +48,10 @@ The pixel-measurement geometry study that originally derived these shapes is ret
 
 Step 24.3 ran the full acceptance matrix on the pinned toolchain (`node v24.22.1`, `npm 12.2.1`): all four routine gates passed (656 tests across 16 files, 29.33s); the full `npm run test:e2e` Chromium suite passed 36/36 in 3m31s; the pre-existing Crystal Worm regression (671 volleys, 30/60/120 Hz equivalence) remained unchanged; a new determinism test reproduced a full Killer Bee Queen fight identically at 30, 60 and 120 Hz and under multi-step batching; storage compatibility held for v1-v4 Crystal Worm records, the v5->v6 Queen transition, and corrupt/blocked/quota storage; session safety (pause, resume, retry, Controls, zoom, countdown) held identically in both encounters and in drill mode. Both encounters were proven to reach their end screen except one case: a full real-browser Queen clear to the win screen is unverified, because a full fight takes about six minutes of real browser time and no test runs that long (tracked as [D12](docs/deferred-work.md#d12---full-browser-win-screen-coverage-for-the-killer-bee-queen)); the headless-simulation clear and the Crystal Worm's own browser win-screen path are proven instead.
 
+### V6 Verification
+
+`npm run verify` passed all four gates (lint, typecheck, test, build). The appearance grids were compared cell-by-cell against the local reference PNGs and all 19 families match. Targeted Chromium cases passed: the Crystal Worm shard render, the Queen's per-family pixel shards, the bomb detonation effect, and the Queen phase-3 and phase-6 drills. The god-mode real Queen drills measured phase 3 at peak 50-52 shards / 416 collision parts and phase 6 at peak 56 shards / 1,416 parts, with median 16 ms / p95 21-24 ms and a maximum gap that varied 44-51 ms across runs over 60 seconds. The headless full fight still clears at 373.43 s with peak 119 live shards, unchanged from V5; the hitbox-only comparison measured phase 1 at 8 hits / 7.40 s (V5) versus 8 / 7.42 s (V6), phase 3 at 11 / 5.72 s versus 8 / 5.08 s, and phase 6 at 15 / 5.30 s versus 15 / 5.30 s. Retuning is deliberately deferred as [D13](docs/deferred-work.md#d13---killer-bee-queen-cadence-retuning-after-projectile-hitbox-correction). The full Playwright suite was not run; only the named targeted cases were.
+
 ## Fidelity And Limitations
 
 This trainer is not a complete recreation of the live fight. Every gap below is deliberate and tracked, not an oversight:
@@ -55,7 +62,9 @@ This trainer is not a complete recreation of the live fight. Every gap below is 
 - **Killer Bee Nests cannot be destroyed.** Phase 6 always runs its full 29 seconds and always yields one Beehemoth of each colour in phase 7, rather than letting the player choose which Nests to destroy ([D03](docs/deferred-work.md#d03---killer-bee-nest-destruction-and-beehemoth-colour-control)).
 - **The Queen's authored 112,500 HP does not scale with player count**, since that figure is meaningless for a single-player trainer ([D06](docs/deferred-work.md#d06---boss-adaptive-hp-scaling)).
 - **Phase 4's Red Glaive wave is dodgeable here**, though the source calls it "unavoidable" - true only in the real fight's small room; this project's 19.2-tile arena lets a player dodge it near the wall.
-- **ROTMG's "Hitbox Size" to tile width/height is this project's own interpretation** (step 23.1), not a published equivalence.
+- **ROTMG's "Hitbox Size" to tile width/height is this project's own interpretation** (step 23.1), not a published equivalence. The Queen's projectile hitboxes are likewise derived from the wiki sprite pixels at 12.8 native pixels per tile; the wiki has no projectile-hitbox column, so this is a documented trainer interpretation, not a verified client value.
+- **Recreated projectile pixel art is not licensed third-party art.** No ROTMG PNG is shipped; the grids are code and data, and a licensing review is deferred as [D15](docs/deferred-work.md#d15---licensing-review-for-recreated-projectile-pixel-art).
+- **The Crystal Worm shard still uses its original gold appearance and 1.45 x 0.65 tile hitbox**, not the sprite-derived treatment ([D14](docs/deferred-work.md#d14---crystal-worm-shard-hitbox-and-appearance-correction)).
 - **Phases 2, 7 and 8 are proven damaging when stationary but not yet proven survivable with correct movement**: every scripted dodge tried so far dies to a stacked volley within 6-16 seconds. This is a verification gap, not a known-unfair design; it needs a bearing-aware dodge script ([D11](docs/deferred-work.md#d11---bearing-aware-dodge-verification-for-phases-2-7-and-8)).
 - **A full real-browser clear of the Queen to the win screen is unverified** - a full fight takes about six minutes of real browser time ([D12](docs/deferred-work.md#d12---full-browser-win-screen-coverage-for-the-killer-bee-queen)).
 

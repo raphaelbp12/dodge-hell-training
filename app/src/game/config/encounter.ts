@@ -1,6 +1,7 @@
 import type { CircularArena, Vector2 } from "../models";
 import type { ConditionApplication } from "../simulation/conditions";
 import {
+  AUTHORED_APPEARANCES,
   AUTHORED_ARCHETYPES,
   AUTHORED_ARENA,
   AUTHORED_ENCOUNTER,
@@ -8,6 +9,8 @@ import {
   AUTHORED_PROJECTILES,
   loadOutline,
   TELEGRAPH_COLOR_NAMES,
+  type AuthoredAppearance,
+  type AuthoredAppearanceTemplate,
   type AuthoredArchetype,
   type AuthoredAttack,
   type AuthoredBody,
@@ -22,6 +25,7 @@ import {
   constrainBodyToArena,
   convexBodyFitsCircle,
   transformBodyVertices,
+  validateConvexParts,
 } from "../simulation/geometry";
 import {
   firstArmCollisionDegrees,
@@ -58,6 +62,28 @@ export type ProjectileMotion =
       detonationRadiusTiles: number;
     }>;
 
+export type ProjectileBombSpec = Readonly<{
+  frameOuterPixels: readonly number[];
+  borderPixels: number;
+  bodyColor: string;
+}>;
+
+export type ProjectileAppearanceSpec = Readonly<{
+  id: string;
+  nativeWidthPixels: number;
+  nativeHeightPixels: number;
+  /** Resolved hex colours, or null for a transparent cell. */
+  pixels: readonly (readonly (string | null)[])[];
+  palette: Readonly<Record<string, string>>;
+  pixelsPerTile: number;
+  visualWidthTiles: number;
+  visualHeightTiles: number;
+  /** Compound collision rectangles derived from the opaque pixel runs. */
+  partsTiles: readonly (readonly Vector2[])[];
+  source: string;
+  bomb?: ProjectileBombSpec;
+}>;
+
 export type ProjectileSpec = Readonly<{
   id: string;
   damageHp: number;
@@ -65,6 +91,8 @@ export type ProjectileSpec = Readonly<{
   armorPiercing: boolean;
   conditions: readonly ConditionApplication[];
   verticesTiles: readonly Vector2[];
+  collisionPartsTiles: readonly (readonly Vector2[])[];
+  appearance: ProjectileAppearanceSpec | null;
   expiration: string;
   hitPolicy: string;
   motion: ProjectileMotion;
@@ -422,8 +450,8 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   projectileSpeedTilesPerSecond: authoredProjectile.speedTilesPerSecond,
   reversalSeconds: authoredBoomerangMotion.reversalAgeSeconds,
   lifetimeSeconds: authoredBoomerangMotion.lifetimeSeconds,
-  projectileWidth: authoredProjectile.body.widthTiles,
-  projectileHeight: authoredProjectile.body.heightTiles,
+  projectileWidth: authoredProjectile.body!.widthTiles,
+  projectileHeight: authoredProjectile.body!.heightTiles,
   firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
   spawnEverySeconds: authoredPrimaryEverySeconds,
   maxConcurrentEnemies: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
@@ -466,7 +494,7 @@ export const SELECTED_ENCOUNTER_VALUES: Readonly<
 
 const headOutline = loadOutline(authoredPrimary.body.shape);
 const playerOutline = loadOutline(AUTHORED_ENCOUNTER.player.body.shape);
-const shardOutline = loadOutline(authoredProjectile.body.shape);
+const shardOutline = loadOutline(authoredProjectile.body!.shape);
 
 export type BuildOptions = Readonly<{
   rulesVersion: string;
@@ -537,17 +565,20 @@ export function buildEncounterConfig(
       }),
     ]),
   });
+  const projectileVerticesTiles = scaleBody(
+    shardOutline,
+    values.projectileWidth,
+    values.projectileHeight,
+  );
   const projectile: ProjectileSpec = Object.freeze({
     id: AUTHORED_PROJECTILE_ID,
     damageHp: values.projectileDamageHp,
     speedTilesPerSecond: values.projectileSpeedTilesPerSecond,
     armorPiercing: authoredProjectile.armorPiercing,
     conditions: authoredProjectile.conditions,
-    verticesTiles: scaleBody(
-      shardOutline,
-      values.projectileWidth,
-      values.projectileHeight,
-    ),
+    verticesTiles: projectileVerticesTiles,
+    collisionPartsTiles: Object.freeze([projectileVerticesTiles]),
+    appearance: null,
     expiration: authoredProjectile.expiration,
     hitPolicy: authoredProjectile.hitPolicy,
     motion: Object.freeze({
@@ -687,19 +718,197 @@ function archetypeFromAuthored(authored: AuthoredArchetype): EnemyArchetype {
   });
 }
 
+const projectileBombBodyTiles = 0.6;
+
+function boundingRectangleVertices(
+  widthTiles: number,
+  heightTiles: number,
+): readonly Vector2[] {
+  const halfWidth = widthTiles / 2;
+  const halfHeight = heightTiles / 2;
+  return Object.freeze([
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight },
+  ]);
+}
+
+function rectanglePart(
+  leftTiles: number,
+  topTiles: number,
+  widthTiles: number,
+  heightTiles: number,
+): readonly Vector2[] {
+  return Object.freeze([
+    { x: leftTiles, y: topTiles },
+    { x: leftTiles + widthTiles, y: topTiles },
+    { x: leftTiles + widthTiles, y: topTiles + heightTiles },
+    { x: leftTiles, y: topTiles + heightTiles },
+  ]);
+}
+
+function appearancePixels(
+  template: Extract<AuthoredAppearanceTemplate, { kind: "pixels" }>,
+  palette: Readonly<Record<string, string>>,
+): readonly (readonly (string | null)[])[] {
+  return Object.freeze(
+    template.rows.map((row) =>
+      Object.freeze(
+        [...row].map((character) => (character === "." ? null : palette[character])),
+      ),
+    ),
+  );
+}
+
+/**
+ * Converts one opaque horizontal run into a collision rectangle. The union of
+ * every run is the exact visible silhouette, which is why the same pixel grid
+ * drives drawing and collision (P03/P05).
+ */
+function appearanceParts(
+  pixels: readonly (readonly (string | null)[])[],
+  pixelsPerTile: number,
+  widthPixels: number,
+  heightPixels: number,
+): readonly (readonly Vector2[])[] {
+  const parts: (readonly Vector2[])[] = [];
+  pixels.forEach((row, rowIndex) => {
+    let runStart = -1;
+    for (let column = 0; column <= row.length; column++) {
+      const opaque = column < row.length && row[column] !== null;
+      if (opaque && runStart < 0) runStart = column;
+      if (!opaque && runStart >= 0) {
+        const leftTiles = (runStart - widthPixels / 2) / pixelsPerTile;
+        const topTiles = (rowIndex - heightPixels / 2) / pixelsPerTile;
+        parts.push(
+          rectanglePart(
+            leftTiles,
+            topTiles,
+            (column - runStart) / pixelsPerTile,
+            1 / pixelsPerTile,
+          ),
+        );
+        runStart = -1;
+      }
+    }
+  });
+  return Object.freeze(parts);
+}
+
+function appearanceFromAuthored(
+  id: string,
+  authored: AuthoredAppearance,
+  template: AuthoredAppearanceTemplate,
+  pixelsPerTile: number,
+): ProjectileAppearanceSpec {
+  if (template.kind === "bomb") {
+    if (!authored.bodyColor)
+      throw new RangeError(`Appearance ${id} is missing its bomb body colour`);
+    return Object.freeze({
+      id,
+      nativeWidthPixels: 0,
+      nativeHeightPixels: 0,
+      pixels: Object.freeze([]),
+      palette: authored.palette,
+      pixelsPerTile,
+      visualWidthTiles: projectileBombBodyTiles,
+      visualHeightTiles: projectileBombBodyTiles,
+      partsTiles: Object.freeze([]),
+      source: authored.source,
+      bomb: Object.freeze({
+        frameOuterPixels: template.frameOuterPixels,
+        borderPixels: template.borderPixels,
+        bodyColor: authored.bodyColor,
+      }),
+    });
+  }
+  const pixels = appearancePixels(template, authored.palette);
+  return Object.freeze({
+    id,
+    nativeWidthPixels: template.widthPixels,
+    nativeHeightPixels: template.heightPixels,
+    pixels,
+    palette: authored.palette,
+    pixelsPerTile,
+    visualWidthTiles: template.widthPixels / pixelsPerTile,
+    visualHeightTiles: template.heightPixels / pixelsPerTile,
+    partsTiles: appearanceParts(
+      pixels,
+      pixelsPerTile,
+      template.widthPixels,
+      template.heightPixels,
+    ),
+    source: authored.source,
+  });
+}
+
+const STATIC_APPEARANCES: Readonly<Record<string, ProjectileAppearanceSpec>> =
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(AUTHORED_APPEARANCES.appearances).map(([id, authored]) => {
+        const template = AUTHORED_APPEARANCES.templates[authored.templateId];
+        if (!template)
+          throw new RangeError(`Appearance ${id} names an unknown template`);
+        return [
+          id,
+          appearanceFromAuthored(
+            id,
+            authored,
+            template,
+            AUTHORED_APPEARANCES.pixelsPerTile,
+          ),
+        ];
+      }),
+    ),
+  );
+
 function projectileFromAuthored(authored: AuthoredProjectile): ProjectileSpec {
-  const outline = loadOutline(authored.body.shape);
+  const appearance = authored.appearance
+    ? STATIC_APPEARANCES[authored.appearance]
+    : null;
+  if (authored.appearance && !appearance)
+    throw new RangeError(`Unknown projectile appearance: ${authored.appearance}`);
+  if (!appearance && !authored.body)
+    throw new RangeError(`Projectile ${authored.id} has no body or appearance`);
+
+  let verticesTiles: readonly Vector2[];
+  let collisionPartsTiles: readonly (readonly Vector2[])[];
+  if (appearance) {
+    if (appearance.bomb) {
+      const bombBody = scaleBody(
+        loadOutline("beveled-octagon"),
+        projectileBombBodyTiles,
+        projectileBombBodyTiles,
+      );
+      verticesTiles = bombBody;
+      collisionPartsTiles = Object.freeze([bombBody]);
+    } else {
+      verticesTiles = boundingRectangleVertices(
+        appearance.visualWidthTiles,
+        appearance.visualHeightTiles,
+      );
+      collisionPartsTiles = appearance.partsTiles;
+    }
+  } else {
+    const outline = loadOutline(authored.body!.shape);
+    verticesTiles = scaleBody(
+      outline,
+      authored.body!.widthTiles,
+      authored.body!.heightTiles,
+    );
+    collisionPartsTiles = Object.freeze([verticesTiles]);
+  }
+
   return Object.freeze({
     id: authored.id,
     damageHp: authored.damageHp,
     speedTilesPerSecond: authored.speedTilesPerSecond,
     armorPiercing: authored.armorPiercing,
     conditions: authored.conditions,
-    verticesTiles: scaleBody(
-      outline,
-      authored.body.widthTiles,
-      authored.body.heightTiles,
-    ),
+    verticesTiles,
+    collisionPartsTiles,
+    appearance,
     expiration: authored.expiration,
     hitPolicy: authored.hitPolicy,
     motion: authored.motion,
@@ -892,6 +1101,22 @@ export function liveShardBoundForEncounter(config: EncounterConfig): number {
   return primaryBound + minionBound * config.maxConcurrentMinions;
 }
 
+/**
+ * Conservative live collision-part bound: the shard bound times the largest
+ * compound body in the catalog. The hive shot currently supplies the largest
+ * body (58 rectangles), so this is a derived cap rather than a round number.
+ */
+export function liveCollisionPartBoundForEncounter(
+  config: EncounterConfig,
+): number {
+  const largestBody = Math.max(
+    ...Object.values(config.projectiles).map(
+      (projectile) => projectile.collisionPartsTiles.length,
+    ),
+  );
+  return liveShardBoundForEncounter(config) * largestBody;
+}
+
 /** Resolves an archetype by id, rejecting an unknown one. */
 export function archetypeOf(
   config: EncounterConfig,
@@ -1018,6 +1243,7 @@ function validateProjectileSpec(projectile: ProjectileSpec): void {
   assertNonnegative(projectile.damageHp, "shardDamageHp");
   assertNonnegative(projectile.speedTilesPerSecond, "shardSpeedTilesPerSecond");
   transformBodyVertices(projectile.verticesTiles, { x: 0, y: 0 });
+  validateConvexParts(projectile.collisionPartsTiles);
   if (motion.kind === "boomerang") {
     assertPositive(motion.reversalAgeSeconds, "reversalAgeSeconds");
     assertPositive(motion.lifetimeSeconds, "lifetimeSeconds");

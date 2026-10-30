@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import {
   ENCOUNTER_CONFIG,
+  encounterConfigOf,
   primaryArchetype,
+  projectileOf,
 } from "../config/encounter";
 import type { Vector2 } from "../models";
 import {
@@ -9,10 +11,15 @@ import {
   convexBodyFitsCircle,
   convexBodyOverlapsCircle,
   convexContactDistance,
+  convexPartsBoundingRadiusTiles,
+  MAXIMUM_BODY_PART_COUNT,
   maximumBodyCenterDistance,
   pursueBody,
   sweptConvexOverlap,
+  sweptConvexPartsOverlap,
+  transformBodyParts,
   transformBodyVertices,
+  validateConvexParts,
 } from "./geometry";
 
 // Local fixture bodies at the historical review scale. They exercise the
@@ -779,4 +786,159 @@ test("rejects invalid pursuit inputs even at coincident centers", () => {
       pursueBody(square, stationary, vertices, stationary, 1),
     ).toThrow(RangeError);
   }
+});
+
+const rectangle = (
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+): readonly Vector2[] => [
+  { x: left, y: top },
+  { x: left + width, y: top },
+  { x: left + width, y: top + height },
+  { x: left, y: top + height },
+];
+
+const squareAt = (x: number, y: number, half = 0.05): readonly Vector2[] =>
+  rectangle(x - half, y - half, half * 2, half * 2);
+
+test("a compound body with a gap misses through the gap and hits each part", () => {
+  const parts = [
+    rectangle(-1, -0.5, 0.4, 1),
+    rectangle(0.6, -0.5, 0.4, 1),
+  ];
+  expect(
+    sweptConvexPartsOverlap(parts, { x: 0, y: 0 }, squareAt(0, 0), {
+      x: 0,
+      y: 0,
+    }),
+  ).toBe(false);
+  expect(
+    sweptConvexPartsOverlap(parts, { x: 0, y: 0 }, squareAt(-0.8, 0), {
+      x: 0,
+      y: 0,
+    }),
+  ).toBe(true);
+  expect(
+    sweptConvexPartsOverlap(parts, { x: 0, y: 0 }, squareAt(0.8, 0), {
+      x: 0,
+      y: 0,
+    }),
+  ).toBe(true);
+});
+
+test("a compound body transforms exactly like the single-body transform", () => {
+  const parts = [rectangle(-0.2, -0.1, 0.4, 0.2)];
+  for (const angle of [0, Math.PI / 6, Math.PI / 2, Math.PI, -Math.PI / 3]) {
+    const compound = transformBodyParts(parts, { x: 2, y: 3 }, angle)[0]!;
+    const single = transformBodyVertices(parts[0]!, { x: 2, y: 3 }, angle);
+    expect(compound).toHaveLength(single.length);
+    for (let index = 0; index < single.length; index++) {
+      expect(compound[index]!.x).toBeCloseTo(single[index]!.x, 12);
+      expect(compound[index]!.y).toBeCloseTo(single[index]!.y, 12);
+    }
+  }
+});
+
+test("a compound body rotates its long axis, not only its centre", () => {
+  const part = rectangle(-0.2, -0.1, 0.4, 0.2);
+  const pointBesideTheLongAxis = squareAt(2, 3.15, 0.01);
+  const unrotated = transformBodyParts([part], { x: 2, y: 3 }, 0);
+  const rotated = transformBodyParts([part], { x: 2, y: 3 }, Math.PI / 2);
+  expect(
+    sweptConvexPartsOverlap(unrotated, { x: 0, y: 0 }, pointBesideTheLongAxis, {
+      x: 0,
+      y: 0,
+    }),
+  ).toBe(false);
+  expect(
+    sweptConvexPartsOverlap(rotated, { x: 0, y: 0 }, pointBesideTheLongAxis, {
+      x: 0,
+      y: 0,
+    }),
+  ).toBe(true);
+});
+
+test("the compound bounding radius is measured on the local parts", () => {
+  expect(
+    convexPartsBoundingRadiusTiles([rectangle(-1, -1, 2, 2)]),
+  ).toBeCloseTo(Math.SQRT2, 12);
+  expect(
+    convexPartsBoundingRadiusTiles([
+      rectangle(-0.5, -0.5, 1, 1),
+      rectangle(1, 1, 1, 1),
+    ]),
+  ).toBeCloseTo(Math.hypot(2, 2), 12);
+});
+
+test("compound validation rejects empty, degenerate, oversized and non-convex bodies", () => {
+  expect(() => validateConvexParts([])).toThrow(RangeError);
+  expect(() =>
+    validateConvexParts([[{ x: 0, y: 0 }, { x: 1, y: 0 }]]),
+  ).toThrow(RangeError);
+  expect(() =>
+    validateConvexParts([
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0.5, y: 0.5 },
+        { x: 0, y: 1 },
+      ],
+    ]),
+  ).toThrow(RangeError);
+  expect(() =>
+    validateConvexParts([
+      Array.from({ length: 9 }, (_, index) => ({
+        x: Math.cos((index * Math.PI * 2) / 9),
+        y: Math.sin((index * Math.PI * 2) / 9),
+      })),
+    ]),
+  ).toThrow(RangeError);
+  expect(() =>
+    validateConvexParts(
+      Array.from({ length: MAXIMUM_BODY_PART_COUNT + 1 }, () =>
+        rectangle(0, 0, 0.1, 0.1),
+      ),
+    ),
+  ).toThrow(RangeError);
+});
+
+test("a single-part compound body agrees with the single-body sweep", () => {
+  const part = rectangle(-0.3, -0.2, 0.6, 0.4);
+  const other = squareAt(0.1, 0.1);
+  for (const displacement of [
+    { x: 0, y: 0 },
+    { x: 0.5, y: 0 },
+    { x: 0, y: -0.5 },
+    { x: 0.2, y: 0.2 },
+  ]) {
+    expect(
+      sweptConvexPartsOverlap([part], displacement, other, { x: 0, y: 0 }),
+    ).toBe(sweptConvexOverlap(part, displacement, other, { x: 0, y: 0 }));
+  }
+});
+
+test("the glaive's visible X is the hitbox: arms hit, empty quadrants miss", () => {
+  const glaive = projectileOf(
+    encounterConfigOf("killer-bee-queen"),
+    "red-glaive-v1",
+  );
+  const parts = glaive.collisionPartsTiles;
+  // Top-left arm pixel and the transparent top-left quadrant beside it.
+  expect(
+    sweptConvexPartsOverlap(parts, { x: 0, y: 0 }, squareAt(-0.2734, -0.2734), {
+      x: 0,
+      y: 0,
+    }),
+  ).toBe(true);
+  expect(
+    sweptConvexPartsOverlap(
+      parts,
+      { x: 0, y: 0 },
+      squareAt(-0.039, -0.195, 0.02),
+      { x: 0, y: 0 },
+    ),
+  ).toBe(false);
 });

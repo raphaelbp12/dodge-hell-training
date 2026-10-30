@@ -82,12 +82,14 @@ function readEncounterIdFromLocation(): string | undefined {
  * how `?seed=` already handles bad input. `?loop=1` additionally re-enters
  * that phase on its own exit instead of advancing.
  */
-function readDrillFromLocation(): { startPhaseIndex?: number; loopPhase?: boolean } {
+function readDrillFromLocation(
+  config: EncounterConfig,
+): { startPhaseIndex?: number; loopPhase?: boolean } {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("phase");
   if (raw === null) return {};
   const phaseIndex = Number(raw);
-  const phaseCount = primaryArchetype(ENCOUNTER_CONFIG).phases.length;
+  const phaseCount = primaryArchetype(config).phases.length;
   if (
     !Number.isInteger(phaseIndex) ||
     phaseIndex < 0 ||
@@ -387,7 +389,7 @@ function Encounter({
       {
         config,
         seed: readSeedFromLocation(),
-        drill: readDrillFromLocation(),
+        drill: readDrillFromLocation(config),
         initialZoom: zoomPreference.current,
         initialMuted: initialMuted.current,
         initialDebugSettings: initialDebugSettings.current,

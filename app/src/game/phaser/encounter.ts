@@ -4,6 +4,7 @@ import {
   ENCOUNTER_CONFIG,
   projectileOf,
   type EncounterConfig,
+  type ProjectileAppearanceSpec,
 } from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
@@ -17,9 +18,16 @@ import { currentPhaseOf, enterDrillPhase, forceNextSubPhase } from "../simulatio
 import type { CreateSimulationOptions } from "../simulation/simulation";
 import { arbitrarySeed } from "../simulation/random";
 import type { TelegraphColorName } from "../config/data";
-import type { AcceptedHit, Vector2 } from "../models";
+import type { AcceptedHit, ShardState, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
+import type { DetonationEvent } from "../simulation/simulation";
 import { HitAudio } from "./hit-audio";
+import { bombExplosionFrameIndex } from "./appearance-pixels";
+import {
+  createAppearanceTextures,
+  destroyAppearanceTextures,
+  type AppearanceTextureKeys,
+} from "./projectile-textures";
 
 export type EncounterView = {
   healthHp: number;
@@ -84,6 +92,10 @@ const presentation = {
     color: 0xff5f5f,
     lineWidthCssPixels: 2,
   },
+  bombExplosion: {
+    /** Trainer-authored placeholder: the wiki strip gives no frame timing. */
+    frameSeconds: 0.04,
+  },
   hitNumbers: {
     lifetimeSeconds: 0.9,
     riseCssPixels: 28,
@@ -118,6 +130,22 @@ const presentation = {
   },
 } as const;
 const pixelsPerTile = ENCOUNTER_CONFIG.camera.cssPixelsPerTile;
+
+function hexColourToNumber(hex: string): number {
+  return Phaser.Display.Color.HexStringToColor(hex).color;
+}
+
+function projectileAppearances(
+  config: EncounterConfig,
+): readonly ProjectileAppearanceSpec[] {
+  const appearances = new Map<string, ProjectileAppearanceSpec>();
+  for (const projectile of Object.values(config.projectiles)) {
+    if (projectile.appearance)
+      appearances.set(projectile.appearance.id, projectile.appearance);
+  }
+  return [...appearances.values()];
+}
+
 const encounters = new WeakMap<HTMLElement, EncounterScene>();
 
 class EncounterScene extends Phaser.Scene {
@@ -128,6 +156,18 @@ class EncounterScene extends Phaser.Scene {
   private ground!: Phaser.GameObjects.Graphics;
   private bodies!: Phaser.GameObjects.Graphics;
   private projectiles!: Phaser.GameObjects.Graphics;
+  private appearanceTextures: ReadonlyMap<string, AppearanceTextureKeys> = new Map();
+  private shardImagePools = new Map<string, Phaser.GameObjects.Image[]>();
+  private shardImageUse = new Map<string, number>();
+  private bombExplosions: {
+    position: Vector2;
+    radiusTiles: number;
+    ageSeconds: number;
+    appearance: ProjectileAppearanceSpec;
+  }[] = [];
+  private bombsDetonated = 0;
+  private bombExplosionFramesDrawn = 0;
+  private fallbackShardDraws = 0;
   private healthBar!: Phaser.GameObjects.Graphics;
   private conditionChips!: Phaser.GameObjects.Graphics;
   private conditionChipTexts: Phaser.GameObjects.Text[] = [];
@@ -189,6 +229,10 @@ class EncounterScene extends Phaser.Scene {
     this.projectiles = this.add.graphics().setDepth(2);
     this.healthBar = this.add.graphics().setDepth(3);
     this.conditionChips = this.add.graphics().setDepth(3);
+    this.appearanceTextures = createAppearanceTextures(
+      this,
+      projectileAppearances(this.state.config),
+    );
     const keyboard = this.input.keyboard!;
     this.keys = keyboard.addKeys(
       { north: "W", south: "S", east: "D", west: "A" },
@@ -337,6 +381,9 @@ class EncounterScene extends Phaser.Scene {
     )
       return;
     this.clearHitNumbers();
+    this.bombExplosions = [];
+    this.bombsDetonated = 0;
+    this.bombExplosionFramesDrawn = 0;
     this.hitAudio.reset();
     this.hitAudio.unlock();
     this.finalHitAmounts = [];
@@ -429,6 +476,7 @@ class EncounterScene extends Phaser.Scene {
     const gameplayFocused = document.activeElement === this.host;
     const previousSeconds = this.state.elapsedSeconds;
     const currentHits: AcceptedHit[] = [];
+    const newDetonations: DetonationEvent[] = [];
     const result = this.session.advance(
       delta / presentation.millisecondsPerSecond,
       {
@@ -454,6 +502,7 @@ class EncounterScene extends Phaser.Scene {
         this.addHitNumber(hit);
         this.hitAudio.play();
       },
+      (event) => newDetonations.push(event),
     );
     if (result) this.finalHitAmounts = currentHits.map((hit) => hit.damageHp);
     const activeSeconds = this.state.elapsedSeconds - previousSeconds;
@@ -464,6 +513,17 @@ class EncounterScene extends Phaser.Scene {
       number.text.destroy();
       return false;
     });
+    this.bombExplosions = this.bombExplosions.filter((effect) => {
+      effect.ageSeconds += activeSeconds;
+      return (
+        effect.ageSeconds <
+        presentation.bombExplosion.frameSeconds *
+          effect.appearance.bomb!.frameOuterPixels.length
+      );
+    });
+    if (this.session.phase === "playing")
+      for (const event of newDetonations) this.addBombExplosion(event);
+    else this.bombExplosions = [];
     this.drawEntities();
     this.centerCamera();
     this.hudRemainingMilliseconds -= delta;
@@ -600,16 +660,33 @@ class EncounterScene extends Phaser.Scene {
       presentation.player,
     );
     this.projectiles.clear();
+    this.shardImageUse.clear();
+    this.fallbackShardDraws = 0;
     const telegraphSeconds = this.state.config.presentation.lobTelegraphSeconds;
     for (const shard of shards) {
       const projectile = projectileOf(this.state.config, shard.projectileId);
-      draw(
-        this.projectiles,
-        projectile.verticesTiles,
-        shard.positionTiles,
-        shard.hasHitPlayer ? presentation.spentShard : presentation.shard,
-        shard.orientationRadians,
+      const appearance = projectile.appearance;
+      const hasShardTexture = Boolean(
+        appearance &&
+          !appearance.bomb &&
+          this.appearanceTextures.has(appearance.id),
       );
+      if (hasShardTexture) {
+        this.drawShardImage(appearance!, shard);
+      } else {
+        if (appearance && !appearance.bomb) this.fallbackShardDraws++;
+        draw(
+          this.projectiles,
+          projectile.verticesTiles,
+          shard.positionTiles,
+          appearance?.bomb
+            ? hexColourToNumber(appearance.bomb.bodyColor)
+            : shard.hasHitPlayer
+              ? presentation.spentShard
+              : presentation.shard,
+          shard.orientationRadians,
+        );
+      }
       if (
         projectile.motion.kind === "lob" &&
         shard.detonationTargetTiles &&
@@ -627,6 +704,12 @@ class EncounterScene extends Phaser.Scene {
           );
       }
     }
+    for (const [key, pool] of this.shardImagePools) {
+      const used = this.shardImageUse.get(key) ?? 0;
+      for (let index = used; index < pool.length; index++)
+        pool[index]!.setVisible(false);
+    }
+    this.drawBombExplosions();
     const bar = presentation.healthBar;
     const width = bar.widthCssPixels / this.zoom;
     const height = bar.heightCssPixels / this.zoom;
@@ -670,6 +753,88 @@ class EncounterScene extends Phaser.Scene {
               (policy.riseCssPixels * number.ageSeconds) /
                 policy.lifetimeSeconds) /
               this.zoom,
+        );
+    }
+  }
+
+  private drawShardImage(
+    appearance: ProjectileAppearanceSpec,
+    shard: ShardState,
+  ): void {
+    const keys = this.appearanceTextures.get(appearance.id);
+    if (!keys) return;
+    const key = shard.hasHitPlayer ? keys.spent : keys.normal;
+    const index = this.shardImageUse.get(key) ?? 0;
+    let pool = this.shardImagePools.get(key);
+    if (!pool) {
+      pool = [];
+      this.shardImagePools.set(key, pool);
+    }
+    let image = pool[index];
+    if (!image) {
+      image = this.add.image(0, 0, key).setDepth(1.9).setOrigin(0.5, 0.5);
+      pool.push(image);
+    }
+    image
+      .setTexture(key)
+      .setPosition(
+        shard.positionTiles.x * pixelsPerTile,
+        shard.positionTiles.y * pixelsPerTile,
+      )
+      .setRotation(shard.orientationRadians)
+      .setScale(pixelsPerTile / appearance.pixelsPerTile)
+      .setVisible(true);
+    this.shardImageUse.set(key, index + 1);
+  }
+
+  private addBombExplosion(event: DetonationEvent): void {
+    const projectile = projectileOf(this.state.config, event.projectileId);
+    const appearance = projectile.appearance;
+    if (!appearance?.bomb) return;
+    this.bombsDetonated++;
+    this.bombExplosions.push({
+      position: { ...event.positionTiles },
+      radiusTiles: event.radiusTiles,
+      ageSeconds: 0,
+      appearance,
+    });
+  }
+
+  private drawBombExplosions(): void {
+    for (const effect of this.bombExplosions) {
+      const bomb = effect.appearance.bomb;
+      if (!bomb) continue;
+      this.bombExplosionFramesDrawn++;
+      const frameIndex = bombExplosionFrameIndex(
+        effect.ageSeconds,
+        presentation.bombExplosion.frameSeconds,
+        bomb.frameOuterPixels.length,
+      );
+      const outerPixels = bomb.frameOuterPixels[frameIndex]!;
+      const finalOuterPixels =
+        bomb.frameOuterPixels[bomb.frameOuterPixels.length - 1]!;
+      const tilesPerNativePixel =
+        (effect.radiusTiles * 2) /
+        (finalOuterPixels / effect.appearance.pixelsPerTile);
+      const sizeCssPixels =
+        (outerPixels / effect.appearance.pixelsPerTile) *
+        tilesPerNativePixel *
+        pixelsPerTile;
+      const borderCssPixels =
+        (bomb.borderPixels / effect.appearance.pixelsPerTile) *
+        tilesPerNativePixel *
+        pixelsPerTile;
+      const left = effect.position.x * pixelsPerTile - sizeCssPixels / 2;
+      const top = effect.position.y * pixelsPerTile - sizeCssPixels / 2;
+      this.projectiles
+        .fillStyle(hexColourToNumber(effect.appearance.palette.A!))
+        .fillRect(left, top, sizeCssPixels, sizeCssPixels)
+        .fillStyle(hexColourToNumber(effect.appearance.palette.B!))
+        .fillRect(
+          left + borderCssPixels,
+          top + borderCssPixels,
+          sizeCssPixels - borderCssPixels * 2,
+          sizeCssPixels - borderCssPixels * 2,
         );
     }
   }
@@ -755,6 +920,10 @@ class EncounterScene extends Phaser.Scene {
         widthCssPixels: number.text.displayWidth * this.zoom,
         heightCssPixels: number.text.displayHeight * this.zoom,
       })),
+      bombsDetonated: this.bombsDetonated,
+      bombExplosionsActive: this.bombExplosions.length,
+      bombExplosionFramesDrawn: this.bombExplosionFramesDrawn,
+      fallbackShards: this.fallbackShardDraws,
       audio: this.hitAudio.inspect(),
     };
   }
@@ -763,6 +932,11 @@ class EncounterScene extends Phaser.Scene {
     if (this.disposed) return;
     this.disposed = true;
     this.clearHitNumbers();
+    this.bombExplosions = [];
+    for (const pool of this.shardImagePools.values())
+      for (const image of pool) image.destroy();
+    this.shardImagePools.clear();
+    destroyAppearanceTextures(this, this.appearanceTextures);
     this.hitAudio.dispose();
     this.session.home();
     this.input?.keyboard?.resetKeys();

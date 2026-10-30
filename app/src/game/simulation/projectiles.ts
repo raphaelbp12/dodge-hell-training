@@ -1,6 +1,7 @@
 import {
   convexBodyOverlapsCircle,
-  sweptConvexOverlap,
+  sweptConvexPartsOverlap,
+  transformBodyParts,
   transformBodyVertices,
 } from "./geometry";
 import { projectileOf, type EncounterConfig, type ProjectileSpec } from "../config/encounter";
@@ -269,9 +270,10 @@ export function shardOverlapsPlayer(
     Math.max(relativeStart.y, relativeEnd.y) < -bound
   )
     return false;
-  return sweptConvexOverlap(
-    transformBodyVertices(
-      projectileOf(context.config, shard.projectileId).verticesTiles,
+  const projectile = projectileOf(context.config, shard.projectileId);
+  return sweptConvexPartsOverlap(
+    transformBodyParts(
+      projectile.collisionPartsTiles,
       shardStart,
       shard.orientationRadians,
     ),
@@ -357,7 +359,7 @@ export function advanceShard(
   elapsedSeconds: number,
   playerStart: Vector2,
   playerEnd: Vector2,
-): { alive: boolean; hitPlayer: boolean } {
+): { alive: boolean; hitPlayer: boolean; detonated: boolean } {
   const initialAgeSeconds = shard.ageSeconds;
   let hitPlayer = false;
   let segmentPlayerStart = playerStart;
@@ -404,5 +406,13 @@ export function advanceShard(
   }
   moveSegment(targetAgeSeconds - shard.ageSeconds);
   shard.ageSeconds = targetAgeSeconds;
-  return { alive: shard.ageSeconds < shard.lifetimeSeconds, hitPlayer };
+  const projectile = projectileOf(context.config, shard.projectileId);
+  return {
+    alive: shard.ageSeconds < shard.lifetimeSeconds,
+    hitPlayer,
+    detonated:
+      projectile.motion.kind === "lob" &&
+      shard.ageSeconds >= shard.lifetimeSeconds &&
+      shard.detonationTargetTiles !== null,
+  };
 }

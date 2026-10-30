@@ -12,8 +12,9 @@ This file is the reusable process for every planning effort in this repository: 
 | V2 | 8-14 | archived | n/a | [`docs/implementation-plan-v2.md`](docs/implementation-plan-v2.md) |
 | V4 | 15-18 | archived | G | [`docs/implementation-plan-v4.md`](docs/implementation-plan-v4.md) |
 | V5 | 19-24 | archived | K | [`docs/implementation-plan-v5.md`](docs/implementation-plan-v5.md) |
+| V6 | 25-28 | archived | P | [`docs/implementation-plan-v6.md`](docs/implementation-plan-v6.md) |
 
-(V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort. Read it, not this file, for anything about what phases 19-24 actually build.
+(V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort. Read it, not this file, for anything about what phases 25-28 actually build.
 
 More than one plan-vN file can exist at once. A row's status is `drafted` from the moment `/brainstorm` writes it until its first phase is actually implemented, then `active`; a drafted plan does not replace or pause the active one. Each plan version picks its own, never-reused decision-letter prefix (G, K, ...) for its recorded decisions, so a decision ID is globally unambiguous. Phase numbers are global and sequential across every plan version - a new plan continues from the highest phase number used anywhere, it never restarts at 1.
 

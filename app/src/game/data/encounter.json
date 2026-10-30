@@ -49,7 +49,7 @@
       }
     },
     "killer-bee-queen": {
-      "rulesVersion": "killer-bee-queen-nest-paladin-v6",
+      "rulesVersion": "killer-bee-queen-nest-paladin-v7",
       "displayName": "Killer Bee Queen",
       "primaryArchetype": "killer-bee-queen",
       "spawns": {

@@ -4,18 +4,22 @@ import { ENCOUNTER_CONFIG, type ProjectileSpec } from "../config/encounter";
 
 const stepSeconds = 1 / 60;
 
+const BOOMERANG_VERTICES = [
+  { x: 0.5, y: 0 },
+  { x: 0, y: 0.5 },
+  { x: -0.5, y: 0 },
+  { x: 0, y: -0.5 },
+];
+
 const BOOMERANG_PROJECTILE: ProjectileSpec = {
   id: "test-boomerang",
   damageHp: 160,
   speedTilesPerSecond: 8,
   armorPiercing: false,
   conditions: [],
-  verticesTiles: [
-    { x: 0.5, y: 0 },
-    { x: 0, y: 0.5 },
-    { x: -0.5, y: 0 },
-    { x: 0, y: -0.5 },
-  ],
+  verticesTiles: BOOMERANG_VERTICES,
+  collisionPartsTiles: [BOOMERANG_VERTICES],
+  appearance: null,
   expiration: "lifetime-only",
   hitPolicy: "once-per-shard",
   motion: { kind: "boomerang", reversalAgeSeconds: 1.5, lifetimeSeconds: 3 },
