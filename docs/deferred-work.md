@@ -187,6 +187,46 @@ Rules for this register:
 
 **Fidelity gap this leaves.** None to gameplay. This is a UX convenience gap.
 
+### D19 - Despawn Tagging And Projectile Variant Disambiguation
+
+**What.** Extend the video tagger to record a projectile's despawn frame as well as its spawn, so measured lifetime can identify which variant of a shared sprite was fired.
+
+**Why deferred.** Plan V8's T19 records spawn tags only. Cadence, which is V8's goal, does not need lifetime, and spawn-only tagging is substantially less work per tag.
+
+**Blocked on.** A decision that variant-level binding is worth a second tagging pass over the same footage.
+
+**Fidelity gap this leaves.** Six sprites cover more than one projectile variant and stay bound only at sprite level: `red-stinger-large` (3 variants), `blue-ball` (3), `yellow-stinger-small`, `blue-stinger-small`, `red-glaive` and `yellow-ball` (2 each). Their variants differ sharply in speed and lifetime - `red-stinger-large` spans 1.3 s, 2.2 s and 3.0 s - so the choice among them remains an authored interpretation rather than an observation.
+
+### D20 - Pattern Geometry Measurement
+
+**What.** Measure arm counts, cone widths and rotation rates from video, rather than inferring them from the wiki prose.
+
+**Why deferred.** Plan V8's T21 keeps geometry out of the tagger. An angle-measurement overlay needs its own pixel-per-tile calibration and camera-motion compensation, which is a materially different tool from timestamp tagging.
+
+**Blocked on.** A decision to build an overlay with scale calibration, and a judgement that the authored geometry is actually wrong.
+
+**Fidelity gap this leaves.** `coneDegrees`, ring arm counts and `clockwiseDegreesPerSecond` remain authored interpretations. V8 records an observed arm count per rotating-attack tag, which partially covers arm counts but not angles or rotation rates.
+
+### D21 - Adopt The Current Client-XML Projectile Data
+
+**What.** Reconcile the committed projectile data against the current game client XML (`HiddenElementGames/RotmgVersionRepo`, `TextAsset/epicHiveObjects`, commit dated 2025-09-30, Queen object id `EH King Bee`), and adopt the fields it carries that the wiki does not publish: the per-projectile `Size` scale multiplier and the projectile index per row.
+
+**Why deferred.** Plan V8's T08 keeps it out of scope as unrelated to video tagging. Datamined client assets are also a different provenance class from the RealmEye wiki, which needs its own decision alongside the licensing review deferred as D15.
+
+**Blocked on.** A re-check of the RealmEye page for the damage conflict below, and a decision that datamined client XML is acceptable provenance with a `tuningSource` of its own.
+
+**Fidelity gap this leaves.** One known defect stands in committed data: `bee-shot` is authored at 130 damage in `app/src/game/data/projectiles.json`, matching the transcribed wiki table, while the current client XML reports 80. The `Size` field is also the sourced projectile scale that the V6 sprite-derived hitboxes approximated from silhouettes, so D13 and D14 may both be resting on an avoidable approximation.
+
+### D22 - Measure Cadences For The Remaining Seven Phases
+
+**What.** Extend the video-tagging measurement from phase 3 to the Killer Bee Queen's other seven phases, producing measured intervals and phase-to-projectile bindings for the rest of the fight.
+
+**Why deferred.** Plan V8's T10 reduces the first measurement to a phase-3 pilot. Phase 3 carries a wiki-verifiable anchor, exercises both tag kinds and has no sub-phases, so it tests the whole method and the write-up format at roughly an eighth of the cost. Committing to a fight-wide run before knowing whether the output is decision-useful would have been the larger bet.
+
+**Blocked on.** The pilot's own "Was This Worth Repeating" verdict in `docs/killer-bee-queen-observations.md`, plus two capabilities the pilot deliberately does without: sub-phase attribution, which phases 1, 2, 5 and 7 need and T25 cut as unexercised, and a phase-identification aid, since across eight visually similar HP-gated phases a mis-set sticky phase would silently mislabel a whole run. Import and resume, cut by T30, would also return for a multi-session run.
+
+**Fidelity gap this leaves.** Seven of eight phases stay unmeasured, so the large majority of the 58 `trainer-authored` attack cadences remain invented values with no external source. The phase-to-projectile bindings the wiki cannot supply stay interpretations outside phase 3.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

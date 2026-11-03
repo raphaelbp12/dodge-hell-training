@@ -14,6 +14,7 @@ This file is the reusable process for every planning effort in this repository: 
 | V5 | 19-24 | archived | K | [`docs/implementation-plan-v5.md`](docs/implementation-plan-v5.md) |
 | V6 | 25-28 | archived | P | [`docs/implementation-plan-v6.md`](docs/implementation-plan-v6.md) |
 | V7 | 29-32 | archived | R | [`docs/implementation-plan-v7.md`](docs/implementation-plan-v7.md) |
+| V8 | 33-35 | drafted | T | [`docs/plan-v8.md`](docs/plan-v8.md) |
 
 (V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 
