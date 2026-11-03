@@ -1,0 +1,81 @@
+.panel {
+  flex: 0 0 320px;
+  width: 320px;
+  max-height: calc(100svh - 110px);
+  overflow: auto;
+  padding: 16px;
+  background: #f8fbf8;
+  border-left: 1px solid #c4d5cc;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* Live: overlay the right 320 px of the playfield instead of shrinking it. */
+.live {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  max-height: none;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.panel button {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.options {
+  border: 0;
+  border-top: 1px solid #c4d5cc;
+  padding: 12px 0 4px;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+.options legend {
+  font-weight: 600;
+  padding-right: 8px;
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.panel input {
+  accent-color: #26885d;
+}
+.nowPlaying {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 16px 0;
+  padding-top: 12px;
+  border-top: 1px solid #c4d5cc;
+}
+.nowPlaying span {
+  color: #4a6b5c;
+  font-size: 12px;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 700px) {
+  .panel {
+    order: -1;
+    flex: none;
+    width: 100%;
+    max-height: 38svh;
+    border-left: 0;
+    border-bottom: 1px solid #c4d5cc;
+  }
+}

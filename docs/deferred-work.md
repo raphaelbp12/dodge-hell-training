@@ -157,6 +157,36 @@ Rules for this register:
 
 **Fidelity gap this leaves.** None to gameplay. This is a distribution-risk item, not a rules gap; [the appearance source record](projectile-appearance-source.md) keeps the provenance.
 
+### D16 - Sub-Phase Drill Selection
+
+**What.** Select and loop individual colour sub-phases, for example the Queen's Phase 2 Red alone, instead of a whole top-level phase.
+
+**Why deferred.** Plan V7's R06 selects top-level phases only. Individual sub-phases need a drill key containing both phase and sub-phase, extra selector rows and entry logic beyond `enterDrillPhase`.
+
+**Blocked on.** A decision to extend the drill model and selector UI to sub-phases.
+
+**Fidelity gap this leaves.** Players cannot isolate one colour sub-phase; selecting Phase 2 always cycles all three.
+
+### D17 - Persist Phase-Selector State Across Reloads
+
+**What.** Store the phase selector's open state, selected phases and Loop toggle in localStorage so a drill survives a reload or a Home return.
+
+**Why deferred.** Plan V7's R10 keeps selector state session-only; returning Home or reloading resets to Full fight. A `?phase=` URL remains the explicit reload path.
+
+**Blocked on.** A storage schema and migration decision, plus a decision to keep drill state across sessions.
+
+**Fidelity gap this leaves.** None to gameplay. This is a training-continuity and convenience gap.
+
+### D18 - Phase Selector On The Results Screen
+
+**What.** Keep the phase selector available after death or clear, so a new drill can be applied directly from the results screen.
+
+**Why deferred.** Plan V7 hides the panel once an attempt ends. Retry keeps the selection, but changing it requires Retry and then reopening the panel.
+
+**Blocked on.** A decision to layer a persistent panel beside the results dialog and define its focus and pause semantics.
+
+**Fidelity gap this leaves.** None to gameplay. This is a UX convenience gap.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

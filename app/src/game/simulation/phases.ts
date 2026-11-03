@@ -1,4 +1,5 @@
 import { archetypeOf, resolveProgression } from "../config/encounter";
+import { nextDrillPhaseIndex } from "../config/drill";
 import type {
   AttackSpec,
   EnemyArchetype,
@@ -247,8 +248,8 @@ export function enterPhase(
  * own entry fraction first, since a drill run never actually drained the
  * phases it skipped, then enters through the normal mechanism so clocks,
  * telegraph, invulnerability and spawns all apply exactly as a real entry
- * would. Shared by `createSimulation`'s drill start, `loopPhase`'s re-entry,
- * and the debug panel's phase jump.
+ * would. Shared by `createSimulation`'s drill start, every drill jump, and
+ * the debug panel's phase jump.
  */
 export function enterDrillPhase(
   state: SimulationState,
@@ -266,10 +267,9 @@ function tryAdvancePhase(
   enemy: EnemyState,
   archetype: EnemyArchetype,
 ): boolean {
-  const nextIndex = enemy.phaseIndex + 1;
-  if (nextIndex >= archetype.phases.length) return false;
   const phase = currentPhaseOf(archetype, enemy);
-  const nextPhase = archetype.phases[nextIndex];
+  const nextIndex = enemy.phaseIndex + 1;
+  const isFinalPhase = nextIndex >= archetype.phases.length;
   const byDuration =
     phase.exitAfterSeconds !== null &&
     state.elapsedSeconds - enemy.phaseEnteredAtSeconds >= phase.exitAfterSeconds;
@@ -279,21 +279,33 @@ function tryAdvancePhase(
   // cannot fire the instant the next phase's fraction happens to already
   // match. A phase with no exitAfterSeconds is ungated, unchanged from before.
   const minimumDurationElapsed = phase.exitAfterSeconds === null || byDuration;
-  const byHealth =
-    minimumDurationElapsed &&
-    healthFraction(enemy) <= nextPhase.enterAtHpFraction;
+  // The final authored phase has no next threshold; its health-zero boundary
+  // is the exit a drill can loop (R05).
+  const byHealth = isFinalPhase
+    ? healthFraction(enemy) <= 0
+    : minimumDurationElapsed &&
+      healthFraction(enemy) <= archetype.phases[nextIndex].enterAtHpFraction;
   if (!byHealth && !byDuration) return false;
   // K01/step 22.5: the one approved exception to the monotonic rule. Only the
-  // primary enemy can be drilled, and only when its current phase is the
-  // authored loop target - a phase-driven minion always advances normally.
-  if (
-    state.loopPhaseIndex === enemy.phaseIndex &&
-    archetype.id === state.config.primaryArchetypeId
-  ) {
-    enterDrillPhase(state, enemy, archetype, enemy.phaseIndex);
-  } else {
-    enterPhase(state, enemy, archetype, nextIndex);
+  // primary enemy can be drilled; a phase-driven minion always advances
+  // normally. Every jump uses the normal drill entry path.
+  if (state.drill !== null && archetype.id === state.config.primaryArchetypeId) {
+    const nextDrillIndex = nextDrillPhaseIndex(state.drill, enemy.phaseIndex);
+    if (nextDrillIndex === null) {
+      state.phase = "cleared";
+      return false;
+    }
+    // `applyProgression` sets "cleared" for any enemy at zero health. Only the
+    // primary's own health-zero exit is the drill loop boundary; a minion's
+    // clear must survive the primary's jump.
+    const primaryHealthReachedZero = enemy.healthHp === 0;
+    enterDrillPhase(state, enemy, archetype, nextDrillIndex);
+    if (primaryHealthReachedZero && state.phase === "cleared")
+      state.phase = "playing";
+    return true;
   }
+  if (isFinalPhase) return false;
+  enterPhase(state, enemy, archetype, nextIndex);
   return true;
 }
 

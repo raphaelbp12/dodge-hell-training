@@ -23,6 +23,9 @@ import {
 import styles from "./App.module.css";
 import { ZoomPreference } from "./storage/zoom";
 import { commitSha } from "virtual:build-info";
+import { parseDrillFromLocation, phaseLabel } from "./game/config/drill";
+import type { DrillSelection } from "./game/models";
+import { PhaseSelector } from "./ui/PhaseSelector";
 import {
   DEBUG_GROUPS,
   DEBUG_PARAMETERS,
@@ -75,32 +78,6 @@ function readEncounterIdFromLocation(): string | undefined {
   return ENCOUNTER_LIST.some((entry) => entry.id === raw) ? raw : undefined;
 }
 
-/**
- * Drill mode (step 22.5, K01): `?phase=<index>` starts the primary enemy in
- * one phase, validated against its archetype's phase count; an out-of-range
- * or malformed value is ignored and the full fight starts normally, matching
- * how `?seed=` already handles bad input. `?loop=1` additionally re-enters
- * that phase on its own exit instead of advancing.
- */
-function readDrillFromLocation(
-  config: EncounterConfig,
-): { startPhaseIndex?: number; loopPhase?: boolean } {
-  const params = new URLSearchParams(window.location.search);
-  const raw = params.get("phase");
-  if (raw === null) return {};
-  const phaseIndex = Number(raw);
-  const phaseCount = primaryArchetype(config).phases.length;
-  if (
-    !Number.isInteger(phaseIndex) ||
-    phaseIndex < 0 ||
-    phaseIndex >= phaseCount
-  )
-    return {};
-  return { startPhaseIndex: phaseIndex, loopPhase: params.get("loop") === "1" };
-}
-
-const PHASE_COUNT = primaryArchetype(ENCOUNTER_CONFIG).phases.length;
-
 function DebugPanel({
   settings,
   onChange,
@@ -112,8 +89,6 @@ function DebugPanel({
   onClose: () => void;
   encounterHandle: RefObject<EncounterHandle | null>;
 }) {
-  const [phaseIndex, setPhaseIndex] = useState(0);
-  const [loopPhase, setLoopPhase] = useState(false);
   return (
     <aside
       id="debug-tools"
@@ -146,45 +121,13 @@ function DebugPanel({
           {toggle.label}
         </label>
       ))}
-      <fieldset>
-        <legend>Phase drill</legend>
-        <label className={styles.debugParameter}>
-          <span>Phase</span>
-          <select
-            aria-label="Jump to phase"
-            value={phaseIndex}
-            onChange={(event) => {
-              const index = Number(event.target.value);
-              setPhaseIndex(index);
-              encounterHandle.current?.jumpToPhase(index);
-            }}
-          >
-            {Array.from({ length: PHASE_COUNT }, (_, index) => (
-              <option key={index} value={index}>
-                {index + 1}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.debugToggle}>
-          <input
-            type="checkbox"
-            aria-label="Loop this phase"
-            checked={loopPhase}
-            onChange={(event) => {
-              setLoopPhase(event.target.checked);
-              encounterHandle.current?.setLoopPhase(event.target.checked);
-            }}
-          />
-          Loop this phase
-        </label>
-        <button
-          type="button"
-          onClick={() => encounterHandle.current?.advanceSubPhase()}
-        >
-          Next sub-phase
-        </button>
-      </fieldset>
+      <button
+        type="button"
+        className={styles.debugLoad}
+        onClick={() => encounterHandle.current?.advanceSubPhase()}
+      >
+        Next sub-phase
+      </button>
       {DEBUG_GROUPS.map((group) => (
         <fieldset key={group}>
           <legend>{group}</legend>
@@ -344,6 +287,10 @@ function Encounter({
   encounterHandle,
   config,
   displayName,
+  drill,
+  onDrillChange,
+  debugOpen,
+  onDebugOpenChange,
 }: {
   zoomPreference: RefObject<number>;
   zoomStorage: ZoomPreference;
@@ -356,13 +303,28 @@ function Encounter({
   encounterHandle: RefObject<EncounterHandle | null>;
   config: EncounterConfig;
   displayName: string;
+  drill: DrillSelection | null;
+  onDrillChange: (drill: DrillSelection | null) => void;
+  debugOpen: boolean;
+  onDebugOpenChange: (open: boolean) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const resultHeading = useRef<HTMLHeadingElement>(null);
+  const phaseButton = useRef<HTMLButtonElement>(null);
   const runtime = encounterHandle;
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [phaseOpen, setPhaseOpen] = useState(false);
   const initialMuted = useRef(muted);
   const initialDebugSettings = useRef(debugSettings);
+  // The launch selection is fixed for this runtime; live Apply updates the
+  // session and the shared selector via the App-owned drill state.
+  const initialDrill = useRef(drill);
+  const phases = primaryArchetype(config).phases.map((phase, index) => ({
+    index,
+    id: phase.id,
+    label: phaseLabel(phase.id, index),
+  }));
+  const initialPhaseIndex = drill?.phaseIndices[0] ?? 0;
   const [view, setView] = useState<EncounterView>({
     healthHp: PALADIN_STATS.healthHp,
     elapsedSeconds: 0,
@@ -371,10 +333,24 @@ function Encounter({
     countdownRemainingSeconds: config.session.startCountdownSeconds,
     zoom: zoomPreference.current,
     result: null,
+    phaseIndex: initialPhaseIndex,
+    phaseLabel: phases[initialPhaseIndex]?.label ?? phases[0].label,
+    phaseCount: phases.length,
+    drill,
   });
   useEffect(() => {
     if (view.result) resultHeading.current?.focus();
   }, [view.result]);
+  useEffect(() => {
+    if (view.result) setPhaseOpen(false);
+  }, [view.result]);
+  useEffect(() => {
+    // A Debug aside opened from the header closes the live phase panel and
+    // resumes the attempt, so the two asides never stack.
+    if (!debugOpen || !phaseOpen) return;
+    setPhaseOpen(false);
+    runtime.current?.resume();
+  }, [debugOpen, phaseOpen, runtime]);
   useEffect(() => {
     let active = true;
     const runtimeId = crypto.randomUUID();
@@ -389,7 +365,7 @@ function Encounter({
       {
         config,
         seed: readSeedFromLocation(),
-        drill: readDrillFromLocation(config),
+        drill: { drill: initialDrill.current },
         initialZoom: zoomPreference.current,
         initialMuted: initialMuted.current,
         initialDebugSettings: initialDebugSettings.current,
@@ -422,6 +398,21 @@ function Encounter({
   useEffect(() => {
     runtime.current?.setDebugSettings(debugSettings);
   }, [debugSettings]);
+  const openPhasePanel = () => {
+    runtime.current?.setControlsOpen(false);
+    setControlsOpen(false);
+    onDebugOpenChange(false);
+    runtime.current?.pause();
+    setPhaseOpen(true);
+  };
+  const closePhasePanel = () => {
+    setPhaseOpen(false);
+    runtime.current?.resume();
+  };
+  const retryAttempt = () => {
+    setPhaseOpen(false);
+    runtime.current?.retry();
+  };
   return (
     <>
       <div className={styles.telemetry} aria-label="Session HUD">
@@ -463,13 +454,28 @@ function Encounter({
           aria-hidden={!!view.result}
         >
           <button
+            ref={phaseButton}
+            type="button"
+            aria-expanded={phaseOpen}
+            aria-controls={phaseOpen ? "phase-selector" : undefined}
+            onClick={() => {
+              if (phaseOpen) closePhasePanel();
+              else openPhasePanel();
+            }}
+          >
+            Phases
+          </button>
+          <button
             type="button"
             disabled={view.status !== "paused"}
-            onClick={() => runtime.current?.resume()}
+            onClick={() => {
+              if (phaseOpen) closePhasePanel();
+              else runtime.current?.resume();
+            }}
           >
             Resume
           </button>
-          <button type="button" onClick={() => runtime.current?.retry()}>
+          <button type="button" onClick={retryAttempt}>
             Retry
           </button>
           <button type="button" onClick={onHome}>
@@ -478,6 +484,7 @@ function Encounter({
           <button
             type="button"
             onClick={() => {
+              setPhaseOpen(false);
               runtime.current?.setControlsOpen(true);
               setControlsOpen(true);
             }}
@@ -486,7 +493,8 @@ function Encounter({
           </button>
         </div>
       </div>
-      <div className={styles.playfield}>
+      <div className={styles.liveLayout}>
+        <div className={styles.playfield}>
         <div
           ref={host}
           tabIndex={0}
@@ -554,6 +562,19 @@ function Encounter({
             <History snapshot={historySnapshot} />
           </section>
         )}
+        </div>
+        {phaseOpen && (
+          <PhaseSelector
+            mode="live"
+            phases={phases}
+            drill={drill}
+            activePhaseIndex={view.phaseIndex}
+            activePhaseLabel={view.phaseLabel}
+            onChange={onDrillChange}
+            onApply={() => runtime.current?.applyDrill(drill)}
+            onClose={closePhasePanel}
+          />
+        )}
       </div>
       {controlsOpen && (
         <ControlsDialog
@@ -582,6 +603,18 @@ export default function App() {
     ENCOUNTER_LIST.find((entry) => entry.id === selectedEncounterId) ??
     ENCOUNTER_LIST[0];
   const isDebugTunable = selectedEncounterId === DEBUG_TUNABLE_ENCOUNTER_ID;
+  const [drill, setDrill] = useState<DrillSelection | null>(() =>
+    parseDrillFromLocation(encounterConfigOf(selectedEncounterId)),
+  );
+  const [phaseOpen, setPhaseOpen] = useState(false);
+  const phaseButton = useRef<HTMLButtonElement>(null);
+  const phases = primaryArchetype(
+    encounterConfigOf(selectedEncounterId),
+  ).phases.map((phase, index) => ({
+    index,
+    id: phase.id,
+    label: phaseLabel(phase.id, index),
+  }));
   const [homeControlsOpen, setHomeControlsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -606,6 +639,20 @@ export default function App() {
           <h1>{selectedEncounter.displayName}</h1>
         </div>
         <div className={styles.headerTools}>
+          {!launched && (
+            <button
+              ref={phaseButton}
+              type="button"
+              aria-expanded={phaseOpen}
+              aria-controls={phaseOpen ? "phase-selector" : undefined}
+              onClick={() => {
+                setPhaseOpen((open) => !open);
+                setDebugOpen(false);
+              }}
+            >
+              Phases
+            </button>
+          )}
           {isDebugTunable && (
             <button
               ref={debugButton}
@@ -613,7 +660,10 @@ export default function App() {
               data-debug-tools
               aria-expanded={debugOpen}
               aria-controls="debug-tools"
-              onClick={() => setDebugOpen(!debugOpen)}
+              onClick={() => {
+                setDebugOpen((open) => !open);
+                setPhaseOpen(false);
+              }}
             >
               Debug
             </button>
@@ -639,13 +689,21 @@ export default function App() {
               zoomStorage={zoomStorage}
               muted={muted}
               debugSettings={debugSettings}
-              onHome={() => setLaunched(false)}
+              onHome={() => {
+                setLaunched(false);
+                setDrill(null);
+                setPhaseOpen(false);
+              }}
               history={history}
               historySnapshot={historySnapshot}
               onHistoryChange={setHistorySnapshot}
               encounterHandle={encounterHandle}
               config={encounterConfigOf(selectedEncounterId)}
               displayName={selectedEncounter.displayName}
+              drill={drill}
+              onDrillChange={setDrill}
+              debugOpen={debugOpen}
+              onDebugOpenChange={setDebugOpen}
             />
           ) : (
             <div className={styles.home}>
@@ -669,7 +727,11 @@ export default function App() {
                           name="encounter"
                           value={entry.id}
                           checked={selectedEncounterId === entry.id}
-                          onChange={() => setSelectedEncounterId(entry.id)}
+                          onChange={() => {
+                            setSelectedEncounterId(entry.id);
+                            setDrill(null);
+                            setPhaseOpen(false);
+                          }}
                         />
                         {entry.displayName}
                       </label>
@@ -683,7 +745,11 @@ export default function App() {
                     ref={startButton}
                     className={styles.primary}
                     type="button"
-                    onClick={() => setLaunched(true)}
+                    onClick={() => {
+                      setLaunched(true);
+                      setDebugOpen(false);
+                      setPhaseOpen(false);
+                    }}
                   >
                     Start
                   </button>
@@ -812,6 +878,18 @@ export default function App() {
               debugButton.current?.focus();
             }}
             encounterHandle={encounterHandle}
+          />
+        )}
+        {!launched && phaseOpen && (
+          <PhaseSelector
+            mode="home"
+            phases={phases}
+            drill={drill}
+            onChange={setDrill}
+            onClose={() => {
+              setPhaseOpen(false);
+              phaseButton.current?.focus();
+            }}
           />
         )}
       </div>

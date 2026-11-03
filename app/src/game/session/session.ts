@@ -1,6 +1,11 @@
 import { ENCOUNTER_CONFIG, type EncounterConfig } from "../config/encounter";
 import { assertNonnegative } from "../config/stats";
-import type { AcceptedHit, SessionPhase, SimulationInput } from "../models";
+import type {
+  AcceptedHit,
+  DrillSelection,
+  SessionPhase,
+  SimulationInput,
+} from "../models";
 import type {
   CreateSimulationOptions,
   SimulationState,
@@ -67,6 +72,21 @@ export class SessionController {
   retry(): boolean {
     if (this.phase === "home") return false;
     this.initialize(this.config.session.retryCountdownSeconds);
+    return true;
+  }
+
+  /**
+   * Applies a drill selection to a live attempt: stores it, starts a fresh
+   * attempt with a new seed and no countdown, then pauses so the panel can stay
+   * open. Only a live attempt (playing or paused) accepts it, so Home and an
+   * ended attempt cannot be resurrected. The abandoned attempt never produces a
+   * result, so it cannot enter attempt history.
+   */
+  applyDrill(drill: DrillSelection | null): boolean {
+    if (this.phase !== "playing" && this.phase !== "paused") return false;
+    this.drillOptions = { drill };
+    this.initialize(0);
+    this.pause();
     return true;
   }
 

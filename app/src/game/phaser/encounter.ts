@@ -14,15 +14,16 @@ import {
 import { PALADIN_STATS } from "../config/stats";
 import { transformBodyVertices } from "../simulation/geometry";
 import { CONDITION_LABELS, visibleConditions } from "../simulation/conditions";
-import { currentPhaseOf, enterDrillPhase, forceNextSubPhase } from "../simulation/phases";
+import { currentPhaseOf, forceNextSubPhase } from "../simulation/phases";
 import type { CreateSimulationOptions } from "../simulation/simulation";
 import { arbitrarySeed } from "../simulation/random";
 import type { TelegraphColorName } from "../config/data";
-import type { AcceptedHit, ShardState, Vector2 } from "../models";
+import type { AcceptedHit, DrillSelection, ShardState, Vector2 } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
 import type { DetonationEvent } from "../simulation/simulation";
 import { HitAudio } from "./hit-audio";
 import { bombExplosionFrameIndex } from "./appearance-pixels";
+import { phaseViewOf } from "./view";
 import {
   createAppearanceTextures,
   destroyAppearanceTextures,
@@ -39,19 +40,24 @@ export type EncounterView = {
   result: AttemptResult | null;
   finalHitAmounts?: readonly number[];
   debug?: boolean;
+  /** The primary enemy's current top-level phase and its derived label. */
+  phaseIndex: number;
+  phaseLabel: string;
+  /** The primary archetype's authored top-level phase count. */
+  phaseCount: number;
+  /** The active drill selection; null is the full fight. */
+  drill: DrillSelection | null;
 };
 
 export type EncounterHandle = {
   destroy(): void;
   resume(): void;
+  pause(): void;
   retry(): void;
+  applyDrill(drill: DrillSelection | null): void;
   setMuted(muted: boolean): void;
   setControlsOpen(open: boolean): void;
   setDebugSettings(settings: DebugSettings): void;
-  /** Debug panel's phase jump (step 22.5, K12): moves the primary enemy mid-run. */
-  jumpToPhase(index: number): void;
-  /** Debug panel's "loop this phase" toggle: arms or disarms the drill re-entry rule. */
-  setLoopPhase(enabled: boolean): void;
   /** Debug panel's "next sub-phase" action; a no-op without sub-phases. */
   advanceSubPhase(): void;
 };
@@ -351,11 +357,17 @@ class EncounterScene extends Phaser.Scene {
   };
   private pauseForFocus = (): void => {
     if (this.disposed || this.state.phase === "ended") return;
+    this.pause();
+  };
+
+  /** Pauses the session and publishes the current view (R09). */
+  pause(): void {
+    if (this.disposed) return;
     this.session.pause();
     this.hitAudio.stop();
     this.clearMovement();
     this.publishView();
-  };
+  }
 
   resume(): void {
     if (
@@ -380,6 +392,27 @@ class EncounterScene extends Phaser.Scene {
       !this.session.retry()
     )
       return;
+    this.resetAttemptCleanup();
+    this.host.focus({ preventScroll: true });
+    this.drawEntities();
+    this.centerCamera();
+    this.publishView();
+  }
+
+  /**
+   * Applies a drill selection to the live attempt (R09, R16). It reuses the
+   * Retry presentation cleanup, then leaves the fresh attempt paused so the
+   * panel can stay open.
+   */
+  applyDrill(drill: DrillSelection | null): void {
+    if (this.disposed || !this.session.applyDrill(drill)) return;
+    this.resetAttemptCleanup();
+    this.drawEntities();
+    this.centerCamera();
+    this.publishView();
+  }
+
+  private resetAttemptCleanup(): void {
     this.clearHitNumbers();
     this.bombExplosions = [];
     this.bombsDetonated = 0;
@@ -389,10 +422,6 @@ class EncounterScene extends Phaser.Scene {
     this.finalHitAmounts = [];
     this.clearMovement();
     this.hudRemainingMilliseconds = 0;
-    this.host.focus({ preventScroll: true });
-    this.drawEntities();
-    this.centerCamera();
-    this.publishView();
   }
 
   setMuted(muted: boolean): void {
@@ -408,19 +437,6 @@ class EncounterScene extends Phaser.Scene {
     this.publishView();
   }
 
-  jumpToPhase(index: number): void {
-    if (this.disposed || this.state.phase !== "playing") return;
-    const enemy = this.state.enemies.find(
-      (candidate) => candidate.archetypeId === this.state.config.primaryArchetypeId,
-    );
-    if (!enemy) return;
-    const archetype = archetypeOf(this.state.config, enemy.archetypeId);
-    if (index < 0 || index >= archetype.phases.length) return;
-    enterDrillPhase(this.state, enemy, archetype, index);
-    if (this.bodies) this.drawEntities();
-    this.publishView();
-  }
-
   advanceSubPhase(): void {
     if (this.disposed || this.state.phase !== "playing") return;
     const enemy = this.state.enemies.find(
@@ -430,14 +446,6 @@ class EncounterScene extends Phaser.Scene {
     forceNextSubPhase(this.state, enemy, archetypeOf(this.state.config, enemy.archetypeId));
     if (this.bodies) this.drawEntities();
     this.publishView();
-  }
-
-  setLoopPhase(enabled: boolean): void {
-    if (this.disposed || this.state.phase !== "playing") return;
-    const enemy = this.state.enemies.find(
-      (candidate) => candidate.archetypeId === this.state.config.primaryArchetypeId,
-    );
-    this.state.loopPhaseIndex = enabled && enemy ? enemy.phaseIndex : null;
   }
 
   setControlsOpen(open: boolean): void {
@@ -554,6 +562,7 @@ class EncounterScene extends Phaser.Scene {
       result: this.session.result,
       finalHitAmounts: this.finalHitAmounts,
       debug: this.state.rulesVersion === DEBUG_RULES_VERSION,
+      ...phaseViewOf(this.state),
     });
   }
 
@@ -989,15 +998,15 @@ export function createEncounter(
   });
   return {
     resume: () => scene?.resume(),
+    pause: () => scene?.pause(),
     retry: () => scene?.retry(),
+    applyDrill: (drill) => scene?.applyDrill(drill),
     setMuted: (muted) => scene?.setMuted(muted),
     setControlsOpen: (open) => scene?.setControlsOpen(open),
     setDebugSettings: (settings) => {
       options.initialDebugSettings = settings;
       scene?.setDebugSettings(settings);
     },
-    jumpToPhase: (index) => scene?.jumpToPhase(index),
-    setLoopPhase: (enabled) => scene?.setLoopPhase(enabled),
     advanceSubPhase: () => scene?.advanceSubPhase(),
     destroy: () => {
       if (disposed) return;

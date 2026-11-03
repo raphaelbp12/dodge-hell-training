@@ -605,7 +605,7 @@ Spawn placement is the only source of randomness, and it enters through a seeded
 
 ## Approved V5 Boss Encounter Contract - Step 19.1
 
-Additive record of the user's 2026-10-27 decisions (K01-K18 in [plan v5](plan-v5.md)) for the Killer Bee Queen encounter, phases 19-24. This supersedes nothing in the v2 or v4 record except where stated.
+Additive record of the user's 2026-10-27 decisions (K01-K18 in [plan v5](implementation-plan-v5.md)) for the Killer Bee Queen encounter, phases 19-24. This supersedes nothing in the v2 or v4 record except where stated.
 
 ### Source Access
 
@@ -735,6 +735,63 @@ Final record of `killer-bee-queen-nest-paladin-v7`. This section adds the V6 app
 
 - The Queen's rules identity is now `killer-bee-queen-nest-paladin-v7`; v6 and earlier attempts remain stored and are excluded from the v7 best.
 - The hitbox sizes are derived from the sprite art, not from a wiki hitbox field. The small stinger is 0.547 x 0.078 tiles, the large stinger 0.625 x 0.391, the ball and glaive 0.625 x 0.625, the hive 3.828 x 2.188 and the bee 0.625 x 0.469. Do not describe these as verified client hitboxes.
-- V5 cadences are unchanged. The hitbox-only comparison measured phase 1 at 8 hits / 7.40 s (V5) versus 8 / 7.42 s (V7), phase 3 at 11 / 5.72 s versus 8 / 5.08 s, and phase 6 at 15 / 5.30 s versus 15 / 5.30 s for the same fixed-seed idle scenario. Retuning is D13.
+- V5 cadences are unchanged. The hitbox-only comparison measured phase 1 at 8 hits / 7.40 s (V5) versus 8 / 7.42 s (V6), phase 3 at 11 / 5.72 s versus 8 / 5.08 s, and phase 6 at 15 / 5.30 s versus 15 / 5.30 s for the same fixed-seed idle scenario. Retuning is D13.
 - The Crystal Worm shard's appearance and hitbox are unchanged (D14). No Plagued Nest content or `white-bomb-v3` was added (P10, D02).
 - God mode is available on the Queen through the shared debug toggle state. It keeps the Queen config, ignores the numeric Crystal Worm tuning fields, and taints the attempt until retry, matching the existing session policy.
+
+## Implemented V7 Handoff - Phase Selector And Drill Sets
+
+Final record of the V7 practice selector (decisions R01-R18). It adds a training control only: no gameplay value, projectile, hitbox, condition, phase or encounter is added or retuned, and the Crystal Worm keeps its single phase while the Killer Bee Queen keeps her eight.
+
+### The Drill-Set Contract
+
+A drill is a sorted, unique, nonempty set of top-level phase indices plus a Loop flag (`DrillSelection`). The primary enemy starts in the first selected phase; minions keep their authored `startPhaseIndex`. Indices are 0-based top-level phase indices. An absent, null or empty drill means Full fight and stores `drill: null`. At the simulation boundary an out-of-range, negative, fractional or non-finite index is a `RangeError`; the URL parser instead rejects the whole list and falls back to Full fight. Duplicates and unsorted lists normalize before storage, so click order never matters (R03).
+
+Only top-level phases are selectable. Selecting a phase includes its authored sub-phase cycle; an individual colour sub-phase is not a drill target (R06, D16).
+
+### Supersession Of `?phase=N`
+
+The old `?phase=N` behaviour is superseded. It used to start at phase N and then continue through authored progression to the encounter's real end. It now means a single-phase one-shot drill that clears when phase N exits. `loop=1` enables looping; any other `loop` value means one-shot. A malformed, repeated, fractional or out-of-range `phase` value falls back to Full fight, as does a repeated `loop` parameter. The single-value form remains valid (R07).
+
+### Drill Semantics
+
+| Selection        | Loop on                                                                              | Loop off                                                  |
+| ---------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| Single phase N   | Re-enter N on every exit; at phase 8's health-zero exit reset to its entry fraction   | Play N once; clear when N exits; phase 8 clears at zero   |
+| Group [a, b, c]  | a -> b -> c -> a; at the final phase's health-zero exit wrap to the first selected    | a -> b -> c; clear when c exits; if c is phase 8, at zero |
+| Full fight       | Normal authored progression to the real end                                           | Normal authored progression to the real end              |
+
+Every jump uses the normal phase-entry path below. There is one phase machine and one clock.
+
+### Normal Phase-Entry Semantics
+
+Every drill jump enters the target phase through `enterDrillPhase`. Health resets to the target phase's entry fraction, its telegraph and invulnerability window apply exactly as at an authored entry, authored minions marked `despawnOnExit` despawn when their owner leaves, and fired shards persist to their own lifetimes. Non-`despawnOnExit` minions stay in the fight. A drill jump is not a clean-slate clear of shards or minions (R13).
+
+### The Primary-Only Rule
+
+Only the primary enemy is drilled. A phase-driven minion keeps its authored monotonic progression, its own spawn cycle and its own phase transitions. A minion reaching zero health still ends the attempt as `cleared` even when the primary jumps in the same step; the primary's own drill jump does not mask it.
+
+### The Final Phase
+
+The final authored phase can loop only in drill mode. When a looped selection reaches phase 8's health-zero exit, its health resets to the phase entry fraction and the selection continues to the next selected phase - or back to itself for a single-phase loop - instead of clearing. With Loop off, phase 8 clears normally at zero health (R05). A one-shot group that ends before phase 8 sets `cleared` at the last selected phase's exit; it does not run on to the real end.
+
+### Rules-Version Suffixes
+
+Full fight keeps the encounter's base identity. Drills append (phase indices are 0-based, as in `?phase=`):
+
+- single phase, Loop on: `-drill-p<N>`;
+- single phase, Loop off: `-drill-p<N>-once`;
+- group, Loop on: `-drill-p<a-b-c>`;
+- group, Loop off: `-drill-p<a-b-c>-once`.
+
+`-drill-p<N>` is unchanged from the earlier single-loop form. `-once` marks a finite drill, so a loop and a one-shot of the same set never share an identity, and different phase sets never compare (R08). `retainedBestSeconds` groups only identical rules versions. The History panel compares against the fixed Crystal Worm base version `crystal-worm-child-swarm-paladin-v4`; records from another version, including Crystal Worm drills and every Killer Bee Queen attempt, show as **Other rules** and never become the retained best.
+
+### The Live Panel And Session Boundary
+
+Opening the phase panel pauses through the session, not a second clock. Close resumes. Apply rebuilds the attempt at the first selected phase with a fresh seed and leaves it paused behind the open panel. A result closes the panel; Retry keeps the selection without reopening it; returning Home resets the selection to Full fight. The live panel overlays the right side of the playfield without resizing the arena or the canvas, and it reads published view data rather than driving per-frame simulation (R09, R10, R15-R17).
+
+Selector state - open state, selected phases and Loop - is session-only. It is not stored in localStorage and resets on Home or reload; a `?phase=` URL is the explicit reload path (D17). There is no phase selector on the results screen (D18). The Debug panel is Crystal-Worm-only and no longer selects or loops phases; it keeps the Crystal Worm stat tuning, the debug toggles and the "Next sub-phase" action (R14).
+
+### Verification
+
+The phase 32 acceptance matrix reran the drill, phase-machine, session, view, component and App suites plus the named Chromium cases. The full fight still clears at **373.43 s** with peak **119** live shards, **1,906** peak collision parts and **13** peak enemies, identical to V6; the Queen's full fight remains deterministic at 30/60/120 Hz and under step batching; `npm run verify` passed lint, typecheck, test (818 tests) and build; five targeted Chromium cases passed. No performance bound was relaxed, and the selector adds no per-frame simulation work.

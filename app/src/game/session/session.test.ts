@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { ENCOUNTER_CONFIG } from "../config/encounter";
 import { createSimulation } from "../simulation/simulation";
-import type { SimulationInput } from "../models";
+import type { DrillSelection, SimulationInput } from "../models";
 import { SessionController } from "./session";
 import { DEFAULT_DEBUG_SETTINGS, DEBUG_RULES_VERSION } from "../config/debug";
 
@@ -276,4 +276,81 @@ test("the controller imports and runs without browser globals", () => {
   expect(typeof document).toBe("undefined");
   expect(typeof window).toBe("undefined");
   expect(typeof localStorage).toBe("undefined");
+});
+
+/** A live attempt paused by the open phase panel, with two attempts behind it. */
+function pausedLive(): SessionController {
+  const session = running();
+  session.pause();
+  return session;
+}
+
+test("applyDrill starts a new attempt at the first selected phase, uses its identity, and pauses", () => {
+  const session = pausedLive();
+  const drill: DrillSelection = { phaseIndices: [0], loop: true };
+
+  expect(session.applyDrill(drill)).toBe(true);
+
+  expect(session.phase).toBe("paused");
+  expect(session.attemptId).toBe(3);
+  expect(session.simulation.drill).toEqual(drill);
+  expect(session.simulation.rulesVersion).toContain("-drill-p0");
+
+  const primaryEnemy = session.simulation.enemies.find(
+    (enemy) => enemy.archetypeId === ENCOUNTER_CONFIG.primaryArchetypeId,
+  );
+  expect(primaryEnemy?.phaseIndex).toBe(0);
+});
+
+test("applyDrill(null) restarts a full fight paused", () => {
+  const session = pausedLive();
+
+  expect(session.applyDrill(null)).toBe(true);
+
+  expect(session.phase).toBe("paused");
+  expect(session.simulation.drill).toBe(null);
+  expect(session.simulation.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion);
+});
+
+test("applyDrill abandons the previous attempt without a result entry", () => {
+  const session = pausedLive();
+  const abandonedAttemptId = session.attemptId;
+
+  session.applyDrill({ phaseIndices: [0], loop: false });
+
+  expect(session.result).toBe(null);
+  expect(session.attemptId).toBe(abandonedAttemptId + 1);
+});
+
+test("applyDrill draws a fresh seed for the new attempt", () => {
+  // Construction, Start and Apply each consume one seed. Returning distinct
+  // values proves the new attempt is not reusing the abandoned attempt's seed.
+  const seeds = [101, 202, 303];
+  let supplied = 0;
+  const session = new SessionController(() => seeds[supplied++]);
+  session.start();
+  session.pause();
+
+  session.applyDrill({ phaseIndices: [0], loop: true });
+
+  expect(supplied).toBe(3);
+  expect(session.simulation).toEqual(
+    createSimulation(ENCOUNTER_CONFIG, 303, {
+      drill: { phaseIndices: [0], loop: true },
+    }),
+  );
+});
+
+test("applyDrill is rejected at Home and after an ended attempt", () => {
+  const home = seededSession();
+  expect(home.applyDrill(null)).toBe(false);
+  expect(home.phase).toBe("home");
+  expect(home.attemptId).toBe(0);
+
+  const ended = running();
+  const result = kill(ended);
+  expect(ended.phase).toBe("ended");
+  expect(ended.applyDrill({ phaseIndices: [0], loop: true })).toBe(false);
+  expect(ended.phase).toBe("ended");
+  expect(ended.result).toBe(result);
 });

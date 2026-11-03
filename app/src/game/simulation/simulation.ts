@@ -47,10 +47,15 @@ import {
   assertNonnegative,
   PALADIN_STATS,
 } from "../config/stats";
+import {
+  drillRulesVersion,
+  normalizeDrillSelection,
+} from "../config/drill";
 import type {
   AcceptedHit,
   AttackClockState,
   CircularArena,
+  DrillSelection,
   EnemyState,
   PlayerState,
   ShardState,
@@ -81,11 +86,10 @@ export type SimulationState = {
   randomSeed: number;
   rulesVersion: string;
   /**
-   * Drill mode (step 22.5): the phase index the primary enemy re-enters from
-   * the top on its own exit, instead of advancing - K01's one approved
-   * exception to the monotonic phase rule. `null` outside drill mode.
+   * The active drill selection: a sorted set of top-level phases plus a Loop
+   * flag. `null` is the normal full fight. Only the primary enemy is drilled.
    */
-  loopPhaseIndex: number | null;
+  drill: DrillSelection | null;
   /** "ended" means the player died; "cleared" means a drained boss's health reached zero. */
   phase: "playing" | "ended" | "cleared";
   hitsTaken: number;
@@ -187,11 +191,13 @@ export function createEnemy(
   };
 }
 
-/** `startPhaseIndex` and `loopPhase` implement drill mode (K01, step 22.5). */
+/** `startPhaseIndex` and `loopPhase` are compatibility aliases for `drill`. */
 export type CreateSimulationOptions = Readonly<{
-  /** The phase the primary enemy starts in, instead of its archetype's phase 0. */
+  /** The drill to start and loop; absent means the normal full fight. */
+  drill?: DrillSelection | null;
+  /** Legacy alias: the phase the primary enemy starts in. */
   startPhaseIndex?: number;
-  /** When true, the drilled phase re-enters itself on exit instead of advancing. */
+  /** Legacy alias: when true, the drilled phase re-enters itself on exit. */
   loopPhase?: boolean;
 }>;
 
@@ -202,13 +208,33 @@ export function createSimulation(
 ): SimulationState {
   const primaryPhaseCount =
     archetypeOf(config, config.primaryArchetypeId).phases.length;
-  if (
-    options.startPhaseIndex !== undefined &&
-    (!Number.isInteger(options.startPhaseIndex) ||
-      options.startPhaseIndex < 0 ||
-      options.startPhaseIndex >= primaryPhaseCount)
-  )
-    throw new RangeError("startPhaseIndex must name an authored phase");
+  const hasExplicitDrill = options.drill !== undefined;
+  const explicitDrill = hasExplicitDrill
+    ? normalizeDrillSelection(options.drill, primaryPhaseCount)
+    : null;
+  // The legacy `startPhaseIndex` without `loopPhase` keeps its old
+  // start-and-continue behaviour: it starts in that phase but is not an active
+  // drill, so authored progression continues. `loopPhase` still arms the old
+  // single-phase loop. The explicit `drill` option is the one-shot/group model.
+  const legacyDrill =
+    !hasExplicitDrill && options.startPhaseIndex !== undefined
+      ? normalizeDrillSelection(
+          {
+            phaseIndices: [options.startPhaseIndex],
+            loop: options.loopPhase ?? false,
+          },
+          primaryPhaseCount,
+        )
+      : null;
+  const drill = explicitDrill ?? (legacyDrill?.loop ? legacyDrill : null);
+  const startPhaseIndex = hasExplicitDrill
+    ? explicitDrill?.phaseIndices[0]
+    : options.startPhaseIndex;
+  const rulesVersion = hasExplicitDrill
+    ? drillRulesVersion(config.rulesVersion, explicitDrill)
+    : options.startPhaseIndex !== undefined
+      ? `${config.rulesVersion}-drill-p${options.startPhaseIndex}`
+      : config.rulesVersion;
   const state: SimulationState = {
     config,
     debugSettings: DEFAULT_DEBUG_SETTINGS,
@@ -217,14 +243,8 @@ export function createSimulation(
     nextEnemyId: 1,
     nextSpawnSeconds: config.spawns.firstSpawnSeconds,
     randomSeed: assertSeed(seed),
-    rulesVersion:
-      options.startPhaseIndex !== undefined
-        ? `${config.rulesVersion}-drill-p${options.startPhaseIndex}`
-        : config.rulesVersion,
-    loopPhaseIndex:
-      options.loopPhase && options.startPhaseIndex !== undefined
-        ? options.startPhaseIndex
-        : null,
+    rulesVersion,
+    drill,
     phase: "playing",
     hitsTaken: 0,
     player: {
@@ -242,12 +262,12 @@ export function createSimulation(
   // The opening enemy is schedule index 0, created through the same routine as
   // every later spawn, so there is no special-cased initial enemy (G18).
   const enemy = spawnEnemy(state);
-  if (enemy && options.startPhaseIndex !== undefined)
+  if (enemy && startPhaseIndex !== undefined)
     enterDrillPhase(
       state,
       enemy,
       archetypeOf(config, config.primaryArchetypeId),
-      options.startPhaseIndex,
+      startPhaseIndex,
     );
   return state;
 }

@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   archetypeOf,
   ENCOUNTER_CONFIG,
+  encounterConfigOf,
   primaryArchetype,
   validateEncounterConfig,
   type EncounterConfig,
@@ -13,7 +14,11 @@ import {
 } from "../config/encounter";
 import type { EnemyState, SimulationInput } from "../models";
 import { advanceSimulation, createSimulation } from "./simulation";
-import { enterDrillPhase, healthFraction } from "./phases";
+import {
+  enterDrillPhase,
+  forceNextSubPhase,
+  healthFraction,
+} from "./phases";
 
 const idle: SimulationInput = {
   north: false,
@@ -820,4 +825,34 @@ test("validateEncounterConfig rejects a startPhaseIndex beyond the spawned arche
       ownerConfig({ spawns: [spawn] }, {}, { [MINION_ID]: minionArchetype() }),
     ),
   ).toThrow(RangeError);
+});
+
+test("forceNextSubPhase advances a Queen drill's sub-phase", () => {
+  const config = encounterConfigOf("killer-bee-queen");
+  const archetype = primaryArchetype(config);
+  const state = createSimulation(config, TEST_SEED, {
+    drill: { phaseIndices: [1], loop: true },
+  });
+  const enemy = state.enemies.find(
+    (candidate) => candidate.archetypeId === config.primaryArchetypeId,
+  )!;
+  expect(enemy.phaseIndex).toBe(1);
+  expect(archetype.phases[1].subPhases).toHaveLength(3);
+  expect(enemy.subPhaseIndex).toBe(0);
+
+  forceNextSubPhase(state, enemy, archetype);
+
+  expect(enemy.phaseIndex).toBe(1);
+  expect(enemy.subPhaseIndex).toBe(1);
+});
+
+test("forceNextSubPhase is a no-op for the Crystal Worm's sole phase", () => {
+  const state = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  const enemy = state.enemies[0];
+  expect(PRIMARY.phases[enemy.phaseIndex].subPhases).toBeNull();
+  expect(enemy.subPhaseIndex).toBe(0);
+
+  forceNextSubPhase(state, enemy, PRIMARY);
+
+  expect(enemy.subPhaseIndex).toBe(0);
 });

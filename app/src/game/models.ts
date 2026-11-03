@@ -15,6 +15,12 @@ export type ConditionKey =
 
 export type Vector2 = Readonly<{ x: number; y: number }>;
 
+export type DrillSelection = Readonly<{
+  /** Sorted, unique, authored top-level phase indices. Nonempty when present. */
+  phaseIndices: readonly number[];
+  loop: boolean;
+}>;
+
 export type CircularArena = Readonly<{
   centerTiles: Vector2;
   radiusTiles: number;

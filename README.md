@@ -2,7 +2,7 @@
 
 A pure-frontend bullet-hell practice game targeting repeated survival training against the Crystal Worm Child Head from Realm of the Mad God.
 
-## Current V6 State
+## Current State
 
 Two selectable encounters ship side by side, chosen from a plain radio list on Home (`?encounter=crystal-worm` or `?encounter=killer-bee-queen` links one directly; an unknown id falls back to the default). Each encounter has its own rules version, arena spawn rule and session values, and attempt history/bests never compare across them.
 
@@ -19,7 +19,7 @@ Two selectable encounters ship side by side, chosen from a plain radio list on H
 
   Append `?seed=<integer>` to pin the opening spawn bearing and reproduce a run, exactly as in v4.
 
-**Drill mode** (`?phase=<index>&loop=1`) starts the Queen in one phase by index instead of phase 1, skipping the lead-up; an out-of-range or malformed `phase` value is ignored and the full fight starts normally. `?loop=1` re-enters that same phase on its own exit instead of advancing, for repeated single-phase practice.
+**Drill mode.** The phase selector and the `?phase=` deep link start a practice drill instead of the full fight; [Phase Selector And Drill Sets](#phase-selector-and-drill-sets-v7) records the selection, Loop and identity rules.
 
 **The condition model** tracks all thirteen ROTMG status effects the Queen's attacks can inflict, split into two groups: seven **active** conditions that change dodging or survival - Paralyzed, Slowed, Confused, Armor Broken, Exposed, Curse, Sick - and six **inert** conditions tracked faithfully but with no effect here - Dazed, Silenced, Quiet, Weak, Unstable, Pet Stasis - because they affect attacking, abilities, mana or pets, none of which exist in this project. The HUD's condition chips show both, labelling inert ones `(inert)` so a reader never mistakes "tracked" for "does something."
 
@@ -52,6 +52,36 @@ Step 24.3 ran the full acceptance matrix on the pinned toolchain (`node v24.22.1
 
 `npm run verify` passed all four gates (lint, typecheck, test, build). The appearance grids were compared cell-by-cell against the local reference PNGs and all 19 families match. Targeted Chromium cases passed: the Crystal Worm shard render, the Queen's per-family pixel shards, the bomb detonation effect, and the Queen phase-3 and phase-6 drills. The god-mode real Queen drills measured phase 3 at peak 50-52 shards / 416 collision parts and phase 6 at peak 56 shards / 1,416 parts, with median 16 ms / p95 21-24 ms and a maximum gap that varied 44-51 ms across runs over 60 seconds. The headless full fight still clears at 373.43 s with peak 119 live shards, unchanged from V5; the hitbox-only comparison measured phase 1 at 8 hits / 7.40 s (V5) versus 8 / 7.42 s (V6), phase 3 at 11 / 5.72 s versus 8 / 5.08 s, and phase 6 at 15 / 5.30 s versus 15 / 5.30 s. Retuning is deliberately deferred as [D13](docs/deferred-work.md#d13---killer-bee-queen-cadence-retuning-after-projectile-hitbox-correction). The full Playwright suite was not run; only the named targeted cases were.
 
+## Phase Selector And Drill Sets (V7)
+
+The **Phases** button opens one shared phase selector on Home and, as an overlay, during play. It is a practice control: it changes only which authored top-level phases are played and whether that set repeats. It adds no gameplay value, projectile, hitbox, phase or encounter, and it does not tune stats. The Crystal Worm keeps its single phase and the Killer Bee Queen keeps her eight.
+
+- **Full fight** is the default and the normal authored progression: phase 1 through phase 8 to the encounter's real end, under the encounter's base rules version. The Loop toggle is disabled while Full fight is selected.
+- **Custom phases** selects one or more top-level phases. Click order does not matter: the set is stored sorted and unique, so the phases play in authored order. Checking the first phase turns Loop on; unchecking the last phase returns to Full fight. Selecting a phase includes its authored colour sub-phases; selecting an individual colour sub-phase is deferred as [D16](docs/deferred-work.md#d16---sub-phase-drill-selection).
+- **Loop** is a toggle. Loop on repeats the selected set in authored order: a single phase re-enters on every exit, and a group goes a -> b -> c -> a. When a looped set reaches the final phase's health-zero exit, that phase's health resets to its entry fraction and the set continues instead of clearing. Loop off plays the set once and marks the attempt **cleared** when the last selected phase exits, or when phase 8 reaches zero health if phase 8 is selected. A single phase with Loop off is therefore one finite one-shot drill, not the old start-and-continue behaviour.
+- **Home sets the selection; Start launches it.** Home has no Apply. In a live encounter, **Apply** starts a fresh attempt at the first selected phase with a new seed and leaves the panel open and paused. Opening the panel pauses the attempt; **Close** resumes it. A result closes the panel, **Retry** keeps the selection without reopening it, and returning **Home** resets the selection to Full fight.
+- **The live panel overlays the playfield** on the right-hand side. The arena and canvas keep their size, the camera stays centred on the player, and the panel adds no per-frame simulation work. The Debug panel keeps its Crystal Worm stat tuning and its "Next sub-phase" action; it no longer has a phase select or a Loop toggle, because the phase selector owns phase selection.
+- **Selector state is session-only.** The panel's open state, the selected phases and the Loop toggle reset when returning Home or reloading. Selector state is never written to localStorage; a `?phase=` URL is the explicit way to reproduce a drill after a reload ([D17](docs/deferred-work.md#d17---persist-phase-selector-state-across-reloads)). The selector is not available on the results screen ([D18](docs/deferred-work.md#d18---phase-selector-on-the-results-screen)).
+
+**URL deep link.** `?phase=` accepts one index or a comma-separated list, and `loop=1` turns looping on. Indices are 0-based top-level phase indices, so `?phase=2` starts the Queen in her phase 3:
+
+- `?phase=2` - Phase 3 as a one-shot drill;
+- `?phase=2&loop=1` - Phase 3, looped;
+- `?phase=0,2,4&loop=1` - phases 1, 3 and 5 in authored order, looped;
+- `?phase=0,2,4` - the same group as a one-shot drill.
+
+Duplicates and unsorted values normalize. A repeated `phase` or `loop` parameter, a malformed or out-of-range `phase` value, or a fractional index falls back to Full fight; any `loop` value other than `1` means one-shot. The single-value form remains valid. The URL is read once at launch; changing the panel does not rewrite it.
+
+**Attempt identities** keep loop, one-shot and different phase sets apart, so their records never compare against a different selection:
+
+| Selection        | Loop on            | Loop off                 |
+| ---------------- | ------------------ | ------------------------ |
+| Full fight       | base rules version | base rules version       |
+| Single phase N   | `-drill-p<N>`      | `-drill-p<N>-once`       |
+| Group [a, b, c]  | `-drill-p<a-b-c>`  | `-drill-p<a-b-c>-once`   |
+
+The suffix is appended to the encounter's base identity, for example `killer-bee-queen-nest-paladin-v7-drill-p2-4-once`. The `<N>` and `<a-b-c>` placeholders are the same 0-based top-level phase indices as `?phase=`, so phases 3 and 5 produce `-drill-p2-4`. The old single-loop `-drill-p<N>` identity is unchanged, and a history record from one selection is shown as **Other rules** against another. The History panel compares against the fixed Crystal Worm base version `crystal-worm-child-swarm-paladin-v4`; records from another version, including Crystal Worm drills and every Killer Bee Queen attempt, show as **Other rules** and never become the retained best.
+
 ## Fidelity And Limitations
 
 This trainer is not a complete recreation of the live fight. Every gap below is deliberate and tracked, not an oversight:
@@ -72,7 +102,9 @@ A training tool that misrepresents its own fidelity is worse than one that admit
 
 ## Debug Tools
 
-The header's Debug button opens a live, non-modal enemy panel on Home or during play. This is a locally implemented follow-up to the release above, explicitly requested on 2026-10-25; that earlier hosted verification does not claim this addition is deployed.
+The header's Debug button opens a live, non-modal enemy panel on Home or during play. It is available for the Crystal Worm encounter only. This is a locally implemented follow-up to the release above, explicitly requested on 2026-10-25; that earlier hosted verification does not claim this addition is deployed.
+
+The Debug panel no longer selects or loops phases; the phase selector owns phase selection and the Debug panel keeps its Crystal Worm stat tuning, its debug toggles and its "Next sub-phase" action.
 
 All 19 sliders use [typed debug metadata](app/src/game/config/debug.ts): chase speed; spawn X/Y; head width/height; emitter count, offset, phase and rotation speed; shots per burst, shot interval, burst cooldown and initial cooldown; projectile damage, speed, reversal age, lifetime and width/height. Positive rotation is clockwise, negative is counterclockwise and zero stops rotation. Fixed collision/expiration policies are not tuning parameters.
 
@@ -508,7 +540,7 @@ The lockfile records installed dependency versions. The initial installation rep
 
 ## Project Documents
 
-- [Active implementation plan](implementation-plan.md): the reusable planning process and the current plan table. Completed plans are archived in the [v1](docs/implementation-plan-v1.md), [v2](docs/implementation-plan-v2.md), [v4](docs/implementation-plan-v4.md) and [v5](docs/implementation-plan-v5.md) archives, which hold the phased prompts, dependencies, acceptance criteria and execution records.
+- [Implementation plan](implementation-plan.md): the reusable planning process and the plan-version table. Completed plans are archived in the [v1](docs/implementation-plan-v1.md), [v2](docs/implementation-plan-v2.md), [v4](docs/implementation-plan-v4.md), [v5](docs/implementation-plan-v5.md), [v6](docs/implementation-plan-v6.md) and [v7](docs/implementation-plan-v7.md) archives, which hold the phased prompts, dependencies, acceptance criteria and execution records.
 - [Mechanics contract](docs/mechanics.md): sourced rules, delegated decisions, and explicit fidelity limitations.
 - [Original draft](first-draft.md): initial design intent.
 

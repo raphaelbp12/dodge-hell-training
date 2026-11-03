@@ -1,3 +1,9 @@
+# Agent scratch workspace (ledgers, briefs, review packages)
+/.superpowers/
+
+# Local Vitest JSON output from tooling; not a source or build artifact.
+/app/.vitest/
+
 # Local reference artwork; not approved for public distribution.
 /image.png
 /docs/fixes-*-candidate.png

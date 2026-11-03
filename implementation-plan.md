@@ -13,8 +13,9 @@ This file is the reusable process for every planning effort in this repository: 
 | V4 | 15-18 | archived | G | [`docs/implementation-plan-v4.md`](docs/implementation-plan-v4.md) |
 | V5 | 19-24 | archived | K | [`docs/implementation-plan-v5.md`](docs/implementation-plan-v5.md) |
 | V6 | 25-28 | archived | P | [`docs/implementation-plan-v6.md`](docs/implementation-plan-v6.md) |
+| V7 | 29-32 | archived | R | [`docs/implementation-plan-v7.md`](docs/implementation-plan-v7.md) |
 
-(V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort. Read it, not this file, for anything about what phases 25-28 actually build.
+(V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 
 More than one plan-vN file can exist at once. A row's status is `drafted` from the moment `/brainstorm` writes it until its first phase is actually implemented, then `active`; a drafted plan does not replace or pause the active one. Each plan version picks its own, never-reused decision-letter prefix (G, K, ...) for its recorded decisions, so a decision ID is globally unambiguous. Phase numbers are global and sequential across every plan version - a new plan continues from the highest phase number used anywhere, it never restarts at 1.
 
@@ -31,7 +32,7 @@ Phases start pending. After completing a phase, replace its status with `complet
 
 Step prompts never live in a plan-vN file: each pending phase has its own `docs/plan/phase-<n>.md`, and the plan-vN file keeps one line per phase (id, title, status, dependencies). As soon as every step in a phase is complete, move that phase file to `docs/plan-archive/phase-<n>.md` (see [`docs/plan-archive/phase-19-20.md`](docs/plan-archive/phase-19-20.md) for the format) and give the phase's line in the plan-vN file a one-sentence outcome.
 
-When every phase in the active plan-vN file is complete, archive it as `docs/implementation-plan-v<N>.md` following the existing v1/v2/v4 convention, and start `docs/plan-v<N+1>.md` for the next effort. Update the table above in the same change.
+When every phase in the active plan-vN file is complete, archive it as `docs/implementation-plan-v<N>.md` following the existing v1/v2/v4 convention and update the table above in the same change. Archiving a plan does not create a next-plan file: when the next effort is brainstormed, its plan is written to `docs/plan-v<N+1>.md`.
 
 ## How To Read A Phase Prompt
 

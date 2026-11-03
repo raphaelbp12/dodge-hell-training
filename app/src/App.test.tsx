@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { commitSha } from "virtual:build-info";
 import type { EncounterView } from "./game/phaser/encounter";
@@ -12,6 +12,7 @@ import {
   SELECTED_DEBUG_VALUES,
 } from "./game/config/debug";
 import type { AttemptResult } from "./game/session/session";
+import type { DrillSelection } from "./game/models";
 import {
   ACTIVE_CONDITIONS,
   CONDITION_LABELS,
@@ -31,11 +32,15 @@ const adapter = vi.hoisted(() => ({
   onResult: null as null | ((result: AttemptResult) => void),
   resume: vi.fn(),
   retry: vi.fn(),
+  pause: vi.fn(),
+  applyDrill: vi.fn(),
+  advanceSubPhase: vi.fn(),
   setMuted: vi.fn(),
   setControlsOpen: vi.fn(),
   setDebugSettings: vi.fn(),
   initialMuted: false,
   initialZoom: undefined as number | undefined,
+  drill: undefined as DrillSelection | null | undefined,
   onZoomChange: undefined as undefined | ((zoom: number) => void),
 }));
 
@@ -46,12 +51,14 @@ vi.mock("./game/phaser/encounter", () => ({
     options: {
       initialMuted?: boolean;
       initialZoom?: number;
+      drill?: { drill?: DrillSelection | null };
       onZoomChange?: (zoom: number) => void;
       onResult?: (result: AttemptResult) => void;
     },
   ) => {
     adapter.initialZoom = options.initialZoom;
     adapter.initialMuted = options.initialMuted ?? false;
+    adapter.drill = options.drill?.drill ?? null;
     adapter.onZoomChange = options.onZoomChange;
     adapter.publish = publish;
     adapter.onResult = options.onResult ?? null;
@@ -62,6 +69,9 @@ vi.mock("./game/phaser/encounter", () => ({
     return {
       resume: adapter.resume,
       retry: adapter.retry,
+      pause: adapter.pause,
+      applyDrill: adapter.applyDrill,
+      advanceSubPhase: adapter.advanceSubPhase,
       setMuted: adapter.setMuted,
       setControlsOpen: adapter.setControlsOpen,
       setDebugSettings: adapter.setDebugSettings,
@@ -81,6 +91,7 @@ beforeEach(() => {
   adapter.created = 0;
   adapter.destroyed = 0;
   adapter.publish = null;
+  adapter.drill = undefined;
   vi.clearAllMocks();
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
     configurable: true,
@@ -96,6 +107,11 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  // Reset the URL so a deep-link test cannot dirty later tests.
+  window.history.pushState({}, "", "/");
+});
+
 test("debug panel exposes every parameter and sends live flags/sliders without recreating the runtime", async () => {
   const user = userEvent.setup();
   render(<App />);
@@ -105,7 +121,17 @@ test("debug panel exposes every parameter and sends live flags/sliders without r
   await user.click(screen.getByRole("button", { name: "Debug" }));
   for (const parameter of DEBUG_PARAMETERS)
     expect(screen.getByRole("slider", { name: parameter.label })).toBeVisible();
+  expect(screen.queryByLabelText("Jump to phase")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("checkbox", { name: "Loop this phase" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("Phase drill")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Start" }));
+  // Start closes the Home Debug aside; the live screen reopens it on demand.
+  expect(screen.queryByLabelText("Enemy debug tools")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Debug" }));
+  await user.click(screen.getByRole("button", { name: "Next sub-phase" }));
+  expect(adapter.advanceSubPhase).toHaveBeenCalledOnce();
   await user.click(screen.getByRole("checkbox", { name: "God mode" }));
   await user.click(
     screen.getByRole("checkbox", { name: "Chase arena center" }),
@@ -259,6 +285,10 @@ const runningView: EncounterView = {
   countdownRemainingSeconds: 0,
   zoom: 1,
   result: null,
+  phaseIndex: 0,
+  phaseLabel: "Phase 1",
+  phaseCount: 1,
+  drill: null,
 };
 
 test("restores zoom before runtime creation and persists only explicit camera changes", async () => {
@@ -297,6 +327,289 @@ test("?encounter= selects a known encounter and ignores an unknown one", () => {
   ).toBeChecked();
   window.history.pushState({}, "", "/");
 });
+
+test("Home Start passes the selected phase drill to the encounter", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  await user.click(
+    screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  );
+  await user.click(
+    screen.getByRole("checkbox", { name: "Phase 4 - Glaive Circle" }),
+  );
+  await user.click(screen.getByRole("checkbox", { name: "Loop" }));
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.drill).toEqual({ phaseIndices: [1, 3], loop: false });
+});
+
+test("a ?phase= deep link seeds the Home selection and Start launches it", async () => {
+  window.history.pushState({}, "", "?phase=1,3&loop=1");
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(
+    screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  ).toBeChecked();
+  expect(
+    screen.getByRole("checkbox", { name: "Phase 4 - Glaive Circle" }),
+  ).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Loop" })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.drill).toEqual({ phaseIndices: [1, 3], loop: true });
+  window.history.pushState({}, "", "/");
+});
+
+test("changing the encounter resets the selection to Full fight and closes the panel", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  await user.click(
+    screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  );
+  await user.click(
+    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+  );
+  expect(screen.queryByLabelText("Phase selection")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(screen.getByRole("radio", { name: "Full fight" })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.drill).toBeNull();
+});
+
+test("the phase panel and the debug panel are mutually exclusive asides", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(
+    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(screen.getByLabelText("Phase selection")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Debug" }));
+  expect(screen.queryByLabelText("Phase selection")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Enemy debug tools")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(screen.queryByLabelText("Enemy debug tools")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Phase selection")).toBeVisible();
+});
+
+test("returning Home clears the selection and closes the phase panel", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  await user.click(
+    screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.drill).toEqual({ phaseIndices: [1], loop: true });
+  await user.click(screen.getByRole("button", { name: "Home" }));
+  expect(screen.queryByLabelText("Phase selection")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.drill).toBeNull();
+});
+
+/** Launches the default Queen encounter and returns its live Phases button. */
+async function launchLive(user: ReturnType<typeof userEvent.setup>) {
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  return screen.getByRole("button", { name: "Phases" });
+}
+
+test("the live phase panel pauses on open, resumes on close, and manages focus", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  expect(phasesButton).toHaveAttribute("aria-expanded", "false");
+  expect(phasesButton).not.toHaveAttribute("aria-controls");
+
+  await user.click(phasesButton);
+
+  expect(adapter.pause).toHaveBeenCalledOnce();
+  expect(phasesButton).toHaveAttribute("aria-expanded", "true");
+  expect(phasesButton).toHaveAttribute("aria-controls", "phase-selector");
+  const panel = screen.getByRole("complementary", { name: "Phase selection" });
+  expect(panel).toBeVisible();
+  expect(within(panel).getByRole("heading", { name: "Phases" })).toHaveFocus();
+
+  await user.click(within(panel).getByRole("button", { name: "Close" }));
+
+  expect(adapter.resume).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+});
+
+test("Escape closes the live phase panel and resumes without leaking to the scene", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  await user.click(phasesButton);
+  const panel = screen.getByRole("complementary", { name: "Phase selection" });
+  expect(within(panel).getByRole("heading", { name: "Phases" })).toHaveFocus();
+
+  await user.keyboard("{Escape}");
+
+  expect(adapter.resume).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+});
+
+test("the live Apply uses the current selection and leaves the panel open", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  await user.click(phasesButton);
+  const panel = screen.getByRole("complementary", { name: "Phase selection" });
+  await user.click(
+    within(panel).getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  );
+
+  await user.click(within(panel).getByRole("button", { name: "Apply" }));
+
+  expect(adapter.applyDrill).toHaveBeenCalledExactlyOnceWith({
+    phaseIndices: [1],
+    loop: true,
+  });
+  expect(panel).toBeVisible();
+  expect(adapter.resume).not.toHaveBeenCalled();
+});
+
+test("a result closes the live phase panel and hides the HUD actions", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  await user.click(phasesButton);
+  expect(
+    screen.getByRole("complementary", { name: "Phase selection" }),
+  ).toBeVisible();
+
+  act(() =>
+    adapter.publish!({
+      ...runningView,
+      status: "ended",
+      healthHp: 0,
+      result: completedResult,
+    }),
+  );
+
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+  expect(phasesButton).toHaveAttribute("aria-expanded", "false");
+  expect(phasesButton.parentElement).toHaveAttribute("aria-hidden", "true");
+});
+
+test("result Retry keeps the selection without reopening the panel", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  await user.click(phasesButton);
+  const panel = screen.getByRole("complementary", { name: "Phase selection" });
+  await user.click(
+    within(panel).getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  );
+  await user.click(within(panel).getByRole("button", { name: "Apply" }));
+  await user.click(within(panel).getByRole("button", { name: "Close" }));
+  act(() =>
+    adapter.publish!({
+      ...runningView,
+      status: "ended",
+      healthHp: 0,
+      result: completedResult,
+    }),
+  );
+
+  const results = screen.getByRole("region", { name: "Attempt complete" });
+  await user.click(within(results).getByRole("button", { name: "Retry" }));
+
+  expect(adapter.retry).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+  act(() => adapter.publish!(runningView));
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(
+    screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  ).toBeChecked();
+});
+
+test("Home resets the live selection and closes the phase panel", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  await user.click(phasesButton);
+  const panel = screen.getByRole("complementary", { name: "Phase selection" });
+  await user.click(
+    within(panel).getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Home" }));
+
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(screen.getByRole("radio", { name: "Full fight" })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(adapter.drill).toBeNull();
+});
+
+test("live Controls and the live phase panel are mutually exclusive", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  await user.click(phasesButton);
+  expect(
+    screen.getByRole("complementary", { name: "Phase selection" }),
+  ).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Controls" }));
+
+  expect(adapter.setControlsOpen).toHaveBeenLastCalledWith(true);
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: "Controls" })).toBeVisible();
+});
+
+test("the live Debug and phase asides are mutually exclusive on the Crystal Worm screen", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(
+    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Debug" }));
+  expect(screen.getByLabelText("Enemy debug tools")).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  expect(screen.queryByLabelText("Enemy debug tools")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Phases" }));
+  expect(
+    screen.getByRole("complementary", { name: "Phase selection" }),
+  ).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Debug" }));
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Enemy debug tools")).toBeVisible();
+  expect(adapter.resume).toHaveBeenCalledOnce();
+});
+
+test("HUD Resume and Retry close the live phase panel", async () => {
+  const user = userEvent.setup();
+  const phasesButton = await launchLive(user);
+  act(() => adapter.publish!({ ...runningView, status: "paused" }));
+
+  await user.click(phasesButton);
+  await user.click(screen.getByRole("button", { name: "Resume" }));
+  expect(adapter.resume).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+
+  await user.click(phasesButton);
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(adapter.retry).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("complementary", { name: "Phase selection" }),
+  ).not.toBeInTheDocument();
+});
+
 
 test("Home includes description, accurate changelog, and delegated links", () => {
   render(<App />);

@@ -315,7 +315,7 @@ test("selected values are the scored defaults without opening Debug", async ({
   await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
 });
 
-test("the ?phase= drill URL parameter starts the named phase and suffixes rulesVersion, and an out-of-range value is ignored", async ({
+test("the ?phase= drill URL parameter starts the named phase as a one-shot and suffixes rulesVersion, and an out-of-range value is ignored", async ({
   page,
 }) => {
   await page.goto(`${seededUrl()}&phase=0`);
@@ -323,7 +323,7 @@ test("the ?phase= drill URL parameter starts the named phase and suffixes rulesV
   await finishCountdown(page);
   const drilled = await inspect(page);
   expect(drilled.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v4-drill-p0",
+    "crystal-worm-child-swarm-paladin-v4-drill-p0-once",
   );
   expect(drilled.enemies[0]?.phaseIndex).toBe(0);
 
@@ -2367,6 +2367,185 @@ test("a direct Queen ?phase= link starts the requested phase", async ({
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page, false);
   expect((await inspect(page)).enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
+});
+
+test("the Home phase panel starts a two-phase one-shot drill at the first selected phase", async ({
+  page,
+}) => {
+  await page.goto(`./?seed=${NORTH_SEED}&encounter=killer-bee-queen`);
+  const phasesButton = page.getByRole("button", {
+    name: "Phases",
+    exact: true,
+  });
+  await expect(phasesButton).toHaveAttribute("aria-expanded", "false");
+  await phasesButton.click();
+  await expect(phasesButton).toHaveAttribute("aria-expanded", "true");
+  const panel = page.getByRole("complementary", { name: "Phase selection" });
+  await expect(panel).toBeVisible();
+  await panel
+    .getByRole("checkbox", { name: "Phase 3 - Pond Barrage" })
+    .check();
+  await panel
+    .getByRole("checkbox", { name: "Phase 5 - Color Return" })
+    .check();
+  const loop = panel.getByRole("checkbox", { name: "Loop" });
+  await expect(loop).toBeChecked();
+  await loop.uncheck();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, false);
+  const state = await inspect(page);
+  expect(state.rulesVersion).toBe(
+    "killer-bee-queen-nest-paladin-v7-drill-p2-4-once",
+  );
+  expect(state.enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
+});
+
+test("the live phase panel pauses, applies, resumes, and handles result/retry/home", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  await page.goto(`./?seed=${NORTH_SEED}&encounter=killer-bee-queen`);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, false);
+
+  const phasesButton = page.getByRole("button", {
+    name: "Phases",
+    exact: true,
+  });
+  await expect(phasesButton).toHaveAttribute("aria-expanded", "false");
+  const beforeLayout = await page.evaluate(() => {
+    const arena = document
+      .querySelector('[aria-label="Encounter"]')!
+      .getBoundingClientRect();
+    const canvas = document
+      .querySelector('[aria-label="Encounter"] canvas')!
+      .getBoundingClientRect();
+    return {
+      arenaWidth: arena.width,
+      canvasWidth: canvas.width,
+      arenaRight: arena.right,
+    };
+  });
+  await phasesButton.click();
+  await expect(phasesButton).toHaveAttribute("aria-expanded", "true");
+
+  const panel = page.getByRole("complementary", { name: "Phase selection" });
+  await expect(panel).toBeVisible();
+  expect((await inspect(page)).paused).toBe(true);
+
+  // The panel overlays the right 320 px; the arena, canvas and camera do not
+  // reflow or recenter.
+  const layout = await page.evaluate(() => {
+    const arena = document
+      .querySelector('[aria-label="Encounter"]')!
+      .getBoundingClientRect();
+    const canvas = document
+      .querySelector('[aria-label="Encounter"] canvas')!
+      .getBoundingClientRect();
+    const phasePanel = document
+      .querySelector("#phase-selector")!
+      .getBoundingClientRect();
+    return {
+      arenaWidth: arena.width,
+      canvasWidth: canvas.width,
+      arenaRight: arena.right,
+      panelLeft: phasePanel.left,
+      panelRight: phasePanel.right,
+      panelWidth: phasePanel.width,
+    };
+  });
+  const viewportWidth = page.viewportSize()!.width;
+  expect(layout.arenaWidth).toBe(beforeLayout.arenaWidth);
+  expect(layout.canvasWidth).toBe(beforeLayout.canvasWidth);
+  expect(layout.arenaWidth).toBe(viewportWidth);
+  expect(layout.canvasWidth).toBe(viewportWidth);
+  expect(layout.panelWidth).toBe(320);
+  expect(layout.panelRight).toBeCloseTo(layout.arenaRight, 0);
+  expect(layout.panelLeft).toBeCloseTo(layout.arenaRight - 320, 0);
+  const framed = await inspect(page);
+  expect(framed.viewport.width).toBe(beforeLayout.canvasWidth);
+  expect(framed.camera.x).toBeCloseTo(framed.player.positionTiles.x, 1);
+  expect(framed.camera.y).toBeCloseTo(framed.player.positionTiles.y, 1);
+
+  await expect(panel.getByLabel("Now playing")).toBeVisible();
+
+  await panel
+    .getByRole("checkbox", { name: "Phase 3 - Pond Barrage" })
+    .check();
+  await panel.getByRole("checkbox", { name: "Loop" }).uncheck();
+  await panel.getByRole("button", { name: "Apply", exact: true }).click();
+  expect((await inspect(page)).paused).toBe(true);
+  expect((await inspect(page)).enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByLabel("Now playing")).toContainText(
+    "Phase 3 - Pond Barrage",
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("live-phase-panel.png"),
+    fullPage: true,
+  });
+
+  await panel.getByRole("button", { name: "Close", exact: true }).click();
+  await expect
+    .poll(async () => (await inspect(page)).paused)
+    .toBe(false);
+  await expect(panel).not.toBeVisible();
+
+  await expect
+    .poll(
+      async () => {
+        await page.clock.runFor(1000);
+        return (await inspect(page)).sessionPhase;
+      },
+      { timeout: 70_000 },
+    )
+    .toBe("ended");
+  const results = page.getByRole("region", { name: "Attempt complete" });
+  await expect(results).toBeVisible();
+
+  await results.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(panel).not.toBeVisible();
+  await page.getByRole("button", { name: "Phases", exact: true }).click();
+  await expect(panel).toBeVisible();
+  await expect(
+    panel.getByRole("checkbox", { name: "Phase 3 - Pond Barrage" }),
+  ).toBeChecked();
+  await panel.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(panel).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: "Phases", exact: true }).click();
+  const homePanel = page.getByRole("complementary", {
+    name: "Phase selection",
+  });
+  await expect(homePanel).toBeVisible();
+  await expect(
+    homePanel.getByRole("radio", { name: "Full fight" }),
+  ).toBeChecked();
+  await expect(
+    homePanel.getByRole("checkbox", { name: "Phase 3 - Pond Barrage" }),
+  ).not.toBeChecked();
+});
+
+test("the Crystal Worm Debug panel drops the phase drill and keeps Next sub-phase a no-op", async ({
+  page,
+}) => {
+  await page.goto(`./?seed=${NORTH_SEED}&encounter=crystal-worm`);
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page, false);
+  await page.getByRole("button", { name: "Debug", exact: true }).click();
+  const debug = page.getByRole("complementary", { name: "Enemy debug tools" });
+  await expect(debug).toBeVisible();
+  await expect(debug.getByLabel("Jump to phase")).toHaveCount(0);
+  await expect(
+    debug.getByRole("checkbox", { name: "Loop this phase" }),
+  ).toHaveCount(0);
+  await expect(debug.getByText("Phase drill")).toHaveCount(0);
+  expect((await inspect(page)).enemies[0].subPhaseIndex).toBe(0);
+
+  await debug.getByRole("button", { name: "Next sub-phase" }).click();
+
+  expect((await inspect(page)).enemies[0].subPhaseIndex).toBe(0);
 });
 
 test("the Killer Bee Queen renders per-family pixel-art shards", async ({
