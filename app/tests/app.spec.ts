@@ -285,7 +285,7 @@ test("selected values are the scored defaults without opening Debug", async ({
 }) => {
   await launch(page);
   const state = await inspect(page);
-  expect(state.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v4");
+  expect(state.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v5");
   expect(state.debugSettings).toMatchObject({
     headWidth: 1.25,
     headHeight: 1.25,
@@ -310,7 +310,7 @@ test("selected values are the scored defaults without opening Debug", async ({
   await page.getByRole("button", { name: "Debug", exact: true }).click();
   await page.getByRole("button", { name: "Load selected values" }).click();
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v4",
+    "crystal-worm-child-swarm-paladin-v5",
   );
   await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
 });
@@ -323,7 +323,7 @@ test("the ?phase= drill URL parameter starts the named phase as a one-shot and s
   await finishCountdown(page);
   const drilled = await inspect(page);
   expect(drilled.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v4-drill-p0-once",
+    "crystal-worm-child-swarm-paladin-v5-drill-p0-once",
   );
   expect(drilled.enemies[0]?.phaseIndex).toBe(0);
 
@@ -331,7 +331,7 @@ test("the ?phase= drill URL parameter starts the named phase as a one-shot and s
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   const ignored = await inspect(page);
-  expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v4");
+  expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v5");
 });
 
 test("the Home encounter list defaults to the Killer Bee Queen, is keyboard operable, and ?encounter= selects a known id", async ({
@@ -348,7 +348,7 @@ test("the Home encounter list defaults to the Killer Bee Queen, is keyboard oper
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v4",
+    "crystal-worm-child-swarm-paladin-v5",
   );
 
   await page.goto(seededUrl());
@@ -356,7 +356,7 @@ test("the Home encounter list defaults to the Killer Bee Queen, is keyboard oper
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v4",
+    "crystal-worm-child-swarm-paladin-v5",
   );
 });
 
@@ -374,6 +374,8 @@ for (const width of [1440, 390]) {
     await expect
       .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
       .toBeGreaterThan(0);
+    // Starting closes the home-screen Debug aside (V7); reopen it to tune live.
+    await page.getByRole("button", { name: "Debug", exact: true }).click();
     const setRange = async (label: string, value: number) => {
       await page
         .getByRole("slider", { name: label, exact: true })
@@ -561,7 +563,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Reset defaults" }).click();
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     expect((await inspect(page)).rulesVersion).toBe(
-      "crystal-worm-child-swarm-paladin-v4",
+      "crystal-worm-child-swarm-paladin-v5",
     );
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page
@@ -896,7 +898,7 @@ for (const width of [1440, 390]) {
       const record = saved.records[0];
       expect(record).toEqual({
         id: expect.any(String),
-        rulesVersion: "crystal-worm-child-swarm-paladin-v4",
+        rulesVersion: "crystal-worm-child-swarm-paladin-v5",
         outcome: "death",
         elapsedSeconds: expect.any(Number),
         hitsTaken: expect.any(Number),
@@ -1060,6 +1062,8 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     positionTiles: { x: 0, y: 0 },
     healthHp: 775,
     combatRemainingSeconds: 0,
+    honeyContactSeconds: 0,
+    nextHoneyDamageAtSeconds: 0,
     conditionSeconds: {
       armorBroken: 0,
       confused: 0,
@@ -2478,7 +2482,7 @@ test("the Home phase panel starts a two-phase one-shot drill at the first select
   await finishCountdown(page, false);
   const state = await inspect(page);
   expect(state.rulesVersion).toBe(
-    "killer-bee-queen-nest-paladin-v8-drill-p2-4-once",
+    "killer-bee-queen-nest-paladin-v9-drill-p2-4-once",
   );
   expect(state.enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
 });

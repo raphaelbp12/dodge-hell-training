@@ -200,6 +200,9 @@
 }
 .actions {
   margin-left: auto;
+  /* Five HUD buttons no longer fit one 390px row after the Phases button (V7). */
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 :global(button:disabled) {
   opacity: 0.45;
