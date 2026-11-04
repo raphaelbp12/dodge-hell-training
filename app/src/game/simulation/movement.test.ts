@@ -19,6 +19,11 @@ const idle: SimulationInput = {
   west: false,
 };
 const stepSeconds = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
+// The Crystal Worm's arena stays circular (P38); narrow once for this file's
+// direct radius/centre reads.
+if (ENCOUNTER_CONFIG.arena.shape.kind !== "circle")
+  throw new RangeError("The debug-tunable encounter must stay circular");
+const ARENA_SHAPE = ENCOUNTER_CONFIG.arena.shape;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
 const PRIMARY_PHASE = PRIMARY.phases[0];
 const TEST_SEED = 20261028;
@@ -82,7 +87,7 @@ test("move-to-point reaches the arena center, stops there, and travels zero at z
   });
   runTicks(state, 180);
   expect(state.enemies[0].positionTiles).toEqual(
-    ENCOUNTER_CONFIG.arena.centerTiles,
+    ARENA_SHAPE.centerTiles,
   );
   const settledPosition = { ...state.enemies[0].positionTiles };
   advanceSimulation(state, stepSeconds, idle);
@@ -98,7 +103,7 @@ test("orbit approaches the ring, then holds it and advances in the authored dire
     direction: "cw",
     approachSpeedTilesPerSecond: 20,
   });
-  const arenaCenter = ENCOUNTER_CONFIG.arena.centerTiles;
+  const arenaCenter = ARENA_SHAPE.centerTiles;
   const distanceFromCenter = () =>
     Math.hypot(
       state.enemies[0].positionTiles.x - arenaCenter.x,
@@ -146,7 +151,7 @@ test("wander retargets on schedule and on arrival, and stays within its radius",
     retargetSeconds: 0.5,
     radiusTiles,
   });
-  const arenaCenter = ENCOUNTER_CONFIG.arena.centerTiles;
+  const arenaCenter = ARENA_SHAPE.centerTiles;
   const targetsSeen = new Set<string>();
   for (let i = 0; i < 300; i++) {
     advanceSimulation(state, stepSeconds, idle);
@@ -184,7 +189,7 @@ test("every movement kind keeps the enemy's collision extent inside the arena", 
     { kind: "move-to-point", target: "arena-center", speedTilesPerSecond: 50 },
     {
       kind: "orbit",
-      radiusTiles: ENCOUNTER_CONFIG.arena.radiusTiles - 0.5,
+      radiusTiles: ARENA_SHAPE.radiusTiles - 0.5,
       degreesPerSecond: 20,
       direction: "ccw",
       approachSpeedTilesPerSecond: 50,
@@ -193,22 +198,22 @@ test("every movement kind keeps the enemy's collision extent inside the arena", 
       kind: "wander",
       speedTilesPerSecond: 50,
       retargetSeconds: 0.2,
-      radiusTiles: ENCOUNTER_CONFIG.arena.radiusTiles - 0.5,
+      radiusTiles: ARENA_SHAPE.radiusTiles - 0.5,
     },
   ];
   for (const movement of movements) {
     const state = freshStateWith(movement);
     state.enemies[0].positionTiles = {
-      x: ENCOUNTER_CONFIG.arena.radiusTiles - 1,
+      x: ARENA_SHAPE.radiusTiles - 1,
       y: 0,
     };
     runTicks(state, 90);
     const radiusFromCenter = Math.hypot(
-      state.enemies[0].positionTiles.x - ENCOUNTER_CONFIG.arena.centerTiles.x,
-      state.enemies[0].positionTiles.y - ENCOUNTER_CONFIG.arena.centerTiles.y,
+      state.enemies[0].positionTiles.x - ARENA_SHAPE.centerTiles.x,
+      state.enemies[0].positionTiles.y - ARENA_SHAPE.centerTiles.y,
     );
     expect(radiusFromCenter).toBeLessThanOrEqual(
-      ENCOUNTER_CONFIG.arena.radiusTiles + 1e-6,
+      ARENA_SHAPE.radiusTiles + 1e-6,
     );
   }
 });

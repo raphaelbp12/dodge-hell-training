@@ -24,6 +24,8 @@ import type { DetonationEvent } from "../simulation/simulation";
 import { HitAudio } from "./hit-audio";
 import { bombExplosionFrameIndex } from "./appearance-pixels";
 import { phaseViewOf } from "./view";
+import { octagonStaircaseRows } from "./arena-staircase";
+import { hazardOutlinesOf } from "./terrain-art";
 import {
   createAppearanceTextures,
   destroyAppearanceTextures,
@@ -81,8 +83,14 @@ const presentation = {
   millisecondsPerSecond: 1000,
   background: 0x101b1b,
   ground: 0x1c302a,
+  // Two shades of the ground colour for the procedural honeycomb floor
+  // motif (P39, step 39.4) - no asset, generated per tile at draw time.
+  groundHoneycombLight: 0x24392f,
+  groundHoneycombDark: 0x152722,
   grid: 0x29423a,
   boundary: 0x648575,
+  honey: 0xb5791a,
+  honeyRim: 0xffcf7a,
   player: 0xf0f5ef,
   enemy: 0xea7969,
   telegraphColors: {
@@ -576,14 +584,25 @@ class EncounterScene extends Phaser.Scene {
       );
   }
 
-  private drawGround(): void {
-    const { radiusTiles, centerTiles } = ENCOUNTER_CONFIG.arena;
+  /** Draws the ground, grid and boundary for a circular arena - unchanged
+   * behaviour from before shaped arenas existed (P38). */
+  private drawCircleGround(shape: Extract<
+    EncounterConfig["arena"]["shape"],
+    { kind: "circle" }
+  >): void {
+    const { radiusTiles, centerTiles } = shape;
     const centerX = centerTiles.x * pixelsPerTile;
     const centerY = centerTiles.y * pixelsPerTile;
     const radius = radiusTiles * pixelsPerTile;
     this.ground
       .fillStyle(presentation.ground)
       .fillCircle(centerX, centerY, radius);
+    this.drawHoneycomb(centerX, centerY, (tileX, tileY) => {
+      const dx = tileX + 0.5 - centerTiles.x;
+      const dy = tileY + 0.5 - centerTiles.y;
+      return Math.hypot(dx, dy) <= radiusTiles;
+    }, radiusTiles);
+    this.drawHazards(centerX, centerY, this.state.config.arena.hazards);
     this.ground.lineStyle(1, presentation.grid);
     for (let tile = -radiusTiles + 1; tile < radiusTiles; tile++) {
       const extent =
@@ -604,6 +623,173 @@ class EncounterScene extends Phaser.Scene {
     this.ground
       .lineStyle(3, presentation.boundary)
       .strokeCircle(centerX, centerY, radius);
+  }
+
+  /** Draws the ground, grid and stepped-tile boundary for an octagonal
+   * arena, deriving the staircase at draw time (P38, step 38.4): no
+   * rasterised outline is stored anywhere. */
+  private drawOctagonGround(
+    shape: Extract<EncounterConfig["arena"]["shape"], { kind: "octagon" }>,
+  ): void {
+    const centerX = shape.centerTiles.x * pixelsPerTile;
+    const centerY = shape.centerTiles.y * pixelsPerTile;
+    const rows = octagonStaircaseRows(shape);
+    this.ground.fillStyle(presentation.ground);
+    for (const row of rows) {
+      this.ground.fillRect(
+        centerX - row.halfWidthTiles * pixelsPerTile,
+        centerY + (row.rowCenterTiles - 0.5) * pixelsPerTile,
+        row.halfWidthTiles * 2 * pixelsPerTile,
+        pixelsPerTile,
+      );
+    }
+    this.drawHoneycomb(
+      centerX,
+      centerY,
+      (tileX, tileY) => {
+        const row = rows.find(
+          (candidate) => candidate.rowCenterTiles === tileY,
+        );
+        return !!row && Math.abs(tileX + 0.5) <= row.halfWidthTiles;
+      },
+      Math.max(
+        ...rows.map((row) => Math.max(row.halfWidthTiles, Math.abs(row.rowCenterTiles))),
+        0,
+      ),
+    );
+    this.drawHazards(centerX, centerY, this.state.config.arena.hazards);
+    this.ground.lineStyle(1, presentation.grid);
+    for (const row of rows) {
+      const left = centerX - row.halfWidthTiles * pixelsPerTile;
+      const right = centerX + row.halfWidthTiles * pixelsPerTile;
+      const top = centerY + (row.rowCenterTiles - 0.5) * pixelsPerTile;
+      const bottom = top + pixelsPerTile;
+      for (
+        let tileX = Math.ceil(left / pixelsPerTile) * pixelsPerTile;
+        tileX < right;
+        tileX += pixelsPerTile
+      )
+        this.ground.lineBetween(tileX, top, tileX, bottom);
+      this.ground.lineBetween(left, top, right, top);
+    }
+    this.ground.lineStyle(3, presentation.boundary);
+    for (const row of rows) {
+      const left = centerX - row.halfWidthTiles * pixelsPerTile;
+      const right = centerX + row.halfWidthTiles * pixelsPerTile;
+      const top = centerY + (row.rowCenterTiles - 0.5) * pixelsPerTile;
+      const bottom = top + pixelsPerTile;
+      const above = rows.find(
+        (candidate) => candidate.rowCenterTiles === row.rowCenterTiles - 1,
+      );
+      const aboveHalfWidthTiles = above?.halfWidthTiles ?? 0;
+      if (aboveHalfWidthTiles !== row.halfWidthTiles) {
+        this.ground.lineBetween(
+          left,
+          top,
+          centerX - aboveHalfWidthTiles * pixelsPerTile,
+          top,
+        );
+        this.ground.lineBetween(
+          right,
+          top,
+          centerX + aboveHalfWidthTiles * pixelsPerTile,
+          top,
+        );
+      }
+      this.ground.lineBetween(left, top, left, bottom);
+      this.ground.lineBetween(right, top, right, bottom);
+      const below = rows.find(
+        (candidate) => candidate.rowCenterTiles === row.rowCenterTiles + 1,
+      );
+      if (!below) this.ground.lineBetween(left, bottom, right, bottom);
+    }
+  }
+
+  private drawGround(): void {
+    const { shape } = this.state.config.arena;
+    if (shape.kind === "circle") this.drawCircleGround(shape);
+    else this.drawOctagonGround(shape);
+  }
+
+  /**
+   * Procedural two-tone honeycomb cell motif over the safe floor (P39, step
+   * 39.4): one small hexagon per tile cell whose centre `cellTest` accepts,
+   * shaded light or dark by tile-coordinate parity. No asset, no authored
+   * grid - generated at draw time from the tile bounds alone, and drawn once
+   * at create/resize, never per frame.
+   */
+  private drawHoneycomb(
+    centerX: number,
+    centerY: number,
+    cellInsideShape: (tileX: number, tileY: number) => boolean,
+    boundsRadiusTiles: number,
+  ): void {
+    const hexRadiusCssPixels = pixelsPerTile * 0.42;
+    const bound = Math.ceil(boundsRadiusTiles) + 1;
+    for (let tileY = -bound; tileY < bound; tileY++) {
+      for (let tileX = -bound; tileX < bound; tileX++) {
+        if (!cellInsideShape(tileX, tileY)) continue;
+        const cellCenterX = centerX + (tileX + 0.5) * pixelsPerTile;
+        const cellCenterY = centerY + (tileY + 0.5) * pixelsPerTile;
+        const shade =
+          (tileX + tileY) % 2 === 0
+            ? presentation.groundHoneycombLight
+            : presentation.groundHoneycombDark;
+        const points: Phaser.Math.Vector2[] = [];
+        for (let corner = 0; corner < 6; corner++) {
+          const angleRadians = (Math.PI / 3) * corner + Math.PI / 6;
+          points.push(
+            new Phaser.Math.Vector2(
+              cellCenterX + hexRadiusCssPixels * Math.cos(angleRadians),
+              cellCenterY + hexRadiusCssPixels * Math.sin(angleRadians),
+            ),
+          );
+        }
+        this.ground.fillStyle(shade).fillPoints(points, true);
+      }
+    }
+  }
+
+  /**
+   * Draws each hazard region as its exact shape (P39, step 39.4): a diamond
+   * pond as a diamond, an annulus pond as a true ring - never approximated
+   * as a circle or a square, since that would misinform the player about
+   * where honey actually is. `hazardOutlinesOf` (terrain-art.ts) is the pure,
+   * separately tested region-to-outline conversion this draws from.
+   */
+  private drawHazards(
+    centerX: number,
+    centerY: number,
+    hazards: EncounterConfig["arena"]["hazards"],
+  ): void {
+    for (const outline of hazardOutlinesOf(hazards)) {
+      if (outline.kind === "diamond") {
+        const points = outline.verticesTiles.map(
+          (vertex) =>
+            new Phaser.Math.Vector2(
+              centerX + vertex.x * pixelsPerTile,
+              centerY + vertex.y * pixelsPerTile,
+            ),
+        );
+        this.ground.fillStyle(presentation.honey).fillPoints(points, true);
+        this.ground
+          .lineStyle(2, presentation.honeyRim)
+          .strokePoints(points, true);
+      } else {
+        const innerRadius = outline.innerRadiusTiles * pixelsPerTile;
+        const outerRadius = outline.outerRadiusTiles * pixelsPerTile;
+        // Phaser has no built-in ring fill; approximate the annulus as a
+        // thick stroked circle at its midline, whose line width exactly
+        // spans inner to outer radius.
+        this.ground
+          .lineStyle(outerRadius - innerRadius, presentation.honey)
+          .strokeCircle(centerX, centerY, (innerRadius + outerRadius) / 2);
+        this.ground
+          .lineStyle(2, presentation.honeyRim)
+          .strokeCircle(centerX, centerY, innerRadius)
+          .strokeCircle(centerX, centerY, outerRadius);
+      }
+    }
   }
 
   private addHitNumber(hit: AcceptedHit): void {

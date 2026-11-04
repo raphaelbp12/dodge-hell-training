@@ -152,3 +152,9 @@ The mapping from family to projectile id is recorded in [plan V6](implementation
 ## Provenance And Distribution
 
 The original PNGs are not committed or shipped. The local copies exist only for visual QA and are gitignored. The recreated pixel grids are data and code, not image assets. Licensing review is deferred as D15 in [the deferred register](deferred-work.md).
+
+## Corrections
+
+**2026-11-04 - the player sprite is not 16 x 16 native.** The balls are native 8x8 and measure 45-48px where a tile is 51.5px; the player measures 43x44px. The player therefore draws at the same per-native-pixel scale as an 8x8 ball, so the 16x16 premise behind `12.8` is wrong. The corrected conversion is 8 native pixels over a measured 0.889-tile ball, giving `pixelsPerTile: 9.0`.
+
+**2026-11-04 - the hive grids are a 4x render, not 1x.** Measured hive shots are 1.07-1.44 tiles wide; the recorded 49x28 grid at any single global scale predicts four times that. `49 x 28` is `4 x (12.25 x 7)`. The grids are kept as authored and divided by a per-appearance `sourceUpscale: 4`.

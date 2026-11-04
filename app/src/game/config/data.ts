@@ -1,4 +1,4 @@
-import type { CircularArena, Vector2 } from "../models";
+import type { Arena, ArenaShape, HazardBand, TerrainRegion, Vector2 } from "../models";
 import {
   CONDITION_KEYS,
   type ConditionApplication,
@@ -51,13 +51,136 @@ function readPoint(value: unknown, path: string): Vector2 {
   };
 }
 
-export function validateArena(value: unknown): CircularArena {
+function validateTerrainRegion(value: unknown, path: string): TerrainRegion {
+  const region = record(value, path);
+  if (region.shape === "diamond") {
+    return Object.freeze({
+      shape: "diamond" as const,
+      halfDiagonalTiles: positiveNumber(
+        region.halfDiagonalTiles,
+        `${path}.halfDiagonalTiles`,
+      ),
+    });
+  }
+  if (region.shape === "annulus") {
+    const innerRadiusTiles = finiteNumber(
+      region.innerRadiusTiles,
+      `${path}.innerRadiusTiles`,
+    );
+    const outerRadiusTiles = finiteNumber(
+      region.outerRadiusTiles,
+      `${path}.outerRadiusTiles`,
+    );
+    if (innerRadiusTiles < 0)
+      reject(`${path}.innerRadiusTiles`, "must be nonnegative");
+    if (!(innerRadiusTiles < outerRadiusTiles))
+      reject(
+        `${path}.outerRadiusTiles`,
+        "must be strictly greater than innerRadiusTiles",
+      );
+    return Object.freeze({
+      shape: "annulus" as const,
+      innerRadiusTiles,
+      outerRadiusTiles,
+    });
+  }
+  reject(`${path}.shape`, 'must be "diamond" or "annulus"');
+}
+
+/** An arena shape's inradius: the distance from centre to its nearest wall. */
+function arenaShapeInradiusTiles(shape: ArenaShape): number {
+  return shape.kind === "circle"
+    ? shape.radiusTiles
+    : Math.min(shape.flatHalfWidthTiles, shape.cornerSumTiles * Math.SQRT1_2);
+}
+
+function validateHazard(
+  value: unknown,
+  path: string,
+  shape: ArenaShape,
+): HazardBand {
+  const hazard = record(value, path);
+  if (hazard.kind !== "honey") reject(`${path}.kind`, 'must be "honey"');
+  const region = validateTerrainRegion(hazard.region, `${path}.region`);
+  if (
+    region.shape === "annulus" &&
+    region.outerRadiusTiles > arenaShapeInradiusTiles(shape)
+  )
+    reject(
+      `${path}.region.outerRadiusTiles`,
+      "must not exceed the arena's own inradius",
+    );
+  return Object.freeze({ kind: "honey" as const, region });
+}
+
+function validateHazards(
+  value: unknown,
+  path: string,
+  shape: ArenaShape,
+): readonly HazardBand[] {
+  if (!Array.isArray(value)) reject(path, "must be an array of hazards");
+  return Object.freeze(
+    value.map((hazard, index) =>
+      validateHazard(hazard, `${path}[${index}]`, shape),
+    ),
+  );
+}
+
+function validateArenaEntry(value: unknown, path: string): Arena {
+  if (!isRecord(value)) reject(path, "must be an object");
+  const centerTiles = readPoint(value.centerTiles, `${path}.centerTiles`);
+  let shape: ArenaShape;
+  if (value.kind === "circle") {
+    const radiusTiles = finiteNumber(value.radiusTiles, `${path}.radiusTiles`);
+    if (radiusTiles <= 0)
+      reject(`${path}.radiusTiles`, "must be a positive number of tiles");
+    shape = Object.freeze({ kind: "circle" as const, centerTiles, radiusTiles });
+  } else if (value.kind === "octagon") {
+    const flatHalfWidthTiles = finiteNumber(
+      value.flatHalfWidthTiles,
+      `${path}.flatHalfWidthTiles`,
+    );
+    if (flatHalfWidthTiles <= 0)
+      reject(
+        `${path}.flatHalfWidthTiles`,
+        "must be a positive number of tiles",
+      );
+    const cornerSumTiles = finiteNumber(
+      value.cornerSumTiles,
+      `${path}.cornerSumTiles`,
+    );
+    if (
+      cornerSumTiles <= flatHalfWidthTiles ||
+      cornerSumTiles >= 2 * flatHalfWidthTiles
+    )
+      reject(
+        `${path}.cornerSumTiles`,
+        "must exceed flatHalfWidthTiles and stay below twice it",
+      );
+    shape = Object.freeze({
+      kind: "octagon" as const,
+      centerTiles,
+      flatHalfWidthTiles,
+      cornerSumTiles,
+    });
+  } else {
+    reject(`${path}.kind`, 'must be "circle" or "octagon"');
+  }
+  const hazards = validateHazards(value.hazards, `${path}.hazards`, shape);
+  return Object.freeze({ shape, hazards });
+}
+
+export function validateArenaMap(value: unknown): Readonly<Record<string, Arena>> {
   if (!isRecord(value)) reject("arena", "must be an object");
-  const centerTiles = readPoint(value.centerTiles, "arena.centerTiles");
-  const radiusTiles = finiteNumber(value.radiusTiles, "arena.radiusTiles");
-  if (radiusTiles <= 0)
-    reject("arena.radiusTiles", "must be a positive number of tiles");
-  return Object.freeze({ centerTiles, radiusTiles });
+  const arenas = isRecord(value.arenas) ? value.arenas : undefined;
+  if (!arenas) reject("arena.arenas", "must be an object of named arenas");
+  const ids = Object.keys(arenas);
+  if (ids.length === 0) reject("arena.arenas", "must define at least one arena");
+  return Object.freeze(
+    Object.fromEntries(
+      ids.map((id) => [id, validateArenaEntry(arenas[id], `arena.arenas.${id}`)]),
+    ),
+  );
 }
 
 function outlineSpan(
@@ -106,7 +229,7 @@ function validateShapes(value: unknown): Readonly<
   );
 }
 
-export const AUTHORED_ARENA = validateArena(arenaData);
+export const AUTHORED_ARENAS = validateArenaMap(arenaData);
 export const AUTHORED_SHAPES = validateShapes(shapesData);
 
 export function loadOutline(name: string): readonly Vector2[] {
@@ -191,6 +314,7 @@ export type AuthoredAppearance = Readonly<{
   palette: Readonly<Record<string, string>>;
   bodyColor?: string;
   source: string;
+  sourceUpscale: number;
 }>;
 
 export type AuthoredAppearances = Readonly<{
@@ -206,6 +330,16 @@ function positiveSafeInteger(value: unknown, path: string): number {
   const number = positiveNumber(value, path);
   if (!Number.isSafeInteger(number)) reject(path, "must be a safe integer");
   return number;
+}
+
+/**
+ * `sourceUpscale` is optional and defaults to 1 so every downstream
+ * consumer of `AuthoredAppearance` reads one field. When present it must be
+ * a positive safe integer (P37).
+ */
+function optionalSourceUpscale(value: unknown, path: string): number {
+  if (value === undefined) return 1;
+  return positiveSafeInteger(value, path);
 }
 
 function colour(value: unknown, path: string): string {
@@ -324,6 +458,10 @@ export function validateAppearances(value: unknown): AuthoredAppearances {
         if (Object.keys(palette).length === 0)
           reject(`${path}.palette`, "must define at least one colour");
         const source = text(appearance.source, `${path}.source`);
+        const sourceUpscale = optionalSourceUpscale(
+          appearance.sourceUpscale,
+          `${path}.sourceUpscale`,
+        );
         if (template.kind === "pixels") {
           for (const [rowIndex, row] of template.rows.entries()) {
             for (const [columnIndex, character] of [...row].entries()) {
@@ -336,7 +474,7 @@ export function validateAppearances(value: unknown): AuthoredAppearances {
           }
           return [
             id,
-            Object.freeze({ id, templateId, palette, source }),
+            Object.freeze({ id, templateId, palette, source, sourceUpscale }),
           ];
         }
         if (!("A" in palette) || !("B" in palette))
@@ -346,7 +484,14 @@ export function validateAppearances(value: unknown): AuthoredAppearances {
         const bodyColor = colour(appearance.bodyColor, `${path}.bodyColor`);
         return [
           id,
-          Object.freeze({ id, templateId, palette, source, bodyColor }),
+          Object.freeze({
+            id,
+            templateId,
+            palette,
+            source,
+            sourceUpscale,
+            bodyColor,
+          }),
         ];
       }),
     ),
@@ -1453,11 +1598,7 @@ export type AuthoredSpawns = Readonly<{
   /** `null` means the opening spawn is never repeated (K10: a single boss). */
   everySeconds: number | null;
   maxConcurrent: number;
-  placement: Readonly<{
-    ringRadiusFraction: number;
-    rule: string;
-    goldenAngleDegrees: number;
-  }>;
+  placement: AuthoredSpawnPlacementRule;
 }>;
 
 /** The fields one encounter entry owns: everything else in `encounter.json` is shared (K14). */
@@ -1465,6 +1606,7 @@ export type AuthoredEncounterEntry = Readonly<{
   rulesVersion: string;
   displayName: string;
   primaryArchetype: string;
+  arenaId: string;
   spawns: AuthoredSpawns;
   session: Readonly<{
     startCountdownSeconds: number;
@@ -1490,23 +1632,66 @@ export type AuthoredEncounterData = Readonly<{
   encounters: Readonly<Record<string, AuthoredEncounterEntry>>;
 }>;
 
+/**
+ * The encounter-level opening spawn's placement rule (step 40.1), distinct
+ * from `AuthoredSpawnPlacement`'s per-phase minion placements above: this
+ * picks where the encounter's own primary enemy first appears.
+ * `farthest-from-player` is the approved ring (unchanged); `arena-center`
+ * (the Killer Bee Queen, so her phase-3 drill no longer walks in from
+ * 16.2 tiles out) must carry neither ring field, so a leftover value can
+ * never look meaningful.
+ */
+export type AuthoredSpawnPlacementRule =
+  | Readonly<{
+      rule: "farthest-from-player";
+      ringRadiusFraction: number;
+      goldenAngleDegrees: number;
+    }>
+  | Readonly<{ rule: "arena-center" }>;
+
+function validateSpawnPlacementRule(
+  value: unknown,
+  path: string,
+): AuthoredSpawnPlacementRule {
+  const placement = record(value, path);
+  if (placement.rule === "arena-center") {
+    if (placement.ringRadiusFraction !== undefined)
+      reject(
+        `${path}.ringRadiusFraction`,
+        'must not be present when rule is "arena-center"',
+      );
+    if (placement.goldenAngleDegrees !== undefined)
+      reject(
+        `${path}.goldenAngleDegrees`,
+        'must not be present when rule is "arena-center"',
+      );
+    return Object.freeze({ rule: "arena-center" });
+  }
+  if (placement.rule === "farthest-from-player") {
+    const ringRadiusFraction = positiveNumber(
+      placement.ringRadiusFraction,
+      `${path}.ringRadiusFraction`,
+    );
+    if (ringRadiusFraction >= 1)
+      reject(`${path}.ringRadiusFraction`, "must be inside the arena, below 1");
+    return Object.freeze({
+      rule: "farthest-from-player",
+      ringRadiusFraction,
+      goldenAngleDegrees: finiteNumber(
+        placement.goldenAngleDegrees,
+        `${path}.goldenAngleDegrees`,
+      ),
+    });
+  }
+  reject(`${path}.rule`, 'must be "farthest-from-player" or "arena-center"');
+}
+
 function validateSpawns(value: unknown, path: string): AuthoredSpawns {
   const spawns = record(value, path);
-  const placement = record(spawns.placement, `${path}.placement`);
-  const ringRadiusFraction = positiveNumber(
-    placement.ringRadiusFraction,
-    `${path}.placement.ringRadiusFraction`,
+  const placement = validateSpawnPlacementRule(
+    spawns.placement,
+    `${path}.placement`,
   );
-  if (ringRadiusFraction >= 1)
-    reject(
-      `${path}.placement.ringRadiusFraction`,
-      "must be inside the arena, below 1",
-    );
-  if (placement.rule !== "farthest-from-player")
-    reject(
-      `${path}.placement.rule`,
-      "must be the approved farthest-from-player rule",
-    );
   return Object.freeze({
     archetype: text(spawns.archetype, `${path}.archetype`),
     firstSpawnSeconds: nonnegativeNumber(
@@ -1518,14 +1703,7 @@ function validateSpawns(value: unknown, path: string): AuthoredSpawns {
         ? null
         : positiveNumber(spawns.everySeconds, `${path}.everySeconds`),
     maxConcurrent: safeCount(spawns.maxConcurrent, `${path}.maxConcurrent`),
-    placement: Object.freeze({
-      ringRadiusFraction,
-      rule: text(placement.rule, `${path}.placement.rule`),
-      goldenAngleDegrees: finiteNumber(
-        placement.goldenAngleDegrees,
-        `${path}.placement.goldenAngleDegrees`,
-      ),
-    }),
+    placement,
   });
 }
 
@@ -1540,6 +1718,7 @@ function validateEncounterEntry(
     rulesVersion: text(data.rulesVersion, `${path}.rulesVersion`),
     displayName: text(data.displayName, `${path}.displayName`),
     primaryArchetype: text(data.primaryArchetype, `${path}.primaryArchetype`),
+    arenaId: text(data.arenaId, `${path}.arenaId`),
     spawns: validateSpawns(data.spawns, `${path}.spawns`),
     session: Object.freeze({
       startCountdownSeconds: nonnegativeNumber(

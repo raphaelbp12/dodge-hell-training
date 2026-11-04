@@ -1,9 +1,9 @@
-import type { CircularArena, Vector2 } from "../models";
+import type { Arena, ArenaShape, Vector2 } from "../models";
 import type { ConditionApplication } from "../simulation/conditions";
 import {
   AUTHORED_APPEARANCES,
   AUTHORED_ARCHETYPES,
-  AUTHORED_ARENA,
+  AUTHORED_ARENAS,
   AUTHORED_ENCOUNTER,
   AUTHORED_ENCOUNTER_DATA,
   AUTHORED_PROJECTILES,
@@ -14,16 +14,19 @@ import {
   type AuthoredArchetype,
   type AuthoredAttack,
   type AuthoredBody,
+  type AuthoredEncounterEntry,
   type AuthoredPhase,
   type AuthoredPhaseSpawn,
   type AuthoredProjectile,
+  type AuthoredSpawnPlacementRule,
   type AuthoredSubPhase,
   type TelegraphColorName,
 } from "./data";
 import { assertNonnegative, PALADIN_DERIVED_STATS } from "./stats";
 import {
+  arenaInradiusTiles,
   constrainBodyToArena,
-  convexBodyFitsCircle,
+  convexBodyFitsArenaShape,
   transformBodyVertices,
   validateConvexParts,
 } from "../simulation/geometry";
@@ -36,7 +39,19 @@ import {
 // Approved encounter geometry. Authored values live in `../data` and are
 // validated at the boundary by `./data`; this module only derives runtime
 // configuration from them. Provenance: docs/mechanics.md step 8.2.
-const ARENA = AUTHORED_ARENA;
+/** Resolves an encounter entry's named arena, rejecting an unknown id at load (W05). */
+function resolveArena(entry: AuthoredEncounterEntry): Arena {
+  const arena = AUTHORED_ARENAS[entry.arenaId];
+  if (!arena) throw new RangeError(`Unknown arena: ${entry.arenaId}`);
+  return arena;
+}
+
+const ARENA = resolveArena(AUTHORED_ENCOUNTER);
+// The debug panel's sliders assume a circular arena (a radial spawn ring and
+// a radius-based clamp); the debug-tunable encounter must author one.
+if (ARENA.shape.kind !== "circle")
+  throw new RangeError("The debug-tunable encounter must use a circular arena");
+const ARENA_SHAPE = ARENA.shape;
 
 export type ProjectileMotion =
   | Readonly<{
@@ -292,8 +307,12 @@ export type SpawnRule = Readonly<{
   /** `null` means the opening spawn is never repeated (K10: a single boss). */
   everySeconds: number | null;
   maxConcurrent: number;
-  ringRadiusTiles: number;
+  /** Seeds minion fan-out across spawn waves; see `GOLDEN_ANGLE_DEGREES`. */
   goldenAngleRadians: number;
+  /** Where the encounter's own opening enemy first appears (step 40.1). */
+  placement:
+    | Readonly<{ rule: "farthest-from-player"; ringRadiusTiles: number }>
+    | Readonly<{ rule: "arena-center" }>;
 }>;
 
 export type EncounterConfig = Readonly<{
@@ -304,7 +323,7 @@ export type EncounterConfig = Readonly<{
     fixedStepSeconds: number;
     maxStepsPerUpdate: number;
   }>;
-  arena: CircularArena;
+  arena: Arena;
   player: Readonly<{ spawnTiles: Vector2; verticesTiles: readonly Vector2[] }>;
   primaryArchetypeId: string;
   archetypes: Readonly<Record<string, EnemyArchetype>>;
@@ -391,6 +410,39 @@ export function bodyExtentTiles(
 export const degreesToRadians = (degrees: number): number =>
   (degrees * Math.PI) / 180;
 
+/**
+ * The golden angle (~137.5deg) seeds the per-spawn bearing offset that fans
+ * minions out across successive spawn waves (`phases.ts`'s `resolveSpawn`
+ * and `simulation.ts`'s `spawnEnemy`), independent of the encounter's own
+ * opening-spawn placement rule. `arena-center` (step 40.1) authors no
+ * `goldenAngleDegrees` of its own, so this constant - the same 137.5 value
+ * every encounter already used - keeps that fan-out unchanged rather than
+ * collapsing it to zero.
+ */
+const GOLDEN_ANGLE_DEGREES = 137.5;
+
+function authoredGoldenAngleDegrees(
+  placement: AuthoredSpawnPlacementRule,
+): number {
+  return placement.rule === "farthest-from-player"
+    ? placement.goldenAngleDegrees
+    : GOLDEN_ANGLE_DEGREES;
+}
+
+/** Resolves an authored opening-spawn placement rule to its runtime form (step 40.1). */
+function resolveSpawnPlacementRule(
+  placement: AuthoredSpawnPlacementRule,
+  arenaShape: ArenaShape,
+): SpawnRule["placement"] {
+  return placement.rule === "farthest-from-player"
+    ? {
+        rule: "farthest-from-player" as const,
+        ringRadiusTiles:
+          placement.ringRadiusFraction * arenaInradiusTiles(arenaShape),
+      }
+    : { rule: "arena-center" as const };
+}
+
 export function bodyVertices(body: AuthoredBody): readonly Vector2[] {
   return scaleBody(loadOutline(body.shape), body.widthTiles, body.heightTiles);
 }
@@ -455,7 +507,12 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
   spawnEverySeconds: authoredPrimaryEverySeconds,
   maxConcurrentEnemies: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
-  spawnRingFraction: AUTHORED_ENCOUNTER.spawns.placement.ringRadiusFraction,
+  // The debug-tunable encounter is hardwired to the Crystal Worm, which
+  // keeps the approved farthest-from-player rule unchanged (step 40.1).
+  spawnRingFraction:
+    AUTHORED_ENCOUNTER.spawns.placement.rule === "farthest-from-player"
+      ? AUTHORED_ENCOUNTER.spawns.placement.ringRadiusFraction
+      : 0,
 });
 
 /**
@@ -594,10 +651,15 @@ export function buildEncounterConfig(
       firstSpawnSeconds: values.firstSpawnSeconds,
       everySeconds: values.spawnEverySeconds,
       maxConcurrent: values.maxConcurrentEnemies,
-      ringRadiusTiles: values.spawnRingFraction * ARENA.radiusTiles,
       goldenAngleRadians: degreesToRadians(
-        AUTHORED_ENCOUNTER.spawns.placement.goldenAngleDegrees,
+        authoredGoldenAngleDegrees(AUTHORED_ENCOUNTER.spawns.placement),
       ),
+      // The debug-tunable encounter is hardwired to the Crystal Worm, which
+      // keeps the approved farthest-from-player rule unchanged (step 40.1).
+      placement: {
+        rule: "farthest-from-player",
+        ringRadiusTiles: values.spawnRingFraction * ARENA_SHAPE.radiusTiles,
+      },
     },
     maxConcurrentMinions: AUTHORED_ENCOUNTER.maxConcurrentMinions,
     simulation: AUTHORED_ENCOUNTER.simulation,
@@ -802,6 +864,13 @@ function appearanceFromAuthored(
   template: AuthoredAppearanceTemplate,
   pixelsPerTile: number,
 ): ProjectileAppearanceSpec {
+  // An appearance's tile size is gridPixels / (pixelsPerTile * sourceUpscale):
+  // the hive grids are authored as a 4x render, so a sourceUpscale of 4
+  // shrinks them back to their measured world size (P37). This is the one
+  // place a resolved grid becomes visualWidthTiles/visualHeightTiles/
+  // partsTiles, so collision parts always scale by the same divisor as the
+  // visual extent.
+  const effectivePixelsPerTile = pixelsPerTile * authored.sourceUpscale;
   if (template.kind === "bomb") {
     if (!authored.bodyColor)
       throw new RangeError(`Appearance ${id} is missing its bomb body colour`);
@@ -811,7 +880,7 @@ function appearanceFromAuthored(
       nativeHeightPixels: 0,
       pixels: Object.freeze([]),
       palette: authored.palette,
-      pixelsPerTile,
+      pixelsPerTile: effectivePixelsPerTile,
       visualWidthTiles: projectileBombBodyTiles,
       visualHeightTiles: projectileBombBodyTiles,
       partsTiles: Object.freeze([]),
@@ -830,12 +899,12 @@ function appearanceFromAuthored(
     nativeHeightPixels: template.heightPixels,
     pixels,
     palette: authored.palette,
-    pixelsPerTile,
-    visualWidthTiles: template.widthPixels / pixelsPerTile,
-    visualHeightTiles: template.heightPixels / pixelsPerTile,
+    pixelsPerTile: effectivePixelsPerTile,
+    visualWidthTiles: template.widthPixels / effectivePixelsPerTile,
+    visualHeightTiles: template.heightPixels / effectivePixelsPerTile,
     partsTiles: appearanceParts(
       pixels,
-      pixelsPerTile,
+      effectivePixelsPerTile,
       template.widthPixels,
       template.heightPixels,
     ),
@@ -948,6 +1017,7 @@ function buildStaticEncounterConfig(
   entryId: string,
 ): EncounterConfig {
   const entry = AUTHORED_ENCOUNTER_DATA.encounters[entryId];
+  const arena = resolveArena(entry);
   return {
     rulesVersion: entry.rulesVersion,
     spawns: {
@@ -955,15 +1025,14 @@ function buildStaticEncounterConfig(
       firstSpawnSeconds: entry.spawns.firstSpawnSeconds,
       everySeconds: entry.spawns.everySeconds,
       maxConcurrent: entry.spawns.maxConcurrent,
-      ringRadiusTiles:
-        entry.spawns.placement.ringRadiusFraction * ARENA.radiusTiles,
       goldenAngleRadians: degreesToRadians(
-        entry.spawns.placement.goldenAngleDegrees,
+        authoredGoldenAngleDegrees(entry.spawns.placement),
       ),
+      placement: resolveSpawnPlacementRule(entry.spawns.placement, arena.shape),
     },
     maxConcurrentMinions: AUTHORED_ENCOUNTER_DATA.maxConcurrentMinions,
     simulation: AUTHORED_ENCOUNTER_DATA.simulation,
-    arena: ARENA,
+    arena,
     player: {
       spawnTiles: AUTHORED_ENCOUNTER_DATA.player.spawnTiles,
       verticesTiles: scaleBody(
@@ -1167,7 +1236,7 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   const positiveValues = {
     fixedStepSeconds: config.simulation.fixedStepSeconds,
     maxStepsPerUpdate: config.simulation.maxStepsPerUpdate,
-    arenaRadiusTiles: config.arena.radiusTiles,
+    arenaInradiusTiles: arenaInradiusTiles(config.arena.shape),
     cssPixelsPerTile: config.camera.cssPixelsPerTile,
     minZoom: config.camera.minZoom,
     maxZoom: config.camera.maxZoom,
@@ -1200,15 +1269,15 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   ) {
     throw new RangeError("Default zoom must be within ordered zoom bounds");
   }
-  validatePoint(config.arena.centerTiles);
+  validatePoint(config.arena.shape.centerTiles);
   validatePoint(config.player.spawnTiles);
   if (
-    !convexBodyFitsCircle(
+    !convexBodyFitsArenaShape(
       transformBodyVertices(
         config.player.verticesTiles,
         config.player.spawnTiles,
       ),
-      config.arena,
+      config.arena.shape,
     )
   ) {
     throw new RangeError("Entity collision extent must spawn inside the arena");
@@ -1224,19 +1293,31 @@ export function validateEncounterConfig(config: EncounterConfig): void {
   assertPositive(config.maxConcurrentMinions, "maxConcurrentMinions");
   if (!Number.isSafeInteger(config.maxConcurrentMinions))
     throw new RangeError("maxConcurrentMinions must be a safe integer");
-  assertPositive(spawns.ringRadiusTiles, "spawnRingRadiusTiles");
-  if (spawns.ringRadiusTiles >= config.arena.radiusTiles)
-    throw new RangeError("Spawn ring must lie inside the arena");
   if (!Number.isFinite(spawns.goldenAngleRadians))
     throw new RangeError("goldenAngleRadians must be finite");
   if (!config.archetypes[spawns.archetypeId])
     throw new RangeError("spawns.archetypeId must name a defined archetype");
   const spawnBody = config.archetypes[spawns.archetypeId].verticesTiles;
-  const farthestVertexTiles = Math.max(
-    ...spawnBody.map((vertex) => Math.hypot(vertex.x, vertex.y)),
-  );
-  if (spawns.ringRadiusTiles + farthestVertexTiles > config.arena.radiusTiles)
-    throw new RangeError("Spawn ring must keep the body inside the arena");
+  if (spawns.placement.rule === "farthest-from-player") {
+    assertPositive(spawns.placement.ringRadiusTiles, "spawnRingRadiusTiles");
+    if (spawns.placement.ringRadiusTiles >= arenaInradiusTiles(config.arena.shape))
+      throw new RangeError("Spawn ring must lie inside the arena");
+    const farthestVertexTiles = Math.max(
+      ...spawnBody.map((vertex) => Math.hypot(vertex.x, vertex.y)),
+    );
+    if (
+      spawns.placement.ringRadiusTiles + farthestVertexTiles >
+      arenaInradiusTiles(config.arena.shape)
+    )
+      throw new RangeError("Spawn ring must keep the body inside the arena");
+  } else if (
+    !convexBodyFitsArenaShape(
+      transformBodyVertices(spawnBody, config.arena.shape.centerTiles),
+      config.arena.shape,
+    )
+  ) {
+    throw new RangeError("Arena-centre spawn must keep the body inside the arena");
+  }
 
   const ids = Object.keys(config.archetypes);
   if (ids.length === 0)
@@ -1574,9 +1655,9 @@ function validateArchetype(
 
   validatePoint(archetype.spawnTiles);
   if (
-    !convexBodyFitsCircle(
+    !convexBodyFitsArenaShape(
       transformBodyVertices(archetype.verticesTiles, archetype.spawnTiles),
-      config.arena,
+      config.arena.shape,
     )
   ) {
     throw new RangeError("Entity collision extent must spawn inside the arena");

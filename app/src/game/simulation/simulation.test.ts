@@ -13,6 +13,7 @@ import {
   advanceSimulation,
   createEnemy,
   createSimulation,
+  repositionPrimaryEnemy,
   setDebugSettings,
   spawnEnemy,
 } from "./simulation.ts";
@@ -24,6 +25,7 @@ import {
   loadSelectedDebugValues,
 } from "../config/debug";
 import {
+  convexBodyFitsArenaShape,
   convexBodyFitsCircle,
   convexContactDistance,
   maximumBodyCenterDistance,
@@ -38,6 +40,11 @@ const idle: SimulationInput = {
 };
 const east: SimulationInput = { ...idle, east: true };
 const stepSeconds = 1 / 60;
+// The debug-tunable encounter stays hardwired to the Crystal Worm's approved
+// farthest-from-player rule (step 40.1), so its ring radius is always present.
+if (ENCOUNTER_CONFIG.spawns.placement.rule !== "farthest-from-player")
+  throw new RangeError("Expected the Crystal Worm to keep farthest-from-player");
+const spawnRingRadiusTiles = ENCOUNTER_CONFIG.spawns.placement.ringRadiusTiles;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
 const PRIMARY_PHASE = PRIMARY.phases[0];
 const PRIMARY_ATTACK = PRIMARY_PHASE.attacks[0];
@@ -54,14 +61,19 @@ const PRIMARY_PATTERN = PRIMARY_ATTACK.pattern;
 if (PRIMARY_PHASE.movement.kind !== "chase")
   throw new Error("test fixture assumes the shipped archetype is chase-kind");
 const PRIMARY_MOVEMENT = PRIMARY_PHASE.movement;
+// The Crystal Worm's arena stays circular (P38); narrow once for this file's
+// many direct radius/centre reads.
+if (ENCOUNTER_CONFIG.arena.shape.kind !== "circle")
+  throw new Error("test fixture assumes the shipped arena is circular");
+const ARENA_SHAPE = ENCOUNTER_CONFIG.arena.shape;
 // Spawn placement draws from the seeded generator, so these tests pin a seed.
 const TEST_SEED = 20261026;
 const freshSimulation = () => createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
 /** Distance of an enemy from the arena centre, in tiles. */
 const ringDistance = (state: ReturnType<typeof createSimulation>): number =>
   Math.hypot(
-    state.enemies[0].positionTiles.x - state.config.arena.centerTiles.x,
-    state.enemies[0].positionTiles.y - state.config.arena.centerTiles.y,
+    state.enemies[0].positionTiles.x - state.config.arena.shape.centerTiles.x,
+    state.enemies[0].positionTiles.y - state.config.arena.shape.centerTiles.y,
   );
 const horizontalContactTiles =
   Math.max(...ENCOUNTER_CONFIG.player.verticesTiles.map((vertex) => vertex.x)) +
@@ -116,13 +128,15 @@ test("matched player size controls movement and immediate live-resize wall conta
   advanceSimulation(state, stepSeconds, east);
   expect(state.player.positionTiles.x).toBeGreaterThan(18.5);
   setDebugSettings(state, { ...selected, headWidth: 5, headHeight: 5 });
+  if (state.config.arena.shape.kind !== "circle")
+    throw new RangeError("The Crystal Worm's arena must stay circular");
   expect(
     convexBodyFitsCircle(
       transformBodyVertices(
         state.config.player.verticesTiles,
         state.player.positionTiles,
       ),
-      state.config.arena,
+      state.config.arena.shape,
     ),
   ).toBe(true);
 });
@@ -246,14 +260,14 @@ test("arena-center chase reaches the exact center and ignores the player silhoue
     enemySpeedTilesPerSecond: 12,
   });
   runTicks(state, 180);
-  expect(state.enemies[0].positionTiles).toEqual(ENCOUNTER_CONFIG.arena.centerTiles);
+  expect(state.enemies[0].positionTiles).toEqual(ARENA_SHAPE.centerTiles);
 });
 
 test("activates the selected v3 preset and eleven-volley first group atomically", () => {
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v4",
+    "crystal-worm-child-swarm-paladin-v5",
   );
-  expect(ENCOUNTER_CONFIG.arena.radiusTiles).toBe(19.2);
+  expect(ARENA_SHAPE.radiusTiles).toBe(19.2);
   expect(PRIMARY.spawnTiles).toEqual({ x: 0, y: -16.2 });
   const state = freshSimulation();
   for (let tick = 0; tick < 234; tick++) {
@@ -283,7 +297,7 @@ test("initializes independent deterministic state from the approved preset", () 
   expect(first.rulesVersion).toBe(ENCOUNTER_CONFIG.rulesVersion);
   expect(first.player.positionTiles).toEqual({ x: 0, y: 0 });
   expect(ringDistance(first)).toBeCloseTo(
-    ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    spawnRingRadiusTiles,
     9,
   );
   expect(first.enemies[0].positionTiles).toEqual(
@@ -322,7 +336,7 @@ test("does not advance movement or survival time without a full tick", () => {
   advanceSimulation(state, stepSeconds / 4, east);
   expect(state.player.positionTiles).toEqual({ x: 0, y: 0 });
   expect(ringDistance(state)).toBeCloseTo(
-    ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    spawnRingRadiusTiles,
     9,
   );
   expect(state.elapsedSeconds).toBe(0);
@@ -346,7 +360,7 @@ test.each([
   // One second of pursuit closes 1.5 tiles toward the centred player,
   // whatever bearing the seeded opening used.
   expect(ringDistance(state)).toBeCloseTo(
-    ENCOUNTER_CONFIG.spawns.ringRadiusTiles - PRIMARY_MOVEMENT.speedTilesPerSecond,
+    spawnRingRadiusTiles - PRIMARY_MOVEMENT.speedTilesPerSecond,
     9,
   );
 });
@@ -449,7 +463,7 @@ test("constrains the player collider at the wall while permitting tangential mov
   const limitTiles = maximumBodyCenterDistance(
     ENCOUNTER_CONFIG.player.verticesTiles,
     { x: 1, y: 0 },
-    ENCOUNTER_CONFIG.arena.radiusTiles,
+    ARENA_SHAPE.radiusTiles,
   );
   state.player.positionTiles = { x: limitTiles, y: 0 };
   advanceSimulation(state, stepSeconds, east);
@@ -464,7 +478,7 @@ test("constrains the player collider at the wall while permitting tangential mov
         ENCOUNTER_CONFIG.player.verticesTiles,
         state.player.positionTiles,
       ),
-      ENCOUNTER_CONFIG.arena,
+      ARENA_SHAPE,
     ),
   ).toBe(true);
 });
@@ -480,7 +494,7 @@ test("keeps both collision extents inside the arena over repeated edge movement"
           ENCOUNTER_CONFIG.player.verticesTiles,
           state.player.positionTiles,
         ),
-        ENCOUNTER_CONFIG.arena,
+        ARENA_SHAPE,
       ),
     ).toBe(true);
     expect(
@@ -489,7 +503,7 @@ test("keeps both collision extents inside the arena over repeated edge movement"
           PRIMARY.verticesTiles,
           state.enemies[0].positionTiles,
         ),
-        ENCOUNTER_CONFIG.arena,
+        ARENA_SHAPE,
       ),
     ).toBe(true);
   }
@@ -1289,7 +1303,10 @@ test("checks newborn overlap at the exact firing boundary", () => {
   const state = freshSimulation();
   runTicks(state, 119);
   state.enemies[0].positionTiles = { x: 0, y: 0 };
-  state.player.positionTiles = { x: 0, y: 0.75 };
+  // The 0.889-tile player body (P37) has a smaller half-extent than the old
+  // 1.25-tile body, so the player sits closer to the enemy to keep all six
+  // newborn shards overlapping it at the firing boundary.
+  state.player.positionTiles = { x: 0, y: 0.7 };
   runTicks(state, 1);
   expect(state.elapsedSeconds).toBe(2);
   expect(state.shards).toHaveLength(6);
@@ -1515,7 +1532,7 @@ test("shard ids stay unique across enemies and every enemy stays in the arena", 
     expect(
       convexBodyFitsCircle(
         transformBodyVertices(archetype.verticesTiles, enemy.positionTiles),
-        state.config.arena,
+        ARENA_SHAPE,
       ),
     ).toBe(true);
   }
@@ -1599,7 +1616,7 @@ test("every spawn lands on the ring and keeps its body inside the arena", () => 
       expect(
         convexBodyFitsCircle(
           transformBodyVertices(archetype.verticesTiles, enemy.positionTiles),
-          ENCOUNTER_CONFIG.arena,
+          ARENA_SHAPE,
         ),
       ).toBe(true);
     }
@@ -1629,11 +1646,11 @@ test("the opening bearing is drawn from the seed and spreads by golden angle", (
     Math.PI +
     before * ENCOUNTER_CONFIG.spawns.goldenAngleRadians;
   expect(added.positionTiles.x).toBeCloseTo(
-    Math.cos(expected) * ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    Math.cos(expected) * spawnRingRadiusTiles,
     9,
   );
   expect(added.positionTiles.y).toBeCloseTo(
-    Math.sin(expected) * ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+    Math.sin(expected) * spawnRingRadiusTiles,
     9,
   );
 });
@@ -1688,7 +1705,7 @@ test("a different seed opens from a different place but the same schedule", () =
   expect(openings[0]).not.toEqual(openings[1]);
   for (const opening of openings) {
     expect(Math.hypot(opening.x, opening.y)).toBeCloseTo(
-      ENCOUNTER_CONFIG.spawns.ringRadiusTiles,
+      spawnRingRadiusTiles,
       9,
     );
   }
@@ -1733,7 +1750,7 @@ test("an archetype edit applies to every live enemy", () => {
     expect(
       convexBodyFitsCircle(
         transformBodyVertices(archetype.verticesTiles, enemy.positionTiles),
-        state.config.arena,
+        ARENA_SHAPE,
       ),
     ).toBe(true);
   }
@@ -2241,7 +2258,10 @@ test("a fast enemy crossing the player within one step still registers contact (
   const config = {
     ...ENCOUNTER_CONFIG,
     archetypes: { [PRIMARY.id]: archetype },
-    arena: { ...ENCOUNTER_CONFIG.arena, centerTiles: { x: far, y: 0 } },
+    arena: {
+      ...ENCOUNTER_CONFIG.arena,
+      shape: { ...ARENA_SHAPE, centerTiles: { x: far, y: 0 } },
+    },
   };
   const state = createSimulation(config, TEST_SEED);
   state.player.positionTiles = { x: 0, y: 0 };
@@ -2270,25 +2290,127 @@ test("an archetype with zero contact damage and no contact conditions never star
 // simulation's own `state.config`, not the module-level `ENCOUNTER_CONFIG`,
 // so two encounters with different arenas never bleed into each other.
 test("two simulations built from different encounter configs each constrain to their own arena", () => {
+  const smallArenaShape = {
+    kind: "circle" as const,
+    centerTiles: { x: 5, y: 5 },
+    radiusTiles: 2,
+  };
   const smallArenaConfig = {
     ...ENCOUNTER_CONFIG,
-    arena: { centerTiles: { x: 5, y: 5 }, radiusTiles: 2 },
+    arena: { shape: smallArenaShape, hazards: [] },
   };
   const smallState = createSimulation(smallArenaConfig, TEST_SEED);
   smallState.player.positionTiles = { x: 100, y: 100 };
   advanceSimulation(smallState, stepSeconds, east);
   expect(
-    distance(smallState.player.positionTiles, smallArenaConfig.arena.centerTiles),
-  ).toBeLessThanOrEqual(smallArenaConfig.arena.radiusTiles + 1e-9);
+    distance(smallState.player.positionTiles, smallArenaShape.centerTiles),
+  ).toBeLessThanOrEqual(smallArenaShape.radiusTiles + 1e-9);
 
   const defaultState = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
   defaultState.player.positionTiles = { x: 0, y: 0 };
   advanceSimulation(defaultState, stepSeconds, east);
   expect(
-    distance(defaultState.player.positionTiles, ENCOUNTER_CONFIG.arena.centerTiles),
-  ).toBeLessThanOrEqual(ENCOUNTER_CONFIG.arena.radiusTiles + 1e-9);
+    distance(defaultState.player.positionTiles, ARENA_SHAPE.centerTiles),
+  ).toBeLessThanOrEqual(ARENA_SHAPE.radiusTiles + 1e-9);
   expect(defaultState.player.positionTiles.x).not.toBeCloseTo(
-    smallArenaConfig.arena.centerTiles.x,
+    smallArenaShape.centerTiles.x,
     3,
   );
+});
+
+// Step 40.2: `repositionPrimaryEnemy` reuses 40.1's placement resolution for
+// a future live-apply path that mutates a running attempt in place (it is
+// not wired into today's `applyDrill`, which already fully recreates the
+// simulation - see session.ts's comment on that call).
+test("repositionPrimaryEnemy moves the Killer Bee Queen from an off-centre position to the arena centre", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, TEST_SEED);
+  const queen = state.enemies.find(
+    (enemy) => enemy.archetypeId === queenConfig.primaryArchetypeId,
+  );
+  if (!queen) throw new RangeError("Expected the Queen to have spawned");
+  queen.positionTiles = { x: 3, y: -2 };
+
+  repositionPrimaryEnemy(state);
+
+  expect(queen.positionTiles).toEqual(queenConfig.arena.shape.centerTiles);
+});
+
+test("repositionPrimaryEnemy is idempotent across repeated calls, re-applying the same phase", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, TEST_SEED);
+  const queen = state.enemies.find(
+    (enemy) => enemy.archetypeId === queenConfig.primaryArchetypeId,
+  );
+  if (!queen) throw new RangeError("Expected the Queen to have spawned");
+  queen.positionTiles = { x: 3, y: -2 };
+
+  repositionPrimaryEnemy(state);
+  const firstResult = { ...queen.positionTiles };
+  repositionPrimaryEnemy(state);
+
+  expect(queen.positionTiles).toEqual(firstResult);
+  expect(queen.positionTiles).toEqual(queenConfig.arena.shape.centerTiles);
+});
+
+test("repositionPrimaryEnemy moves only the primary enemy, leaving a minion untouched", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, TEST_SEED);
+  const queen = state.enemies.find(
+    (enemy) => enemy.archetypeId === queenConfig.primaryArchetypeId,
+  );
+  if (!queen) throw new RangeError("Expected the Queen to have spawned");
+  queen.positionTiles = { x: 3, y: -2 };
+  const minion = createEnemy(
+    queenConfig,
+    "red-killer-bee",
+    state.nextEnemyId++,
+    state.elapsedSeconds,
+    { x: 5, y: 1 },
+    { spawnedByEnemyId: queen.id },
+  );
+  state.enemies.push(minion);
+  const minionPositionBefore = { ...minion.positionTiles };
+
+  repositionPrimaryEnemy(state);
+
+  expect(queen.positionTiles).toEqual(queenConfig.arena.shape.centerTiles);
+  expect(minion.positionTiles).toEqual(minionPositionBefore);
+});
+
+test("repositionPrimaryEnemy keeps the Killer Bee Queen's 2x2 body inside the arena", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, TEST_SEED);
+  const queen = state.enemies.find(
+    (enemy) => enemy.archetypeId === queenConfig.primaryArchetypeId,
+  );
+  if (!queen) throw new RangeError("Expected the Queen to have spawned");
+  queen.positionTiles = { x: 3, y: -2 };
+
+  repositionPrimaryEnemy(state);
+
+  expect(queen.positionTiles).toEqual(queenConfig.arena.shape.centerTiles);
+  expect(
+    convexBodyFitsArenaShape(
+      transformBodyVertices(
+        queenConfig.archetypes[queenConfig.primaryArchetypeId].verticesTiles,
+        queen.positionTiles,
+      ),
+      queenConfig.arena.shape,
+    ),
+  ).toBe(true);
+});
+
+test("repositionPrimaryEnemy resolves the Crystal Worm's farthest-from-player rule rather than throwing", () => {
+  const state = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  const primary = state.enemies.find(
+    (enemy) => enemy.archetypeId === ENCOUNTER_CONFIG.primaryArchetypeId,
+  );
+  if (!primary) throw new RangeError("Expected the primary enemy to have spawned");
+  primary.positionTiles = { x: 1, y: 1 };
+
+  expect(() => repositionPrimaryEnemy(state)).not.toThrow();
+  expect(
+    Math.hypot(primary.positionTiles.x, primary.positionTiles.y),
+  ).toBeCloseTo(spawnRingRadiusTiles, 9);
 });

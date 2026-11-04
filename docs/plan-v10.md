@@ -311,31 +311,31 @@ export function arenaContains(shape: ArenaShape, positionTiles: Vector2): boolea
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 37 | The Sprite Scale Re-Anchor | pending | V9 phase 36 |
-| 38 | The Octagonal Boss Room | pending | 37 |
-| 39 | Killer Honey | pending | 38 |
-| 40 | Centre Spawn And Release | pending | 39 |
+| 37 | The Sprite Scale Re-Anchor | complete | V9 phase 36 |
+| 38 | The Octagonal Boss Room | complete | 37 |
+| 39 | Killer Honey | complete | 38 |
+| 40 | Centre Spawn And Release | complete | 39 |
 
 ## Phase 37: The Sprite Scale Re-Anchor
 
-Status: pending. Dependencies: V9 phase 36. Steps in [`docs/plan/phase-37.md`](plan/phase-37.md).
+Status: complete. Dependencies: V9 phase 36. Steps in [`docs/plan-archive/phase-37.md`](plan-archive/phase-37.md).
 
-Commits the geometry evidence, corrects `pixelsPerTile` to 9.0, adds the hive `sourceUpscale`, shrinks the player body to 0.889 tiles and takes the plan's single comparison break.
+Committed the geometry evidence, corrected `pixelsPerTile` to 9.0, added the hive `sourceUpscale` of 4 on the three hive-grid appearances, shrank the player body to 0.889 tiles and took the plan's single comparison break (both rules versions to `-v5`/`-v9`).
 
 ## Phase 38: The Octagonal Boss Room
 
-Status: pending. Dependencies: 37. Steps in [`docs/plan/phase-38.md`](plan/phase-38.md).
+Status: complete. Dependencies: 37. Steps in [`docs/plan-archive/phase-38.md`](plan-archive/phase-38.md).
 
-Turns `arena.json` into a keyed map with a shape union, adds octagon containment, points each encounter at its arena, retunes the two out-of-arena radii and draws the room as its tile staircase.
+Turned `arena.json` into a keyed map with a circle/octagon shape union, added octagon containment via half-plane clamping, pointed each encounter at its own named arena (`nest-boss-room` at `flatHalfWidthTiles` 9.5 / `cornerSumTiles` 14.25), and retuned the Queen's phase-1 orbit and the yellow Beehemoth's orbit to 8.0 tiles for the smaller room.
 
 ## Phase 39: Killer Honey
 
-Status: pending. Dependencies: 38. Steps in [`docs/plan/phase-39.md`](plan/phase-39.md).
+Status: complete. Dependencies: 38. Steps in [`docs/plan-archive/phase-39.md`](plan-archive/phase-39.md).
 
-Adds the hazard-region model, the honey speed multiplier with its ramp, the 60 HP armor-piercing damage clock and the honey floor art.
+Added the hazard-region model (diamond/annulus regions on an arena), authored the Nest boss room's static centre pond and outer-ring Killer Honey, and implemented honey's two player-only effects: the 0.75x speed multiplier (ramping 0.05/s to a 0.50 floor) and the 60 HP/1.0s armor-piercing damage clock, plus the honey floor art.
 
 ## Phase 40: Centre Spawn And Release
 
-Status: pending. Dependencies: 39. Steps in [`docs/plan/phase-40.md`](plan/phase-40.md).
+Status: complete. Dependencies: 39. Steps in [`docs/plan-archive/phase-40.md`](plan-archive/phase-40.md).
 
-Makes the Queen spawn at the arena centre, repositions her on a live drill phase switch, adds the Playwright case and records the release.
+Turned the encounter-level opening-spawn placement into a `farthest-from-player`/`arena-center` rule union, moved the Killer Bee Queen onto `arena-center` so she no longer walks in from 16.2 tiles out on a phase-3 drill while the Crystal Worm's spawns stayed byte-for-byte unchanged, exported the shared placement-resolution and primary-enemy-reposition helpers for reuse, added one browser case covering the centre spawn and the already-implemented pond speed/damage effects, and updated the mechanics contract, README and deferred register. The full fight still clears at 373.43 s, unchanged from the V9 baseline.

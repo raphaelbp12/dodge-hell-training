@@ -27,6 +27,7 @@ import {
   type EncounterConfig,
   type EnemyArchetype,
   type MovementSpec,
+  type SpawnRule,
 } from "../config/encounter";
 import {
   advanceShard,
@@ -54,7 +55,7 @@ import {
 import type {
   AcceptedHit,
   AttackClockState,
-  CircularArena,
+  Arena,
   DrillSelection,
   EnemyState,
   PlayerState,
@@ -73,6 +74,11 @@ import {
   resolveEntrySpawns,
 } from "./phases";
 import { arbitrarySeed, assertSeed, nextSeed, unitFromSeed } from "./random";
+import {
+  honeyAt,
+  HONEY_DAMAGE_HP,
+  HONEY_DAMAGE_INTERVAL_SECONDS,
+} from "./terrain";
 
 export type SimulationState = {
   config: EncounterConfig;
@@ -252,6 +258,8 @@ export function createSimulation(
       healthHp: PALADIN_STATS.healthHp,
       combatRemainingSeconds: 0,
       conditionSeconds: createConditionSeconds(),
+      honeyContactSeconds: 0,
+      nextHoneyDamageAtSeconds: 0,
     },
     enemies: [],
     shards: [],
@@ -288,11 +296,20 @@ function nextUnitRandom(state: SimulationState): number {
   return unitFromSeed(state.randomSeed);
 }
 
-export function spawnEnemy(state: SimulationState): EnemyState | null {
-  const { spawns, arena } = state.config;
-  if (state.enemies.length >= spawns.maxConcurrent) return null;
-  const offsetX = state.player.positionTiles.x - arena.centerTiles.x;
-  const offsetY = state.player.positionTiles.y - arena.centerTiles.y;
+/**
+ * Resolves where the encounter's opening spawn (and every later repeat of
+ * it) should appear, dispatching on the encounter's authored placement rule
+ * (step 40.1). Shared by `spawnEnemy` and, reused rather than recomputed, by
+ * `applyDrill`'s live-switch reposition (step 40.2).
+ */
+export function resolveSpawnPosition(
+  state: SimulationState,
+  spawns: SpawnRule,
+  arena: Arena,
+): Vector2 {
+  if (spawns.placement.rule === "arena-center") return arena.shape.centerTiles;
+  const offsetX = state.player.positionTiles.x - arena.shape.centerTiles.x;
+  const offsetY = state.player.positionTiles.y - arena.shape.centerTiles.y;
   const distanceTiles = Math.hypot(offsetX, offsetY);
   const awayBearing =
     distanceTiles === 0
@@ -300,16 +317,45 @@ export function spawnEnemy(state: SimulationState): EnemyState | null {
       : Math.atan2(offsetY, offsetX) + Math.PI;
   const bearing =
     awayBearing + state.enemies.length * spawns.goldenAngleRadians;
+  return pointOnRing(
+    arena.shape.centerTiles,
+    spawns.placement.ringRadiusTiles,
+    bearing,
+  );
+}
+
+export function spawnEnemy(state: SimulationState): EnemyState | null {
+  const { spawns, arena } = state.config;
+  if (state.enemies.length >= spawns.maxConcurrent) return null;
   const enemy = createEnemy(
     state.config,
     spawns.archetypeId,
     state.nextEnemyId++,
     state.elapsedSeconds,
-    pointOnRing(arena.centerTiles, spawns.ringRadiusTiles, bearing),
+    resolveSpawnPosition(state, spawns, arena),
   );
   state.enemies.push(enemy);
   resolveEntrySpawns(state, enemy, archetypeOf(state.config, spawns.archetypeId));
   return enemy;
+}
+
+/**
+ * Repositions the primary enemy to the encounter's spawn-placement
+ * resolution (step 40.2), used when a live drill switch forces a phase on a
+ * running attempt. Minions are despawned/respawned by phase machinery
+ * already and must not be touched here.
+ */
+export function repositionPrimaryEnemy(state: SimulationState): void {
+  const enemy = state.enemies.find(
+    (candidate) => candidate.archetypeId === state.config.primaryArchetypeId,
+  );
+  if (!enemy) return;
+  const resolved = resolveSpawnPosition(state, state.config.spawns, state.config.arena);
+  enemy.positionTiles = constrainBodyToArena(
+    archetypeOf(state.config, enemy.archetypeId).verticesTiles,
+    resolved,
+    state.config.arena,
+  );
 }
 
 /**
@@ -418,7 +464,7 @@ export function setDebugSettings(
 function constrainToArena(
   positionTiles: Vector2,
   verticesTiles: readonly Vector2[],
-  arena: CircularArena,
+  arena: Arena,
 ): Vector2 {
   return constrainBodyToArena(verticesTiles, positionTiles, arena);
 }
@@ -561,14 +607,14 @@ function advanceEnemyMovement(
     case "move-to-point":
       return movePointToward(
         enemy.positionTiles,
-        config.arena.centerTiles,
+        config.arena.shape.centerTiles,
         movement.speedTilesPerSecond * stepSeconds,
       );
     case "orbit":
       return advanceOrbitMovement(
         enemy,
         movement,
-        config.arena.centerTiles,
+        config.arena.shape.centerTiles,
         stepSeconds,
       );
     case "wander":
@@ -576,7 +622,7 @@ function advanceEnemyMovement(
         state,
         enemy,
         movement,
-        config.arena.centerTiles,
+        config.arena.shape.centerTiles,
         stepSeconds,
       );
   }
@@ -870,6 +916,31 @@ export function advanceSimulation(
     updateMovement(state, input);
     state.ticksElapsed++;
     state.elapsedSeconds = state.ticksElapsed * fixedStepSeconds;
+    // Honey occupancy is evaluated AFTER movement finalises this step's
+    // position, so the speed multiplier a step uses reflects contact
+    // accumulated BEFORE that step: entering honey slows the player starting
+    // the step after they first stood in it, the same one-step lag the
+    // condition model already has. Re-entry damages on the very first step
+    // inside (the clock resets to due-immediately on leaving), so dipping in
+    // and out is never cheaper than standing still.
+    if (
+      state.player.healthHp > 0 &&
+      currentPhase(state) === "playing" &&
+      honeyAt(state.config.arena, state.player.positionTiles)
+    ) {
+      state.player.honeyContactSeconds += fixedStepSeconds;
+      if (state.elapsedSeconds >= state.player.nextHoneyDamageAtSeconds) {
+        // No shard is involved, so 0 (never a real shard or enemy-contact
+        // id) tags the hit through the same shared path shards and enemy
+        // contact use.
+        applyAcceptedHit(state, 0, HONEY_DAMAGE_HP, true, [], acceptedHits);
+        state.player.nextHoneyDamageAtSeconds =
+          state.elapsedSeconds + HONEY_DAMAGE_INTERVAL_SECONDS;
+      }
+    } else if (currentPhase(state) === "playing") {
+      state.player.honeyContactSeconds = 0;
+      state.player.nextHoneyDamageAtSeconds = 0;
+    }
     applyProgression(state, fixedStepSeconds);
     applyPhaseTransitions(state);
     if (state.player.healthHp > 0 && currentPhase(state) === "playing")

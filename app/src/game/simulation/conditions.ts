@@ -3,6 +3,7 @@ import type {
   PlayerState,
   SimulationInput,
 } from "../models";
+import { honeySpeedMultiplier } from "./terrain";
 import {
   derivePlayerStats,
   PALADIN_DERIVED_STATS,
@@ -176,5 +177,12 @@ export function playerTravelTiles(
     : hasCondition(player, "slowed")
       ? SLOWED_SPEED_TILES_PER_SECOND
       : PALADIN_DERIVED_STATS.speedTilesPerSecond;
-  return speedTilesPerSecond * stepSeconds;
+  // Honey is a pure multiplier stacked on top of whatever the condition
+  // system already decided (paralyzed stays 0; slowed's reduced speed is
+  // further reduced) - it never sets a condition of its own.
+  const honeyMultiplier =
+    player.honeyContactSeconds > 0
+      ? honeySpeedMultiplier(player.honeyContactSeconds)
+      : 1;
+  return speedTilesPerSecond * honeyMultiplier * stepSeconds;
 }

@@ -21,10 +21,33 @@ export type DrillSelection = Readonly<{
   loop: boolean;
 }>;
 
-export type CircularArena = Readonly<{
-  centerTiles: Vector2;
-  radiusTiles: number;
-}>;
+/**
+ * An authored arena's outer boundary (W03/W05). The octagon's eight
+ * half-planes are derived once from `flatHalfWidthTiles`/`cornerSumTiles` by
+ * `octagonHalfPlanes` (simulation/geometry.ts), not stored here.
+ */
+export type ArenaShape =
+  | Readonly<{ kind: "circle"; centerTiles: Vector2; radiusTiles: number }>
+  | Readonly<{
+      kind: "octagon";
+      centerTiles: Vector2;
+      /** Distance from centre to each of the four axis-aligned flat sides. */
+      flatHalfWidthTiles: number;
+      /** The 45-degree corner faces, as |x| + |y| measured from centre (W03). */
+      cornerSumTiles: number;
+    }>;
+
+/** Everything an arena does not list is safe floor (W06). */
+export type TerrainRegion =
+  | Readonly<{ shape: "diamond"; halfDiagonalTiles: number }>
+  | Readonly<{ shape: "annulus"; innerRadiusTiles: number; outerRadiusTiles: number }>;
+
+export type HazardBand = Readonly<{ kind: "honey"; region: TerrainRegion }>;
+
+export type Arena = Readonly<{ shape: ArenaShape; hazards: readonly HazardBand[] }>;
+
+/** The shape union's circle member, so the Crystal Worm path is unchanged. */
+export type CircularArena = Extract<ArenaShape, { kind: "circle" }>;
 
 export type PrimaryStats = Readonly<{
   healthHp: number;
@@ -54,6 +77,10 @@ export type PlayerState = {
   combatRemainingSeconds: number;
   /** Remaining seconds per condition; 0 means not applied. */
   conditionSeconds: Record<ConditionKey, number>;
+  /** Seconds of unbroken honey contact; drives the W09 ramp, reset to 0 on leaving. */
+  honeyContactSeconds: number;
+  /** Simulation time the next honey tick is due; 0 means "due immediately" (W11). */
+  nextHoneyDamageAtSeconds: number;
 };
 
 /**

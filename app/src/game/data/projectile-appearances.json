@@ -1,6 +1,6 @@
 {
-  "comment": "Code-generated pixel appearances transcribed from the RealmEye Killer Bee Queen projectile table. Provenance: docs/projectile-appearance-source.md. No third-party image file is shipped.",
-  "pixelsPerTile": 12.8,
+  "comment": "Code-generated pixel appearances transcribed from the RealmEye Killer Bee Queen projectile table. Provenance: docs/projectile-appearance-source.md. pixelsPerTile is derived in docs/killer-bee-queen-geometry-source.md: 8 native pixels over a measured 0.889-tile ball. No third-party image file is shipped.",
+  "pixelsPerTile": 9.0,
   "templates": {
     "stinger-small": {
       "widthPixels": 7,
@@ -218,7 +218,8 @@
         "B": "#F1442E",
         "C": "#ED7842"
       },
-      "source": "row 15; EH Hive Spiral Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+      "sourceUpscale": 4,
+      "source": "row 15; EH Hive Spiral Shot; https://www.realmeye.com/wiki/killer-bee-queen; grid is a 4x render, see docs/killer-bee-queen-geometry-source.md"
     },
     "hive-range-shot": {
       "template": "hive-shot",
@@ -227,7 +228,8 @@
         "B": "#004F9F",
         "C": "#1EA9A1"
       },
-      "source": "row 16; EH Hive Range Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+      "sourceUpscale": 4,
+      "source": "row 16; EH Hive Range Shot; https://www.realmeye.com/wiki/killer-bee-queen; grid is a 4x render, see docs/killer-bee-queen-geometry-source.md"
     },
     "hive-shot": {
       "template": "hive-shot",
@@ -236,7 +238,8 @@
         "B": "#FFDF7F",
         "C": "#FFFFFF"
       },
-      "source": "row 17; EH Hive Shot; https://www.realmeye.com/wiki/killer-bee-queen"
+      "sourceUpscale": 4,
+      "source": "row 17; EH Hive Shot; https://www.realmeye.com/wiki/killer-bee-queen; grid is a 4x render, see docs/killer-bee-queen-geometry-source.md"
     },
     "bee-shot": {
       "template": "bee-shot",

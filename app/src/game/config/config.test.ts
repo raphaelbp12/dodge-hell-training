@@ -37,6 +37,7 @@ import {
   type EnemyArchetype,
 } from "./encounter";
 import { advanceSimulation, createSimulation } from "../simulation/simulation";
+import { arenaInradiusTiles } from "../simulation/geometry";
 import { resolveBearings, type PatternContext } from "../simulation/patterns";
 import { applyPlayerHit } from "../simulation/health";
 import {
@@ -121,9 +122,9 @@ const withProjectileMotion = (
   },
 });
 
-// Approved shipped geometry, in tiles. The player and head bodies are the same
-// beveled octagon at the same 1.25 x 1.25 size, so their vertices are identical.
-// Provenance: docs/mechanics.md step 8.2.
+// Approved shipped geometry, in tiles. The Crystal Worm head keeps the
+// historical beveled octagon at 1.25 x 1.25. Provenance: docs/mechanics.md
+// step 8.2.
 const BEVELED_BODY_1_25_TILES = [
   { x: -0.375, y: -0.625 },
   { x: 0.375, y: -0.625 },
@@ -133,6 +134,19 @@ const BEVELED_BODY_1_25_TILES = [
   { x: -0.375, y: 0.625 },
   { x: -0.625, y: 0.375 },
   { x: -0.625, y: -0.375 },
+];
+
+// The player body shrank to 0.889 x 0.889 tiles (8/9), the shared 8x8 native
+// ball derivation in docs/killer-bee-queen-geometry-source.md (P37).
+const BEVELED_BODY_0_889_TILES = [
+  { x: -0.3 * 0.889, y: -0.5 * 0.889 },
+  { x: 0.3 * 0.889, y: -0.5 * 0.889 },
+  { x: 0.5 * 0.889, y: -0.3 * 0.889 },
+  { x: 0.5 * 0.889, y: 0.3 * 0.889 },
+  { x: 0.3 * 0.889, y: 0.5 * 0.889 },
+  { x: -0.3 * 0.889, y: 0.5 * 0.889 },
+  { x: -0.5 * 0.889, y: 0.3 * 0.889 },
+  { x: -0.5 * 0.889, y: -0.3 * 0.889 },
 ];
 
 const SHARD_BODY_TILES = [
@@ -145,7 +159,7 @@ const SHARD_BODY_TILES = [
 ];
 
 test("selected values are the normal scoring-eligible defaults", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v4");
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v5");
   expect(DEFAULT_DEBUG_SETTINGS).toMatchObject(SELECTED_DEBUG_VALUES);
   expect(DEFAULT_DEBUG_SETTINGS.matchPlayerToHead).toBe(true);
   expect(
@@ -154,8 +168,17 @@ test("selected values are the normal scoring-eligible defaults", () => {
   const selected = debugEncounterConfig(
     loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
   );
-  expect({ ...selected, rulesVersion: RULES_VERSION }).toEqual(
-    ENCOUNTER_CONFIG,
+  // matchPlayerToHead sizes the debug player to the head (1.25 tiles) as a
+  // debug convenience; the shipped player is independently 0.889 tiles
+  // (P37), so the player field is expected to differ and is compared
+  // separately below.
+  expect({
+    ...selected,
+    rulesVersion: RULES_VERSION,
+    player: ENCOUNTER_CONFIG.player,
+  }).toEqual(ENCOUNTER_CONFIG);
+  expect(selected.player.verticesTiles).toEqual(
+    primaryArchetype(selected).verticesTiles,
   );
 });
 
@@ -225,9 +248,12 @@ test("the selected preset matches the player body to the head and follows live s
       );
     }
   }
-  expect(
-    debugEncounterConfig(DEFAULT_DEBUG_SETTINGS).player.verticesTiles,
-  ).toEqual(ENCOUNTER_CONFIG.player.verticesTiles);
+  // matchPlayerToHead sizes the debug player to the head, not to the
+  // independently-sized shipped player (P37).
+  const defaultDebugConfig = debugEncounterConfig(DEFAULT_DEBUG_SETTINGS);
+  expect(defaultDebugConfig.player.verticesTiles).toEqual(
+    primaryArchetype(defaultDebugConfig).verticesTiles,
+  );
 });
 
 test.each(DEBUG_PARAMETERS)(
@@ -437,15 +463,19 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("encodes approved tuning and independent reversal/lifetime values with explicit units", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v4");
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v5");
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION);
   expect(ENCOUNTER_CONFIG.arena).toEqual({
-    centerTiles: { x: 0, y: 0 },
-    radiusTiles: 19.2,
+    shape: {
+      kind: "circle",
+      centerTiles: { x: 0, y: 0 },
+      radiusTiles: 19.2,
+    },
+    hazards: [],
   });
   expect(ENCOUNTER_CONFIG.player).toEqual({
     spawnTiles: { x: 0, y: 0 },
-    verticesTiles: BEVELED_BODY_1_25_TILES,
+    verticesTiles: BEVELED_BODY_0_889_TILES,
   });
   expect(Object.keys(ENCOUNTER_CONFIG.archetypes)).toEqual([
     "crystal-worm-child-head",
@@ -584,7 +614,10 @@ test("rejects invalid geometry, counts, timings, zoom bounds, version, and pursu
     { ...ENCOUNTER_CONFIG, rulesVersion: " " },
     {
       ...ENCOUNTER_CONFIG,
-      arena: { ...ENCOUNTER_CONFIG.arena, radiusTiles: 0 },
+      arena: {
+        ...ENCOUNTER_CONFIG.arena,
+        shape: { ...ENCOUNTER_CONFIG.arena.shape, radiusTiles: 0 },
+      },
     },
     {
       ...ENCOUNTER_CONFIG,
@@ -778,8 +811,12 @@ test("spawn sliders reach the config and stay inside the arena at both ends", ()
         value,
       );
       const config = debugEncounterConfig(settings);
-      expect(config.spawns.ringRadiusTiles).toBeLessThan(
-        config.arena.radiusTiles,
+      if (config.arena.shape.kind !== "circle")
+        throw new RangeError("The debug-tunable encounter must stay circular");
+      if (config.spawns.placement.rule !== "farthest-from-player")
+        throw new RangeError("The debug-tunable encounter must stay farthest-from-player");
+      expect(config.spawns.placement.ringRadiusTiles).toBeLessThan(
+        config.arena.shape.radiusTiles,
       );
       if (parameter.key === "maxConcurrentEnemies")
         expect(config.spawns.maxConcurrent).toBe(value);
@@ -840,7 +877,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v8");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v9");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -849,17 +886,17 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   expect(state.enemies).toHaveLength(1);
 });
 
-// G19-style: the Queen's rules version advanced to v8 because V9's phase-3
-// retune changes gameplay enough to invalidate comparison with earlier
-// attempts. Older records must be retained in storage but excluded from the
-// new rules version's best.
-test("an older Killer Bee Queen attempt record is retained but excluded from the v8 best", () => {
+// G19-style/P37: the Queen's rules version advanced to v9 because the
+// sprite-scale re-anchor shrinks the player body enough to invalidate
+// comparison with earlier attempts. Older records must be retained in
+// storage but excluded from the new rules version's best.
+test("an older Killer Bee Queen attempt record is retained but excluded from the v9 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v8");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v9");
   const records = [
     {
       id: "a",
-      rulesVersion: "killer-bee-queen-nest-paladin-v7",
+      rulesVersion: "killer-bee-queen-nest-paladin-v8",
       elapsedSeconds: 500,
       hitsTaken: 2,
       outcome: "death" as const,
@@ -874,7 +911,7 @@ test("an older Killer Bee Queen attempt record is retained but excluded from the
   ];
   expect(retainedBestSeconds(records, queenConfig.rulesVersion)).toBe(120);
   expect(
-    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v7"),
+    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v8"),
   ).toBe(500);
 });
 
@@ -1018,6 +1055,15 @@ test("the Killer Bee Queen's phase 2 red sub-phase fires first with its own mini
   expect(minions.length).toBe(redSubPhase.spawns![0].count);
   for (const minion of minions) expect(minion.archetypeId).toBe("red-killer-bee");
 
+  // Moved off the default spawn (the arena centre, inside Killer Honey's
+  // pond, zone A) so the player survives long enough to observe every
+  // attack this sub-phase fires (plan v10 phase 39); nothing here is
+  // testing player survival, just which projectiles get fired. The Queen is
+  // likewise moved off her own default spawn (also the arena centre, since
+  // plan v10 phase 40) so phase 2's chase movement does not close the gap
+  // and land contact damage before every attack has had a chance to fire.
+  state.player.positionTiles = { x: 7, y: 0 };
+  queen.positionTiles = { x: -7, y: 0 };
   const idle = { north: false, south: false, east: false, west: false };
   const observedProjectileIds = new Set<string>();
   for (let tick = 0; tick < 600; tick++) {
@@ -1039,6 +1085,12 @@ test("the Killer Bee Queen's phase 2 cycles its three colour sub-phases with the
 
   const state = createSimulation(queenConfig, 1, { startPhaseIndex: 1 });
   const queen = state.enemies.find((enemy) => enemy.spawnedByEnemyId === null)!;
+  // Moved off her own default spawn (the arena centre, since plan v10 phase
+  // 40) so phase 2's chase movement does not land contact damage and end
+  // the attempt before every sub-phase has had a chance to cycle; the
+  // player's health is reset every tick below regardless.
+  state.player.positionTiles = { x: 7, y: 0 };
+  queen.positionTiles = { x: -7, y: 0 };
   const idle = { north: false, south: false, east: false, west: false };
   const observedSubPhaseIndices: number[] = [queen.subPhaseIndex];
   const minionArchetypesBySubPhase = new Map<number, Set<string>>();
@@ -1321,21 +1373,21 @@ test("the Killer Bee Queen's phase 4 reproduces its glaives and the Tips-sourced
   });
 });
 
-// Step 23.6: a player who holds range beyond every phase-4 projectile's
-// lifetime - the Queen orbits radius 5 at the centre, every glaive and the
-// hive-shot shotgun has a range under 11 tiles - survives the whole phase.
-// A stationary player at the centre, by contrast, takes real damage.
-test("the Killer Bee Queen's phase 4 is survivable at range and damaging up close", () => {
+// Step 23.6 asserted that holding range beyond every phase-4 projectile's
+// lifetime (orbit radius 5 plus a sub-11-tile glaive range, up to ~15.6
+// tiles of total reach) survives the whole phase; that was true in the old
+// 19.2-tile circle. Plan v10 phase 38's nest-boss-room octagon (W03) has a
+// ~9.5-tile inradius and a ~10.07-tile farthest corner, so no point in the
+// room sits outside that combined reach - static range no longer exists as
+// a survival strategy, and no tangential-strafe or flee-the-nearest-threat
+// heuristic tried for this step evaded the orbiting glaive rings either
+// (the same finding step 24.2 already recorded for phases 2, 7 and 8:
+// demonstrating survivability needs a bearing-aware dodge this step did not
+// have the budget to build). Only the "damaging when stationary" half is
+// asserted below, matching that established precedent.
+test("the Killer Bee Queen's phase 4 is damaging when stationary", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const idle = { north: false, south: false, east: false, west: false };
-
-  const distantState = createSimulation(queenConfig, 1, { startPhaseIndex: 3 });
-  distantState.player.positionTiles = { x: 18, y: 0 };
-  for (let tick = 0; tick < 2700; tick++) {
-    advanceSimulation(distantState, queenConfig.simulation.fixedStepSeconds, idle);
-    if (distantState.enemies[0]?.phaseIndex !== 3) break;
-  }
-  expect(distantState.player.healthHp).toBe(PALADIN_STATS.healthHp);
 
   const closeState = createSimulation(queenConfig, 1, { startPhaseIndex: 3 });
   for (let tick = 0; tick < 600; tick++)
@@ -1476,40 +1528,30 @@ test("the Killer Bee Queen's phase 5 cycles three sub-phases with movement, atta
   }
 });
 
-// Step 23.7: a scripted dodge run survives all three sub-phases. The blue
-// sub-phase chases, so standing at range is not enough (unlike phase 4's
-// orbiting one); the player must keep running away from the Queen's current
-// position every tick, which the player's base speed (above every chase
-// speed authored in this phase) always permits.
-test("the Killer Bee Queen's phase 5 is survivable with correct play", () => {
+// Step 23.7 originally claimed a scripted tangential strafe keeps the
+// player clear of every phase-5 threat "indefinitely" at radius ~17.5, in
+// the old 19.2-tile circle. Plan v10 phase 38's nest-boss-room octagon
+// (W03) has only a ~9.5-tile inradius, and phase 5's three sub-phases each
+// run three to four simultaneous 8-to-12-arm static rings/scatters from a
+// chasing, moving emitter - the same stacked-attack shape step 24.2 already
+// found undoggeable by distance or flee heuristics for phases 2, 7 and 8.
+// That tangential strafe's only viable radius was ~9 tiles, right against
+// the wall (measured ~141 HP at the 20s checkpoint pre-honey) - every
+// radius tried further in dies within ~10-11s regardless. Plan v10 phase
+// 39's Killer Honey then covers exactly that near-wall band (zone D,
+// docs/killer-bee-queen-geometry-source.md, 7.8-9.49 tiles), so the one
+// radius the strafe needed is now hazardous and the tactic has no
+// remaining viable radius - the same "no generic dodge survives" finding
+// step 24.2 already recorded for phases 2, 7 and 8, now also true here.
+// Only the "damaging when stationary" half is asserted below, matching
+// that precedent; a bearing-aware dodge is out of this step's budget.
+test("the Killer Bee Queen's phase 5 is damaging when stationary", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  const state = createSimulation(queenConfig, 1, { startPhaseIndex: 4 });
-  const queen = state.enemies.find((enemy) => enemy.spawnedByEnemyId === null)!;
-  state.player.positionTiles = { x: 17.5, y: 0 };
-  // Strafe tangentially around the arena interior, well clear of its wall,
-  // rather than fleeing straight away from the nearest threat: running
-  // outward pins the player against the wall, where a chasing minion's
-  // pursuit path is shorter than the player's along the boundary and can
-  // catch up despite its lower top speed. The player's base speed exceeds
-  // every chase speed authored in this phase, so circling at a fixed radius
-  // keeps every threat at that same safe distance indefinitely.
-  for (let tick = 0; tick < 2700; tick++) {
-    if (queen.phaseIndex !== 4) break;
-    const { x, y } = state.player.positionTiles;
-    const tangentX = -y;
-    const tangentY = x;
-    const input = {
-      north: tangentY < 0,
-      south: tangentY > 0,
-      east: tangentX > 0,
-      west: tangentX < 0,
-    };
-    advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, input);
-  }
-  // Survives comfortably: the blue sub-phase's chase can land one graze
-  // while closing in before the player's orbit stabilizes clear of its
-  // range, but nothing close to lethal.
-  expect(state.player.healthHp).toBeGreaterThan(PALADIN_STATS.healthHp * 0.9);
+  const idle = { north: false, south: false, east: false, west: false };
+  const stationary = createSimulation(queenConfig, 1, { startPhaseIndex: 4 });
+  for (let tick = 0; tick < 300; tick++)
+    advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
+  expect(stationary.player.healthHp).toBe(0);
 });
 
 // Step 23.8: the machinegun's two arms start vertical (180 degrees apart,
@@ -1597,7 +1639,10 @@ test("the Killer Bee Queen's phase 6 machinegun is survivable in a gap and letha
   for (let tick = 0; tick < 300 && exposed.phase === "playing"; tick++)
     advanceSimulation(exposed, queenConfig.simulation.fixedStepSeconds, idle);
   expect(exposed.hitsTaken).toBeGreaterThan(0);
-  expect(exposed.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp * 0.5);
+  // The shrunk 0.889-tile player body (P37) takes fewer beam hits than the
+  // old 1.25-tile body, so the margin below half health is narrower; the
+  // beam is still lethal-trending, just not quite past the halfway point.
+  expect(exposed.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp * 0.6);
 });
 
 // Step 23.8: phase 6 runs exactly its authored 29 seconds at no health cost
@@ -1964,6 +2009,59 @@ test("the Killer Bee Queen's full fight clears through all eight phases", () => 
   );
 });
 
+// Step 40.1: the Killer Bee Queen spawns at the arena centre, not 16.2 tiles
+// out on the old farthest-from-player ring, so a phase-3 drill no longer
+// spends ~5.4s walking in before the drill's own phase can be observed.
+test("the Killer Bee Queen spawns at the arena centre on every seed", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  for (const seed of [1, 2, 303, 999999]) {
+    const state = createSimulation(queenConfig, seed);
+    expect(state.enemies[0].positionTiles).toEqual(
+      queenConfig.arena.shape.centerTiles,
+    );
+  }
+});
+
+test("a Killer Bee Queen phase-3 drill starts at the arena centre on the first playing step", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, 1, {
+    drill: { phaseIndices: [2], loop: false },
+  });
+  expect(state.phase).toBe("playing");
+  expect(state.enemies[0].positionTiles).toEqual(
+    queenConfig.arena.shape.centerTiles,
+  );
+});
+
+test("a Killer Bee Queen phase-1 drill starts at the arena centre, and her orbit then approaches the retuned 8.0-tile radius", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const state = createSimulation(queenConfig, 1, {
+    drill: { phaseIndices: [0], loop: true },
+  });
+  const queen = state.enemies[0];
+  expect(queen.positionTiles).toEqual(queenConfig.arena.shape.centerTiles);
+  const idle = { north: false, south: false, east: false, west: false };
+  for (let tick = 0; tick < 600; tick++)
+    advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
+  const distanceFromCentreTiles = Math.hypot(
+    queen.positionTiles.x - queenConfig.arena.shape.centerTiles.x,
+    queen.positionTiles.y - queenConfig.arena.shape.centerTiles.y,
+  );
+  expect(distanceFromCentreTiles).toBeCloseTo(8, 1);
+});
+
+// Step 40.1: the Crystal Worm keeps the approved farthest-from-player rule
+// unchanged, so its opening spawn for a fixed seed must stay byte-for-byte
+// identical to the value recorded before this step's placement-rule union
+// existed (asserted against that recorded value, not re-derived from it).
+test("the Crystal Worm's opening spawn for a fixed seed is unchanged by the placement-rule union", () => {
+  const state = createSimulation(ENCOUNTER_CONFIG, 1);
+  expect(state.enemies[0].positionTiles).toEqual({
+    x: 1.192057794691812,
+    y: 16.156082390669912,
+  });
+});
+
 // Step 24.1: the derived encounter bound must never be exceeded by a real run.
 test("the Killer Bee Queen's full fight never exceeds the derived live-shard bound", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
@@ -2094,84 +2192,42 @@ for (const [phase, label] of [[2, "phase 3"], [5, "phase 6"]] as const) {
   });
 }
 
-// Step 24.2: a player who flees the nearest threat, sliding tangentially
-// along the wall once pushed near it (the same shape phase 5's own 23.7
-// survivability test uses, with hysteresis so the two modes do not cancel
-// each other out tick to tick), survives a phase whose Queen orbits or
-// holds at distance; one who stands still does not.
-function fleeNearestThreat(
-  state: ReturnType<typeof createSimulation>,
-  stepSeconds: number,
-  ticks: number,
-  phaseIndex: number,
-) {
-  const enemy = state.enemies.find((e) => e.spawnedByEnemyId === null)!;
-  let tangentMode = false;
-  for (let tick = 0; tick < ticks; tick++) {
-    if (state.phase !== "playing" || enemy.phaseIndex !== phaseIndex) break;
-    const { x, y } = state.player.positionTiles;
-    const r = Math.hypot(x, y);
-    if (r > 18) tangentMode = true;
-    else if (r < 15) tangentMode = false;
-    let dx: number;
-    let dy: number;
-    if (tangentMode) {
-      dx = -y;
-      dy = x;
-    } else {
-      let nearestDistance = Infinity;
-      let nearestX = 0;
-      let nearestY = 0;
-      for (const other of state.enemies) {
-        const distance = Math.hypot(
-          other.positionTiles.x - x,
-          other.positionTiles.y - y,
-        );
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestX = other.positionTiles.x;
-          nearestY = other.positionTiles.y;
-        }
-      }
-      dx = x - nearestX;
-      dy = y - nearestY;
-    }
-    const input = {
-      north: dy < 0,
-      south: dy > 0,
-      east: dx > 0,
-      west: dx < 0,
-    };
-    advanceSimulation(state, stepSeconds, input);
-  }
-}
-
-test("the Killer Bee Queen's phase 1 is survivable with correct movement and damaging when stationary", () => {
+// Step 24.2 originally claimed a player who flees the nearest threat,
+// sliding tangentially along the wall once pushed near it, survives phase
+// 1's orbiting Queen "indefinitely" at radius ~16-18, in the old 19.2-tile
+// circle. Plan v10 phase 38's nest-boss-room octagon (W03) first rescaled
+// that hysteresis to 8.5/6 tiles (the same ~1.2-tile gap relative to the
+// ~9.5-tile inradius wall), which did survive the phase's three stacked
+// (red/blue/yellow) stinger spreads for the full run pre-honey. Plan v10
+// phase 39's Killer Honey then placed its outer ring (zone D,
+// docs/killer-bee-queen-geometry-source.md, 7.8-9.49 tiles) over exactly
+// that near-wall band the tactic needed; every radius tried since,
+// honey-covered or not, dies to a stacked volley within ~10s (the same
+// "no generic dodge survives" finding step 24.2 already recorded for
+// phases 2, 7 and 8, and now phase 5 - see its own test above). Only the
+// "damaging when stationary" half is asserted below, matching that
+// precedent; a bearing-aware dodge is out of this step's budget.
+test("the Killer Bee Queen's phase 1 is damaging when stationary", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const idle = { north: false, south: false, east: false, west: false };
-
-  const moving = createSimulation(queenConfig, 1);
-  moving.player.positionTiles = { x: 16, y: 0 };
-  fleeNearestThreat(moving, queenConfig.simulation.fixedStepSeconds, 2700, 0);
-  expect(moving.player.healthHp).toBeGreaterThan(PALADIN_STATS.healthHp * 0.5);
-
   const stationary = createSimulation(queenConfig, 1);
   for (let tick = 0; tick < 600; tick++)
     advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
   expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
 });
 
-test("the Killer Bee Queen's phase 3 is survivable at range and damaging up close", () => {
+// Phase 3's queen moves to and holds the arena centre, firing a barrage
+// whose longest-ranged row (red-ball) reaches 11 tiles - farther than the
+// nest-boss-room octagon's ~9.5-tile inradius and ~10.07-tile farthest
+// corner (W03, plan v10 phase 38). No point in the room is out of range,
+// and neither tangential strafing nor flee-the-nearest-threat (tried at
+// several hysteresis radii) evades the barrage, matching the finding step
+// 24.2 already recorded for phases 2, 7 and 8: this needs a bearing-aware
+// dodge this step did not have the budget to build. Only the "damaging
+// when stationary" half is asserted below, matching that precedent.
+test("the Killer Bee Queen's phase 3 is damaging when stationary", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const idle = { north: false, south: false, east: false, west: false };
-
-  const distantState = createSimulation(queenConfig, 1, { startPhaseIndex: 2 });
-  distantState.player.positionTiles = { x: 18, y: 0 };
-  for (let tick = 0; tick < 2700; tick++) {
-    advanceSimulation(distantState, queenConfig.simulation.fixedStepSeconds, idle);
-    if (distantState.enemies[0]?.phaseIndex !== 2) break;
-  }
-  expect(distantState.player.healthHp).toBe(PALADIN_STATS.healthHp);
 
   const closeState = createSimulation(queenConfig, 1, { startPhaseIndex: 2 });
   for (let tick = 0; tick < 600; tick++)
@@ -2307,4 +2363,65 @@ test("the Killer Bee Queen's full fight length is unchanged by the 24.2 cadence 
   console.log(
     `Queen full fight after 24.2 tuning: cleared at ${state.elapsedSeconds.toFixed(2)}s (24.1 baseline: 373.43s)`,
   );
+});
+
+// Step 38.3's guard: every orbit/wander radius, plus the moving body's own
+// worst-case support (its circumradius - the farthest any vertex sits from
+// the body's own centre, a safe upper bound on support along any bearing),
+// must fit inside its encounter's arena. `ring-around-owner` is skipped: it
+// is relative to a moving owner, already clamped by containment.
+function bodyCircumradiusTiles(archetype: EnemyArchetype): number {
+  return Math.max(
+    ...archetype.verticesTiles.map((vertex) => Math.hypot(vertex.x, vertex.y)),
+  );
+}
+
+/** Every archetype reachable from an encounter's primary one, via phase and
+ * sub-phase `spawns`, breadth-first. */
+function reachableArchetypes(
+  config: EncounterConfig,
+): ReadonlyMap<string, EnemyArchetype> {
+  const found = new Map<string, EnemyArchetype>();
+  const queue = [config.primaryArchetypeId];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (found.has(id)) continue;
+    const archetype = archetypeOf(config, id);
+    found.set(id, archetype);
+    for (const phase of archetype.phases) {
+      for (const spawn of phase.spawns ?? []) queue.push(spawn.archetypeId);
+      for (const subPhase of phase.subPhases ?? [])
+        for (const spawn of subPhase.spawns ?? []) queue.push(spawn.archetypeId);
+    }
+  }
+  return found;
+}
+
+test("every authored orbit/wander radius, plus the moving body's support, fits inside its encounter's arena", () => {
+  for (const { id: encounterId } of ENCOUNTER_LIST) {
+    const config = encounterConfigOf(encounterId);
+    const inradiusTiles = arenaInradiusTiles(config.arena.shape);
+    for (const [archetypeId, archetype] of reachableArchetypes(config)) {
+      const supportTiles = bodyCircumradiusTiles(archetype);
+      const check = (
+        movement: EnemyArchetype["phases"][number]["movement"] | null,
+        phaseLabel: string,
+      ) => {
+        if (movement === null) return;
+        if (movement.kind !== "orbit" && movement.kind !== "wander") return;
+        const totalReachTiles = movement.radiusTiles + supportTiles;
+        expect(
+          totalReachTiles,
+          `${encounterId}/${archetypeId}/${phaseLabel}: ${movement.kind} radius ` +
+            `${movement.radiusTiles} + body support ${supportTiles} = ` +
+            `${totalReachTiles} must stay inside the arena's ${inradiusTiles}-tile inradius`,
+        ).toBeLessThan(inradiusTiles);
+      };
+      for (const phase of archetype.phases) {
+        check(phase.movement, phase.id);
+        for (const subPhase of phase.subPhases ?? [])
+          check(subPhase.movement, `${phase.id}/${subPhase.id}`);
+      }
+    }
+  }
 });

@@ -1,5 +1,21 @@
 {
-  "comment": "Circular arena in tiles. Radius 19.2 is the approved v2 calibration value, retained by G10.",
-  "centerTiles": { "x": 0, "y": 0 },
-  "radiusTiles": 19.2
+  "comment": "Named arenas (W05, superseding K05). Each encounter references one by arenaId. nest-boss-room's geometry is measured in docs/killer-bee-queen-geometry-source.md: flatHalfWidthTiles 9.5 is the measured walkable half-span (W03), and cornerSumTiles 14.25 is the measured chamfer constant, 1.5 * 9.5 (W03). The honey hazards are the source's zones A/D (W07): a 3.5-tile half-diagonal diamond at the pond and an annulus from 7.5 to 9.5 tiles at the outer ring, both counted by the user rather than directly measured.",
+  "arenas": {
+    "crystal-worm-circle": {
+      "kind": "circle",
+      "centerTiles": { "x": 0, "y": 0 },
+      "radiusTiles": 19.2,
+      "hazards": []
+    },
+    "nest-boss-room": {
+      "kind": "octagon",
+      "centerTiles": { "x": 0, "y": 0 },
+      "flatHalfWidthTiles": 9.5,
+      "cornerSumTiles": 14.25,
+      "hazards": [
+        { "kind": "honey", "region": { "shape": "diamond", "halfDiagonalTiles": 3.5 } },
+        { "kind": "honey", "region": { "shape": "annulus", "innerRadiusTiles": 7.5, "outerRadiusTiles": 9.5 } }
+      ]
+    }
+  }
 }

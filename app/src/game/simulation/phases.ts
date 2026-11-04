@@ -8,7 +8,7 @@ import type {
   PhaseSpec,
 } from "../config/encounter";
 import type { AttackClockState, EnemyState } from "../models";
-import { pointOnRing } from "./geometry";
+import { arenaInradiusTiles, pointOnRing } from "./geometry";
 import { createEnemy, type SimulationState } from "./simulation";
 
 /** 1 for an archetype with no `health` block, so callers need one query for both kinds. */
@@ -118,11 +118,12 @@ function resolveSpawn(
   const center =
     spec.placement.kind === "ring-around-owner"
       ? owner.positionTiles
-      : state.config.arena.centerTiles;
+      : state.config.arena.shape.centerTiles;
   const radiusTiles =
     spec.placement.kind === "ring-around-owner"
       ? spec.placement.radiusTiles
-      : spec.placement.ringRadiusFraction * state.config.arena.radiusTiles;
+      : spec.placement.ringRadiusFraction *
+        arenaInradiusTiles(state.config.arena.shape);
   const baseBearingRadians =
     state.nextEnemyId * state.config.spawns.goldenAngleRadians;
   for (let index = 0; index < toSpawn; index++) {

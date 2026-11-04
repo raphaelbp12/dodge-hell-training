@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
   AUTHORED_APPEARANCES,
   AUTHORED_ARCHETYPES,
-  AUTHORED_ARENA,
+  AUTHORED_ARENAS,
   AUTHORED_PROJECTILES,
   AUTHORED_SHAPES,
   validateAppearances,
@@ -10,11 +10,12 @@ import {
   validateArchetypes,
   validateAttack,
   validateOutline,
-  validateArena,
+  validateArenaMap,
   validateProjectile,
   validateProjectiles,
   wavyDeviationTiles,
   loadOutline,
+  validateEncounterData,
 } from "./data";
 
 const CATALOG_IDS = new Set(["crystal-worm-child-shard"]);
@@ -52,11 +53,29 @@ const VALID_PROJECTILE = {
   motion: { kind: "boomerang", reversalAgeSeconds: 1.5, lifetimeSeconds: 3 },
 };
 
-test("authored arena matches the approved circular arena in tiles", () => {
-  expect(AUTHORED_ARENA).toEqual({
-    centerTiles: { x: 0, y: 0 },
-    radiusTiles: 19.2,
+test("both authored arenas load with their approved values (W05)", () => {
+  expect(AUTHORED_ARENAS["crystal-worm-circle"]).toEqual({
+    shape: {
+      kind: "circle",
+      centerTiles: { x: 0, y: 0 },
+      radiusTiles: 19.2,
+    },
+    hazards: [],
   });
+  const nest = AUTHORED_ARENAS["nest-boss-room"];
+  expect(nest.shape).toEqual({
+    kind: "octagon",
+    centerTiles: { x: 0, y: 0 },
+    flatHalfWidthTiles: 9.5,
+    cornerSumTiles: 14.25,
+  });
+  expect(nest.hazards).toEqual([
+    { kind: "honey", region: { shape: "diamond", halfDiagonalTiles: 3.5 } },
+    {
+      kind: "honey",
+      region: { shape: "annulus", innerRadiusTiles: 7.5, outerRadiusTiles: 9.5 },
+    },
+  ]);
 });
 
 test("authored outlines are normalized to a 1x1 tile box", () => {
@@ -79,27 +98,131 @@ test("loadOutline resolves a named outline and rejects an unknown name", () => {
   expect(() => loadOutline("no-such-shape")).toThrow(RangeError);
 });
 
-test("validateArena rejects malformed authored arenas", () => {
-  expect(() => validateArena({ centerTiles: { x: 0, y: 0 }, radiusTiles: 1 }))
-    .not.toThrow();
+const validCircleArena = {
+  arenas: {
+    a: {
+      kind: "circle",
+      centerTiles: { x: 0, y: 0 },
+      radiusTiles: 1,
+      hazards: [],
+    },
+  },
+};
+
+function octagonArenaWith(overrides: Record<string, unknown>) {
+  return {
+    arenas: {
+      a: {
+        kind: "octagon",
+        centerTiles: { x: 0, y: 0 },
+        flatHalfWidthTiles: 9.5,
+        cornerSumTiles: 14.25,
+        hazards: [],
+        ...overrides,
+      },
+    },
+  };
+}
+
+test("validateArenaMap resolves Crystal Worm to a circle and the Queen to an octagon", () => {
+  expect(validateArenaMap(validCircleArena).a.shape.kind).toBe("circle");
+  expect(validateArenaMap(octagonArenaWith({})).a.shape.kind).toBe("octagon");
+});
+
+test("validateArenaMap rejects an empty arena map and a malformed single arena", () => {
+  expect(() => validateArenaMap({ arenas: {} })).toThrow(RangeError);
+  expect(() => validateArenaMap(validCircleArena)).not.toThrow();
   for (const bad of [
     undefined,
     null,
     42,
-    {},
-    { centerTiles: { x: 0, y: 0 } },
-    { radiusTiles: 1 },
-    { centerTiles: { x: 0 }, radiusTiles: 1 },
-    { centerTiles: { x: 0, y: 0 }, radiusTiles: 0 },
-    { centerTiles: { x: 0, y: 0 }, radiusTiles: -1 },
-    { centerTiles: { x: 0, y: 0 }, radiusTiles: Number.NaN },
-    { centerTiles: { x: Number.POSITIVE_INFINITY, y: 0 }, radiusTiles: 1 },
-    { centerTiles: { x: "0", y: 0 }, radiusTiles: 1 },
+    { arenas: {} },
+    { arenas: { a: {} } },
+    { arenas: { a: { kind: "circle", centerTiles: { x: 0, y: 0 } } } },
+    {
+      arenas: {
+        a: {
+          kind: "circle",
+          centerTiles: { x: 0, y: 0 },
+          radiusTiles: 0,
+          hazards: [],
+        },
+      },
+    },
+    {
+      arenas: {
+        a: {
+          kind: "circle",
+          centerTiles: { x: 0, y: 0 },
+          radiusTiles: -1,
+          hazards: [],
+        },
+      },
+    },
+    { arenas: { a: { kind: "sphere", centerTiles: { x: 0, y: 0 } } } },
+    octagonArenaWith({ cornerSumTiles: 9.5 }),
+    octagonArenaWith({ cornerSumTiles: 9.49 }),
+    octagonArenaWith({ cornerSumTiles: 19 }),
+    octagonArenaWith({ cornerSumTiles: 19.01 }),
   ]) {
-    expect(() => validateArena(bad), `arena ${JSON.stringify(bad)}`).toThrow(
+    expect(() => validateArenaMap(bad), `arena ${JSON.stringify(bad)}`).toThrow(
       RangeError,
     );
   }
+  // 14.25 / 9.5 is exactly the approved authored pair and must pass.
+  expect(() => validateArenaMap(octagonArenaWith({}))).not.toThrow();
+});
+
+test("validateArenaMap validates the nest-boss-room's hazards", () => {
+  expect(() =>
+    validateArenaMap(
+      octagonArenaWith({
+        hazards: [{ kind: "honey", region: { shape: "diamond", halfDiagonalTiles: 0 } }],
+      }),
+    ),
+  ).toThrow(RangeError);
+  expect(() =>
+    validateArenaMap(
+      octagonArenaWith({
+        hazards: [
+          {
+            kind: "honey",
+            region: { shape: "annulus", innerRadiusTiles: 5, outerRadiusTiles: 5 },
+          },
+        ],
+      }),
+    ),
+  ).toThrow(RangeError);
+  expect(() =>
+    validateArenaMap(
+      octagonArenaWith({
+        hazards: [
+          {
+            kind: "honey",
+            region: { shape: "annulus", innerRadiusTiles: 0, outerRadiusTiles: 20 },
+          },
+        ],
+      }),
+    ),
+  ).toThrow(RangeError);
+  expect(() =>
+    validateArenaMap(octagonArenaWith({ hazards: [{ kind: "ice", region: {} }] })),
+  ).toThrow(RangeError);
+  const nest = validateArenaMap(
+    octagonArenaWith({
+      hazards: [
+        { kind: "honey", region: { shape: "diamond", halfDiagonalTiles: 3.5 } },
+        {
+          kind: "honey",
+          region: { shape: "annulus", innerRadiusTiles: 7.5, outerRadiusTiles: 9.5 },
+        },
+      ],
+    }),
+  ).a;
+  expect(nest.hazards.map((hazard) => hazard.region.shape)).toEqual([
+    "diamond",
+    "annulus",
+  ]);
 });
 
 test("validateOutline enforces the 3-to-8 vertex 1x1 contract", () => {
@@ -128,8 +251,18 @@ test("validateOutline enforces the 3-to-8 vertex 1x1 contract", () => {
 });
 
 test("authored data names the offending path when it rejects", () => {
-  expect(() => validateArena({ centerTiles: { x: 0, y: 0 }, radiusTiles: 0 }))
-    .toThrow(/radiusTiles/);
+  expect(() =>
+    validateArenaMap({
+      arenas: {
+        a: {
+          kind: "circle",
+          centerTiles: { x: 0, y: 0 },
+          radiusTiles: 0,
+          hazards: [],
+        },
+      },
+    }),
+  ).toThrow(/radiusTiles/);
   expect(() => loadOutline("missing")).toThrow(/missing/);
 });
 
@@ -694,11 +827,69 @@ test.each([
   ).toThrow(RangeError);
 });
 
-test("the appearance catalog covers 19 families with 7 templates at 12.8 pixels per tile", () => {
-  expect(AUTHORED_APPEARANCES.pixelsPerTile).toBe(12.8);
+test("the appearance catalog covers 19 families with 7 templates at 9.0 pixels per tile", () => {
+  expect(AUTHORED_APPEARANCES.pixelsPerTile).toBe(9.0);
   expect(Object.keys(AUTHORED_APPEARANCES.appearances)).toHaveLength(19);
   expect(Object.keys(AUTHORED_APPEARANCES.templates)).toHaveLength(7);
 });
+
+test("sourceUpscale defaults to 1 when absent and is set on the three hive appearances", () => {
+  for (const id of Object.keys(AUTHORED_APPEARANCES.appearances)) {
+    const expected = id.startsWith("hive-") ? 4 : 1;
+    expect(AUTHORED_APPEARANCES.appearances[id]!.sourceUpscale).toBe(expected);
+  }
+});
+
+test.each([0, -1, 1.5, "4"])(
+  "validateAppearances rejects a sourceUpscale of %p",
+  (bad) => {
+    const base = {
+      pixelsPerTile: 9.0,
+      templates: {
+        "stinger-small": { widthPixels: 1, heightPixels: 1, rows: ["A"] },
+        "stinger-large": { widthPixels: 1, heightPixels: 1, rows: ["."] },
+        ball: { widthPixels: 1, heightPixels: 1, rows: ["."] },
+        glaive: { widthPixels: 1, heightPixels: 1, rows: ["."] },
+        "hive-shot": { widthPixels: 1, heightPixels: 1, rows: ["."] },
+        "bee-shot": { widthPixels: 1, heightPixels: 1, rows: ["."] },
+        "bomb-explosion": { frameOuterPixels: [3], borderPixels: 1 },
+      },
+      appearances: Object.fromEntries(
+        [
+          "red-stinger-small",
+          "red-stinger-large",
+          "yellow-stinger-small",
+          "yellow-stinger-large",
+          "blue-stinger-small",
+          "blue-stinger-large",
+          "red-ball",
+          "yellow-ball",
+          "blue-ball",
+          "red-glaive",
+          "yellow-glaive",
+          "blue-glaive",
+          "hive-spiral-shot",
+          "hive-range-shot",
+          "hive-shot",
+          "bee-shot",
+          "red-bomb",
+          "white-bomb",
+          "blue-bomb",
+        ].map((id) => [
+          id,
+          {
+            template: id.includes("bomb") ? "bomb-explosion" : "stinger-small",
+            palette: { A: "#000000" },
+            source: "test",
+            ...(id === "red-stinger-small" ? { sourceUpscale: bad } : {}),
+            ...(id.includes("bomb") ? { bodyColor: "#000000" } : {}),
+          },
+        ]),
+      ),
+    };
+    expect(() => validateAppearances(base)).toThrow(RangeError);
+  },
+);
 
 test("every Killer Bee Queen projectile names an appearance, and the Crystal Worm keeps its body", () => {
   const queenIds = Object.keys(AUTHORED_PROJECTILES).filter(
@@ -893,3 +1084,103 @@ test("validateProjectile requires exactly one of body or appearance", () => {
     ),
   ).toThrow(/defined appearance/);
 });
+
+// Step 40.1: the encounter-level spawn placement is a rule union - the
+// approved farthest-from-player ring (unchanged) or the new arena-center rule.
+function minimalEncounterData(placement: unknown) {
+  return {
+    maxConcurrentMinions: 12,
+    simulation: { fixedStepHz: 60, maxStepsPerUpdate: 8 },
+    player: {
+      spawnTiles: { x: 0, y: 0 },
+      body: { shape: "beveled-octagon", widthTiles: 0.889, heightTiles: 0.889 },
+    },
+    camera: {
+      cssPixelsPerTile: 32,
+      defaultZoom: 1,
+      minZoom: 0.25,
+      maxZoom: 3,
+      zoomStep: 0.125,
+    },
+    presentation: { lobTelegraphSeconds: 0.3 },
+    defaultEncounter: "test-encounter",
+    encounters: {
+      "test-encounter": {
+        rulesVersion: "test-v1",
+        displayName: "Test Encounter",
+        primaryArchetype: "test-archetype",
+        arenaId: "test-arena",
+        spawns: {
+          archetype: "test-archetype",
+          firstSpawnSeconds: 0,
+          everySeconds: null,
+          maxConcurrent: 1,
+          placement,
+        },
+        session: {
+          startCountdownSeconds: 3,
+          retryCountdownSeconds: 0,
+          historyLimit: 100,
+        },
+      },
+    },
+  };
+}
+
+test("validateEncounterData accepts the farthest-from-player placement rule", () => {
+  const data = validateEncounterData(
+    minimalEncounterData({
+      rule: "farthest-from-player",
+      ringRadiusFraction: 0.84375,
+      goldenAngleDegrees: 137.5,
+    }),
+  );
+  expect(data.encounters["test-encounter"].spawns.placement).toEqual({
+    rule: "farthest-from-player",
+    ringRadiusFraction: 0.84375,
+    goldenAngleDegrees: 137.5,
+  });
+});
+
+test("validateEncounterData accepts the arena-center placement rule", () => {
+  const data = validateEncounterData(
+    minimalEncounterData({ rule: "arena-center" }),
+  );
+  expect(data.encounters["test-encounter"].spawns.placement).toEqual({
+    rule: "arena-center",
+  });
+});
+
+test("validateEncounterData rejects an unknown placement rule", () => {
+  expect(() =>
+    validateEncounterData(minimalEncounterData({ rule: "unknown-rule" })),
+  ).toThrow(RangeError);
+});
+
+test("validateEncounterData rejects arena-center carrying ringRadiusFraction", () => {
+  expect(() =>
+    validateEncounterData(
+      minimalEncounterData({ rule: "arena-center", ringRadiusFraction: 0.5 }),
+    ),
+  ).toThrow(RangeError);
+});
+
+test("validateEncounterData rejects arena-center carrying goldenAngleDegrees", () => {
+  expect(() =>
+    validateEncounterData(
+      minimalEncounterData({ rule: "arena-center", goldenAngleDegrees: 137.5 }),
+    ),
+  ).toThrow(RangeError);
+});
+
+test.each([
+  ["ringRadiusFraction", { rule: "farthest-from-player", goldenAngleDegrees: 137.5 }],
+  ["goldenAngleDegrees", { rule: "farthest-from-player", ringRadiusFraction: 0.5 }],
+] as const)(
+  "validateEncounterData rejects farthest-from-player missing %s",
+  (_name, placement) => {
+    expect(() =>
+      validateEncounterData(minimalEncounterData(placement)),
+    ).toThrow(RangeError);
+  },
+);

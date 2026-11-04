@@ -88,8 +88,9 @@
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "white",
           "movement": {
+            "comment": "W27: 8 tiles, retuned from the previous 10 which was calibrated against the old 19.2-tile circle.",
             "kind": "orbit",
-            "radiusTiles": 10,
+            "radiusTiles": 8,
             "degreesPerSecond": 20,
             "direction": "cw",
             "approachSpeedTilesPerSecond": 3
@@ -194,8 +195,9 @@
               "telegraphSeconds": 1,
               "invulnerableOnEnterSeconds": 0,
               "movement": {
+                "comment": "W27: 8 tiles, retuned from the previous 10 which was calibrated against the old 19.2-tile circle.",
                 "kind": "orbit",
-                "radiusTiles": 10,
+                "radiusTiles": 8,
                 "degreesPerSecond": 20,
                 "direction": "cw",
                 "approachSpeedTilesPerSecond": 3
@@ -2388,8 +2390,9 @@
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
           "movement": {
+            "comment": "W27: 8 tiles, retuned from the previous 16 which was calibrated against the old 19.2-tile circle.",
             "kind": "orbit",
-            "radiusTiles": 16,
+            "radiusTiles": 8,
             "degreesPerSecond": 5,
             "direction": "ccw",
             "approachSpeedTilesPerSecond": 3
@@ -2424,8 +2427,9 @@
           "invulnerableOnEnterSeconds": 0,
           "telegraphColor": "amber",
           "movement": {
+            "comment": "W27: 8 tiles, retuned from the previous 16 which was calibrated against the old 19.2-tile circle.",
             "kind": "orbit",
-            "radiusTiles": 16,
+            "radiusTiles": 8,
             "degreesPerSecond": 5,
             "direction": "ccw",
             "approachSpeedTilesPerSecond": 3

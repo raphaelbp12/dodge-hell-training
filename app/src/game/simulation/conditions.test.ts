@@ -175,13 +175,15 @@ test("arena containment holds for every movement-condition combination", () => {
             east: true,
             south: true,
           });
+          if (state.config.arena.shape.kind !== "circle")
+            throw new RangeError("The Crystal Worm's arena must stay circular");
           expect(
             convexBodyFitsCircle(
               transformBodyVertices(
                 state.config.player.verticesTiles,
                 state.player.positionTiles,
               ),
-              state.config.arena,
+              state.config.arena.shape,
             ),
           ).toBe(true);
         }
@@ -291,6 +293,8 @@ test("visibleConditions is empty for a fresh player", () => {
     healthHp: 1,
     combatRemainingSeconds: 0,
     conditionSeconds: createConditionSeconds(),
+    honeyContactSeconds: 0,
+    nextHoneyDamageAtSeconds: 0,
   };
   expect(visibleConditions(player)).toEqual([]);
 });
@@ -301,6 +305,8 @@ test("visibleConditions orders active before inert, matching declaration order, 
     healthHp: 1,
     combatRemainingSeconds: 0,
     conditionSeconds: createConditionSeconds(),
+    honeyContactSeconds: 0,
+    nextHoneyDamageAtSeconds: 0,
   };
   player.conditionSeconds.sick = 2.34;
   player.conditionSeconds.paralyzed = 1.0;

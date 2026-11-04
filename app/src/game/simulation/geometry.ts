@@ -1,5 +1,7 @@
 import { Matrix } from "@flatten-js/core";
-import type { CircularArena, Vector2 } from "../models";
+import type { Arena, ArenaShape, CircularArena, Vector2 } from "../models";
+
+type OctagonArena = Extract<ArenaShape, { kind: "octagon" }>;
 
 const minimumBodyVertexCount = 3;
 const maximumBodyVertexCount = 8;
@@ -317,6 +319,239 @@ function assertCircle(arena: CircularArena): void {
   }
 }
 
+/**
+ * An octagon's eight half-planes, derived once per authored shape (W03): the
+ * four axis-aligned flat sides at `flatHalfWidthTiles`, and the four 45-degree
+ * corner faces at `cornerSumTiles / sqrt(2)`. Cached per shape object so a
+ * step never re-derives them.
+ */
+type HalfPlane = Readonly<{ normal: Vector2; offsetTiles: number }>;
+
+const octagonHalfPlaneCache = new WeakMap<OctagonArena, readonly HalfPlane[]>();
+const inverseSqrt2 = Math.SQRT1_2;
+
+function assertOctagon(octagon: OctagonArena): void {
+  assertFiniteVector(octagon.centerTiles);
+  if (
+    !Number.isFinite(octagon.flatHalfWidthTiles) ||
+    octagon.flatHalfWidthTiles <= 0
+  ) {
+    throw new RangeError("Octagon flat half-width must be positive finite tiles");
+  }
+  if (
+    !Number.isFinite(octagon.cornerSumTiles) ||
+    octagon.cornerSumTiles <= octagon.flatHalfWidthTiles ||
+    octagon.cornerSumTiles >= 2 * octagon.flatHalfWidthTiles
+  ) {
+    throw new RangeError(
+      "Octagon corner sum must exceed the flat half-width and stay below twice it",
+    );
+  }
+}
+
+function octagonHalfPlanes(octagon: OctagonArena): readonly HalfPlane[] {
+  const cached = octagonHalfPlaneCache.get(octagon);
+  if (cached) return cached;
+  const diagonalOffsetTiles = octagon.cornerSumTiles * inverseSqrt2;
+  const halfPlanes: readonly HalfPlane[] = Object.freeze([
+    { normal: { x: 1, y: 0 }, offsetTiles: octagon.flatHalfWidthTiles },
+    { normal: { x: -1, y: 0 }, offsetTiles: octagon.flatHalfWidthTiles },
+    { normal: { x: 0, y: 1 }, offsetTiles: octagon.flatHalfWidthTiles },
+    { normal: { x: 0, y: -1 }, offsetTiles: octagon.flatHalfWidthTiles },
+    {
+      normal: { x: inverseSqrt2, y: inverseSqrt2 },
+      offsetTiles: diagonalOffsetTiles,
+    },
+    {
+      normal: { x: inverseSqrt2, y: -inverseSqrt2 },
+      offsetTiles: diagonalOffsetTiles,
+    },
+    {
+      normal: { x: -inverseSqrt2, y: inverseSqrt2 },
+      offsetTiles: diagonalOffsetTiles,
+    },
+    {
+      normal: { x: -inverseSqrt2, y: -inverseSqrt2 },
+      offsetTiles: diagonalOffsetTiles,
+    },
+  ]);
+  octagonHalfPlaneCache.set(octagon, halfPlanes);
+  return halfPlanes;
+}
+
+/** The inradius of any authored arena shape: the distance to its nearest wall. */
+export function arenaInradiusTiles(shape: ArenaShape): number {
+  if (shape.kind === "circle") {
+    assertCircle(shape);
+    return shape.radiusTiles;
+  }
+  assertOctagon(shape);
+  return Math.min(
+    ...octagonHalfPlanes(shape).map((plane) => plane.offsetTiles),
+  );
+}
+
+/** Support function `max(v . n)` over a body's own (already centred) vertices. */
+function bodySupport(
+  orientedLocalVerticesTiles: readonly Vector2[],
+  normal: Vector2,
+): number {
+  return Math.max(
+    ...orientedLocalVerticesTiles.map(
+      (vertex) => vertex.x * normal.x + vertex.y * normal.y,
+    ),
+  );
+}
+
+export function convexBodyFitsOctagon(
+  worldVerticesTiles: readonly Vector2[],
+  octagon: OctagonArena,
+): boolean {
+  validatedAxes(worldVerticesTiles);
+  assertOctagon(octagon);
+  const toleranceTiles = Math.max(
+    coordinateTolerance([...worldVerticesTiles, octagon.centerTiles]),
+    numericalRoundoffBudget * octagon.cornerSumTiles,
+  );
+  return octagonHalfPlanes(octagon).every((plane) => {
+    const supportTiles = Math.max(
+      ...worldVerticesTiles.map(
+        (vertex) =>
+          (vertex.x - octagon.centerTiles.x) * plane.normal.x +
+          (vertex.y - octagon.centerTiles.y) * plane.normal.y,
+      ),
+    );
+    return supportTiles <= plane.offsetTiles + toleranceTiles;
+  });
+}
+
+/** Dispatches containment on `shape.kind`; the only place outside the two
+ * shape-specific fit checks that needs to know both kinds exist. */
+export function convexBodyFitsArenaShape(
+  worldVerticesTiles: readonly Vector2[],
+  shape: ArenaShape,
+): boolean {
+  return shape.kind === "circle"
+    ? convexBodyFitsCircle(worldVerticesTiles, shape)
+    : convexBodyFitsOctagon(worldVerticesTiles, shape);
+}
+
+/**
+ * Clips a convex polygon (vertices in order) to the half-plane
+ * `v . normal <= offsetTiles`, by the Sutherland-Hodgman algorithm.
+ */
+function clipPolygonToHalfPlane(
+  polygon: readonly Vector2[],
+  normal: Vector2,
+  offsetTiles: number,
+): Vector2[] {
+  if (polygon.length === 0) return [];
+  const signedDistance = (point: Vector2): number =>
+    point.x * normal.x + point.y * normal.y - offsetTiles;
+  const output: Vector2[] = [];
+  for (let index = 0; index < polygon.length; index++) {
+    const current = polygon[index];
+    const next = polygon[(index + 1) % polygon.length];
+    const currentDistance = signedDistance(current);
+    const nextDistance = signedDistance(next);
+    if (currentDistance <= 0) output.push(current);
+    if ((currentDistance <= 0) !== (nextDistance <= 0)) {
+      const fraction = currentDistance / (currentDistance - nextDistance);
+      output.push({
+        x: current.x + (next.x - current.x) * fraction,
+        y: current.y + (next.y - current.y) * fraction,
+      });
+    }
+  }
+  return output;
+}
+
+/**
+ * The region a body's centre may occupy inside an octagon: the octagon's own
+ * half-planes, each moved inward by the body's support along that normal
+ * (W: step 38.2). Starts from a square comfortably larger than the octagon
+ * and clips it by all eight eroded half-planes in turn.
+ */
+function erodedOctagonPolygon(
+  orientedLocalVerticesTiles: readonly Vector2[],
+  octagon: OctagonArena,
+): readonly Vector2[] {
+  const halfSideTiles = 2 * octagon.cornerSumTiles;
+  let polygon: readonly Vector2[] = [
+    { x: -halfSideTiles, y: -halfSideTiles },
+    { x: halfSideTiles, y: -halfSideTiles },
+    { x: halfSideTiles, y: halfSideTiles },
+    { x: -halfSideTiles, y: halfSideTiles },
+  ];
+  for (const plane of octagonHalfPlanes(octagon)) {
+    const supportTiles = bodySupport(orientedLocalVerticesTiles, plane.normal);
+    polygon = clipPolygonToHalfPlane(
+      polygon,
+      plane.normal,
+      plane.offsetTiles - supportTiles,
+    );
+    if (polygon.length === 0) break;
+  }
+  return polygon;
+}
+
+function constrainBodyToOctagon(
+  orientedLocalVerticesTiles: readonly Vector2[],
+  candidatePositionTiles: Vector2,
+  octagon: OctagonArena,
+): Vector2 {
+  assertOctagon(octagon);
+  if (
+    !convexBodyFitsOctagon(orientedLocalVerticesTiles, {
+      ...octagon,
+      centerTiles: originTiles,
+    })
+  ) {
+    throw new RangeError(
+      "Body must fit at the octagon center before travel",
+    );
+  }
+  const polygon = erodedOctagonPolygon(orientedLocalVerticesTiles, octagon);
+  if (polygon.length === 0) {
+    throw new RangeError("Octagon contact exceeds representable geometry");
+  }
+  const offsetTiles = {
+    x: candidatePositionTiles.x - octagon.centerTiles.x,
+    y: candidatePositionTiles.y - octagon.centerTiles.y,
+  };
+  const toleranceTiles = Math.max(
+    coordinateTolerance([...orientedLocalVerticesTiles, offsetTiles]),
+    numericalRoundoffBudget * octagon.cornerSumTiles,
+  );
+  const inside = octagonHalfPlanes(octagon).every((plane) => {
+    const erodedOffsetTiles =
+      plane.offsetTiles - bodySupport(orientedLocalVerticesTiles, plane.normal);
+    return (
+      offsetTiles.x * plane.normal.x + offsetTiles.y * plane.normal.y <=
+      erodedOffsetTiles + toleranceTiles
+    );
+  });
+  if (inside) return candidatePositionTiles;
+  let nearest = polygon[0];
+  let nearestDistanceSquaredTiles = Infinity;
+  for (let index = 0; index < polygon.length; index++) {
+    const start = polygon[index];
+    const end = polygon[(index + 1) % polygon.length];
+    const closest = closestPointOnSegment(offsetTiles, start, end);
+    const deltaX = offsetTiles.x - closest.x;
+    const deltaY = offsetTiles.y - closest.y;
+    const distanceSquaredTiles = deltaX * deltaX + deltaY * deltaY;
+    if (distanceSquaredTiles < nearestDistanceSquaredTiles) {
+      nearestDistanceSquaredTiles = distanceSquaredTiles;
+      nearest = closest;
+    }
+  }
+  return {
+    x: octagon.centerTiles.x + nearest.x,
+    y: octagon.centerTiles.y + nearest.y,
+  };
+}
+
 function unitDirection(direction: Vector2): Vector2 {
   assertFiniteVector(direction);
   const length = Math.hypot(direction.x, direction.y);
@@ -432,7 +667,11 @@ export function maximumBodyCenterDistance(
   direction: Vector2,
   radiusTiles: number,
 ): number {
-  const centeredArena = { centerTiles: originTiles, radiusTiles };
+  const centeredArena = {
+    kind: "circle" as const,
+    centerTiles: originTiles,
+    radiusTiles,
+  };
   if (!convexBodyFitsCircle(orientedLocalVerticesTiles, centeredArena)) {
     throw new RangeError(
       "Body must fit at the circle center before radial travel",
@@ -467,7 +706,7 @@ export function pointOnRing(
   };
 }
 
-export function constrainBodyToArena(
+function constrainBodyToCircle(
   orientedLocalVerticesTiles: readonly Vector2[],
   candidatePositionTiles: Vector2,
   arena: CircularArena,
@@ -491,6 +730,27 @@ export function constrainBodyToArena(
     x: arena.centerTiles.x + direction.x * limitTiles,
     y: arena.centerTiles.y + direction.y * limitTiles,
   };
+}
+
+/** Clamps a body's centre inside an arena, dispatching on `arena.shape.kind`
+ * (W: step 38.2) - nothing else in the simulation learns about shapes. */
+export function constrainBodyToArena(
+  orientedLocalVerticesTiles: readonly Vector2[],
+  candidatePositionTiles: Vector2,
+  arena: Arena,
+): Vector2 {
+  assertFiniteVector(candidatePositionTiles);
+  return arena.shape.kind === "circle"
+    ? constrainBodyToCircle(
+        orientedLocalVerticesTiles,
+        candidatePositionTiles,
+        arena.shape,
+      )
+    : constrainBodyToOctagon(
+        orientedLocalVerticesTiles,
+        candidatePositionTiles,
+        arena.shape,
+      );
 }
 
 export function convexContactDistance(

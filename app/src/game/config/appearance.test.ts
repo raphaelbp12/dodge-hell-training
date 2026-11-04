@@ -5,12 +5,12 @@ import { encounterConfigOf, projectileOf } from "./encounter";
 const QUEEN = encounterConfigOf("killer-bee-queen");
 
 const expected = {
-  "red-stinger-small": { width: 7 / 12.8, height: 1 / 12.8, parts: 1 },
-  "red-stinger-large-v1": { width: 8 / 12.8, height: 5 / 12.8, parts: 5 },
-  "red-ball": { width: 8 / 12.8, height: 8 / 12.8, parts: 8 },
-  "red-glaive-v1": { width: 8 / 12.8, height: 8 / 12.8, parts: 14 },
-  "hive-spiral-shot-v1": { width: 49 / 12.8, height: 28 / 12.8, parts: 58 },
-  "bee-shot": { width: 8 / 12.8, height: 6 / 12.8, parts: 8 },
+  "red-stinger-small": { width: 7 / 9, height: 1 / 9, parts: 1 },
+  "red-stinger-large-v1": { width: 8 / 9, height: 5 / 9, parts: 5 },
+  "red-ball": { width: 8 / 9, height: 8 / 9, parts: 8 },
+  "red-glaive-v1": { width: 8 / 9, height: 8 / 9, parts: 14 },
+  "hive-spiral-shot-v1": { width: 49 / 36, height: 28 / 36, parts: 58 },
+  "bee-shot": { width: 8 / 9, height: 6 / 9, parts: 8 },
 } as const;
 
 test.each(Object.entries(expected))(
@@ -47,7 +47,7 @@ test("the opaque pixels are covered exactly once by the collision parts", () => 
     "bee-shot",
   ]) {
     const appearance = projectileOf(QUEEN, id).appearance!;
-    const scale = 12.8;
+    const scale = id === "hive-spiral-shot-v1" ? 36 : 9;
     const widthPixels = appearance.nativeWidthPixels;
     const heightPixels = appearance.nativeHeightPixels;
     const covered = Array.from({ length: heightPixels }, () =>
@@ -101,8 +101,8 @@ test("the body-part cap equals the largest authored compound body", () => {
 
 test("the small stinger is one exact 7 x 1 rectangle centred on the shard", () => {
   const part = projectileOf(QUEEN, "red-stinger-small").collisionPartsTiles[0]!;
-  const halfWidth = 7 / 12.8 / 2;
-  const halfHeight = 1 / 12.8 / 2;
+  const halfWidth = 7 / 9 / 2;
+  const halfHeight = 1 / 9 / 2;
   expect(part).toEqual([
     { x: -halfWidth, y: -halfHeight },
     { x: halfWidth, y: -halfHeight },

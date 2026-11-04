@@ -10,6 +10,8 @@ function player(): PlayerState {
     healthHp: 700,
     combatRemainingSeconds: 0,
     conditionSeconds: createConditionSeconds(),
+    honeyContactSeconds: 0,
+    nextHoneyDamageAtSeconds: 0,
   };
 }
 

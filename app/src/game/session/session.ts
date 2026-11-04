@@ -82,6 +82,20 @@ export class SessionController {
    * ended attempt cannot be resurrected. The abandoned attempt never produces a
    * result, so it cannot enter attempt history.
    */
+  /**
+   * `initialize` fully recreates the simulation, so the fresh primary enemy
+   * is already placed by `createSimulation`'s own `spawnEnemy` call, which
+   * resolves 40.1's placement rule (arena-center for the Queen, unchanged
+   * farthest-from-player for the Crystal Worm). A second, explicit
+   * `repositionPrimaryEnemy` pass here would be redundant for arena-center
+   * and actively harmful for farthest-from-player - it would re-derive the
+   * bearing with `state.enemies.length` already at 1 instead of 0, and, for
+   * a player exactly at the arena centre, consume an extra random draw -
+   * silently moving the Crystal Worm's spawn and breaking its `?seed=`
+   * reproduction. `repositionPrimaryEnemy` stays exported from the
+   * simulation module, tested on its own, for a future live-apply path that
+   * mutates a running attempt in place instead of recreating it.
+   */
   applyDrill(drill: DrillSelection | null): boolean {
     if (this.phase !== "playing" && this.phase !== "paused") return false;
     this.drillOptions = { drill };

@@ -5,10 +5,12 @@ import {
   primaryArchetype,
   projectileOf,
 } from "../config/encounter";
-import type { Vector2 } from "../models";
+import type { Arena, ArenaShape, Vector2 } from "../models";
 import {
+  arenaInradiusTiles,
   constrainBodyToArena,
   convexBodyFitsCircle,
+  convexBodyFitsOctagon,
   convexBodyOverlapsCircle,
   convexContactDistance,
   convexPartsBoundingRadiusTiles,
@@ -436,7 +438,9 @@ test("runs in Node without browser, storage or engine globals", () => {
   expect(sweptConvexOverlap(square, stationary, square, stationary)).toBe(true);
 });
 
-const arena = { centerTiles: stationary, radiusTiles: 5 };
+const arena = { kind: "circle" as const, centerTiles: stationary, radiusTiles: 5 };
+/** Wraps a circle shape as the full `Arena` `constrainBodyToArena` now takes. */
+const toArena = (shape: ArenaShape): Arena => ({ shape, hazards: [] });
 
 test("checks actual vertices for circular interior, contact and outside placements", () => {
   expect(convexBodyFitsCircle(square, arena)).toBe(true);
@@ -516,18 +520,26 @@ test("derives rotated corner contact from the same physical vertices", () => {
 });
 
 test("preserves radial candidate direction and interior positions in translated arenas", () => {
-  const translatedArena = { centerTiles: { x: 11, y: -8 }, radiusTiles: 5 };
+  const translatedArena = {
+    kind: "circle" as const,
+    centerTiles: { x: 11, y: -8 },
+    radiusTiles: 5,
+  };
   const interior = { x: 12, y: -7 };
-  expect(constrainBodyToArena(square, interior, translatedArena)).toEqual(
-    interior,
-  );
   expect(
-    constrainBodyToArena(square, translatedArena.centerTiles, translatedArena),
+    constrainBodyToArena(square, interior, toArena(translatedArena)),
+  ).toEqual(interior);
+  expect(
+    constrainBodyToArena(
+      square,
+      translatedArena.centerTiles,
+      toArena(translatedArena),
+    ),
   ).toEqual(translatedArena.centerTiles);
   const constrained = constrainBodyToArena(
     square,
     { x: 21, y: 2 },
-    translatedArena,
+    toArena(translatedArena),
   );
   expect(constrained.x - 11).toBeCloseTo(constrained.y + 8, 12);
   expect(
@@ -546,9 +558,9 @@ test("preserves radial candidate direction and interior positions in translated 
 });
 
 test("rejects outward movement while retaining tangential edge movement over repeated constraints", () => {
-  const edge = constrainBodyToArena(square, { x: 10, y: 0 }, arena);
+  const edge = constrainBodyToArena(square, { x: 10, y: 0 }, toArena(arena));
   expect(
-    constrainBodyToArena(square, { x: edge.x + 0.1, y: 0 }, arena),
+    constrainBodyToArena(square, { x: edge.x + 0.1, y: 0 }, toArena(arena)),
   ).toEqual(edge);
   let position = edge;
   for (let tick = 0; tick < 240; tick++) {
@@ -560,7 +572,7 @@ test("rejects outward movement while retaining tangential edge movement over rep
         x: position.x + (tangent.x / length) * 0.05,
         y: position.y + (tangent.y / length) * 0.05,
       },
-      arena,
+      toArena(arena),
     );
     expect(
       Math.hypot(next.x - position.x, next.y - position.y),
@@ -568,21 +580,30 @@ test("rejects outward movement while retaining tangential edge movement over rep
     expect(
       convexBodyFitsCircle(transformBodyVertices(square, next), arena),
     ).toBe(true);
-    expect(constrainBodyToArena(square, next, arena).x).toBeCloseTo(next.x, 12);
-    expect(constrainBodyToArena(square, next, arena).y).toBeCloseTo(next.y, 12);
+    expect(constrainBodyToArena(square, next, toArena(arena)).x).toBeCloseTo(
+      next.x,
+      12,
+    );
+    expect(constrainBodyToArena(square, next, toArena(arena)).y).toBeCloseTo(
+      next.y,
+      12,
+    );
     position = next;
   }
 });
 
 test("fits the approved north spawn and constrains both approved upright bodies", () => {
   const approvedArena = ENCOUNTER_CONFIG.arena;
+  if (approvedArena.shape.kind !== "circle")
+    throw new RangeError("Crystal Worm's arena must stay circular");
+  const approvedShape = approvedArena.shape;
   expect(
     convexBodyFitsCircle(
       transformBodyVertices(
         primaryArchetype(ENCOUNTER_CONFIG).verticesTiles,
         primaryArchetype(ENCOUNTER_CONFIG).spawnTiles,
       ),
-      approvedArena,
+      approvedShape,
     ),
   ).toBe(true);
   for (const body of [ENCOUNTER_CONFIG.player, primaryArchetype(ENCOUNTER_CONFIG)]) {
@@ -599,7 +620,7 @@ test("fits the approved north spawn and constrains both approved upright bodies"
       expect(
         convexBodyFitsCircle(
           transformBodyVertices(body.verticesTiles, position),
-          approvedArena,
+          approvedShape,
         ),
       ).toBe(true);
     }
@@ -613,7 +634,7 @@ test("rejects invalid circles, directions and bodies in containment and constrai
       RangeError,
     );
     expect(() =>
-      constrainBodyToArena(square, stationary, invalidArena),
+      constrainBodyToArena(square, stationary, toArena(invalidArena)),
     ).toThrow(RangeError);
     expect(() =>
       maximumBodyCenterDistance(square, { x: 1, y: 0 }, radiusTiles),
@@ -629,7 +650,7 @@ test("rejects invalid circles, directions and bodies in containment and constrai
     RangeError,
   );
   expect(() =>
-    constrainBodyToArena(square, { x: Number.NaN, y: 0 }, arena),
+    constrainBodyToArena(square, { x: Number.NaN, y: 0 }, toArena(arena)),
   ).toThrow(RangeError);
   expect(() =>
     convexBodyFitsCircle(square, {
@@ -639,9 +660,9 @@ test("rejects invalid circles, directions and bodies in containment and constrai
   ).toThrow(RangeError);
   for (const vertices of invalidBodies) {
     expect(() => convexBodyFitsCircle(vertices, arena)).toThrow(RangeError);
-    expect(() => constrainBodyToArena(vertices, stationary, arena)).toThrow(
-      RangeError,
-    );
+    expect(() =>
+      constrainBodyToArena(vertices, stationary, toArena(arena)),
+    ).toThrow(RangeError);
   }
 });
 
@@ -917,6 +938,208 @@ test("a single-part compound body agrees with the single-body sweep", () => {
     expect(
       sweptConvexPartsOverlap([part], displacement, other, { x: 0, y: 0 }),
     ).toBe(sweptConvexOverlap(part, displacement, other, { x: 0, y: 0 }));
+  }
+});
+
+// Octagon containment (W03, plan V10 step 38.2): the authored nest-boss-room
+// geometry (9.5-tile flat half-width, 14.25-tile corner sum) and a
+// 0.889-tile beveled-octagon body, matching the Nest's player body.
+const nestOctagon = {
+  kind: "octagon" as const,
+  centerTiles: { x: 0, y: 0 },
+  flatHalfWidthTiles: 9.5,
+  cornerSumTiles: 14.25,
+};
+const playerBodyTiles = 0.889;
+const octagonBody: readonly Vector2[] = beveledFixtureOutline.map(
+  ([horizontal, vertical]) => ({
+    x: horizontal * playerBodyTiles,
+    y: vertical * playerBodyTiles,
+  }),
+);
+const diagonalBearings = [
+  { x: 1, y: 1 },
+  { x: 1, y: -1 },
+  { x: -1, y: 1 },
+  { x: -1, y: -1 },
+];
+
+function withinEveryOctagonHalfPlane(
+  point: Vector2,
+  octagon: typeof nestOctagon,
+  supportTiles: number,
+  toleranceTiles = 1e-9,
+): boolean {
+  const planes = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+  ].map((normal) => ({ normal, offsetTiles: octagon.flatHalfWidthTiles }));
+  const diagonalOffsetTiles = octagon.cornerSumTiles * Math.SQRT1_2;
+  for (const normal of diagonalBearings) {
+    const length = Math.hypot(normal.x, normal.y);
+    planes.push({
+      normal: { x: normal.x / length, y: normal.y / length },
+      offsetTiles: diagonalOffsetTiles,
+    });
+  }
+  return planes.every(
+    (plane) =>
+      point.x * plane.normal.x + point.y * plane.normal.y <=
+      plane.offsetTiles - supportTiles + toleranceTiles,
+  );
+}
+
+test("octagon: leaves an interior candidate at the centre unchanged", () => {
+  const constrained = constrainBodyToArena(
+    octagonBody,
+    { x: 0, y: 0 },
+    toArena(nestOctagon),
+  );
+  expect(constrained).toEqual({ x: 0, y: 0 });
+});
+
+test.each([
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+])(
+  "octagon: clamps a far candidate along the flat axis %o to its own eroded offset, preserving the other coordinate",
+  (axis) => {
+    const supportTiles = Math.max(
+      ...octagonBody.map((vertex) => vertex.x * axis.x + vertex.y * axis.y),
+    );
+    const far = { x: axis.x * 100, y: axis.y * 100 };
+    const constrained = constrainBodyToArena(
+      octagonBody,
+      far,
+      toArena(nestOctagon),
+    );
+    const alongAxis = constrained.x * axis.x + constrained.y * axis.y;
+    expect(alongAxis).toBeCloseTo(
+      nestOctagon.flatHalfWidthTiles - supportTiles,
+      9,
+    );
+    // The coordinate perpendicular to the clamped axis is preserved at 0.
+    expect(constrained.x * (1 - Math.abs(axis.x))).toBeCloseTo(0, 9);
+    expect(constrained.y * (1 - Math.abs(axis.y))).toBeCloseTo(0, 9);
+  },
+);
+
+test.each(diagonalBearings)(
+  "octagon: clamps a far candidate along corner bearing %o inside every half-plane, not just one axis",
+  (bearing) => {
+    const length = Math.hypot(bearing.x, bearing.y);
+    const far = { x: (bearing.x / length) * 100, y: (bearing.y / length) * 100 };
+    const constrained = constrainBodyToArena(
+      octagonBody,
+      far,
+      toArena(nestOctagon),
+    );
+    expect(
+      convexBodyFitsOctagon(
+        transformBodyVertices(octagonBody, constrained),
+        nestOctagon,
+      ),
+    ).toBe(true);
+    // A naive per-axis clamp would land exactly on a flat-side offset along
+    // both axes, which crosses the corner face; assert every half-plane,
+    // including the diagonal ones, is actually satisfied.
+    expect(withinEveryOctagonHalfPlane(constrained, nestOctagon, 0)).toBe(
+      true,
+    );
+  },
+);
+
+test("octagon: leaves a candidate just inside the corner's start unchanged", () => {
+  // The eroded polygon's own corner: where the eroded flat half-plane meets
+  // the eroded diagonal half-plane, each offset inward by the body's support
+  // along its normal (W: step 38.2).
+  const supportAxisTiles = Math.max(...octagonBody.map((vertex) => vertex.x));
+  const supportDiagonalTiles = Math.max(
+    ...octagonBody.map((vertex) => (vertex.x + vertex.y) * Math.SQRT1_2),
+  );
+  const erodedFlatOffsetTiles =
+    nestOctagon.flatHalfWidthTiles - supportAxisTiles;
+  const erodedDiagonalOffsetTiles =
+    nestOctagon.cornerSumTiles * Math.SQRT1_2 - supportDiagonalTiles;
+  const cornerYTiles =
+    erodedDiagonalOffsetTiles * Math.SQRT2 - erodedFlatOffsetTiles;
+  const marginTiles = 0.05;
+  const candidate = {
+    x: erodedFlatOffsetTiles - marginTiles,
+    y: cornerYTiles - marginTiles,
+  };
+  expect(withinEveryOctagonHalfPlane(candidate, nestOctagon, 0, 1e-6)).toBe(
+    true,
+  );
+  expect(
+    constrainBodyToArena(octagonBody, candidate, toArena(nestOctagon)),
+  ).toEqual(candidate);
+});
+
+test("octagon: sliding along a flat wall preserves the tangential coordinate, proving nearest-point rather than radial projection", () => {
+  const supportTiles = Math.max(...octagonBody.map((vertex) => vertex.x));
+  const wallX = nestOctagon.flatHalfWidthTiles - supportTiles;
+  const beyondWall = { x: wallX + 5, y: 3 };
+  const constrained = constrainBodyToArena(
+    octagonBody,
+    beyondWall,
+    toArena(nestOctagon),
+  );
+  expect(constrained.x).toBeCloseTo(wallX, 9);
+  expect(constrained.y).toBeCloseTo(3, 9);
+});
+
+test("octagon: throws when the body cannot fit at the arena centre", () => {
+  const oversized = octagonBody.map((vertex) => ({
+    x: vertex.x * 50,
+    y: vertex.y * 50,
+  }));
+  expect(() =>
+    constrainBodyToArena(oversized, { x: 0, y: 0 }, toArena(nestOctagon)),
+  ).toThrow(RangeError);
+});
+
+test("convexBodyFitsOctagon rejects a body above the inradius and accepts the player body", () => {
+  const tooLarge = [
+    { x: -20, y: -20 },
+    { x: 20, y: -20 },
+    { x: 20, y: 20 },
+    { x: -20, y: 20 },
+  ];
+  expect(convexBodyFitsOctagon(tooLarge, nestOctagon)).toBe(false);
+  expect(
+    convexBodyFitsOctagon(
+      transformBodyVertices(octagonBody, { x: 0, y: 0 }),
+      nestOctagon,
+    ),
+  ).toBe(true);
+});
+
+test("the octagon's inradius is its flat half-width for the authored nest-boss-room geometry", () => {
+  expect(arenaInradiusTiles(nestOctagon)).toBeCloseTo(9.5, 12);
+});
+
+test("Crystal Worm's circle containment is unchanged by the octagon branch, across several bearings", () => {
+  for (const bearing of [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+    { x: -1, y: 0.5 },
+  ]) {
+    const length = Math.hypot(bearing.x, bearing.y);
+    const far = { x: (bearing.x / length) * 1000, y: (bearing.y / length) * 1000 };
+    const constrained = constrainBodyToArena(square, far, toArena(arena));
+    const limitTiles = maximumBodyCenterDistance(
+      square,
+      { x: bearing.x / length, y: bearing.y / length },
+      arena.radiusTiles,
+    );
+    expect(constrained.x).toBeCloseTo((bearing.x / length) * limitTiles, 9);
+    expect(constrained.y).toBeCloseTo((bearing.y / length) * limitTiles, 9);
   }
 });
 

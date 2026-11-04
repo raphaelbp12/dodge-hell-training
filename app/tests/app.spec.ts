@@ -2374,6 +2374,84 @@ test("a direct Queen ?phase= link starts the requested phase", async ({
   expect((await inspect(page)).enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
 });
 
+// Plan v10 phase 40: the Queen's phase-3 drill starts her at the arena
+// centre (step 40.1, replacing the old farthest-from-player 16.2-tile walk
+// in), and the centre sits inside Killer Honey's pond, so this one case also
+// re-verifies the pond's two already-implemented player-visible effects
+// (plan v10 phase 39) in the browser: flat 60 HP/1.0s damage while idle, and
+// the 0.75x speed multiplier measured by driving out of the pond onto safe
+// floor.
+test("a Queen phase-3 drill spawns her at the arena centre; the pond damages an idle player and slows a moving one", async ({
+  page,
+}) => {
+  await page.goto(
+    `./?seed=${NORTH_SEED}&encounter=killer-bee-queen&phase=2&loop=1`,
+  );
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await finishCountdown(page);
+  await expect
+    .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
+    .toBeGreaterThan(0);
+
+  const spawned = await inspect(page);
+  expect(spawned.enemies[0].positionTiles).toEqual({ x: 0, y: 0 });
+
+  // Idle in the pond (the player also spawns at the arena centre): health
+  // falls by exactly HONEY_DAMAGE_HP on each 1.0s tick, in step with hitsTaken.
+  const before = await inspect(page);
+  await expect
+    .poll(async () => (await inspect(page)).hitsTaken)
+    .toBeGreaterThan(before.hitsTaken);
+  const afterHit = await inspect(page);
+  expect(afterHit.hitsTaken).toBe(before.hitsTaken + 1);
+  // A wide-ish band, not an exact -60: passive regen keeps ticking between
+  // the hit landing and this real-time poll observing it.
+  expect(afterHit.player.healthHp).toBeLessThan(before.player.healthHp - 45);
+  expect(afterHit.player.healthHp).toBeGreaterThan(before.player.healthHp - 75);
+
+  // Drive east, measuring tiles/second first inside the pond (halfDiagonal
+  // 3.5 tiles) and then on the safe floor beyond it but short of the outer
+  // honey ring (7.5-9.5 tiles).
+  await page.keyboard.down("d");
+  // Skips past the initial step, where the player's and the Queen's bodies
+  // both start exactly at the arena centre and briefly separate, before
+  // timing the pond traversal.
+  await expect
+    .poll(async () => (await inspect(page)).player.positionTiles.x)
+    .toBeGreaterThan(1);
+  const pondStart = await inspect(page);
+  await expect
+    .poll(async () => (await inspect(page)).player.positionTiles.x)
+    .toBeGreaterThan(2.5);
+  const pondEnd = await inspect(page);
+  await expect
+    .poll(async () => (await inspect(page)).player.positionTiles.x)
+    .toBeGreaterThan(5.5);
+  const floorStart = await inspect(page);
+  await expect
+    .poll(async () => (await inspect(page)).player.positionTiles.x)
+    .toBeGreaterThan(7);
+  const floorEnd = await inspect(page);
+  await page.keyboard.up("d");
+
+  const pondTilesPerSecond =
+    (pondEnd.player.positionTiles.x - pondStart.player.positionTiles.x) /
+    (pondEnd.elapsedSeconds - pondStart.elapsedSeconds);
+  const floorTilesPerSecond =
+    (floorEnd.player.positionTiles.x - floorStart.player.positionTiles.x) /
+    (floorEnd.elapsedSeconds - floorStart.elapsedSeconds);
+  const speedRatio = pondTilesPerSecond / floorTilesPerSecond;
+  // The pond is only 3.5 tiles wide, so a window short enough to stay fully
+  // inside it also keeps the honey-entry one-step lag (the multiplier starts
+  // applying the step AFTER the player first stands in honey) a sizeable
+  // share of the measured distance, biasing this ratio above the flat 0.75.
+  // A wide band, not a tight match to 0.75, still demonstrates the pond
+  // measurably slows the player by something in the honey multiplier's
+  // authored 0.50-0.75 range rather than leaving speed unaffected.
+  expect(speedRatio).toBeLessThan(0.95);
+  expect(speedRatio).toBeGreaterThan(0.6);
+});
+
 test("the Home phase panel starts a two-phase one-shot drill at the first selected phase", async ({
   page,
 }) => {
