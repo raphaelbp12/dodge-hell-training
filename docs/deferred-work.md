@@ -229,6 +229,16 @@ Rules for this register:
 
 **Fidelity gap this leaves.** Seven of eight phases stay unmeasured, so the large majority of the 58 `trainer-authored` attack cadences remain invented values with no external source. The phase-to-projectile bindings the wiki cannot supply stay interpretations outside phase 3.
 
+### D23 - Per-Variant Hive Projectile Sizes
+
+**What.** Separate authored sizes for the three hive projectile families - `hive-spiral-shot`, `hive-range-shot` and `hive-shot` - instead of the single scale plan V10 gives all three.
+
+**Why deferred.** Deferred by explicit user decision on 2026-11-04, recorded as part of [plan V10](plan-v10.md)'s W18. V10's measurement corrected the hive grids from an apparent 49 x 28 at 1x to a 4x render of roughly 12.25 x 7, which brought every hive shot from a predicted 5.44 tiles down into the 1.07-1.44 tiles the screenshots show. Within that range the measurements fall into two clusters, about 1.9 x 1.3 tiles and about 2.9 x 2.2 tiles, and the user's own impression is that the size differs by phase. No screenshot supplied labels which cluster belongs to which variant, and the hive families fire in phases 5, 7 and 8 rather than the phase 3 that is best documented, so splitting them now would mean assigning two measured numbers to three families by guesswork.
+
+**Blocked on.** One labelled screenshot per hive variant - a red Hive Spiral Shot, a blue Hive Range Shot and a yellow Hive Shot, each identifiable and not overlapping another shot - measured against the same 51.5 px tile. The data shape needs nothing new: each appearance can already carry its own `sourceUpscale`, so this is a data change once the evidence exists.
+
+**Fidelity gap this leaves.** All three hive families render and collide at 1.361 x 0.778 tiles. If the two measured clusters really are two different in-game sizes, one or two of the three families is wrong by up to about 1.5x in each axis, and because V10's W19 keeps hitboxes sprite-derived, the error is in the hitbox as well as the art. It affects phases 5, 7 and 8 only.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

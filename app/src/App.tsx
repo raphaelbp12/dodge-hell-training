@@ -842,6 +842,9 @@ export default function App() {
                     Realm of the Mad God
                   </a>
                   <a href={REPOSITORY_URL}>Source code</a>
+                  {import.meta.env.DEV && (
+                    <a href="?tagger=1">Video tagger (dev)</a>
+                  )}
                 </nav>
                 <p className={styles.build}>
                   {(() => {
