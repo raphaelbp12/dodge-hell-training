@@ -1784,6 +1784,9 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.getByRole("button", { name: "Start", exact: true }).click();
     await expect(page.locator("canvas")).toHaveCount(1);
+    // Advance the fake clock instead of racing the real 3s countdown, which
+    // overran the default 5s expect timeout on the slower CI runner.
+    await finishCountdown(page);
     await expect(page.getByLabel("Survival time")).not.toHaveText("0.0 s");
     expect((await inspect(page)).keydownListeners).toBe(1);
     await page.getByRole("button", { name: "Home", exact: true }).click();
@@ -2028,10 +2031,9 @@ for (const phase of ["countdown", "playing", "paused"] as const) {
     await expect
       .poll(async () => (await inspect(page))?.sessionPhase)
       .toBe("countdown");
-    if (phase !== "countdown")
-      await expect
-        .poll(async () => (await inspect(page)).sessionPhase)
-        .toBe("playing");
+    // finishCountdown advances the fake clock deterministically; waiting on
+    // the real 3s countdown overran the default 5s expect timeout in CI.
+    if (phase !== "countdown") await finishCountdown(page);
     if (phase === "paused") await page.keyboard.press("Escape");
     const canvas = await page.locator("canvas").elementHandle();
     await page.keyboard.down("w");
@@ -2392,10 +2394,10 @@ test("a Queen phase-3 drill spawns her at the arena centre; the pond damages an 
     `./?seed=${NORTH_SEED}&encounter=killer-bee-queen&phase=2&loop=1`,
   );
   await page.getByRole("button", { name: "Start", exact: true }).click();
-  await finishCountdown(page);
-  await expect
-    .poll(async () => (await inspect(page))?.elapsedSeconds ?? 0)
-    .toBeGreaterThan(0);
+  // Leave the fake clock paused so every measurement advances the simulation
+  // by an exact 100ms slice instead of racing real-time poll latency, which
+  // made the speed ratio swing between 1.47 and 4.66 on the CI runner.
+  await finishCountdown(page, false);
 
   const spawned = await inspect(page);
   expect(spawned.enemies[0].positionTiles).toEqual({ x: 0, y: 0 });
@@ -2403,48 +2405,57 @@ test("a Queen phase-3 drill spawns her at the arena centre; the pond damages an 
   // Idle in the pond (the player also spawns at the arena centre): health
   // falls by exactly HONEY_DAMAGE_HP on each 1.0s tick, in step with hitsTaken.
   const before = await inspect(page);
-  await expect
-    .poll(async () => (await inspect(page)).hitsTaken)
-    .toBeGreaterThan(before.hitsTaken);
-  const afterHit = await inspect(page);
+  let afterHit = before;
+  for (
+    let slice = 0;
+    slice < 20 && afterHit.hitsTaken === before.hitsTaken;
+    slice++
+  ) {
+    await page.clock.runFor(100);
+    afterHit = await inspect(page);
+  }
   expect(afterHit.hitsTaken).toBe(before.hitsTaken + 1);
   // A wide-ish band, not an exact -60: passive regen keeps ticking between
-  // the hit landing and this real-time poll observing it.
+  // the hit landing and this sample observing it.
   expect(afterHit.player.healthHp).toBeLessThan(before.player.healthHp - 45);
   expect(afterHit.player.healthHp).toBeGreaterThan(before.player.healthHp - 75);
 
-  // Drive east, measuring tiles/second first inside the pond (halfDiagonal
-  // 3.5 tiles) and then on the safe floor beyond it but short of the outer
-  // honey ring (7.5-9.5 tiles).
+  // Drive east in fixed slices, measuring tiles/second inside the pond
+  // (halfDiagonal 3.5 tiles) and on the safe floor beyond it but short of the
+  // outer honey ring (7.5-9.5 tiles). Movement keys are only sampled while the
+  // arena itself holds focus.
+  await page
+    .getByRole("region", { name: "Encounter", exact: true })
+    .evaluate((element) => (element as HTMLElement).focus());
   await page.keyboard.down("d");
-  // Skips past the initial step, where the player's and the Queen's bodies
-  // both start exactly at the arena centre and briefly separate, before
-  // timing the pond traversal.
-  await expect
-    .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeGreaterThan(1);
-  const pondStart = await inspect(page);
-  await expect
-    .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeGreaterThan(2.5);
-  const pondEnd = await inspect(page);
-  await expect
-    .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeGreaterThan(5.5);
-  const floorStart = await inspect(page);
-  await expect
-    .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeGreaterThan(7);
-  const floorEnd = await inspect(page);
+  const samples: { x: number; elapsedSeconds: number }[] = [];
+  for (let slice = 0; slice < 40; slice++) {
+    await page.clock.runFor(100);
+    const { player, elapsedSeconds } = await inspect(page);
+    samples.push({ x: player.positionTiles.x, elapsedSeconds });
+    if (player.positionTiles.x > 7.2) break;
+  }
   await page.keyboard.up("d");
 
-  const pondTilesPerSecond =
-    (pondEnd.player.positionTiles.x - pondStart.player.positionTiles.x) /
-    (pondEnd.elapsedSeconds - pondStart.elapsedSeconds);
-  const floorTilesPerSecond =
-    (floorEnd.player.positionTiles.x - floorStart.player.positionTiles.x) /
-    (floorEnd.elapsedSeconds - floorStart.elapsedSeconds);
-  const speedRatio = pondTilesPerSecond / floorTilesPerSecond;
+  let pondDistance = 0;
+  let pondSeconds = 0;
+  let floorDistance = 0;
+  let floorSeconds = 0;
+  for (let index = 1; index < samples.length; index++) {
+    const from = samples[index - 1];
+    const to = samples[index];
+    const seconds = to.elapsedSeconds - from.elapsedSeconds;
+    if (seconds <= 0) continue;
+    const midpoint = (from.x + to.x) / 2;
+    if (midpoint > 0.5 && midpoint < 3.3) {
+      pondDistance += to.x - from.x;
+      pondSeconds += seconds;
+    } else if (midpoint > 3.7 && midpoint < 7.2) {
+      floorDistance += to.x - from.x;
+      floorSeconds += seconds;
+    }
+  }
+  const speedRatio = pondDistance / pondSeconds / (floorDistance / floorSeconds);
   // The pond is only 3.5 tiles wide, so a window short enough to stay fully
   // inside it also keeps the honey-entry one-step lag (the multiplier starts
   // applying the step AFTER the player first stands in honey) a sizeable
