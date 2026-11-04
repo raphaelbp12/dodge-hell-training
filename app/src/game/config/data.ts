@@ -680,6 +680,7 @@ const validTuningSources = [
   "approved-v3",
   "wiki-prose",
   "trainer-authored",
+  "video-observation",
 ] as const;
 
 export type AuthoredAttack = Readonly<{
@@ -912,7 +913,7 @@ export function validateAttack(
   if (!validTuningSources.includes(attack.tuningSource as never))
     reject(
       `${path}.tuningSource`,
-      'must be "approved-v3", "wiki-prose" or "trainer-authored"',
+      'must be "approved-v3", "wiki-prose", "trainer-authored" or "video-observation"',
     );
   return Object.freeze({
     id,

@@ -1,0 +1,144 @@
+/**
+ * Pure helpers for the dev-only tagger route (T13/T14).
+ *
+ * They live outside the React component so the query-string convention,
+ * frame-step arithmetic, key map and provenance assembly are unit-testable
+ * without a DOM or a video element. No React, Phaser, DOM or video API here.
+ */
+import type { VideoProvenance } from "./tagging";
+
+/**
+ * The tagger opts in through the same query-string convention as `?phase=`
+ * and `?encounter=`; `?tagger=1` is the whole switch (T14).
+ */
+export function isTaggerRequested(search: string): boolean {
+  return new URLSearchParams(search).get("tagger") === "1";
+}
+
+/**
+ * One frame at the typed rate (T19). The rate is a convenience for stepping
+ * only; recorded times always come from the frame callback's `mediaTime`.
+ */
+export function frameStepSeconds(frameRate: number): number {
+  if (!Number.isFinite(frameRate) || frameRate <= 0)
+    throw new RangeError("frameRate must be a positive finite number");
+  return 1 / frameRate;
+}
+
+/** T37: a coarse transport jump for reaching a region without frame stepping. */
+export const FINE_JUMP_SECONDS = 5;
+export const COARSE_JUMP_SECONDS = 30;
+
+export type TaggerAction =
+  | Readonly<{
+      kind: "frame-step";
+      direction: -1 | 1;
+      deltaSeconds: number;
+    }>
+  | Readonly<{ kind: "jump"; direction: -1 | 1; seconds: number }>
+  | Readonly<{ kind: "play-pause" }>
+  | Readonly<{ kind: "record" }>
+  | Readonly<{ kind: "set-shots"; shots: number }>;
+
+/**
+ * The one key map the route binds: arrows step one frame, Shift+arrows jump
+ * five seconds, PageUp/PageDown jump thirty, space toggles playback, Enter
+ * records, and 1-9 set the sticky shot count. Everything else belongs to the
+ * browser or another control.
+ */
+export function actionForKey(
+  key: string,
+  frameRate: number,
+  shiftKey = false,
+): TaggerAction | null {
+  if (shiftKey && key === "ArrowLeft")
+    return { kind: "jump", direction: -1, seconds: FINE_JUMP_SECONDS };
+  if (shiftKey && key === "ArrowRight")
+    return { kind: "jump", direction: 1, seconds: FINE_JUMP_SECONDS };
+  if (key === "PageUp")
+    return { kind: "jump", direction: -1, seconds: COARSE_JUMP_SECONDS };
+  if (key === "PageDown")
+    return { kind: "jump", direction: 1, seconds: COARSE_JUMP_SECONDS };
+  if (key === "ArrowLeft")
+    return {
+      kind: "frame-step",
+      direction: -1,
+      deltaSeconds: frameStepSeconds(frameRate),
+    };
+  if (key === "ArrowRight")
+    return {
+      kind: "frame-step",
+      direction: 1,
+      deltaSeconds: frameStepSeconds(frameRate),
+    };
+  if (key === " ") return { kind: "play-pause" };
+  if (key === "Enter") return { kind: "record" };
+  if (/^[1-9]$/.test(key)) return { kind: "set-shots", shots: Number(key) };
+  return null;
+}
+
+export type KeyTarget = Readonly<{
+  tagName?: string;
+  type?: string;
+  isContentEditable?: boolean;
+}>;
+
+/**
+ * A focused text-like field keeps its own keys; the tagger's shortcuts step
+ * aside. Radios and checkboxes are deliberately not editable: Enter should
+ * still record a tag after changing one with the mouse.
+ */
+export function isEditableTarget(target: KeyTarget | null): boolean {
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  const tagName = target.tagName?.toUpperCase();
+  if (tagName === "TEXTAREA" || tagName === "SELECT") return true;
+  if (tagName !== "INPUT") return false;
+  const type = target.type?.toLowerCase() ?? "text";
+  return !["radio", "checkbox", "button", "submit", "reset"].includes(type);
+}
+
+/**
+ * A focused control that activates on Enter or Space keeps that key so the
+ * user can operate the device without the tagger eating the activation. A
+ * radio or checkbox activates on Space only, which leaves Enter available to
+ * record a tag.
+ */
+export function isActivationTarget(
+  target: KeyTarget | null,
+  key: string,
+): boolean {
+  if (!target) return false;
+  const tagName = target.tagName?.toUpperCase();
+  if (tagName === "BUTTON" || tagName === "A" || tagName === "SUMMARY")
+    return key === "Enter" || key === " ";
+  if (tagName !== "INPUT") return false;
+  const type = target.type?.toLowerCase() ?? "text";
+  if (type === "radio" || type === "checkbox") return key === " ";
+  if (type === "button" || type === "submit" || type === "reset")
+    return key === "Enter" || key === " ";
+  return false;
+}
+
+/**
+ * Assembles the four provenance fields exactly (T18). `sourceUrl` is typed
+ * rather than discovered, so a blank field becomes `null` (a local-only
+ * recording) instead of an empty string that claims a source.
+ */
+export function buildProvenance(input: {
+  fileName: string;
+  durationSeconds: number;
+  sourceUrl: string;
+  frameRate: number;
+}): VideoProvenance {
+  const fileName = input.fileName.trim();
+  if (fileName.length === 0)
+    throw new RangeError("provenance.fileName must be a nonempty string");
+  const sourceUrl = input.sourceUrl.trim();
+  return {
+    sourceUrl: sourceUrl.length === 0 ? null : sourceUrl,
+    fileName,
+    frameRate: input.frameRate,
+    durationSeconds: input.durationSeconds,
+  };
+}

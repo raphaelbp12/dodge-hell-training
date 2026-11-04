@@ -109,6 +109,8 @@ Timing facts from [the source extract](killer-bee-queen-source.md)'s prose table
 - **T33 - Committed evidence in `docs/`,** created when it has content. No placeholder sections.
 - **T34 - A schema test over the committed JSON,** mirroring how the runtime data files are validated. Durable because T31 keeps validation structural.
 - **T35 - Excluded UI.** No frame-index display, no playback-rate control, no one-second jumps and no undo. Per-row delete on the tag list is the single correction mechanism.
+- **T36 - User waiver of the interval minimum (2026-11-03, after the gate measurement).** The user reviewed the 2-interval result and states that no available video shows five wave intervals and that this data is enough. The five-interval minimum is waived for this pilot; the 7.0 s mean and 0.0 s deviation are accepted as the gate evidence. This is an explicit user override of T02's consequence, not a claim that T02 was met. The second video the user offered (`https://www.youtube.com/watch?v=aTnAjcyzKPQ`, encounter at 6:40) was checked and its phase 3 is shorter - about 11 s, one interval - so it is not a substitute.
+- **T37 - Coarse transport jumps (2026-11-03, after phase 34).** The user asked for buttons that make bigger jumps because frame stepping through a nine-minute video is too slow. Add -5 s/+5 s and -30 s/+30 s buttons, with Shift+ArrowLeft/Right jumping 5 s and PageUp/PageDown jumping 30 s. This overrides T35's exclusion of larger transport for navigation; frame stepping remains the tagging step. A jump changes only the presented frame: recorded times still come from the `mediaTime` frame callback, and a jump marks the seek pending exactly as a frame step does.
 
 ## Architecture
 
@@ -195,24 +197,32 @@ export function summarizeTags(tags: readonly Tag[]): readonly IntervalSummary[];
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 33 | The Calibration Gate | pending | none |
-| 34 | The Tagger | pending | 33 |
-| 35 | The Phase-3 Measurement And Write-Up | pending | 34 |
+| 33 | The Calibration Gate | complete | none |
+| 34 | The Tagger | complete | 33 |
+| 35 | The Phase-3 Measurement And Write-Up | complete | 34 |
+
+> Phase 33's measurement found only 2 intervals in the first video's phase 3, below T02's minimum of 5, and the second video is shorter still. The user explicitly waived the minimum in T36 and accepted the 7.0 s mean and 0.0 s deviation. Phase 33 is complete under that waiver, not a T02 pass; phases 34 and 35 proceed on that recorded basis.
+
+## Recorded Correction - 2026-11-03
+
+The phase 35 tagged run measures the Red Glaive wave at **6.017 s** over two intervals (6.000 and 6.033, standard deviation 0.017) from 98 phase-3 tags. That is **0.983 s** below phase 33's approximate 7.0 s endpoint reading. The user re-watched the footage after the tagging run and confirms the waves are about 6 seconds apart. The tagged intervals agree to 33 ms, the tagger's resolution, so the reading points at the value taken from the wiki's prose, not at the tagger's clock.
+
+This is a correction to the calibration record, not a retroactive failure: phase 33's gate remains user-accepted under T36 at its recorded 7.0 s, and its archive is unchanged. Applying the measured value to the encounter is V9's decision, not V8's, and V8's T08 still forbids authored-data writes.
 
 ## Phase 33: The Calibration Gate
 
-Status: pending. Dependencies: none. Steps in [`docs/plan/phase-33.md`](plan/phase-33.md).
+Status: complete (user-accepted under T36). Dependencies: none. Steps in [`docs/plan-archive/phase-33.md`](plan-archive/phase-33.md).
 
-Establishes whether the video can yield trustworthy timings at all, by measuring phase 3's Red Glaive wave against the wiki's 7-second fact. No code.
+Establishes whether the video can yield trustworthy timings at all, by measuring phase 3's Red Glaive wave against the wiki's 7-second fact. No code. Complete: the first video's three-wave run gives a 7.0 s mean and a 0.0 s deviation; the run has only 2 intervals, below T02's minimum, and the user waived the minimum in T36. The second video is shorter and is not a substitute.
 
 ## Phase 34: The Tagger
 
-Status: pending. Dependencies: 33. Steps in [`docs/plan/phase-34.md`](plan/phase-34.md).
+Status: complete. Dependencies: 33. Steps in [`docs/plan-archive/phase-34.md`](plan-archive/phase-34.md).
 
-The `research/` boundary, the tag model and pure derivation, the dev-only route with frame-accurate timestamping, and the tagging surfaces.
+The `research/` boundary, the tag model and pure derivation, the dev-only route with frame-accurate timestamping, and the tagging surfaces. Complete: the pure model, structural validator and interval derivation, the `?tagger=1` development route with `mediaTime` timestamps, the 19-entry sprite picker, sticky tagging, readout and validated export were built and their four gates pass, and the route is absent from the production bundle. The phase rests on phase 33's user-accepted (T36) gate.
 
 ## Phase 35: The Phase-3 Measurement And Write-Up
 
-Status: pending. Dependencies: 34. Steps in [`docs/plan/phase-35.md`](plan/phase-35.md).
+Status: complete. Dependencies: 34. Steps in [`docs/plan-archive/phase-35.md`](plan-archive/phase-35.md).
 
-Performs the pilot measurement, commits the observations JSON and its written summaries, and records the tooling addition in the mechanics contract.
+Measured phase 3, committed the 98-tag export and its script-generated summaries, added the schema guard, and recorded the tooling addition. Complete: `docs/killer-bee-queen-observations.json` is the unedited export and passes structural validation; its markdown sibling has the seven sections and the T12 cross-check (tool 6.017 s, hand 7.0 s, difference 0.983 s); the schema test protects the committed file; `npm run verify` passed and the production build excludes the tagger.

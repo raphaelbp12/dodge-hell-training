@@ -517,6 +517,16 @@ test("validateAttack accepts the authored spiral-shards attack", () => {
   ).not.toThrow();
 });
 
+test("validateAttack accepts the video-observation tuning source", () => {
+  const attack = validateAttack(
+    { ...VALID_ATTACK, tuningSource: "video-observation" },
+    "attacks[0]",
+    CATALOG_IDS,
+    new Set(),
+  );
+  expect(attack.tuningSource).toBe("video-observation");
+});
+
 test("validateAttack rejects a duplicate id within the same archetype", () => {
   const seenIds = new Set(["spiral-shards"]);
   expect(() =>

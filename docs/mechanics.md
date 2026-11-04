@@ -795,3 +795,42 @@ Selector state - open state, selected phases and Loop - is session-only. It is n
 ### Verification
 
 The phase 32 acceptance matrix reran the drill, phase-machine, session, view, component and App suites plus the named Chromium cases. The full fight still clears at **373.43 s** with peak **119** live shards, **1,906** peak collision parts and **13** peak enemies, identical to V6; the Queen's full fight remains deterministic at 30/60/120 Hz and under step batching; `npm run verify` passed lint, typecheck, test (818 tests) and build; five targeted Chromium cases passed. No performance bound was relaxed, and the selector adds no per-frame simulation work.
+
+## Research Tooling - The Dev Tagger (Plan V8)
+
+This section records V8's measurement capability, not a gameplay rule. V8 adds no projectile, phase, condition, hitbox, encounter or cadence value, and it promotes none of D13, D19, D20, D21 or D22. The later V9 retune below is a separate decision taken from V8's evidence; it promotes D13 for phase 3 only.
+
+### The `research/` Boundary
+
+- `app/src/research/` owns the tag model, the pure interval derivation, the export schema and its structural validator, the appearance and phase option builders, and the dev-only tagger route.
+- The dependency is one-way: `research/` may import `game/config/`, and nothing under `game/` may import from `research/`.
+- `research/tagging.ts` is pure: no React, DOM, video API, file access, Phaser, simulation or session import.
+- `research/taggingOptions.ts` reads the encounter's authored phases and the resolved 19-entry appearance catalog through `game/config/`; it does not re-read or re-resolve authored JSON.
+
+### The Dev-Only Route
+
+- The tagger mounts only when `import.meta.env.DEV` is true and the URL carries `?tagger=1`. A production build contains no tagger component or chunk; the guard is the whole mechanism, with no second Vite entry point and no build-configuration change.
+- A local video is chosen at runtime through a file picker and its object URL is revoked on change and unmount. The video is never uploaded, written into the repository or committed (D17 is unrelated and stays open).
+- The displayed and recorded time is `requestVideoFrameCallback`'s `mediaTime`. `video.currentTime` is read only to choose a seek target for a non-recorded transport step. The typed frame rate sets the step size only.
+- T37 adds coarse -5 s/+5 s and -30 s/+30 s transport jumps for navigation, with Shift+Arrow and PageUp/PageDown equivalents. A jump is still a non-recorded seek; frame stepping remains the tagging step, and every recorded time continues to come from `mediaTime`.
+- Selection is sticky across tags: sprite-level appearance id, top-level phase, kind (`volley` or `rotating-arm`) and shot/arm count. Tags are spawn-only and top-level-phase-only. There is no variant picker, despawn tag, angle or rotation measurement, sub-phase field, phase-entry inference, import, resume or unload guard.
+- The only correction mechanism is per-row delete. No outlier detection, running mean or sample count is shown.
+
+### Evidence Files
+
+- When a pilot measurement exists, `docs/killer-bee-queen-observations.json` holds the unedited tool export: the encounter id, the four provenance fields, the ISO recording date and the raw tags. `docs/killer-bee-queen-observations.md` holds the summaries and their reading.
+- These files are cited evidence for a later decision, not runtime data. Nothing in the app reads them, and their validator is structural only: it does not check sprite ids, phase indices or tag times against the current configuration, so a later configuration change cannot invalidate a historically accurate observation.
+- The committed JSON carries raw tags and provenance only. Derived means and standard deviations belong in the markdown. T34's schema test now reads the committed JSON and fails if it stops passing structural validation; nothing at runtime reads the file.
+- The pilot is phase 3 only (D22). It made no cadence recommendation of its own; the retune below is a separate decision taken from that evidence.
+
+### The Phase-3 Retune (Plan V9)
+
+- Phase 3's seven attacks now cite `tuningSource: "video-observation"`, meaning their values were fitted from the tagged recording rather than estimated or taken from wiki prose. The evidence is [the observations JSON](killer-bee-queen-observations.json) and its [written reading](killer-bee-queen-observations.md).
+- Blue and red volleys repeat every 0.40 s. The two 3-arm blue spirals counter-rotate at ±37.5°/s from a 0° / 60° offset, so their arms interleave into six balls and coincide into three every fourth volley, a 1.6 s beat. Red remains a clockwise 2-arm spiral at its authored 40°/s because rotation rate is not recoverable from spawn tags (D20).
+- Yellow rings carry 8 balls every 2.50 s, the bee burst is a 4-way volley every 3.04 s, white bombs are 4 per volley every 3.23 s, and the Red Glaive wave is a 60-arm ring every 6.02 s.
+- White bombs are the one video-versus-wiki conflict: the footage shows four, while the source extract's "cardinal/intermediate directions" implies eight. The recording is the authority for this trainer, and the conflict is recorded in the phase's authored comment and the observations markdown.
+- The glaive wave's 6.02 s supersedes the wiki's "every 7 seconds" for this video. The user confirmed the footage shows about 6 s; the observation markdown and [plan V8](plan-v8.md) record the correction, and phase 33's original 7.0 s reading stays in its archive.
+- All seven attacks start on the phase epoch (`initialDelaySeconds` 0), so the opening volley is the one the recording shows. Red's rotation, the zero delays and the telegraph/movement stay trainer-authored.
+- The Queen's comparison identity advances to `killer-bee-queen-nest-paladin-v8`, because the denser phase invalidates time comparison with earlier attempts. Older attempts remain in history and are excluded from the new best by the existing exact-match rule.
+- D13 is resolved for phase 3. Its remaining scope is the other seven phases, which stay deferred under D22 because no measurement exists for them.
+- The real-browser phase-3 drill measured 3,519 frames over 60 s (sampled every 250 ms) at peak 112 live shards and 1,256 collision parts, with median 16 ms, p95 22 ms and a 76 ms maximum frame gap, against the derived encounter bounds of 1,571 shards and 91,118 parts. The pre-retune phase-3 figure was 50-52 shards / 416 parts and a 44-51 ms maximum, consistent with its old 60-shard bound, so the retune is about 2.2× the live shards. The full-fight headless run still peaks at 119 shards and 1,906 parts and clears at 373.43 s.

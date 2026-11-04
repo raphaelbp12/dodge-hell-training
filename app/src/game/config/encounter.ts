@@ -863,6 +863,14 @@ const STATIC_APPEARANCES: Readonly<Record<string, ProjectileAppearanceSpec>> =
     ),
   );
 
+/**
+ * The resolved sprite-level appearance catalog, exactly the 19 authored
+ * entries. Exported for the dev-only research tagger, which lists these ids
+ * rather than deriving or grouping its own sprite list (plan V8 T20). Nothing
+ * under `game/` reads from `research/`; this is a one-way outward view.
+ */
+export const PROJECTILE_APPEARANCES = STATIC_APPEARANCES;
+
 function projectileFromAuthored(authored: AuthoredProjectile): ProjectileSpec {
   const appearance = authored.appearance
     ? STATIC_APPEARANCES[authored.appearance]

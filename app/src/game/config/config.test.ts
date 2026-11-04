@@ -840,7 +840,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v7");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v8");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -849,17 +849,17 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   expect(state.enemies).toHaveLength(1);
 });
 
-// G19-style: the Queen's rules version advanced to v7 because the
-// sprite-derived hitboxes change gameplay enough to invalidate comparison
-// with earlier attempts. Older records must be retained in storage but
-// excluded from the new rules version's best.
-test("an older Killer Bee Queen attempt record is retained but excluded from the v7 best", () => {
+// G19-style: the Queen's rules version advanced to v8 because V9's phase-3
+// retune changes gameplay enough to invalidate comparison with earlier
+// attempts. Older records must be retained in storage but excluded from the
+// new rules version's best.
+test("an older Killer Bee Queen attempt record is retained but excluded from the v8 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v7");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v8");
   const records = [
     {
       id: "a",
-      rulesVersion: "killer-bee-queen-nest-paladin-v5",
+      rulesVersion: "killer-bee-queen-nest-paladin-v7",
       elapsedSeconds: 500,
       hitsTaken: 2,
       outcome: "death" as const,
@@ -874,7 +874,7 @@ test("an older Killer Bee Queen attempt record is retained but excluded from the
   ];
   expect(retainedBestSeconds(records, queenConfig.rulesVersion)).toBe(120);
   expect(
-    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v5"),
+    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v7"),
   ).toBe(500);
 });
 
@@ -1091,17 +1091,37 @@ test("the Killer Bee Queen's phase 3 fires two counter-rotating blue spirals", (
     if (attack.pattern.kind !== "ring") throw new Error("expected ring");
     return attack.pattern.clockwiseDegreesPerSecond;
   });
-  expect(rates[0]).toBeGreaterThan(0);
-  expect(rates[1]).toBeLessThan(0);
-  expect(Math.abs(rates[0])).toBe(Math.abs(rates[1]));
+  expect(rates).toEqual([37.5, -37.5]);
+  for (const ring of blueRings) {
+    if (ring.pattern.kind !== "ring") throw new Error("expected ring");
+    expect(ring.pattern.arms).toBe(3);
+    expect(ring.cadence.cooldownAfterLastShotSeconds).toBe(0.4);
+    expect(ring.cadence.shotsPerBurst).toBe(1);
+    expect(ring.cadence.initialDelaySeconds).toBe(0);
+  }
+  if (
+    blueRings[0].pattern.kind !== "ring" ||
+    blueRings[1].pattern.kind !== "ring"
+  )
+    throw new Error("expected rings");
+  expect(blueRings[0].pattern.initialPhaseRadians).toBe(0);
+  expect(blueRings[1].pattern.initialPhaseRadians).toBeCloseTo(
+    Math.PI / 3,
+    10,
+  );
+  const rate = Math.abs(blueRings[0].pattern.clockwiseDegreesPerSecond);
+  expect(120 / (2 * rate)).toBeCloseTo(1.6, 10);
+  expect((120 - 60) / (2 * rate)).toBeCloseTo(0.8, 10);
 });
 
-// Step 23.5: the red ring has exactly two arms and rotates clockwise; the
-// glaive wave fires at entry and then every 7 seconds exactly (the one
-// sourced cadence this phase states); the eight-arm bomb ring lands on the
-// eight compass bearings; phase 2's minions are gone on entry; the Queen
-// arrives at the centre and stops; a 0-damage glaive still registers a hit
-// and applies Armor Broken, which then changes a later hit's damage.
+// V9 retune (from the tagged recording): the red ring has two arms and
+// rotates clockwise at its authored rate; blue/red volleys repeat every
+// 0.40 s; yellow is 8 arms at 2.50 s; the bee burst is 4 arms at 3.04 s; the
+// white-bomb ring is 4 arms at 3.23 s; the glaive wave is 60 arms at 6.02 s,
+// superseding the wiki's 7 s; every attack starts on the phase epoch; phase
+// 2's minions are gone on entry; the Queen arrives at the centre and stops;
+// a 0-damage glaive still registers a hit and applies Armor Broken, which
+// then changes a later hit's damage.
 test("the Killer Bee Queen's phase 3 reproduces the source's six-attack barrage", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
@@ -1117,33 +1137,42 @@ test("the Killer Bee Queen's phase 3 reproduces the source's six-attack barrage"
   )!;
   if (redRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(redRing.pattern.arms).toBe(2);
-  expect(redRing.pattern.clockwiseDegreesPerSecond).toBeGreaterThan(0);
+  expect(redRing.pattern.clockwiseDegreesPerSecond).toBe(40);
+  expect(redRing.cadence.cooldownAfterLastShotSeconds).toBe(0.4);
 
   const yellowRing = phase3.attacks.find(
     (attack) => attack.projectileId === "yellow-ball-v1",
   )!;
-  expect(yellowRing.cadence.cooldownAfterLastShotSeconds).toBeLessThan(2);
+  if (yellowRing.pattern.kind !== "ring") throw new Error("expected ring");
+  expect(yellowRing.pattern.arms).toBe(8);
+  expect(yellowRing.cadence.cooldownAfterLastShotSeconds).toBe(2.5);
 
   const beeRing = phase3.attacks.find(
     (attack) => attack.projectileId === "bee-shot",
   )!;
   if (beeRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(beeRing.pattern.arms).toBe(4);
-  expect(beeRing.cadence.cooldownAfterLastShotSeconds).toBeGreaterThan(4);
+  expect(beeRing.cadence.cooldownAfterLastShotSeconds).toBe(3.04);
 
   const bombRing = phase3.attacks.find(
     (attack) => attack.projectileId === "white-bomb-v1",
   )!;
   if (bombRing.pattern.kind !== "ring") throw new Error("expected ring");
-  expect(bombRing.pattern.arms).toBe(8);
+  expect(bombRing.pattern.arms).toBe(4);
+  expect(bombRing.cadence.cooldownAfterLastShotSeconds).toBe(3.23);
 
   const glaiveRing = phase3.attacks.find(
     (attack) => attack.projectileId === "red-glaive-v1",
   )!;
   if (glaiveRing.pattern.kind !== "ring") throw new Error("expected ring");
-  expect(glaiveRing.cadence.cooldownAfterLastShotSeconds).toBe(7);
+  expect(glaiveRing.pattern.arms).toBe(60);
+  expect(glaiveRing.cadence.cooldownAfterLastShotSeconds).toBe(6.02);
   expect(glaiveRing.cadence.initialDelaySeconds).toBe(0);
-  expect(glaiveRing.tuningSource).toBe("wiki-prose");
+  expect(glaiveRing.tuningSource).toBe("video-observation");
+
+  expect(phase3.attacks).toHaveLength(7);
+  for (const attack of phase3.attacks)
+    expect(attack.cadence.initialDelaySeconds).toBe(0);
   const glaiveProjectile = projectileOf(queenConfig, "red-glaive-v1");
   expect(glaiveProjectile.damageHp).toBe(0);
   expect(glaiveProjectile.conditions).toEqual([
@@ -2213,22 +2242,18 @@ test("the Killer Bee Queen's phase 6 machinegun gap geometry is unchanged by the
 });
 
 // Step 24.2: every value whose provenance is "wiki-prose" or "approved-v3"
-// must be untouched by this tuning pass. Checked against the source
-// extract's own "Quantitative Facts Present In The Prose" table
-// (docs/killer-bee-queen-source.md) for the two Queen attacks that carry a
+// must be untouched by that tuning pass. Checked against the source extract's
+// own "Quantitative Facts Present In The Prose" table
+// (docs/killer-bee-queen-source.md) for the Queen attack that still carries a
 // real sourced number, plus a spot check of sourced projectile stats that
 // tuning never touches regardless of tuningSource.
+//
+// V9 retuned phase 3's glaive wave from the tagged recording, so its old
+// wiki-prose/7s guard moved to the V9 test below. This test keeps the 24.2
+// record: at the time, that pass left the glaive alone.
 test("the 24.2 tuning pass changed no wiki-prose or approved-v3 value", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
-
-  const phase3 = archetype.phases[2];
-  const glaiveWave = phase3.attacks.find(
-    (attack) => attack.projectileId === "red-glaive-v1",
-  )!;
-  expect(glaiveWave.tuningSource).toBe("wiki-prose");
-  expect(glaiveWave.cadence.cooldownAfterLastShotSeconds).toBe(7);
-  expect(glaiveWave.cadence.initialDelaySeconds).toBe(0);
 
   const phase7 = archetype.phases[6];
   const yellowSub = phase7.subPhases!.find((sub) => sub.id === "yellow")!;
@@ -2246,6 +2271,23 @@ test("the 24.2 tuning pass changed no wiki-prose or approved-v3 value", () => {
   const hiveSpiralShot = projectileOf(queenConfig, "hive-spiral-shot-v1");
   expect(hiveSpiralShot.damageHp).toBe(200);
   expect(hiveSpiralShot.armorPiercing).toBe(true);
+});
+
+// V9: every phase-3 attack now cites the tagged recording rather than a
+// trainer estimate or the wiki's prose cadence.
+test("every phase-3 attack cites the tagged video observation", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const phase3 = primaryArchetype(queenConfig).phases[2];
+  expect(phase3.attacks).toHaveLength(7);
+  expect(phase3.attacks.map((attack) => attack.tuningSource)).toEqual([
+    "video-observation",
+    "video-observation",
+    "video-observation",
+    "video-observation",
+    "video-observation",
+    "video-observation",
+    "video-observation",
+  ]);
 });
 
 // Step 24.2 (K13/K04): the full fight's length is governed entirely by the

@@ -6,7 +6,7 @@ This phase builds the whole tool: its pure model first, then the route, then the
 
 ### Step 34.1 - The Tag Model, Validator And Interval Derivation
 
-Status: pending. Dependencies: 33.1.
+Status: complete. Dependencies: 33.1.
 
 **Implementation prompt**
 
@@ -42,7 +42,7 @@ The derivation stops here. It must not emit `shotsPerBurst`, `shotIntervalSecond
 
 ### Step 34.2 - The Dev-Only Route And Frame-Accurate Timestamping
 
-Status: pending. Dependencies: 34.1.
+Status: complete. Dependencies: 34.1.
 
 **Implementation prompt**
 
@@ -74,7 +74,7 @@ Display the current `mediaTime` numerically to at least three decimal places.
 
 ### Step 34.3 - Tagging Surfaces, The Readout And Export
 
-Status: pending. Dependencies: 34.2.
+Status: complete. Dependencies: 34.2.
 
 **Implementation prompt**
 
@@ -107,3 +107,52 @@ There is no import or resume, per T30, and no unload guard. The download goes to
 **Focused checks:** focused failing test first on the option-list builder: it returns exactly T20's entry count for the Killer Bee Queen in catalog order, each with an id and a flag marking whether it is a bomb; the three bomb ids are flagged and the rest are not. Test the pixel-grid-to-cells helper on a small fixture including a transparent cell. Test the phase-option builder: it returns the encounter's top-level phases labelled by authored id, with no sub-phase entries. Test the tag-construction helper: it copies all four sticky fields and takes its time from the supplied `mediaTime` argument. Test the readout selector: given tags and a sticky selection it returns the interval since the previous tag in that group, and a well-defined empty result when the group has no previous tag. Test export assembly: a helper taking encounter, provenance, tags and a date returns an export the validator accepts with tags time-sorted; an invalid payload surfaces the error instead of returning. Do not unit-test the canvas drawing or the download. All four routine gates.
 
 **Acceptance:** the picker lists exactly the catalog's appearance ids with thumbnails from resolved pixel grids, bombs as label plus `bodyColor` swatch, and ids visible as text; phase selection comes from configuration with authored ids and no sub-phase control; the kind toggle and sticky `shots` exist with number-key entry; all four sticky fields are visible together and one key records a tag at the frame-callback time; the tag list supports per-row delete and nothing else; the readout shows only the interval since the previous tag in the current group; export validates before downloading and surfaces errors; no import, resume or unload guard exists; nothing is written into the repository and nothing under `app/src/game/data/` changes; all four gates pass.
+
+### Execution record
+
+Implemented on 2026-11-03 in the working tree; nothing was committed, pushed or deployed. This record covers steps 34.1-34.3. The code was built under the user's explicit instruction to implement the whole V8 plan before phase 33 was measured. Phase 33 was then measured from the supplied video: phase 3 contains only 2 intervals, below T02's minimum of 5, and the phase 7 fallback also falls short. The user explicitly waived the minimum in T36 and accepted the 7.0 s mean and 0.0 s deviation, so this phase is complete under that waiver. It is not a T02 pass; the waiver is recorded in the plan and in phase 33's record.
+
+#### Files and boundaries
+
+- Added `app/src/research/tagging.ts`: the five plan types, structural validator and interval derivation. It imports nothing.
+- Added `app/src/research/taggingRoute.ts`: pure query parsing, frame-step arithmetic, key mapping, editable-target check and provenance assembly. It imports only the `VideoProvenance` type.
+- Added `app/src/research/taggingOptions.ts`: appearance and phase options, pixel-grid flattening, sticky tag construction, readout selector and validated export assembly.
+- Added `app/src/research/TaggerRoute.tsx` and `TaggerRoute.module.css`: the dev-only route.
+- Added `app/src/research/tagging.test.ts`, `taggingRoute.test.ts` and `taggingOptions.test.ts`.
+- Changed `app/src/game/config/encounter.ts` only to export `PROJECTILE_APPEARANCES`, the already-resolved 19-entry catalog. No authored value changed.
+- Changed `app/src/main.tsx` to mount the route behind `import.meta.env.DEV` and `?tagger=1` through a dynamic import.
+- No file under `app/src/game/data/` changed. Nothing under `game/` imports from `research/`. No video was committed or added to `.gitignore`.
+
+#### TDD and focused checks
+
+- 34.1: `src/research/tagging.test.ts` was written first and failed on the missing module; after implementation all 29 cases passed. Every rejection case asserts the offending path, and the file pins structural-only validation with explicit unknown-sprite and out-of-range-phase passes, single-tag groups, population standard deviation and deterministic ordering.
+- 34.2: `src/research/taggingRoute.test.ts` was written first and failed on the missing module; after implementation all 18 cases passed. It covers the query convention, 30/60 fps steps, invalid frame rates, the key map, coarse jump mapping, provenance assembly accepted by the validator, editable-target detection, and the distinction between editable and activation targets that keeps Enter usable on a focused radio while a focused button keeps its own activation.
+- 34.3: `src/research/taggingOptions.test.ts` was written first and failed on the missing module; after implementation all 10 cases passed. It covers exactly 19 catalog options and three bombs, no sub-phase entries, transparent pixel cells, sticky tag construction, readout selection and time-sorted validated export assembly.
+
+#### Review follow-up
+
+Three independent reviews found no P0 and no phase-acceptance failure, but they found two data-integrity issues and several smaller ones, all corrected before the final gate:
+
+- Changing the encounter selector now clears the tag list, so a tag recorded under one encounter cannot be relabelled and exported under another (T16).
+- A frame step now marks the seek pending until the next `requestVideoFrameCallback`; the Record action refuses a tag whose `mediaTime` still names the pre-seek frame, with a 500 ms safety release for a step that lands on the already displayed frame.
+- A focused button or link keeps Enter and Space for its own activation, while a focused radio or checkbox keeps Space and leaves Enter available to record. The earlier rule made Enter dead on a radio and stole Enter from the Export and Delete buttons.
+- Changing the video file now clears the typed source URL and resets the frame rate, so provenance cannot mix an old source with a new file.
+- Export appends the download anchor, removes it, and revokes the blob URL in a later task rather than in the same click task.
+- The tagger CSS no longer defines unscoped global `button` rules.
+- The dev dynamic import has a failure path instead of leaving a blank page.
+
+#### Post-completion transport addition (T37)
+
+The user asked for buttons that make bigger jumps because frame stepping through the nine-minute source video is too slow. Added -5 s/+5 s and -30 s/+30 s buttons, with Shift+ArrowLeft/Right jumping 5 s and PageUp/PageDown jumping 30 s. A jump is a non-recorded seek: it pauses, clamps to the video bounds, marks the seek pending, and still records from the next `mediaTime` callback. A manual smoke test with the synthetic clip confirmed that forward and back jumps clamp to the ends and that the keyboard equivalents work. The action-map tests cover the new keys.
+
+The same user pass showed a dense Red Glaive ring of about 64 projectiles and a four-bomb ring. The shots input had capped at 9, which would have under-recorded the observation. It now accepts any positive integer; number keys 1-9 remain quick presets, and the validator test pins a 64-projectile count. The research suite is now 58 cases.
+
+#### Full gate and production exclusion
+
+`npm run verify` from `app/` passed lint, typecheck, test (876 tests) and build. The build emitted one JavaScript and one CSS asset. A byte search of `dist/assets/*.js` found none of `data-tagger-route`, `Killer Bee Queen tagger`, `Record tag` or `No previous tag in this group`, and no separate tagger chunk existed, so the route is absent from the production bundle. This was a manual confirmation, not a test, as the plan requires. The final build hashes were `index-DsI6AzQb.js` and `index-D_nCrz8E.css`, with the existing roughly 1.87 MB chunk warning unchanged.
+
+#### Manual smoke test
+
+A synthetic 64x64, 1.42-second WebM was generated inside the browser with `MediaRecorder` and loaded through the file picker. It was never placed in the repository. The route rendered at `?tagger=1`, loaded the file, reported its duration, displayed `mediaTime` to three decimals, stepped by a frame, accepted a phase-3 `red-glaive`/`volley`/4-shots sticky selection, recorded two tags with Enter, showed `0.432 s since previous`, listed both tags newest first, and exported `killer-bee-queen-observations.json` that `validateObservationExport` accepts. The synthetic tags are not evidence and were not committed.
+
+A code search confirmed the only `video.currentTime` read is the seek target in `seekBy`; the comment there and the frame-callback path keep every recorded time on `mediaTime` (T19).

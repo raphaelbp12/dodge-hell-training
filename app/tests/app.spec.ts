@@ -1625,9 +1625,9 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
 // own real-browser frame-timing sample, compared against step 17.4's v4
 // baseline (median 16ms, p95 19ms, max 113ms over 3709 frames at a peak of
 // 162 shards - docs/implementation-plan-v4.md) rather than only simulated.
-for (const [phaseIndex, label] of [
-  [2, "phase-3"],
-  [5, "phase-6"],
+for (const [phaseIndex, label, phaseLabel, phaseId] of [
+  [2, "phase-3", "Phase 3 - Pond Barrage", "phase-3-pond-barrage"],
+  [5, "phase-6", "Phase 6 - Nests", "phase-6-nests"],
 ] as const) {
   test(`Queen ${label} drilled for 60 seconds stays within the derived shard bound and reports frame timing`, async ({
     page,
@@ -1641,14 +1641,19 @@ for (const [phaseIndex, label] of [
     page.on("pageerror", (error) => errors.push(error.message));
 
     await page.goto(
-      `./?seed=${NORTH_SEED}&encounter=crystal-worm&phase=${phaseIndex}&loop=1`,
+      `./?seed=${NORTH_SEED}&encounter=crystal-worm`,
     );
     await page.getByRole("button", { name: "Debug", exact: true }).click();
     await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
     await page.getByRole("button", { name: "Close debug" }).click();
     await page.getByRole("radio", { name: "Killer Bee Queen" }).check();
+    await page.getByRole("button", { name: "Phases", exact: true }).click();
+    const panel = page.getByRole("complementary", { name: "Phase selection" });
+    await panel.getByRole("checkbox", { name: phaseLabel }).check();
+    // Loop stays checked: the drill must remain in this phase for the sample.
     await page.getByRole("button", { name: "Start", exact: true }).click();
     await finishCountdown(page);
+    expect((await inspect(page)).enemyPhaseIds[0]).toBe(phaseId);
 
     const { bound, partBound } = await page.evaluate(async () => {
       const modulePath = new URL(
@@ -2395,7 +2400,7 @@ test("the Home phase panel starts a two-phase one-shot drill at the first select
   await finishCountdown(page, false);
   const state = await inspect(page);
   expect(state.rulesVersion).toBe(
-    "killer-bee-queen-nest-paladin-v7-drill-p2-4-once",
+    "killer-bee-queen-nest-paladin-v8-drill-p2-4-once",
   );
   expect(state.enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
 });

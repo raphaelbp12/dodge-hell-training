@@ -484,7 +484,7 @@
         },
         {
           "id": "phase-3-pond-barrage",
-          "comment": "Source (23.5): at 75% HP she despawns phase 2's minions (automatic via their despawnOnExit) and moves to the arena centre, flashing white, then stays stationary (move-to-point stops on arrival; no second mechanism) while firing a six-attack barrage: two counter-rotating 3-arm blue spirals, one clockwise 2-arm red spiral, frequent non-rotating yellow rings, occasional 4-way bee bursts, an 8-arm white-bomb ring on the compass bearings, and a red-glaive wave Armor-Breaking for 7s that fires at entry and every 7 seconds (the only cadence the source states; every other cadence here is trainer-authored). Fidelity gap: the source calls the glaive wave 'unavoidable', true only in the real fight's small room - this project's 19.2-tile arena makes it dodgeable near the wall, recorded rather than faked by widening the wave (deferred to 24.2).",
+          "comment": "Source (V8 measurement, docs/killer-bee-queen-observations.json and its markdown sibling; wiki prose for phase 3 in docs/killer-bee-queen-source.md): at 75% HP she despawns phase 2's minions, moves to the centre and flashes white, then stays stationary while firing the tagged barrage: two counter-rotating 3-arm blue spirals at 0.40 s with a 60-degree offset, which interleave into six balls and coincide into three every fourth volley (a 1.6 s beat); a clockwise 2-arm red spiral at 0.40 s; 8-arm yellow rings every 2.50 s; a 4-way bee burst every 3.04 s; 4 white bombs every 3.23 s - the footage shows four, contradicting the wiki's cardinal/intermediate (8) count, and the recording is the authority here; and a 60-glaive Armor-Break wave every 6.02 s, superseding the wiki's 'every 7 seconds'. Red's rotation rate, the zero initial delays and the white telegraph/movement remain trainer-authored. Fidelity note: the 60-arm wave may be effectively unavoidable in this 19.2-tile arena, matching the source's 'unavoidable' description; record what playtest shows rather than claiming it.",
           "enterAtHpFraction": 0.75,
           "exitAfterSeconds": null,
           "telegraphSeconds": 2,
@@ -500,43 +500,43 @@
             {
               "id": "blue-ball-spiral-cw",
               "projectile": "blue-ball-v2",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
                 "arms": 3,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
-                "clockwiseDegreesPerSecond": 50
+                "clockwiseDegreesPerSecond": 37.5
               },
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 0.84,
-                "initialDelaySeconds": 0.42
+                "cooldownAfterLastShotSeconds": 0.4,
+                "initialDelaySeconds": 0
               }
             },
             {
               "id": "blue-ball-spiral-ccw",
               "projectile": "blue-ball-v2",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
                 "arms": 3,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 60,
-                "clockwiseDegreesPerSecond": -50
+                "clockwiseDegreesPerSecond": -37.5
               },
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 0.84,
-                "initialDelaySeconds": 0.42
+                "cooldownAfterLastShotSeconds": 0.4,
+                "initialDelaySeconds": 0
               }
             },
             {
               "id": "red-ball-spiral-cw",
               "projectile": "red-ball",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
                 "arms": 2,
@@ -547,17 +547,17 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.05,
-                "initialDelaySeconds": 0.64
+                "cooldownAfterLastShotSeconds": 0.4,
+                "initialDelaySeconds": 0
               }
             },
             {
               "id": "yellow-ball-ring-frequent",
               "projectile": "yellow-ball-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 6,
+                "arms": 8,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
@@ -565,14 +565,14 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 0.7,
-                "initialDelaySeconds": 0.21
+                "cooldownAfterLastShotSeconds": 2.5,
+                "initialDelaySeconds": 0
               }
             },
             {
               "id": "bee-shot-burst-occasional",
               "projectile": "bee-shot",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
                 "arms": 4,
@@ -583,17 +583,17 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 5,
-                "initialDelaySeconds": 3
+                "cooldownAfterLastShotSeconds": 3.04,
+                "initialDelaySeconds": 0
               }
             },
             {
               "id": "white-bomb-compass-ring",
               "projectile": "white-bomb-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 8,
+                "arms": 4,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
@@ -601,17 +601,17 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.8,
-                "initialDelaySeconds": 1.7
+                "cooldownAfterLastShotSeconds": 3.23,
+                "initialDelaySeconds": 0
               }
             },
             {
               "id": "red-glaive-wave",
               "projectile": "red-glaive-v1",
-              "tuningSource": "wiki-prose",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 8,
+                "arms": 60,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
@@ -619,7 +619,7 @@
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 7,
+                "cooldownAfterLastShotSeconds": 6.02,
                 "initialDelaySeconds": 0
               }
             }

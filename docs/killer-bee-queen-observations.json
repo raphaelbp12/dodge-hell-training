@@ -1,0 +1,698 @@
+{
+  "encounterId": "killer-bee-queen",
+  "provenance": {
+    "sourceUrl": "https://www.youtube.com/watch?v=TFclwuPtC94",
+    "fileName": "killer-bee-queen-solo-nest-TFclwuPtC94.mp4",
+    "frameRate": 60,
+    "durationSeconds": 565.7
+  },
+  "recordedAt": "2026-11-03T21:54:01.659Z",
+  "tags": [
+    {
+      "timeSeconds": 342.3,
+      "phaseIndex": 2,
+      "spriteId": "white-bomb",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 343.733333,
+      "phaseIndex": 2,
+      "spriteId": "red-glaive",
+      "kind": "rotating-arm",
+      "shots": 60
+    },
+    {
+      "timeSeconds": 344.633333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 344.633333,
+      "phaseIndex": 2,
+      "spriteId": "yellow-ball",
+      "kind": "rotating-arm",
+      "shots": 8
+    },
+    {
+      "timeSeconds": 344.633333,
+      "phaseIndex": 2,
+      "spriteId": "white-bomb",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 344.633333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 344.633333,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 344.666667,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 344.7,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 345.033333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 345.033333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 345.466667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 345.466667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 345.866667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 345.866667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 346.266667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 346.266667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 346.7,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 346.7,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 347.1,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 347.1,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 347.3,
+      "phaseIndex": 2,
+      "spriteId": "yellow-ball",
+      "kind": "rotating-arm",
+      "shots": 8
+    },
+    {
+      "timeSeconds": 347.5,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 347.5,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 347.7,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 347.733333,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 347.9,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 347.9,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 347.933333,
+      "phaseIndex": 2,
+      "spriteId": "white-bomb",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 348.333333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 348.333333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 348.733333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 348.733333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 349.133333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 349.133333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 349.533333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 349.533333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 349.733333,
+      "phaseIndex": 2,
+      "spriteId": "red-glaive",
+      "kind": "rotating-arm",
+      "shots": 60
+    },
+    {
+      "timeSeconds": 349.733333,
+      "phaseIndex": 2,
+      "spriteId": "yellow-ball",
+      "kind": "rotating-arm",
+      "shots": 8
+    },
+    {
+      "timeSeconds": 349.933333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 349.933333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 350.333333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 350.333333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 350.733333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 350.733333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 350.733333,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 350.766667,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 351.166667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 351.166667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 351.166667,
+      "phaseIndex": 2,
+      "spriteId": "white-bomb",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 351.566667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 351.566667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 351.966667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 351.966667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 352.366667,
+      "phaseIndex": 2,
+      "spriteId": "yellow-ball",
+      "kind": "rotating-arm",
+      "shots": 8
+    },
+    {
+      "timeSeconds": 352.366667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 352.366667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 352.766667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 352.766667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 353.2,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 353.2,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 353.6,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 353.6,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 353.8,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 353.833333,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 354,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 354,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 354.4,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 354.4,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 354.4,
+      "phaseIndex": 2,
+      "spriteId": "white-bomb",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 354.733333,
+      "phaseIndex": 2,
+      "spriteId": "yellow-ball",
+      "kind": "rotating-arm",
+      "shots": 8
+    },
+    {
+      "timeSeconds": 354.733333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 354.733333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 355.133333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 355.133333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 355.533333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 355.533333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 355.766667,
+      "phaseIndex": 2,
+      "spriteId": "red-glaive",
+      "kind": "rotating-arm",
+      "shots": 60
+    },
+    {
+      "timeSeconds": 355.966667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 355.966667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 356.366667,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 356.366667,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 356.8,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 356.833333,
+      "phaseIndex": 2,
+      "spriteId": "bee-shot",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 356.833333,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 356.833333,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 357.2,
+      "phaseIndex": 2,
+      "spriteId": "yellow-ball",
+      "kind": "rotating-arm",
+      "shots": 8
+    },
+    {
+      "timeSeconds": 357.2,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 357.2,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 357.6,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 357.6,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 357.6,
+      "phaseIndex": 2,
+      "spriteId": "white-bomb",
+      "kind": "rotating-arm",
+      "shots": 4
+    },
+    {
+      "timeSeconds": 358,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 358,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 358.4,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    },
+    {
+      "timeSeconds": 358.4,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 358.8,
+      "phaseIndex": 2,
+      "spriteId": "blue-ball",
+      "kind": "rotating-arm",
+      "shots": 6
+    },
+    {
+      "timeSeconds": 358.8,
+      "phaseIndex": 2,
+      "spriteId": "red-ball",
+      "kind": "rotating-arm",
+      "shots": 2
+    }
+  ]
+}

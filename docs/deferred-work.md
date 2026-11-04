@@ -129,13 +129,15 @@ Rules for this register:
 
 ### D13 - Killer Bee Queen Cadence Retuning After Projectile Hitbox Correction
 
+**Status (2026-11-03): resolved for phase 3, open for the other seven phases.** Plan V9 retuned `phase-3-pond-barrage`'s seven attacks from the tagged recording committed by V8, citing [the observations](killer-bee-queen-observations.md) as the source and advancing the Queen's `rulesVersion` to `killer-bee-queen-nest-paladin-v8`; the decision and values are recorded in [the mechanics contract](mechanics.md#the-phase-3-retune-plan-v9) and [plan V9](plan-v9.md). The rest of this entry describes the scope that remains.
+
 **What.** Re-tune the Killer Bee Queen's authored attack cadences after the sprite-derived projectile hitboxes change.
 
 **Why deferred.** Plan V6's P13 keeps every V5 cadence and deliberately excludes retuning. Step 26.3 captures a pre-change baseline and step 28.2 measures the shift, but correcting it is a separate tuning decision.
 
-**Blocked on.** The measured difficulty shift from step 28.2, and a decision that the shift needs correction. Comparison with real-game footage would strengthen that decision.
+**Blocked on.** A measurement for each remaining phase. V8 measured phase 3 only (D22); the other seven phases have no tagged run, so retuning them would again be an estimate rather than evidence.
 
-**Fidelity gap this leaves.** The trainer may be easier or harder than the real encounter. The cadences were tuned against the old 0.5 x 0.25 to 0.9 x 0.4 tile bodies, while the new hitboxes follow the wiki sprite silhouettes.
+**Fidelity gap this leaves.** Phases 1, 2 and 4-8 may be easier or harder than the real encounter. Phase 3 now follows the measured barrage.
 
 ### D14 - Crystal Worm Shard Hitbox And Appearance Correction
 
@@ -191,7 +193,7 @@ Rules for this register:
 
 **What.** Extend the video tagger to record a projectile's despawn frame as well as its spawn, so measured lifetime can identify which variant of a shared sprite was fired.
 
-**Why deferred.** Plan V8's T19 records spawn tags only. Cadence, which is V8's goal, does not need lifetime, and spawn-only tagging is substantially less work per tag.
+**Why deferred.** Plan V8's T26 records spawn tags only. Cadence, which is V8's goal, does not need lifetime, and spawn-only tagging is substantially less work per tag.
 
 **Blocked on.** A decision that variant-level binding is worth a second tagging pass over the same footage.
 
@@ -201,7 +203,7 @@ Rules for this register:
 
 **What.** Measure arm counts, cone widths and rotation rates from video, rather than inferring them from the wiki prose.
 
-**Why deferred.** Plan V8's T21 keeps geometry out of the tagger. An angle-measurement overlay needs its own pixel-per-tile calibration and camera-motion compensation, which is a materially different tool from timestamp tagging.
+**Why deferred.** Plan V8's T27 keeps geometry out of the tagger. An angle-measurement overlay needs its own pixel-per-tile calibration and camera-motion compensation, which is a materially different tool from timestamp tagging.
 
 **Blocked on.** A decision to build an overlay with scale calibration, and a judgement that the authored geometry is actually wrong.
 
@@ -211,7 +213,7 @@ Rules for this register:
 
 **What.** Reconcile the committed projectile data against the current game client XML (`HiddenElementGames/RotmgVersionRepo`, `TextAsset/epicHiveObjects`, commit dated 2025-09-30, Queen object id `EH King Bee`), and adopt the fields it carries that the wiki does not publish: the per-projectile `Size` scale multiplier and the projectile index per row.
 
-**Why deferred.** Plan V8's T08 keeps it out of scope as unrelated to video tagging. Datamined client assets are also a different provenance class from the RealmEye wiki, which needs its own decision alongside the licensing review deferred as D15.
+**Why deferred.** Plan V8's T09 keeps it out of scope as unrelated to video tagging. Datamined client assets are also a different provenance class from the RealmEye wiki, which needs its own decision alongside the licensing review deferred as D15.
 
 **Blocked on.** A re-check of the RealmEye page for the damage conflict below, and a decision that datamined client XML is acceptable provenance with a `tuningSource` of its own.
 
