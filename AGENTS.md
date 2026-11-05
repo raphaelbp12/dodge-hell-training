@@ -36,6 +36,7 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 Checks cost time and tokens, so run them at the end of a unit of work, not after each edit.
 
 - While iterating, run only the focused test file from `app/`: `npx vitest run <path>`.
+- Delegate verification runs (`npm run verify`, targeted Playwright) to the `verifier` subagent (Haiku, `.claude/agents/verifier.md`). It may apply only `oxlint --fix` and single-file typecheck fixes and reports everything else. Draft commit messages, when asked to commit, with the `commit-drafter` subagent and review the draft before committing.
 - Run `npm run verify` from `app/` once when a plan phase or a set of code edits under `app/` is finished, before reporting. It runs `lint`, `typecheck`, `test` and `build`, prints one line per gate, and puts full logs in `app/test-results/verification/<gate>.log`. Read a log only when the printed excerpt is not enough. Do not run the four gates separately.
 - Skip `npm run verify` when only documentation, plans or agent instruction files changed.
 - Playwright is not routine; CI runs the full suite on every push. When adding or changing a Playwright test, run only that test: `npm run test:e2e -- --grep "<pattern>"`. Run the full suite only to reproduce a CI failure or when the user asks for an acceptance run.

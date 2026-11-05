@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 <!-- Mirrors .github/workflows/pages.yml: same scripts, same order. Only deviation: the build skip below. -->
 
-Reproduce the `Validate And Deploy Pages` workflow locally for the gate(s) the user named: `$ARGUMENTS` (if that reads as a literal placeholder, use the words the user typed after `/verify`; none means the default). Run everything from `app/`.
+Delegate the run to the `verifier` subagent (Haiku, `.claude/agents/verifier.md`), passing the gate or browser pattern, and relay its report. The notes below describe what it runs. Reproduce the `Validate And Deploy Pages` workflow locally for the gate(s) the user named: `$ARGUMENTS` (if that reads as a literal placeholder, use the words the user typed after `/verify`; none means the default). Run everything from `app/`.
 
 - **Default (no arguments):** `npm run verify`. It runs `lint`, `typecheck` and `test` (CI's independent, non-fail-fast checks matrix; all three always run), then `build` (CI's build job, which produces `app/dist`). It prints one `PASS`/`FAIL`/`SKIP` line per gate, adds a tail excerpt for each failure, writes full logs to `app/test-results/verification/<gate>.log`, and exits nonzero on any failure. Read a full log only when the excerpt is not enough.
 - **Deliberate deviation:** CI runs build regardless of the checks, but `npm run verify` skips build when any check fails, because `build` repeats `tsc -b` and would only duplicate the failure. Report a skipped build as skipped, not passed.
