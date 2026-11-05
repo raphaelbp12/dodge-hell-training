@@ -29,6 +29,19 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
  && apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/*
 
+# CodeGraph's npm package selects the matching native binary through its
+# optional dependencies, so the same install serves amd64 and arm64.
+RUN npm install -g @colbymchenry/codegraph@1.6.2 \
+ && codegraph --version
+
+# RTK's official installer verifies the pinned release checksum and selects the
+# matching Linux target for the build architecture.
+RUN curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh \
+      -o /tmp/rtk-install.sh \
+ && RTK_VERSION=v1.1.0 RTK_INSTALL_DIR=/usr/local/bin sh /tmp/rtk-install.sh \
+ && rtk --version \
+ && rm -f /tmp/rtk-install.sh
+
 # Chromium is installed at the lockfile's Playwright version and kept outside
 # node_modules, so the volume that holds the dependencies stays clean.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright

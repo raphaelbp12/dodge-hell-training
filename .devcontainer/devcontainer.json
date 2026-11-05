@@ -12,15 +12,19 @@
   "mounts": [
     "source=claude-config-${devcontainerId},target=/home/node/.claude,type=volume",
     "source=user-config-${devcontainerId},target=/home/node/.config,type=volume",
-    "source=app-node-modules-${devcontainerId},target=/workspaces/${localWorkspaceFolderBasename}/app/node_modules,type=volume"
+    "source=app-node-modules-${devcontainerId},target=/workspaces/${localWorkspaceFolderBasename}/app/node_modules,type=volume",
+    "source=codegraph-data-${devcontainerId},target=/workspaces/${localWorkspaceFolderBasename}/.codegraph-container,type=volume"
   ],
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
     "GIT_CONFIG_GLOBAL": "/home/node/.config/git/config",
-    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright"
+    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright",
+    "CODEGRAPH_TELEMETRY": "0",
+    "DO_NOT_TRACK": "1",
+    "CODEGRAPH_DIR": ".codegraph-container"
   },
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci",
+  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci && codegraph init && rtk init -g --hook-only --auto-patch --no-trust-filters && (claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman || echo 'WARNING: caveman plugin install failed; rerun it manually')",
   "postStartCommand": "sudo /usr/local/bin/init-devcontainer-firewall.sh",
   "waitFor": "postStartCommand",
   "runArgs": [

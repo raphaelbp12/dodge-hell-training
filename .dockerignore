@@ -8,6 +8,7 @@
 docs
 image.png
 **/node_modules
+.codegraph-*
 app/dist
 app/test-results
 app/.vitest

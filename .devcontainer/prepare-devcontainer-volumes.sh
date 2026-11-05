@@ -29,3 +29,10 @@ for modules in /workspaces/*/app/node_modules; do
         chown -R node:node "$modules"
     fi
 done
+
+# The per-container CodeGraph index lives in its own volume for the same reason.
+for codegraph in /workspaces/*/.codegraph-container; do
+    if [ -d "$codegraph" ]; then
+        chown -R node:node "$codegraph"
+    fi
+done

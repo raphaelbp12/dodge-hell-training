@@ -1,6 +1,9 @@
 # Agent scratch workspace (ledgers, briefs, review packages)
 /.superpowers/
 
+# Per-container CodeGraph index; the host's .codegraph/ stays separate.
+/.codegraph-container/
+
 # Local Vitest JSON output from tooling; not a source or build artifact.
 /app/.vitest/
 
