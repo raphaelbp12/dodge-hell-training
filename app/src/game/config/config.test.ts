@@ -138,23 +138,19 @@ const BEVELED_BODY_1_25_TILES = [
   { x: -0.625, y: -0.375 },
 ];
 
-// The player body is the Paladin class image's 6 x 8 body-and-arm mask at
-// 0.667 x 0.889 tiles (plan V11 X01). It is the authored paladin-body hull
-// scaled by those dimensions. Provenance: docs/player-body-source.md.
-const PALADIN_BODY_NORMALIZED = [
-  { x: -0.5, y: -0.375 },
-  { x: -0.333333, y: -0.5 },
-  { x: 0.166667, y: -0.5 },
-  { x: 0.333333, y: -0.375 },
-  { x: 0.5, y: 0 },
-  { x: 0.5, y: 0.125 },
-  { x: 0.333333, y: 0.5 },
-  { x: -0.5, y: 0.5 },
+// The shipped player body is the symmetric 5 x 7 body core at 0.556 x 0.778
+// tiles, using the approved beveled octagon with no lateral arm bump.
+// Provenance: the post-V11 addendum in docs/player-body-source.md.
+const SYMMETRIC_BODY_TILES = [
+  { x: -0.3 * 0.556, y: -0.5 * 0.778 },
+  { x: 0.3 * 0.556, y: -0.5 * 0.778 },
+  { x: 0.5 * 0.556, y: -0.3 * 0.778 },
+  { x: 0.5 * 0.556, y: 0.3 * 0.778 },
+  { x: 0.3 * 0.556, y: 0.5 * 0.778 },
+  { x: -0.3 * 0.556, y: 0.5 * 0.778 },
+  { x: -0.5 * 0.556, y: 0.3 * 0.778 },
+  { x: -0.5 * 0.556, y: -0.3 * 0.778 },
 ];
-const PALADIN_BODY_TILES = PALADIN_BODY_NORMALIZED.map(({ x, y }) => ({
-  x: x * 0.667,
-  y: y * 0.889,
-}));
 const bodySize = (
   vertices: readonly { x: number; y: number }[],
   axis: "x" | "y",
@@ -171,29 +167,29 @@ const SHARD_BODY_TILES = [
   { x: 0.3625, y: -0.325 },
 ];
 
-test("the player body is the Paladin 6 x 8 body-and-arm mask", () => {
-  const authored = loadOutline("paladin-body");
-  expect(authored).toEqual(PALADIN_BODY_NORMALIZED);
-  expect(ENCOUNTER_CONFIG.player.verticesTiles).toEqual(PALADIN_BODY_TILES);
-  // The authored values round 6/9 and 8/9 to three decimals, matching the
-  // project's existing 0.889 frame convention.
+test("the player body is the symmetric 5 x 7 body core", () => {
+  const authored = loadOutline("beveled-octagon");
+  expect(ENCOUNTER_CONFIG.player.verticesTiles).toEqual(SYMMETRIC_BODY_TILES);
+  expect(ENCOUNTER_CONFIG.player.verticesTiles).toEqual(
+    authored.map(({ x, y }) => ({ x: x * 0.556, y: y * 0.778 })),
+  );
   expect(bodyExtentTiles(ENCOUNTER_CONFIG.player.verticesTiles, "x")).toBeCloseTo(
-    0.667,
+    0.556,
     6,
   );
   expect(bodyExtentTiles(ENCOUNTER_CONFIG.player.verticesTiles, "y")).toBeCloseTo(
-    0.889,
+    0.778,
     6,
   );
   const originals = new Set(authored.map((vertex) => `${vertex.x}:${vertex.y}`));
   const centrallySymmetric = authored.every((vertex) =>
     originals.has(`${-vertex.x}:${-vertex.y}`),
   );
-  expect(centrallySymmetric).toBe(false);
+  expect(centrallySymmetric).toBe(true);
 });
 
 test("selected values are the normal scoring-eligible defaults", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v6");
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v7");
   expect(DEFAULT_DEBUG_SETTINGS).toMatchObject(SELECTED_DEBUG_VALUES);
   expect(DEFAULT_DEBUG_SETTINGS.matchPlayerToHead).toBe(true);
   expect(
@@ -203,16 +199,16 @@ test("selected values are the normal scoring-eligible defaults", () => {
     loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
   );
   // matchPlayerToHead sizes the debug player to the head (1.25 tiles) as a
-  // debug convenience; the shipped player is independently 0.667 x 0.889
-  // tiles (V11), so the player field is expected to differ and is compared
-  // separately below.
+  // debug convenience; the shipped player is independently 0.556 x 0.778
+  // tiles (V11 follow-up), so the player field is expected to differ and is
+  // compared separately below.
   expect({
     ...selected,
     rulesVersion: RULES_VERSION,
     player: ENCOUNTER_CONFIG.player,
   }).toEqual(ENCOUNTER_CONFIG);
-  // The debug player keeps the player's own shape and adopts the head's
-  // dimensions; the head and player shapes are not the same silhouette.
+  // The debug player keeps the player's beveled-octagon shape at the head's
+  // dimensions.
   for (const axis of ["x", "y"] as const) {
     expect(bodySize(selected.player.verticesTiles, axis)).toBeCloseTo(
       bodySize(primaryArchetype(selected).verticesTiles, axis),
@@ -294,10 +290,10 @@ test("the selected preset matches the player body to the head and follows live s
       12,
     );
   }
-  // The debug player keeps the player silhouette, not the head's beveled
-  // octagon; only its extents are resized to the head.
+  // The debug player uses the player's own beveled-octagon shape at the
+  // head's dimensions.
   expect(defaultDebugConfig.player.verticesTiles).toEqual(
-    scaleBody(loadOutline("paladin-body"), 1.25, 1.25),
+    scaleBody(loadOutline("beveled-octagon"), 1.25, 1.25),
   );
 });
 
@@ -508,7 +504,7 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("encodes approved tuning and independent reversal/lifetime values with explicit units", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v6");
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v7");
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION);
   expect(ENCOUNTER_CONFIG.arena).toEqual({
     shape: {
@@ -520,7 +516,7 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   });
   expect(ENCOUNTER_CONFIG.player).toEqual({
     spawnTiles: { x: 0, y: 0 },
-    verticesTiles: PALADIN_BODY_TILES,
+    verticesTiles: SYMMETRIC_BODY_TILES,
   });
   expect(Object.keys(ENCOUNTER_CONFIG.archetypes)).toEqual([
     "crystal-worm-child-head",
@@ -922,7 +918,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v10");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v11");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -931,17 +927,17 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   expect(state.enemies).toHaveLength(1);
 });
 
-// G19-style/V11: the Queen's rules version advanced to v10 because the
-// Paladin-derived player body changes collision enough to invalidate
+// G19-style/V11 follow-up: the Queen's rules version advanced to v11 because
+// the symmetric 5 x 7 player body changes collision enough to invalidate
 // comparison with earlier attempts. Older records must be retained in
 // storage but excluded from the new rules version's best.
-test("an older Killer Bee Queen attempt record is retained but excluded from the v10 best", () => {
+test("an older Killer Bee Queen attempt record is retained but excluded from the v11 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v10");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v11");
   const records = [
     {
       id: "a",
-      rulesVersion: "killer-bee-queen-nest-paladin-v9",
+      rulesVersion: "killer-bee-queen-nest-paladin-v10",
       elapsedSeconds: 500,
       hitsTaken: 2,
       outcome: "death" as const,
@@ -956,16 +952,16 @@ test("an older Killer Bee Queen attempt record is retained but excluded from the
   ];
   expect(retainedBestSeconds(records, queenConfig.rulesVersion)).toBe(120);
   expect(
-    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v9"),
+    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v10"),
   ).toBe(500);
 });
 
-test("an older Crystal Worm v5 attempt record is retained but excluded from the v6 best", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v6");
+test("an older Crystal Worm v6 attempt record is retained but excluded from the v7 best", () => {
+  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v7");
   const records = [
     {
       id: "old",
-      rulesVersion: "crystal-worm-child-swarm-paladin-v5",
+      rulesVersion: "crystal-worm-child-swarm-paladin-v6",
       elapsedSeconds: 40,
       hitsTaken: 1,
       outcome: "death" as const,
@@ -980,7 +976,7 @@ test("an older Crystal Worm v5 attempt record is retained but excluded from the 
   ];
   expect(retainedBestSeconds(records, RULES_VERSION)).toBe(80);
   expect(
-    retainedBestSeconds(records, "crystal-worm-child-swarm-paladin-v5"),
+    retainedBestSeconds(records, "crystal-worm-child-swarm-paladin-v6"),
   ).toBe(40);
 });
 
@@ -1708,9 +1704,9 @@ test("the Killer Bee Queen's phase 6 machinegun is survivable in a gap and letha
   for (let tick = 0; tick < 300 && exposed.phase === "playing"; tick++)
     advanceSimulation(exposed, queenConfig.simulation.fixedStepSeconds, idle);
   expect(exposed.hitsTaken).toBeGreaterThan(0);
-  // The 0.667 x 0.889 player body (V11) is narrower than the old 0.889
-  // square, so it takes fewer beam hits; the beam is still lethal-trending,
-  // just not past the halfway point.
+  // The 0.556 x 0.778 player body (V11 follow-up) is narrower than the old
+  // 0.889 square, so it takes fewer beam hits; the beam is still
+  // lethal-trending, just not past the halfway point.
   expect(exposed.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp * 0.6);
 });
 

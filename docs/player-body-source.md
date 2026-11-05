@@ -2,6 +2,8 @@
 
 Evidence record for the player body authored by plan V11 (phase 41). It derives the `paladin-body` shape from the RealmEye Paladin class image and records the exact vertices, normalization and limitations. It is the citation for `app/src/game/data/shapes.json` and the player body in `app/src/game/data/encounter.json`.
 
+> **Post-V11 follow-up (2026-11-05):** the shipped body is now the symmetric 5 x 7 core at `0.556 x 0.778` tiles, using the beveled octagon; the `paladin-body` hull is superseded and no longer authored. See the follow-up section below.
+
 | Field | Value |
 | ----- | ----- |
 | Page | `https://www.realmeye.com/wiki/paladin` |
@@ -86,6 +88,10 @@ The hull is convex: every consecutive triple has the same cross-product sign. It
   { "x": -0.5, "y": 0.5 }
 ]
 ```
+
+## Post-V11 Follow-Up - 2026-11-05
+
+The user superseded the asymmetric 6 x 8 hull for the shipped body. The player now uses the **symmetric 5 x 7 body core** at `0.556 x 0.778` tiles with the approved `beveled-octagon` silhouette, removing the lateral sword-arm bump and shortening the height by one native pixel. The `paladin-body` shape is no longer authored; this record remains the evidence for the V11 attempt and the reason the body was later simplified. Both encounters take the follow-up comparison break: `crystal-worm-child-swarm-paladin-v7` and `killer-bee-queen-nest-paladin-v11`.
 
 ## What This Record Does Not Establish
 

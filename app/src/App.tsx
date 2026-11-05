@@ -778,8 +778,9 @@ export default function App() {
                 <time dateTime="2026-11-05">5 Nov 2026</time>
                 <ul>
                   <li>
-                    The player's body now matches the Paladin sprite's 6 x 8
-                    footprint, and its hitbox follows the new asymmetric body.
+                    The player's body is now a symmetric 5 x 7 core: shorter
+                    than before and without the lateral arm bump, with its
+                    hitbox following the same shape.
                   </li>
                   <li>
                     Both encounters have a new comparison identity, so earlier

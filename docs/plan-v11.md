@@ -4,6 +4,8 @@ Phase 41. [The implementation plan](../implementation-plan.md) is the reusable p
 
 This plan corrects the player's body footprint and hitbox to the Paladin class sprite's 6 x 8 body-and-arm mask, replacing the 0.889 x 0.889 beveled octagon with a sprite-derived convex outline. It changes no cadence, projectile, condition, phase, arena, terrain or spawn rule.
 
+> **Post-plan follow-up (2026-11-05):** the shipped body was later simplified to the symmetric 5 x 7 core at `0.556 x 0.778` tiles with no lateral arm bump. See the follow-up section at the end. The V11 decisions below remain the record of what phase 41 implemented.
+
 ## Sources And Decision Authority
 
 - [The implementation plan](../implementation-plan.md): the reusable process.
@@ -199,3 +201,7 @@ The file keeps every other field unchanged.
 Status: complete. Dependencies: V10 phase 40. Steps archived in [`docs/plan-archive/phase-41.md`](plan-archive/phase-41.md).
 
 Measures the Paladin class image's 6 x 8 body-and-arm mask, derives the asymmetric convex `paladin-body` outline, authors it beside the existing shapes, and changes the shared player body to `0.667 x 0.889` tiles with one comparison break for both encounters.
+
+## Post-Plan Follow-Up - 2026-11-05
+
+After phase 41 shipped, the user superseded the asymmetric body: the player now uses the **symmetric 5 x 7 body core** at `0.556 x 0.778` tiles with the approved `beveled-octagon`, removing the lateral sword-arm bump and shortening the height by one native pixel. This supersedes X01 and X05 for the shipped body, removes `paladin-body` from `shapes.json`, and takes a second comparison break: `crystal-worm-child-swarm-paladin-v7` and `killer-bee-queen-nest-paladin-v11`. The evidence record's addendum keeps the V11 measurement and explains the simplification; the V11 decisions above remain as the record of what phase 41 implemented.

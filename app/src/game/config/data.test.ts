@@ -81,7 +81,6 @@ test("both authored arenas load with their approved values (W05)", () => {
 test("authored outlines are normalized to a 1x1 tile box", () => {
   expect(Object.keys(AUTHORED_SHAPES).sort()).toEqual([
     "beveled-octagon",
-    "paladin-body",
     "shard-hexagon",
   ]);
   for (const outline of Object.values(AUTHORED_SHAPES)) {
@@ -93,27 +92,8 @@ test("authored outlines are normalized to a 1x1 tile box", () => {
   }
 });
 
-test("the paladin body is the recorded asymmetric 6 x 8 hull", () => {
-  const authored = loadOutline("paladin-body");
-  expect(authored).toEqual([
-    { x: -0.5, y: -0.375 },
-    { x: -0.333333, y: -0.5 },
-    { x: 0.166667, y: -0.5 },
-    { x: 0.333333, y: -0.375 },
-    { x: 0.5, y: 0 },
-    { x: 0.5, y: 0.125 },
-    { x: 0.333333, y: 0.5 },
-    { x: -0.5, y: 0.5 },
-  ]);
-  const originals = new Set(authored.map((vertex) => `${vertex.x}:${vertex.y}`));
-  expect(
-    authored.every((vertex) => originals.has(`${-vertex.x}:${-vertex.y}`)),
-  ).toBe(false);
-});
-
 test("loadOutline resolves a named outline and rejects an unknown name", () => {
   expect(loadOutline("beveled-octagon")).toHaveLength(8);
-  expect(loadOutline("paladin-body")).toHaveLength(8);
   expect(loadOutline("shard-hexagon")).toHaveLength(6);
   expect(() => loadOutline("no-such-shape")).toThrow(RangeError);
 });

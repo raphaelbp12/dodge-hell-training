@@ -1,5 +1,5 @@
 {
-  "comment": "Convex body outlines normalized to a 1x1 tile box, scaled to authored dimensions by the loader. Provenance: docs/mechanics.md step 8.2. paladin-body is the asymmetric 6 x 8 body-and-arm hull of the RealmEye Paladin class image; provenance: docs/player-body-source.md.",
+  "comment": "Convex body outlines normalized to a 1x1 tile box, scaled to authored dimensions by the loader. Provenance: docs/mechanics.md step 8.2. The player uses beveled-octagon at 0.556 x 0.778 tiles, the symmetric 5 x 7 body core; the superseded Paladin hull is recorded in docs/player-body-source.md.",
   "shapes": {
     "beveled-octagon": [
       { "x": -0.3, "y": -0.5 },
@@ -10,16 +10,6 @@
       { "x": -0.3, "y": 0.5 },
       { "x": -0.5, "y": 0.3 },
       { "x": -0.5, "y": -0.3 }
-    ],
-    "paladin-body": [
-      { "x": -0.5, "y": -0.375 },
-      { "x": -0.333333, "y": -0.5 },
-      { "x": 0.166667, "y": -0.5 },
-      { "x": 0.333333, "y": -0.375 },
-      { "x": 0.5, "y": 0 },
-      { "x": 0.5, "y": 0.125 },
-      { "x": 0.333333, "y": 0.5 },
-      { "x": -0.5, "y": 0.5 }
     ],
     "shard-hexagon": [
       { "x": 0.5, "y": 0 },

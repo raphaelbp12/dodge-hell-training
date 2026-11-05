@@ -62,7 +62,7 @@ Zones B and C differ in look only.
 
 ## Addenda
 
-**2026-11-05 - the 0.889 player body is the frame, not the character's body.** The entity table's `Player body` row describes the full 8 x 8 frame and its visible mask. The current player's **body** is the 6 x 8 body-and-arm mask of the RealmEye Paladin class image, `0.667 x 0.889` tiles, recorded in [the player body source record](player-body-source.md). The `9.0` native-pixels-per-tile scale and the 8 x 8 frame are unchanged; the old `0.889 x 0.889` value stands only as the frame derivation, not as the current body.
+**2026-11-05 - the 0.889 player body is the frame, not the character's body.** The entity table's `Player body` row describes the full 8 x 8 frame and its visible mask. The current player's **body** is the symmetric 5 x 7 body core, `0.556 x 0.778` tiles, using the approved beveled octagon and recorded in [the player body source record](player-body-source.md). An intermediate V11 body used the Paladin class image's 6 x 8 body-and-arm mask at `0.667 x 0.889`; the follow-up superseded it by removing the asymmetric arm bump and shortening the height by one native pixel. The `9.0` native-pixels-per-tile scale and the 8 x 8 frame are unchanged; the old `0.889 x 0.889` value stands only as the frame derivation, not as the current body.
 
 ## What This Record Does Not Establish
 

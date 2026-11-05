@@ -265,7 +265,7 @@ test("arena-center chase reaches the exact center and ignores the player silhoue
 
 test("activates the selected v3 preset and eleven-volley first group atomically", () => {
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v6",
+    "crystal-worm-child-swarm-paladin-v7",
   );
   expect(ARENA_SHAPE.radiusTiles).toBe(19.2);
   expect(PRIMARY.spawnTiles).toEqual({ x: 0, y: -16.2 });
@@ -1303,10 +1303,10 @@ test("checks newborn overlap at the exact firing boundary", () => {
   const state = freshSimulation();
   runTicks(state, 119);
   state.enemies[0].positionTiles = { x: 0, y: 0 };
-  // The 0.667 x 0.889 player body (V11) has a smaller half-extent than the
-  // old 1.25-tile body, so the player sits closer to the enemy to keep all
-  // six newborn shards overlapping it at the firing boundary.
-  state.player.positionTiles = { x: 0, y: 0.7 };
+  // The 0.556 x 0.778 player body (V11 follow-up) has a smaller half-extent
+  // than the old 1.25-tile body, so the player sits closer to the enemy to
+  // keep all six newborn shards overlapping it at the firing boundary.
+  state.player.positionTiles = { x: 0, y: 0.5 };
   runTicks(state, 1);
   expect(state.elapsedSeconds).toBe(2);
   expect(state.shards).toHaveLength(6);

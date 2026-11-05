@@ -946,7 +946,7 @@ test("a single-part compound body agrees with the single-body sweep", () => {
 // Octagon containment (W03, plan V10 step 38.2): the authored nest-boss-room
 // geometry (9.5-tile flat half-width, 14.25-tile corner sum) and a generic
 // 0.889-tile beveled-octagon fixture. The shipped player body is the
-// asymmetric paladin-body tested separately below.
+// symmetric 5 x 7 core tested separately below.
 const nestOctagon = {
   kind: "octagon" as const,
   centerTiles: { x: 0, y: 0 },
@@ -994,29 +994,40 @@ function withinEveryOctagonHalfPlane(
   );
 }
 
-const paladinBody = scaleBody(loadOutline("paladin-body"), 0.667, 0.889);
+const symmetricBody = scaleBody(loadOutline("beveled-octagon"), 0.556, 0.778);
 
-test("paladin body: the asymmetric hit shape shrank and still fits the octagon", () => {
-  // The Paladin body is narrower than the old 0.889 square, and its arm side
-  // is tapered while the opposite side is a straight edge. A tiny circle at
-  // y = -0.3 is outside the tapered right side but inside the flat left side.
+test("symmetric player body: shrank, is symmetric and still fits the octagon", () => {
+  // A point at x = 0.32 hits the old 0.889 square but misses the new
+  // 0.556-wide body, on either side.
   expect(
-    convexBodyOverlapsCircle(paladinBody, { x: 0.28, y: -0.3 }, 0.001),
+    convexBodyOverlapsCircle(symmetricBody, { x: 0.32, y: 0 }, 0.001),
   ).toBe(false);
   expect(
-    convexBodyOverlapsCircle(paladinBody, { x: -0.28, y: -0.3 }, 0.001),
+    convexBodyOverlapsCircle(symmetricBody, { x: -0.32, y: 0 }, 0.001),
+  ).toBe(false);
+  // The body is symmetric: the same offset inside one side is inside the
+  // other.
+  expect(
+    convexBodyOverlapsCircle(symmetricBody, { x: 0.25, y: 0 }, 0.001),
   ).toBe(true);
-  // The old 0.889 square would have hit both, so the miss is the new body.
+  expect(
+    convexBodyOverlapsCircle(symmetricBody, { x: -0.25, y: 0 }, 0.001),
+  ).toBe(true);
   const oldBody = scaleBody(loadOutline("beveled-octagon"), 0.889, 0.889);
   expect(
-    convexBodyOverlapsCircle(oldBody, { x: 0.28, y: -0.3 }, 0.001),
+    convexBodyOverlapsCircle(oldBody, { x: 0.32, y: 0 }, 0.001),
   ).toBe(true);
+  const vertexSet = new Set(
+    symmetricBody.map((vertex) => `${vertex.x}:${vertex.y}`),
+  );
   expect(
-    convexBodyOverlapsCircle(oldBody, { x: -0.28, y: -0.3 }, 0.001),
+    symmetricBody.every((vertex) =>
+      vertexSet.has(`${-vertex.x}:${-vertex.y}`),
+    ),
   ).toBe(true);
 
-  // Containment is correct on every side, including the arm side and the
-  // opposite side, a flat face and a 45-degree corner.
+  // Containment is correct on every side, a flat face and a 45-degree
+  // corner.
   for (const candidate of [
     { x: 20, y: 0 },
     { x: -20, y: 0 },
@@ -1028,11 +1039,11 @@ test("paladin body: the asymmetric hit shape shrank and still fits the octagon",
     { x: -20, y: 20 },
   ]) {
     const constrained = constrainBodyToArena(
-      paladinBody,
+      symmetricBody,
       candidate,
       toArena(nestOctagon),
     );
-    for (const vertex of transformBodyVertices(paladinBody, constrained)) {
+    for (const vertex of transformBodyVertices(symmetricBody, constrained)) {
       expect(Math.abs(vertex.x)).toBeLessThanOrEqual(9.5 + 1e-9);
       expect(Math.abs(vertex.y)).toBeLessThanOrEqual(9.5 + 1e-9);
       expect(Math.abs(vertex.x) + Math.abs(vertex.y)).toBeLessThanOrEqual(
