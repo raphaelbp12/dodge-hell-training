@@ -285,7 +285,7 @@ test("selected values are the scored defaults without opening Debug", async ({
 }) => {
   await launch(page);
   const state = await inspect(page);
-  expect(state.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v5");
+  expect(state.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v6");
   expect(state.debugSettings).toMatchObject({
     headWidth: 1.25,
     headHeight: 1.25,
@@ -310,7 +310,7 @@ test("selected values are the scored defaults without opening Debug", async ({
   await page.getByRole("button", { name: "Debug", exact: true }).click();
   await page.getByRole("button", { name: "Load selected values" }).click();
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v5",
+    "crystal-worm-child-swarm-paladin-v6",
   );
   await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
 });
@@ -323,7 +323,7 @@ test("the ?phase= drill URL parameter starts the named phase as a one-shot and s
   await finishCountdown(page);
   const drilled = await inspect(page);
   expect(drilled.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v5-drill-p0-once",
+    "crystal-worm-child-swarm-paladin-v6-drill-p0-once",
   );
   expect(drilled.enemies[0]?.phaseIndex).toBe(0);
 
@@ -331,7 +331,7 @@ test("the ?phase= drill URL parameter starts the named phase as a one-shot and s
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   const ignored = await inspect(page);
-  expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v5");
+  expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v6");
 });
 
 test("the Home encounter list defaults to the Killer Bee Queen, is keyboard operable, and ?encounter= selects a known id", async ({
@@ -348,7 +348,7 @@ test("the Home encounter list defaults to the Killer Bee Queen, is keyboard oper
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v5",
+    "crystal-worm-child-swarm-paladin-v6",
   );
 
   await page.goto(seededUrl());
@@ -356,7 +356,7 @@ test("the Home encounter list defaults to the Killer Bee Queen, is keyboard oper
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v5",
+    "crystal-worm-child-swarm-paladin-v6",
   );
 });
 
@@ -563,7 +563,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "Reset defaults" }).click();
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     expect((await inspect(page)).rulesVersion).toBe(
-      "crystal-worm-child-swarm-paladin-v5",
+      "crystal-worm-child-swarm-paladin-v6",
     );
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page
@@ -898,7 +898,7 @@ for (const width of [1440, 390]) {
       const record = saved.records[0];
       expect(record).toEqual({
         id: expect.any(String),
-        rulesVersion: "crystal-worm-child-swarm-paladin-v5",
+        rulesVersion: "crystal-worm-child-swarm-paladin-v6",
         outcome: "death",
         elapsedSeconds: expect.any(Number),
         hitsTaken: expect.any(Number),
@@ -1838,9 +1838,14 @@ test("WASD uses world speed and camera stays centered at the arena edge through 
   for (let press = 0; press < 32; press++) await page.keyboard.press("o");
   await expect.poll(async () => (await inspect(page)).zoom).toBe(0.25);
   await page.keyboard.down("d");
+  // The debug preset matches the player to the 1.25-tile head, so the
+  // paladin-body arm vertex is at (0.5 * 1.25, 0.125 * 1.25) and the
+  // circular arena clamps that vertex against the wall.
+  const debugArmX = 0.5 * 1.25;
+  const debugArmY = 0.125 * 1.25;
   await expect
     .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeCloseTo(Math.sqrt(19.2 ** 2 - 0.375 ** 2) - 0.625, 5);
+    .toBeCloseTo(Math.sqrt(19.2 ** 2 - debugArmY ** 2) - debugArmX, 5);
   await page.keyboard.up("d");
   const edge = await inspect(page);
   expect(edge.camera.x).toBeCloseTo(edge.player.positionTiles.x, 6);
@@ -2493,7 +2498,7 @@ test("the Home phase panel starts a two-phase one-shot drill at the first select
   await finishCountdown(page, false);
   const state = await inspect(page);
   expect(state.rulesVersion).toBe(
-    "killer-bee-queen-nest-paladin-v9-drill-p2-4-once",
+    "killer-bee-queen-nest-paladin-v10-drill-p2-4-once",
   );
   expect(state.enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
 });

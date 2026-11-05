@@ -1,5 +1,5 @@
 {
-  "comment": "Encounter-wide authored values, shared by every encounter (K14). The player body is sized independently of any enemy (G08). Per-encounter values (rulesVersion, displayName, primaryArchetype, spawns, session) live under encounters. The player body's 0.889 tiles is 8/9, the shared 8x8 native derivation measured in docs/killer-bee-queen-geometry-source.md (P37).",
+  "comment": "Encounter-wide authored values, shared by every encounter (K14). The player body is sized independently of any enemy (G08). Per-encounter values (rulesVersion, displayName, primaryArchetype, spawns, session) live under encounters. The player body is the Paladin class image's 6 x 8 body-and-arm mask: 0.667 x 0.889 tiles (6/9 and 8/9), with the asymmetric convex paladin-body outline recorded in docs/player-body-source.md (V11 X01). The 8 x 8 frame remains 0.889 x 0.889.",
   "simulation": {
     "fixedStepHz": 60,
     "maxStepsPerUpdate": 8
@@ -7,8 +7,8 @@
   "player": {
     "spawnTiles": { "x": 0, "y": 0 },
     "body": {
-      "shape": "beveled-octagon",
-      "widthTiles": 0.889,
+      "shape": "paladin-body",
+      "widthTiles": 0.667,
       "heightTiles": 0.889
     }
   },
@@ -27,7 +27,7 @@
   "defaultEncounter": "killer-bee-queen",
   "encounters": {
     "crystal-worm": {
-      "rulesVersion": "crystal-worm-child-swarm-paladin-v5",
+      "rulesVersion": "crystal-worm-child-swarm-paladin-v6",
       "displayName": "Crystal Worm Swarm",
       "primaryArchetype": "crystal-worm-child-head",
       "arenaId": "crystal-worm-circle",
@@ -50,7 +50,7 @@
       }
     },
     "killer-bee-queen": {
-      "rulesVersion": "killer-bee-queen-nest-paladin-v9",
+      "rulesVersion": "killer-bee-queen-nest-paladin-v10",
       "displayName": "Killer Bee Queen",
       "primaryArchetype": "killer-bee-queen",
       "arenaId": "nest-boss-room",

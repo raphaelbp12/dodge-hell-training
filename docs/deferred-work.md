@@ -241,6 +241,16 @@ Rules for this register:
 
 **Fidelity gap this leaves.** All three hive families render and collide at 1.361 x 0.778 tiles. If the two measured clusters really are two different in-game sizes, one or two of the three families is wrong by up to about 1.5x in each axis, and because V10's W19 keeps hitboxes sprite-derived, the error is in the hitbox as well as the art. It affects phases 5, 7 and 8 only.
 
+### D24 - Player Character Sprite Appearance
+
+**What.** Render the Paladin's 8 x 8 pixel character as the player's sprite, code-generated from the RealmEye Paladin class image, instead of the white body marker.
+
+**Why deferred.** Declined by explicit user decision on 2026-11-05 (plan V11, X03). The request was the player body's footprint and hitbox, not its art, and project decision Q03 chose original simple art or code-generated shapes over copied sprites. No third-party image is shipped.
+
+**Blocked on.** A decision to reopen Q03 and extend the D15 licensing review to a recreated player sprite, plus an appearance path for the player: the existing appearance catalog and pixel renderer are projectile-only.
+
+**Fidelity gap this leaves.** The player reads as a white body marker rather than the Paladin sprite, so class identity, facing and animation are absent. The hitbox still matches the sprite-derived body, so the gap is visual only and the trainer does not misstate the player's size.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

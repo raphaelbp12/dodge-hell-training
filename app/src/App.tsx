@@ -775,6 +775,17 @@ export default function App() {
                 aria-labelledby="changelog-title"
               >
                 <h2 id="changelog-title">Changelog</h2>
+                <time dateTime="2026-11-05">5 Nov 2026</time>
+                <ul>
+                  <li>
+                    The player's body now matches the Paladin sprite's 6 x 8
+                    footprint, and its hitbox follows the new asymmetric body.
+                  </li>
+                  <li>
+                    Both encounters have a new comparison identity, so earlier
+                    attempts show as other rules.
+                  </li>
+                </ul>
                 <time dateTime="2026-11-04">4 Nov 2026</time>
                 <ul>
                   <li>
