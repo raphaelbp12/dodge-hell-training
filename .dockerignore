@@ -1,0 +1,19 @@
+# Build context for the dev container image.
+# The image only needs the package manifests and the container helper scripts.
+.git
+.github
+.codegraph
+.superpowers
+.vscode
+docs
+image.png
+**/node_modules
+app/dist
+app/test-results
+app/.vitest
+app/playwright-report
+app/coverage
+app/src
+app/tests
+app/public
+app/scripts

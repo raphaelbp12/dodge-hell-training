@@ -1,0 +1,46 @@
+{
+  "name": "Dodge Hell Training",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "mounts": [
+    "source=claude-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=user-config-${devcontainerId},target=/home/node/.config,type=volume",
+    "source=app-node-modules-${devcontainerId},target=/workspaces/${localWorkspaceFolderBasename}/app/node_modules,type=volume"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "GIT_CONFIG_GLOBAL": "/home/node/.config/git/config",
+    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright"
+  },
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci",
+  "postStartCommand": "sudo /usr/local/bin/init-devcontainer-firewall.sh",
+  "waitFor": "postStartCommand",
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW"
+  ],
+  "forwardPorts": [
+    5173
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "Vite dev server",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code"
+      ]
+    }
+  }
+}

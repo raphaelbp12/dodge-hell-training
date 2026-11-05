@@ -18,6 +18,7 @@ This file is the reusable process for every planning effort in this repository: 
 | V9 | 36 | archived | U | [`docs/plan-v9.md`](docs/plan-v9.md) |
 | V10 | 37-40 | drafted | W | [`docs/plan-v10.md`](docs/plan-v10.md) |
 | V11 | 41 | archived | X | [`docs/plan-v11.md`](docs/plan-v11.md) |
+| V12 | 42 | drafted | Y | [`docs/plan-v12.md`](docs/plan-v12.md) |
 
 (V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 
