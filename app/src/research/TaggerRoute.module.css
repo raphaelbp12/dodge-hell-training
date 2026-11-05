@@ -261,3 +261,47 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.warning,
+.confirm {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #8a6d2f;
+  border-radius: 0.35rem;
+  background: #352b14;
+  color: #ffd98a;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cellInput {
+  box-sizing: border-box;
+  width: 6.5rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid #3e4a60;
+  border-radius: 0.25rem;
+  background: #0f131b;
+  color: inherit;
+  font: inherit;
+}
+
+.cellSelect {
+  max-width: 11rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid #3e4a60;
+  border-radius: 0.25rem;
+  background: #0f131b;
+  color: inherit;
+  font: inherit;
+}
+
+.intervals {
+  max-width: 24rem;
+  overflow-x: auto;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}

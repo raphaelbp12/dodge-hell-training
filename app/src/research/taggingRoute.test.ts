@@ -2,11 +2,13 @@ import { describe, expect, test } from "vitest";
 import { validateObservationExport } from "./tagging";
 import {
   actionForKey,
+  clampSeekTarget,
   buildProvenance,
   frameStepSeconds,
   isActivationTarget,
   isEditableTarget,
   isTaggerRequested,
+  parseFrameRate,
 } from "./taggingRoute";
 
 describe("isTaggerRequested", () => {
@@ -47,7 +49,13 @@ describe("actionForKey", () => {
       deltaSeconds: 1 / 30,
     });
     expect(actionForKey(" ", 60)).toEqual({ kind: "play-pause" });
-    expect(actionForKey("Enter", 60)).toEqual({ kind: "record" });
+    expect(actionForKey("Enter", 60)).toEqual({ kind: "record", mode: "standalone" });
+    expect(actionForKey("b", 60)).toEqual({ kind: "record", mode: "new-burst" });
+    expect(actionForKey("B", 60, true)).toEqual({ kind: "record", mode: "new-burst" });
+    expect(actionForKey("Enter", 60, true)).toEqual({
+      kind: "record",
+      mode: "continue-burst",
+    });
     expect(actionForKey("3", 60)).toEqual({ kind: "set-shots", shots: 3 });
     expect(actionForKey("9", 60)).toEqual({ kind: "set-shots", shots: 9 });
   });
@@ -184,5 +192,26 @@ describe("isActivationTarget", () => {
     ).toBe(false);
     expect(isActivationTarget({ tagName: "BUTTON" }, "ArrowRight")).toBe(false);
     expect(isActivationTarget(null, "Enter")).toBe(false);
+  });
+});
+
+describe("parseFrameRate", () => {
+  test.each(["", "  ", "0", "-5", "abc", "Infinity"])("rejects %j", (text) => {
+    expect(parseFrameRate(text)).toBeNull();
+  });
+  test("accepts a positive rate", () => {
+    expect(parseFrameRate("29.97")).toBe(29.97);
+  });
+});
+
+describe("clampSeekTarget", () => {
+  test("clamps to zero and the limit", () => {
+    expect(clampSeekTarget(-3, 100)).toBe(0);
+    expect(clampSeekTarget(120, 100)).toBe(100);
+    expect(clampSeekTarget(50, 100)).toBe(50);
+  });
+  test("only floors when the limit is unknown", () => {
+    expect(clampSeekTarget(500, 0)).toBe(500);
+    expect(clampSeekTarget(-1, 0)).toBe(0);
   });
 });

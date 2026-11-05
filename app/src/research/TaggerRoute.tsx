@@ -10,29 +10,55 @@ import {
   encounterConfigOf,
   type ProjectileAppearanceSpec,
 } from "../game/config/encounter";
-import type { Tag } from "./tagging";
+import { summarizeTags, type Tag, type TagPattern } from "./tagging";
 import {
   actionForKey,
-  buildProvenance,
+  clampSeekTarget,
   COARSE_JUMP_SECONDS,
   FINE_JUMP_SECONDS,
   frameStepSeconds,
   isActivationTarget,
   isEditableTarget,
+  parseFrameRate,
 } from "./taggingRoute";
 import {
   appearanceOptions,
   assembleExport,
+  assignBurst,
   createTag,
+  editTag,
+  formatSummaryRow,
+  OFFERABLE_PATTERNS,
+  patternTakesAim,
   phaseOptions,
   pixelGridCells,
   readoutInterval,
+  shotsLabel,
+  sortNewestFirst,
+  TAG_AIMS,
   type AppearanceOption,
+  type PhaseOption,
   type StickySelection,
+  type TagChange,
 } from "./taggingOptions";
+import {
+  currentDuration,
+  fileNameMismatch,
+  loadDecision,
+  parseStudyFile,
+  resolveProvenance,
+  videoChoiceDecision,
+} from "./studyLoad";
+import {
+  buildDraft,
+  restoreSticky,
+  shouldWriteDraft,
+  TaggerSessions,
+  type SessionListEntry,
+} from "./taggerSessions";
+import type { StudyState } from "./tagging";
 import styles from "./TaggerRoute.module.css";
 
-const DEFAULT_FRAME_RATE = 60;
 const THUMBNAIL_SCALE_PIXELS = 6;
 
 type FrameMetadata = Readonly<{ mediaTime: number }>;
@@ -92,6 +118,84 @@ function AppearanceChoice({
   );
 }
 
+type Confirmation = Readonly<{ message: string; onConfirm: () => void }>;
+
+const KNOWN_ENCOUNTER_IDS = ENCOUNTER_LIST.map((entry) => entry.id);
+
+function RawOrKnownSelect({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  const known = options.some((option) => option.value === value);
+  return (
+    <select
+      className={styles.cellSelect}
+      aria-label={label}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {!known && <option value={value}>{value} (unknown)</option>}
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function phaseChoices(phases: readonly PhaseOption[]) {
+  return phases.map((phase) => ({
+    value: String(phase.index),
+    label: `${phase.label} — ${phase.id}`,
+  }));
+}
+
+/**
+ * A number input that commits on blur or Enter and restores its text when the
+ * edit is refused, so a rejected value never lingers in the row.
+ */
+function CommitInput({
+  value,
+  label,
+  onCommit,
+  blankAllowed = false,
+  step = "1",
+}: {
+  value: string;
+  label: string;
+  onCommit: (text: string) => boolean;
+  blankAllowed?: boolean;
+  step?: string;
+}) {
+  return (
+    <input
+      key={value}
+      className={styles.cellInput}
+      type="number"
+      step={step}
+      aria-label={label}
+      defaultValue={value}
+      onBlur={(event) => {
+        const text = event.currentTarget.value;
+        if (text === value || (blankAllowed && text === "" && value === ""))
+          return;
+        if (!onCommit(text)) event.currentTarget.value = value;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 export function TaggerRoute() {
   const appearances = appearanceOptions();
   const initialEncounter = ENCOUNTER_LIST.some(
@@ -105,7 +209,8 @@ export function TaggerRoute() {
   const [sticky, setSticky] = useState<StickySelection>({
     phaseIndex: 0,
     spriteId: appearances[0].id,
-    kind: "volley",
+    pattern: "rotating-arm",
+    aim: "player",
     shots: 1,
   });
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -114,10 +219,29 @@ export function TaggerRoute() {
   const [mediaTime, setMediaTime] = useState(0);
   const [seekPending, setSeekPending] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [frameRateText, setFrameRateText] = useState(String(DEFAULT_FRAME_RATE));
+  // Z26: the presented rate has no default; it must be typed.
+  const [frameRateText, setFrameRateText] = useState("");
   const [sourceUrlText, setSourceUrlText] = useState("");
   const [tags, setTags] = useState<readonly Tag[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // The loaded or restored study's file name and duration (Z14, Z16).
+  const [studyMeta, setStudyMeta] = useState<Readonly<{
+    fileName: string;
+    durationSeconds: number;
+  }> | null>(null);
+  // Z15: the first video chosen after a load or restore keeps the tags.
+  const [keepTagsOnNextVideo, setKeepTagsOnNextVideo] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  // Z30: a slot is written only after a first tag or edit in this session.
+  const [dirty, setDirty] = useState(false);
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const [sessions] = useState(() => new TaggerSessions(() => window.localStorage));
+  const [sessionList, setSessionList] = useState<
+    readonly SessionListEntry[] | null
+  >(null);
+  const [sessionListError, setSessionListError] = useState<string | null>(null);
+  const [sessionsDismissed, setSessionsDismissed] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
   // A seek has not yet produced a presented frame, so `mediaTime` still names
   // the previous frame. Recording waits for the callback rather than reading
@@ -126,9 +250,76 @@ export function TaggerRoute() {
   const seekPendingRef = useRef(false);
   const seekTimeoutRef = useRef<number | null>(null);
 
-  const frameRate = Number(frameRateText);
+  const frameRate = parseFrameRate(frameRateText);
   const selectedPhase = phases[sticky.phaseIndex] ?? phases[0];
   const interval = readoutInterval(tags, sticky);
+  const duration = currentDuration(
+    durationSeconds,
+    studyMeta?.durationSeconds ?? null,
+  );
+  const mismatch = fileNameMismatch(
+    studyMeta?.fileName ?? null,
+    videoUrl ? fileName : null,
+  );
+  const summaryRows = summarizeTags(tags).map((summary) =>
+    formatSummaryRow(summary, phases),
+  );
+
+  const refreshSessions = () => {
+    const result = sessions.list();
+    if (result.ok) {
+      setSessionList(result.value);
+      setSessionListError(null);
+    } else {
+      setSessionList([]);
+      setSessionListError(result.error);
+    }
+  };
+
+  // Z29: opening the route lists saved sessions.
+  useEffect(() => {
+    refreshSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Z28/Z30: autosave once the session is dirty and holds a tag. The slot is
+  // keyed by the file name in use now, so an accepted mismatched video writes
+  // to its own slot and leaves the old one (Z16).
+  useEffect(() => {
+    if (!shouldWriteDraft({ dirty, tagCount: tags.length })) return;
+    const source = videoUrl
+      ? { fileName, durationSeconds }
+      : studyMeta;
+    if (!source || source.fileName.trim().length === 0 || !(source.durationSeconds > 0))
+      return;
+    const trimmed = sourceUrlText.trim();
+    const study: StudyState = {
+      encounterId,
+      provenance: {
+        sourceUrl: trimmed.length === 0 ? null : trimmed,
+        fileName: source.fileName.trim(),
+        frameRate,
+        durationSeconds: source.durationSeconds,
+      },
+      tags,
+    };
+    const result = sessions.write(
+      buildDraft({ study, sticky, savedAt: new Date().toISOString() }),
+    );
+    setAutosaveError(result.ok ? null : result.error);
+  }, [
+    dirty,
+    tags,
+    sticky,
+    sourceUrlText,
+    frameRate,
+    encounterId,
+    videoUrl,
+    fileName,
+    durationSeconds,
+    studyMeta,
+    sessions,
+  ]);
 
   // T17: the video only ever enters through a file picker, and its object URL
   // is revoked when the file changes or the route unmounts.
@@ -188,12 +379,12 @@ export function TaggerRoute() {
   };
 
   /**
-   * A transport seek, whether a frame step or a coarse jump, changes only the
-   * presented frame. The displayed and recorded time still comes from the next
-   * frame callback. Reading the seeked value here would reintroduce
-   * frame-rate-dependent timestamps (T19).
+   * The one seek path (Z22). It changes only the presented frame: the
+   * displayed and recorded time still comes from the next frame callback.
+   * Reading the seeked value here would reintroduce frame-rate-dependent
+   * timestamps (T19).
    */
-  const seekBy = (deltaSeconds: number) => {
+  const seekTo = (target: number) => {
     const element = video.current;
     if (!element) return;
     element.pause();
@@ -201,9 +392,6 @@ export function TaggerRoute() {
       Number.isFinite(element.duration) && element.duration > 0
         ? element.duration
         : durationSeconds;
-    // `currentTime` is read here only to find the seek target of a
-    // non-recorded affordance. No tag time is ever derived from it (T19).
-    const target = element.currentTime + deltaSeconds;
     clearSeekTimeout();
     seekPendingRef.current = true;
     setSeekPending(true);
@@ -212,16 +400,23 @@ export function TaggerRoute() {
       setSeekPending(false);
       seekTimeoutRef.current = null;
     }, 500);
-    element.currentTime =
-      limit > 0 ? Math.min(Math.max(0, target), limit) : Math.max(0, target);
+    element.currentTime = clampSeekTarget(target, limit);
+  };
+
+  const seekBy = (deltaSeconds: number) => {
+    const element = video.current;
+    if (!element) return;
+    // `currentTime` is read here only to find the seek target of a
+    // non-recorded affordance. No tag time is ever derived from it (T19).
+    seekTo(element.currentTime + deltaSeconds);
   };
 
   const stepFrame = (direction: -1 | 1, deltaSeconds?: number) => {
     let delta: number;
     try {
-      delta = deltaSeconds ?? frameStepSeconds(frameRate);
+      delta = deltaSeconds ?? frameStepSeconds(frameRate ?? 0);
     } catch {
-      setError("Enter a positive frame rate before stepping frames.");
+      setError("Enter the video's presented frame rate before stepping frames.");
       return;
     }
     seekBy(direction * delta);
@@ -229,17 +424,37 @@ export function TaggerRoute() {
 
   const jumpBy = (seconds: number) => seekBy(seconds);
 
-  const recordTag = () => {
+  const recordTag = (mode: "standalone" | "new-burst" | "continue-burst") => {
     if (!videoUrl) {
       setError("Load a video before recording a tag.");
+      return;
+    }
+    if (frameRate === null) {
+      setError("Enter the video's presented frame rate before recording.");
       return;
     }
     if (seekPendingRef.current) {
       setError("Wait for the seeked frame to appear before recording.");
       return;
     }
+    let burstId: number | undefined;
+    if (mode !== "standalone") {
+      const assigned = assignBurst(
+        tags,
+        sticky,
+        mode === "new-burst" ? "new" : "continue",
+      );
+      if (assigned === null) {
+        setError(
+          "No earlier burst matches this phase, sprite, pattern and aim. Press B to start one.",
+        );
+        return;
+      }
+      burstId = assigned;
+    }
     setError(null);
-    setTags((current) => [...current, createTag(mediaTime, sticky)]);
+    setDirty(true);
+    setTags((current) => [...current, createTag(mediaTime, sticky, burstId)]);
   };
 
   useEffect(() => {
@@ -247,11 +462,20 @@ export function TaggerRoute() {
       const target = event.target as HTMLElement | null;
       if (isEditableTarget(target)) return;
       if (isActivationTarget(target, event.key)) return;
-      if (event.repeat && (event.key === " " || event.key === "Enter")) return;
+      if (
+        event.repeat &&
+        (event.key === " " ||
+          event.key === "Enter" ||
+          event.key === "b" ||
+          event.key === "B")
+      )
+        return;
       let action: ReturnType<typeof actionForKey>;
       try {
-        action = actionForKey(event.key, frameRate, event.shiftKey);
+        action = actionForKey(event.key, frameRate ?? 0, event.shiftKey);
       } catch {
+        event.preventDefault();
+        setError("Enter the video's presented frame rate before stepping frames.");
         return;
       }
       if (!action) return;
@@ -260,7 +484,7 @@ export function TaggerRoute() {
       else if (action.kind === "frame-step")
         stepFrame(action.direction, action.deltaSeconds);
       else if (action.kind === "play-pause") togglePlayback();
-      else if (action.kind === "record") recordTag();
+      else if (action.kind === "record") recordTag(action.mode);
       else
         setSticky((current) => ({ ...current, shots: action.shots }));
     };
@@ -268,20 +492,45 @@ export function TaggerRoute() {
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
-  const chooseFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const resetSeek = () => {
+    clearSeekTimeout();
+    seekPendingRef.current = false;
+    setSeekPending(false);
+  };
+
+  const applyVideo = (file: File, keepTags: boolean) => {
     setError(null);
     setFileName(file.name);
     setDurationSeconds(0);
     setMediaTime(0);
-    setSourceUrlText("");
-    setFrameRateText(String(DEFAULT_FRAME_RATE));
-    clearSeekTimeout();
-    seekPendingRef.current = false;
-    setSeekPending(false);
-    setTags([]);
+    resetSeek();
+    if (keepTags) {
+      // Z15: tags, sourceUrl and frameRate carry over from the load.
+      setKeepTagsOnNextVideo(false);
+    } else {
+      setSourceUrlText("");
+      setFrameRateText("");
+      setTags([]);
+      setStudyMeta(null);
+      setDirty(false);
+    }
     setVideoUrl(URL.createObjectURL(file));
+  };
+
+  const chooseFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const decision = videoChoiceDecision({
+      tagCount: tags.length,
+      keepTagsOnNextVideo,
+    });
+    if (decision === "confirm-reset")
+      setConfirmation({
+        message: `Choosing "${file.name}" clears the ${tags.length} tag(s) in this session. Saved sessions are not affected.`,
+        onConfirm: () => applyVideo(file, false),
+      });
+    else applyVideo(file, decision === "keep");
   };
 
   const chooseEncounter = (id: string) => {
@@ -289,23 +538,125 @@ export function TaggerRoute() {
     // One video is one fight (T16): tags recorded under the previous encounter
     // cannot be relabelled by a later selector change.
     setTags([]);
-    clearSeekTimeout();
-    seekPendingRef.current = false;
-    setSeekPending(false);
+    setStudyMeta(null);
+    setKeepTagsOnNextVideo(false);
+    setDirty(false);
+    resetSeek();
     setError(null);
     setSticky((current) => ({ ...current, phaseIndex: 0 }));
+  };
+
+  /** Shared by loading a study file and restoring a saved session. */
+  const applyStudy = (
+    study: StudyState,
+    nextSticky: StickySelection | null,
+    notices: readonly string[],
+  ) => {
+    setEncounterId(study.encounterId);
+    setSourceUrlText(study.provenance.sourceUrl ?? "");
+    setFrameRateText(
+      study.provenance.frameRate === null ? "" : String(study.provenance.frameRate),
+    );
+    setTags(study.tags);
+    setStudyMeta({
+      fileName: study.provenance.fileName,
+      durationSeconds: study.provenance.durationSeconds,
+    });
+    setSticky((current) =>
+      nextSticky ? nextSticky : { ...current, phaseIndex: 0 },
+    );
+    setKeepTagsOnNextVideo(true);
+    setDirty(false);
+    setError(null);
+    setNotice(notices.length > 0 ? notices.join(" ") : null);
+  };
+
+  const requestApply = (message: string, apply: () => void) => {
+    if (loadDecision(tags.length) === "confirm")
+      setConfirmation({ message, onConfirm: apply });
+    else apply();
+  };
+
+  const chooseStudy = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    void file.text().then(
+      (text) => {
+        let study: StudyState;
+        try {
+          study = parseStudyFile(text, KNOWN_ENCOUNTER_IDS);
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+          return;
+        }
+        requestApply(
+          `Loading "${file.name}" replaces the ${tags.length} tag(s) in this session.`,
+          () => applyStudy(study, null, []),
+        );
+      },
+      () => setError("The study file could not be read."),
+    );
+  };
+
+  const restoreSession = (key: string) => {
+    const result = sessions.read(key);
+    if (!result.ok) {
+      setError(`The saved session could not be restored: ${result.error}`);
+      return;
+    }
+    const draft = result.value;
+    if (!KNOWN_ENCOUNTER_IDS.includes(draft.study.encounterId)) {
+      setError(`Unknown encounter "${draft.study.encounterId}".`);
+      return;
+    }
+    const restored = restoreSticky(
+      draft.sticky,
+      encounterConfigOf(draft.study.encounterId),
+    );
+    const notices = restored.notices.map((entry) =>
+      entry === "sprite-missing"
+        ? "The saved sprite no longer exists; the default sprite is selected."
+        : "The saved phase no longer exists; the first phase is selected.",
+    );
+    requestApply(
+      `Restoring "${draft.study.provenance.fileName}" replaces the ${tags.length} tag(s) in this session.`,
+      () => applyStudy(draft.study, restored.sticky, notices),
+    );
+  };
+
+  const discardSession = (key: string) => {
+    setConfirmation({
+      message: "Discard this saved session? This cannot be undone.",
+      onConfirm: () => {
+        const result = sessions.discard(key);
+        if (!result.ok) setError(`Could not discard: ${result.error}`);
+        refreshSessions();
+      },
+    });
+  };
+
+  const applyEdit = (index: number, change: TagChange) => {
+    const result = editTag(tags[index], change, duration);
+    if (!result.ok) {
+      setError(result.error);
+      return false;
+    }
+    setError(null);
+    setDirty(true);
+    setTags((current) =>
+      current.map((entry, at) => (at === index ? result.tag : entry)),
+    );
+    return true;
   };
 
   const exportTags = () => {
     setError(null);
     try {
-      if (!videoUrl) throw new Error("Load a video before exporting.");
-      if (!Number.isFinite(durationSeconds) || durationSeconds <= 0)
-        throw new Error("Wait until the video's duration is known.");
-      const provenance = buildProvenance({
-        fileName,
-        durationSeconds,
-        sourceUrl: sourceUrlText,
+      const provenance = resolveProvenance({
+        video: videoUrl ? { fileName, durationSeconds } : null,
+        study: studyMeta,
+        sourceUrlText,
         frameRate,
       });
       const exported = assembleExport({
@@ -332,9 +683,10 @@ export function TaggerRoute() {
     }
   };
 
-  const newestFirst = tags
-    .map((tag, index) => ({ tag, index }))
-    .reverse();
+  const rows = sortNewestFirst(tags);
+  const showSessions =
+    !sessionsDismissed &&
+    ((sessionList !== null && sessionList.length > 0) || sessionListError);
 
   return (
     <main className={styles.shell} data-tagger-route>
@@ -349,12 +701,95 @@ export function TaggerRoute() {
         </p>
       </header>
 
+      {confirmation && (
+        <div className={styles.confirm} role="alertdialog" aria-label="Confirm">
+          <span>{confirmation.message}</span>
+          <button
+            type="button"
+            onClick={() => {
+              const { onConfirm } = confirmation;
+              setConfirmation(null);
+              onConfirm();
+            }}
+          >
+            Confirm
+          </button>
+          <button type="button" onClick={() => setConfirmation(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {showSessions && (
+        <section className={styles.panel} aria-labelledby="sessions-title">
+          <h2 id="sessions-title">Saved sessions</h2>
+          {sessionListError && (
+            <p className={styles.error} role="alert">
+              Saved sessions are unavailable: {sessionListError}
+            </p>
+          )}
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">File</th>
+                  <th scope="col">Tags</th>
+                  <th scope="col">Last saved</th>
+                  <th scope="col">
+                    <span className={styles.visuallyHidden}>Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(sessionList ?? []).map((entry) =>
+                  entry.readable ? (
+                    <tr key={entry.key}>
+                      <td>{entry.fileName}</td>
+                      <td>{entry.tagCount}</td>
+                      <td>{new Date(entry.savedAt).toLocaleString()}</td>
+                      <td>
+                        <button type="button" onClick={() => restoreSession(entry.key)}>
+                          Restore
+                        </button>{" "}
+                        <button type="button" onClick={() => discardSession(entry.key)}>
+                          Discard
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={entry.key}>
+                      <td colSpan={3}>Unreadable: {entry.key}</td>
+                      <td>
+                        <button type="button" onClick={() => discardSession(entry.key)}>
+                          Discard
+                        </button>
+                      </td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className={styles.note}>
+            Sessions are saved automatically per video file name and removed
+            only when discarded.
+          </p>
+          <button type="button" onClick={() => setSessionsDismissed(true)}>
+            Dismiss list
+          </button>
+        </section>
+      )}
+
       <section className={styles.panel} aria-labelledby="source-title">
         <h2 id="source-title">Video</h2>
         <div className={styles.row}>
           <label className={styles.field}>
             <span>Local video file</span>
             <input type="file" accept="video/*" onChange={chooseFile} />
+          </label>
+          <label className={styles.field}>
+            <span>Load study (JSON, optional)</span>
+            <input type="file" accept="application/json,.json" onChange={chooseStudy} />
           </label>
           <label className={styles.field}>
             <span>Encounter</span>
@@ -376,25 +811,42 @@ export function TaggerRoute() {
             <input
               type="url"
               value={sourceUrlText}
-              onChange={(event) => setSourceUrlText(event.target.value)}
+              onChange={(event) => {
+                setSourceUrlText(event.target.value);
+                if (tags.length > 0) setDirty(true);
+              }}
               placeholder="https://..."
             />
           </label>
           <label className={styles.field}>
-            <span>Frame rate (steps only)</span>
+            <span>Video's presented frame rate (fps, required)</span>
             <input
               type="number"
               min="1"
-              step="1"
+              step="any"
               value={frameRateText}
-              onChange={(event) => setFrameRateText(event.target.value)}
+              onChange={(event) => {
+                setFrameRateText(event.target.value);
+                if (tags.length > 0) setDirty(true);
+              }}
             />
           </label>
         </div>
         <p className={styles.meta}>
-          {fileName || "No file chosen"} · duration{" "}
-          {durationSeconds > 0 ? `${durationSeconds.toFixed(3)} s` : "unknown"}
+          {videoUrl
+            ? fileName
+            : studyMeta
+              ? `${studyMeta.fileName} (from study, no video open)`
+              : "No file chosen"}{" "}
+          · duration {duration > 0 ? `${duration.toFixed(3)} s` : "unknown"}
         </p>
+        {mismatch && (
+          <p className={styles.warning} role="status">
+            The study names "{studyMeta?.fileName}" but the open video is "
+            {fileName}". Export will use the open video's file name and
+            duration.
+          </p>
+        )}
         {videoUrl && (
           <video
             ref={video}
@@ -416,7 +868,8 @@ export function TaggerRoute() {
         )}
         {!videoUrl && (
           <p className={styles.empty}>
-            Choose a video file to begin. Nothing is uploaded.
+            Choose a video file to record, step or jump. Without one you can
+            still load, edit and export a study. Nothing is uploaded.
           </p>
         )}
         <div className={styles.transport}>
@@ -468,7 +921,9 @@ export function TaggerRoute() {
         <p className={styles.note}>
           Space plays or pauses, arrows step one frame, Shift+arrows jump{" "}
           {FINE_JUMP_SECONDS} seconds, PageUp/PageDown jump {COARSE_JUMP_SECONDS}{" "}
-          seconds, Enter records, and number keys 1-9 set the shot count.
+          seconds, Enter records a standalone tag, B records a volley that
+          starts a new burst, Shift+Enter adds a volley to the latest matching
+          burst, and number keys 1-9 set the shot count.
         </p>
       </section>
 
@@ -477,8 +932,14 @@ export function TaggerRoute() {
         <p className={styles.sticky} aria-live="polite">
           Recording: <strong>{sticky.spriteId}</strong> ·{" "}
           {selectedPhase ? selectedPhase.label : "No phase"} ({selectedPhase?.id}
-          ) · <strong>{sticky.kind}</strong> · <strong>{sticky.shots}</strong>{" "}
-          {sticky.kind === "volley" ? "shots" : "arms"}
+          ) · <strong>{sticky.pattern}</strong>
+          {patternTakesAim(sticky.pattern) && (
+            <>
+              {" "}
+              · aim <strong>{sticky.aim}</strong>
+            </>
+          )}{" "}
+          · <strong>{sticky.shots}</strong> {shotsLabel(sticky.pattern)}
         </p>
         <div className={styles.controls}>
           <label className={styles.field}>
@@ -500,32 +961,37 @@ export function TaggerRoute() {
             </select>
           </label>
           <fieldset className={styles.field}>
-            <legend>Kind</legend>
-            <label>
-              <input
-                type="radio"
-                name="kind"
-                checked={sticky.kind === "volley"}
-                onChange={() =>
-                  setSticky((current) => ({ ...current, kind: "volley" }))
-                }
-              />
-              Volley
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="kind"
-                checked={sticky.kind === "rotating-arm"}
-                onChange={() =>
-                  setSticky((current) => ({ ...current, kind: "rotating-arm" }))
-                }
-              />
-              Rotating arm
-            </label>
+            <legend>Pattern</legend>
+            {OFFERABLE_PATTERNS.map((pattern) => (
+              <label key={pattern}>
+                <input
+                  type="radio"
+                  name="pattern"
+                  checked={sticky.pattern === pattern}
+                  onChange={() => setSticky((current) => ({ ...current, pattern }))}
+                />
+                {pattern}
+              </label>
+            ))}
           </fieldset>
+          {patternTakesAim(sticky.pattern) && (
+            <fieldset className={styles.field}>
+              <legend>Aim</legend>
+              {TAG_AIMS.map((aim) => (
+                <label key={aim}>
+                  <input
+                    type="radio"
+                    name="aim"
+                    checked={sticky.aim === aim}
+                    onChange={() => setSticky((current) => ({ ...current, aim }))}
+                  />
+                  {aim}
+                </label>
+              ))}
+            </fieldset>
+          )}
           <label className={styles.field}>
-            <span>Shots / arms</span>
+            <span>{sticky.pattern === "rotating-arm" || sticky.pattern === "fixed-ring" ? "Arms" : "Shots"}</span>
             <input
               type="number"
               min="1"
@@ -550,10 +1016,24 @@ export function TaggerRoute() {
           <button
             type="button"
             className={styles.record}
-            onClick={recordTag}
+            onClick={() => recordTag("standalone")}
             disabled={!videoUrl || seekPending}
           >
             Record tag
+          </button>
+          <button
+            type="button"
+            onClick={() => recordTag("new-burst")}
+            disabled={!videoUrl || seekPending}
+          >
+            Start burst (B)
+          </button>
+          <button
+            type="button"
+            onClick={() => recordTag("continue-burst")}
+            disabled={!videoUrl || seekPending}
+          >
+            Add to burst (Shift+Enter)
           </button>
           <output className={styles.readout} aria-label="Interval since previous tag">
             {seekPending
@@ -569,6 +1049,17 @@ export function TaggerRoute() {
         {error && (
           <p className={styles.error} role="alert">
             {error}
+          </p>
+        )}
+        {autosaveError && (
+          <p className={styles.error} role="alert">
+            Autosave failed: {autosaveError}. Tagging continues; export to keep
+            your work.
+          </p>
+        )}
+        {notice && (
+          <p className={styles.warning} role="status">
+            {notice}
           </p>
         )}
       </section>
@@ -589,6 +1080,46 @@ export function TaggerRoute() {
         </div>
       </section>
 
+      <section className={styles.panel} aria-labelledby="summary-title">
+        <h2 id="summary-title">Summary</h2>
+        {summaryRows.length === 0 ? (
+          <p className={styles.empty}>No tags to summarise yet.</p>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Phase</th>
+                  <th scope="col">Sprite</th>
+                  <th scope="col">Pattern</th>
+                  <th scope="col">Aim</th>
+                  <th scope="col">Scope</th>
+                  <th scope="col">Samples</th>
+                  <th scope="col">Mean</th>
+                  <th scope="col">Deviation</th>
+                  <th scope="col">Intervals</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryRows.map((row) => (
+                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.scope}`}>
+                    <td>{row.phase}</td>
+                    <td>{row.sprite}</td>
+                    <td>{row.pattern}</td>
+                    <td>{row.aim}</td>
+                    <td>{row.scope}</td>
+                    <td>{row.sampleCount}</td>
+                    <td>{row.mean}</td>
+                    <td>{row.deviation}</td>
+                    <td className={styles.intervals}>{row.intervals}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <section className={styles.panel} aria-labelledby="tags-title">
         <h2 id="tags-title">Tags ({tags.length})</h2>
         {tags.length === 0 ? (
@@ -598,32 +1129,143 @@ export function TaggerRoute() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th scope="col">Time</th>
+                  <th scope="col">Time (s)</th>
                   <th scope="col">Sprite</th>
                   <th scope="col">Phase</th>
-                  <th scope="col">Kind</th>
+                  <th scope="col">Pattern</th>
+                  <th scope="col">Aim</th>
                   <th scope="col">Shots / arms</th>
+                  <th scope="col">Burst</th>
                   <th scope="col">
-                    <span className={styles.visuallyHidden}>Remove</span>
+                    <span className={styles.visuallyHidden}>Actions</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {newestFirst.map(({ tag, index }) => (
-                  <tr key={`${index}-${tag.timeSeconds}`}>
-                    <td>{tag.timeSeconds.toFixed(3)} s</td>
-                    <td>{tag.spriteId}</td>
-                    <td>{phases[tag.phaseIndex]?.label ?? tag.phaseIndex}</td>
-                    <td>{tag.kind}</td>
-                    <td>{tag.shots}</td>
+                {rows.map(({ tag, index }) => (
+                  <tr key={index}>
+                    <td>
+                      <CommitInput
+                        label={`Time of tag ${index + 1}`}
+                        value={tag.timeSeconds.toFixed(3)}
+                        step="0.001"
+                        onCommit={(text) =>
+                          text.trim() !== "" &&
+                          applyEdit(index, {
+                            field: "timeSeconds",
+                            value: Number(text),
+                          })
+                        }
+                      />
+                      {tag.timeSource === "typed" && (
+                        <small className={styles.note}> typed</small>
+                      )}
+                    </td>
+                    <td>
+                      <RawOrKnownSelect
+                        label={`Sprite of tag ${index + 1}`}
+                        value={tag.spriteId}
+                        options={appearances.map((option) => ({
+                          value: option.id,
+                          label: option.id,
+                        }))}
+                        onChange={(value) =>
+                          applyEdit(index, { field: "spriteId", value })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <RawOrKnownSelect
+                        label={`Phase of tag ${index + 1}`}
+                        value={String(tag.phaseIndex)}
+                        options={phaseChoices(phases)}
+                        onChange={(value) =>
+                          applyEdit(index, {
+                            field: "phaseIndex",
+                            value: Number(value),
+                          })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <RawOrKnownSelect
+                        label={`Pattern of tag ${index + 1}`}
+                        value={tag.pattern}
+                        options={OFFERABLE_PATTERNS.map((pattern) => ({
+                          value: pattern,
+                          label: pattern,
+                        }))}
+                        onChange={(value) =>
+                          applyEdit(index, {
+                            field: "pattern",
+                            value: value as TagPattern,
+                          })
+                        }
+                      />
+                    </td>
+                    <td>
+                      {tag.aim === undefined ? (
+                        "—"
+                      ) : (
+                        <select
+                          className={styles.cellSelect}
+                          aria-label={`Aim of tag ${index + 1}`}
+                          value={tag.aim}
+                          onChange={(event) =>
+                            applyEdit(index, {
+                              field: "aim",
+                              value: event.target.value as "player" | "fixed",
+                            })
+                          }
+                        >
+                          {TAG_AIMS.map((aim) => (
+                            <option key={aim} value={aim}>
+                              {aim}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                    <td>
+                      <CommitInput
+                        label={`Shots of tag ${index + 1}`}
+                        value={String(tag.shots)}
+                        onCommit={(text) =>
+                          text.trim() !== "" &&
+                          applyEdit(index, { field: "shots", value: Number(text) })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <CommitInput
+                        label={`Burst of tag ${index + 1}`}
+                        value={tag.burstId === undefined ? "" : String(tag.burstId)}
+                        blankAllowed
+                        onCommit={(text) =>
+                          applyEdit(index, {
+                            field: "burstId",
+                            value: text.trim() === "" ? null : Number(text),
+                          })
+                        }
+                      />
+                    </td>
                     <td>
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => seekTo(tag.timeSeconds)}
+                        disabled={!videoUrl}
+                        aria-label={`Go to tag at ${tag.timeSeconds.toFixed(3)} seconds`}
+                      >
+                        Go to
+                      </button>{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDirty(true);
                           setTags((current) =>
                             current.filter((_entry, at) => at !== index),
-                          )
-                        }
+                          );
+                        }}
                         aria-label={`Delete tag at ${tag.timeSeconds.toFixed(3)} seconds`}
                       >
                         Delete
@@ -636,8 +1278,9 @@ export function TaggerRoute() {
           </div>
         )}
         <p className={styles.note}>
-          Delete the newest row to undo a double-tap. There is no other undo,
-          import or resume.
+          Tags list newest footage first. Edit a row in place or delete it;
+          there is no undo. Sessions are saved automatically per video file
+          name; load a study JSON above to continue earlier work.
         </p>
       </section>
     </main>

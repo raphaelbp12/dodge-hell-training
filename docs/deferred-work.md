@@ -251,6 +251,16 @@ Rules for this register:
 
 **Fidelity gap this leaves.** The player reads as a white body marker rather than the Paladin sprite, so class identity, facing and animation are absent. The hitbox still matches the sprite-derived body, so the gap is visual only and the trainer does not misstate the player's size.
 
+### D25 - Re-Tag And Retune The Killer Bee Queen's Phase-3 Bee Shot
+
+**What.** Re-tag phase 3's `bee-shot` with the burst-capable tagger from plan V13, then decide whether `bee-shot-burst-occasional` should change its `shotsPerBurst`, `shotIntervalSeconds`, cooldown or `clockwiseDegreesPerSecond`, with a new rules version if it does.
+
+**Why deferred.** Plan V13's Z34 keeps that plan to tooling. A retune should rest on the new evidence, which cannot exist until the tool ships, and gameplay changes should not be mixed with tooling.
+
+**Blocked on.** Completion of plan V13's phase 43, the user's re-tagging run, and an explicit retuning decision in its own plan.
+
+**Fidelity gap this leaves.** The encounter authors `bee-shot` as one 4-arm volley with `clockwiseDegreesPerSecond: 0` every 3.04 s, while the user reads the footage as a burst fired by rotating arms. Until this is resolved, the attack's rate and motion may differ from the real fight. Tag spacing of one video frame also means a new tagging run may not fully separate distinct volleys from one event stepped across frames.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

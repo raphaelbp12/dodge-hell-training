@@ -8,6 +8,16 @@
 import type { VideoProvenance } from "./tagging";
 
 /**
+ * Z26: the typed presented frame rate. Null when blank, zero, negative or not
+ * a finite number.
+ */
+export function parseFrameRate(text: string): number | null {
+  if (text.trim().length === 0) return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
  * The tagger opts in through the same query-string convention as `?phase=`
  * and `?encounter=`; `?tagger=1` is the whole switch (T14).
  */
@@ -37,13 +47,14 @@ export type TaggerAction =
     }>
   | Readonly<{ kind: "jump"; direction: -1 | 1; seconds: number }>
   | Readonly<{ kind: "play-pause" }>
-  | Readonly<{ kind: "record" }>
+  | Readonly<{ kind: "record"; mode: "standalone" | "new-burst" | "continue-burst" }>
   | Readonly<{ kind: "set-shots"; shots: number }>;
 
 /**
  * The one key map the route binds: arrows step one frame, Shift+arrows jump
  * five seconds, PageUp/PageDown jump thirty, space toggles playback, Enter
- * records, and 1-9 set the sticky shot count. Everything else belongs to the
+ * records a standalone tag, B records a volley that starts a new burst, Shift+Enter
+ * adds a volley to the latest matching burst, and 1-9 set the sticky shot count. Everything else belongs to the
  * browser or another control.
  */
 export function actionForKey(
@@ -72,7 +83,10 @@ export function actionForKey(
       deltaSeconds: frameStepSeconds(frameRate),
     };
   if (key === " ") return { kind: "play-pause" };
-  if (key === "Enter") return { kind: "record" };
+  if (key === "Enter" && shiftKey)
+    return { kind: "record", mode: "continue-burst" };
+  if (key === "Enter") return { kind: "record", mode: "standalone" };
+  if (key === "b" || key === "B") return { kind: "record", mode: "new-burst" };
   if (/^[1-9]$/.test(key)) return { kind: "set-shots", shots: Number(key) };
   return null;
 }
@@ -141,4 +155,13 @@ export function buildProvenance(input: {
     frameRate: input.frameRate,
     durationSeconds: input.durationSeconds,
   };
+}
+
+/**
+ * Z22: the one absolute seek target, clamped to the video. A relative step or
+ * jump adds its delta to the current time first, then shares this clamp.
+ */
+export function clampSeekTarget(target: number, limitSeconds: number): number {
+  const floored = Math.max(0, target);
+  return limitSeconds > 0 ? Math.min(floored, limitSeconds) : floored;
 }

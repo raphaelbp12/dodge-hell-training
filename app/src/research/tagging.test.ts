@@ -2,18 +2,32 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
+  studyFromExport,
   summarizeTags,
   validateObservationExport,
   type ObservationExport,
   type Tag,
+  type TagV1,
 } from "./tagging";
 
-function tag(overrides: Partial<Tag> = {}): Tag {
+/** A schema-v1 tag; the v1 cases below keep covering the committed evidence shape. */
+function tag(overrides: Partial<TagV1> = {}): TagV1 {
   return {
     timeSeconds: 10,
     phaseIndex: 2,
     spriteId: "red-glaive",
     kind: "volley",
+    shots: 4,
+    ...overrides,
+  };
+}
+
+function tag2(overrides: Partial<Tag> = {}): Tag {
+  return {
+    timeSeconds: 10,
+    phaseIndex: 2,
+    spriteId: "red-glaive",
+    pattern: "rotating-arm",
     shots: 4,
     ...overrides,
   };
@@ -208,57 +222,155 @@ describe("validateObservationExport", () => {
   });
 });
 
+function observation2(
+  tags: readonly unknown[],
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return { ...observation({ tags }), schemaVersion: 2, ...extra };
+}
+
+describe("validateObservationExport v2", () => {
+  test("accepts a well-formed v2 export unchanged", () => {
+    const value = observation2([
+      tag2(),
+      tag2({ pattern: "spread", aim: "player", burstId: 1 }),
+      tag2({ pattern: "volley", timeSource: "typed" }),
+      tag2({ pattern: "fixed-ring" }),
+      tag2({ pattern: "scatter", aim: "fixed" }),
+    ]);
+    expect(validateObservationExport(value)).toBe(value);
+  });
+
+  test("rejects an unknown schema version", () => {
+    expect(() =>
+      validateObservationExport(observation2([tag2()], { schemaVersion: 3 })),
+    ).toThrow(/schemaVersion/);
+    expect(() =>
+      validateObservationExport(observation2([tag2()], { schemaVersion: 1 })),
+    ).toThrow(/schemaVersion/);
+  });
+
+  const rejections: ReadonlyArray<readonly [string, unknown, RegExp]> = [
+    ["unknown pattern", { ...tag2(), pattern: "burst" }, /pattern/],
+    ["v1 kind field only", { ...tag(), kind: "volley" }, /pattern/],
+    ["spread without aim", tag2({ pattern: "spread" }), /aim/],
+    ["scatter with bad aim", { ...tag2({ pattern: "scatter" }), aim: "x" }, /aim/],
+    ["aim on a ring", tag2({ pattern: "fixed-ring", aim: "player" }), /aim/],
+    ["aim on a rotating arm", tag2({ aim: "fixed" }), /aim/],
+    ["zero burst id", tag2({ burstId: 0 }), /burstId/],
+    ["fractional burst id", tag2({ burstId: 1.5 }), /burstId/],
+    ["bad time source", { ...tag2(), timeSource: "frame" }, /timeSource/],
+  ];
+
+  test.each(rejections)("rejects %s", (_label, entry, path) => {
+    expect(() => validateObservationExport(observation2([entry]))).toThrow(path);
+  });
+
+  test("makes no referential check", () => {
+    const value = observation2([tag2({ spriteId: "gone", phaseIndex: 99 })], {
+      encounterId: "no-such-encounter",
+    });
+    expect(validateObservationExport(value)).toBe(value);
+  });
+});
+
+describe("studyFromExport", () => {
+  test("upgrades v1: kind to pattern, null frame rate, no input mutation", () => {
+    const value = observation({
+      tags: [tag(), tag({ kind: "rotating-arm", timeSeconds: 11 })],
+    });
+    const before = JSON.stringify(value);
+    const study = studyFromExport(
+      validateObservationExport(value),
+    );
+    expect(JSON.stringify(value)).toBe(before);
+    expect(study.provenance.frameRate).toBeNull();
+    expect(study.tags.map((entry) => entry.pattern)).toEqual([
+      "volley",
+      "rotating-arm",
+    ]);
+    expect(study.tags[0]).not.toHaveProperty("aim");
+    expect(study.tags[0]).not.toHaveProperty("burstId");
+    expect(study.tags[0]).not.toHaveProperty("kind");
+  });
+
+  test("copies v2 values unchanged", () => {
+    const tags = [tag2({ burstId: 2 }), tag2({ pattern: "spread", aim: "fixed" })];
+    const value = observation2(tags);
+    const study = studyFromExport(validateObservationExport(value));
+    expect(study.tags).toEqual(tags);
+    expect(study.provenance.frameRate).toBe(60);
+    expect(study.encounterId).toBe("killer-bee-queen");
+  });
+});
+
 describe("summarizeTags", () => {
   test("returns no summaries for no tags", () => {
     expect(summarizeTags([])).toEqual([]);
   });
 
-  test("sorts tags in time before differencing", () => {
+  test("a no-burst group keeps one all result with sorted intervals", () => {
     const tags = [
-      tag({ timeSeconds: 12 }),
-      tag({ timeSeconds: 10 }),
-      tag({ timeSeconds: 11 }),
+      tag2({ timeSeconds: 12 }),
+      tag2({ timeSeconds: 10 }),
+      tag2({ timeSeconds: 11 }),
     ];
     expect(summarizeTags(tags)).toEqual([
       {
         phaseIndex: 2,
         spriteId: "red-glaive",
-        kind: "volley",
+        pattern: "rotating-arm",
+        scope: "all",
         sampleCount: 2,
         meanSeconds: 1,
         stdevSeconds: 0,
+        intervalsSeconds: [1, 1],
       },
     ]);
   });
 
-  test("keeps kinds separate when only the kind differs", () => {
+  test("keeps patterns separate when only the pattern differs", () => {
     const summaries = summarizeTags([
-      tag({ timeSeconds: 10 }),
-      tag({ timeSeconds: 11 }),
-      tag({ timeSeconds: 12, kind: "rotating-arm" }),
-      tag({ timeSeconds: 15, kind: "rotating-arm" }),
+      tag2({ timeSeconds: 10 }),
+      tag2({ timeSeconds: 11 }),
+      tag2({ timeSeconds: 12, pattern: "fixed-ring" }),
+      tag2({ timeSeconds: 15, pattern: "fixed-ring" }),
     ]);
-    expect(summaries.map((summary) => [summary.kind, summary.sampleCount])).toEqual([
+    expect(summaries.map((s) => [s.pattern, s.sampleCount])).toEqual([
+      ["fixed-ring", 1],
       ["rotating-arm", 1],
-      ["volley", 1],
+    ]);
+  });
+
+  test("keeps concurrent groups with different aim separate", () => {
+    const summaries = summarizeTags([
+      tag2({ pattern: "spread", aim: "player", timeSeconds: 1 }),
+      tag2({ pattern: "spread", aim: "fixed", timeSeconds: 2 }),
+      tag2({ pattern: "spread", aim: "player", timeSeconds: 4 }),
+    ]);
+    expect(summaries.map((s) => [s.aim, s.sampleCount])).toEqual([
+      ["fixed", 0],
+      ["player", 1],
     ]);
   });
 
   test("keeps a one-tag group with zero samples", () => {
-    expect(summarizeTags([tag()])).toEqual([
+    expect(summarizeTags([tag2()])).toEqual([
       {
         phaseIndex: 2,
         spriteId: "red-glaive",
-        kind: "volley",
+        pattern: "rotating-arm",
+        scope: "all",
         sampleCount: 0,
         meanSeconds: 0,
         stdevSeconds: 0,
+        intervalsSeconds: [],
       },
     ]);
   });
 
   test("uses population standard deviation", () => {
-    const tags = [0, 1, 3, 6].map((timeSeconds) => tag({ timeSeconds }));
+    const tags = [0, 1, 3, 6].map((timeSeconds) => tag2({ timeSeconds }));
     const [summary] = summarizeTags(tags);
     expect(summary.sampleCount).toBe(3);
     expect(summary.meanSeconds).toBe(2);
@@ -266,22 +378,74 @@ describe("summarizeTags", () => {
     expect(summary.stdevSeconds).toBeCloseTo(Math.sqrt(2 / 3), 12);
   });
 
-  test("orders summaries deterministically by phase, sprite and kind", () => {
+  test("orders summaries by phase, sprite, pattern, aim then scope", () => {
     const tags = [
-      tag({ phaseIndex: 3, spriteId: "a", kind: "volley" }),
-      tag({ phaseIndex: 1, spriteId: "b", kind: "volley" }),
-      tag({ phaseIndex: 1, spriteId: "a", kind: "volley" }),
-      tag({ phaseIndex: 1, spriteId: "a", kind: "rotating-arm" }),
+      tag2({ phaseIndex: 3, spriteId: "a", pattern: "volley" }),
+      tag2({ phaseIndex: 1, spriteId: "b", pattern: "volley" }),
+      tag2({ phaseIndex: 1, spriteId: "a", pattern: "volley" }),
+      tag2({ phaseIndex: 1, spriteId: "a", pattern: "rotating-arm" }),
     ];
     const first = summarizeTags(tags);
     const second = summarizeTags([...tags].reverse());
     expect(first).toEqual(second);
-    expect(first.map((s) => [s.phaseIndex, s.spriteId, s.kind])).toEqual([
+    expect(first.map((s) => [s.phaseIndex, s.spriteId, s.pattern])).toEqual([
       [1, "a", "rotating-arm"],
       [1, "a", "volley"],
       [1, "b", "volley"],
       [3, "a", "volley"],
     ]);
+  });
+
+  test("the upgraded pilot tags stay one all result", () => {
+    const exportUrl = new URL(
+      "../../../docs/killer-bee-queen-observations.json",
+      import.meta.url,
+    );
+    const study = studyFromExport(
+      validateObservationExport(JSON.parse(readFileSync(exportUrl, "utf8"))),
+    );
+    const summaries = summarizeTags(study.tags);
+    expect(summaries.length).toBeGreaterThan(0);
+    expect(summaries.every((s) => s.scope === "all")).toBe(true);
+  });
+
+  test("splits two bursts into between and within intervals", () => {
+    // Burst 1 at 0, 0.5, 1.0; burst 2 at 4, 4.5; one standalone at 8.
+    const tags = [
+      tag2({ timeSeconds: 0, burstId: 1 }),
+      tag2({ timeSeconds: 0.5, burstId: 1 }),
+      tag2({ timeSeconds: 1, burstId: 1 }),
+      tag2({ timeSeconds: 4, burstId: 2 }),
+      tag2({ timeSeconds: 4.5, burstId: 2 }),
+      tag2({ timeSeconds: 8 }),
+    ];
+    const summaries = summarizeTags(tags);
+    expect(summaries.map((s) => s.scope)).toEqual([
+      "between-bursts",
+      "within-bursts",
+    ]);
+    expect(summaries[0].intervalsSeconds).toEqual([4, 4]);
+    expect(summaries[0].meanSeconds).toBe(4);
+    expect(summaries[1].intervalsSeconds).toEqual([0.5, 0.5, 0.5]);
+    expect(summaries[1].sampleCount).toBe(3);
+  });
+
+  test("a single one-volley burst yields zero-sample results", () => {
+    const summaries = summarizeTags([tag2({ burstId: 1 })]);
+    expect(summaries.map((s) => [s.scope, s.sampleCount])).toEqual([
+      ["between-bursts", 0],
+      ["within-bursts", 0],
+    ]);
+  });
+
+  test("emits no cadence-mapping fields", () => {
+    const [summary] = summarizeTags([tag2({ burstId: 1 }), tag2({ burstId: 1, timeSeconds: 11 })]);
+    for (const field of [
+      "shotsPerBurst",
+      "shotIntervalSeconds",
+      "cooldownAfterLastShotSeconds",
+    ])
+      expect(summary).not.toHaveProperty(field);
   });
 });
 

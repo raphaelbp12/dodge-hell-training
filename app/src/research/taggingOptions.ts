@@ -11,10 +11,13 @@ import {
   type ProjectileAppearanceSpec,
 } from "../game/config/encounter";
 import {
+  groupKey,
   validateObservationExport,
+  type IntervalSummary,
   type ObservationExport,
   type Tag,
-  type TagKind,
+  type TagAim,
+  type TagPattern,
   type VideoProvenance,
 } from "./tagging";
 
@@ -82,10 +85,36 @@ export function pixelGridCells(
   };
 }
 
+/** Z03/Z04: the patterns a new or edited tag may use; `volley` is load-only. */
+export const OFFERABLE_PATTERNS: readonly TagPattern[] = [
+  "rotating-arm",
+  "fixed-ring",
+  "spread",
+  "scatter",
+];
+
+export const TAG_AIMS: readonly TagAim[] = ["player", "fixed"];
+
+export const DEFAULT_AIM: TagAim = "player";
+
+/** Z05: only spread and scatter record where they aim. */
+export function patternTakesAim(pattern: TagPattern): boolean {
+  return pattern === "spread" || pattern === "scatter";
+}
+
+/** Rings count arms, every other pattern counts shots. */
+export function shotsLabel(pattern: TagPattern): "arms" | "shots" {
+  return pattern === "rotating-arm" || pattern === "fixed-ring"
+    ? "arms"
+    : "shots";
+}
+
 export type StickySelection = Readonly<{
   phaseIndex: number;
   spriteId: string;
-  kind: TagKind;
+  pattern: TagPattern;
+  /** Kept even when the pattern ignores it, so the choice survives a switch. */
+  aim: TagAim;
   shots: number;
 }>;
 
@@ -93,35 +122,156 @@ export type StickySelection = Readonly<{
 export function createTag(
   mediaTimeSeconds: number,
   sticky: StickySelection,
+  burstId?: number,
 ): Tag {
   return {
     timeSeconds: mediaTimeSeconds,
     phaseIndex: sticky.phaseIndex,
     spriteId: sticky.spriteId,
-    kind: sticky.kind,
+    pattern: sticky.pattern,
+    ...(patternTakesAim(sticky.pattern) ? { aim: sticky.aim } : {}),
     shots: sticky.shots,
+    ...(burstId === undefined ? {} : { burstId }),
   };
 }
 
+function stickyKey(sticky: StickySelection): string {
+  return groupKey({
+    phaseIndex: sticky.phaseIndex,
+    spriteId: sticky.spriteId,
+    pattern: sticky.pattern,
+    aim: patternTakesAim(sticky.pattern) ? sticky.aim : undefined,
+  });
+}
+
 /**
- * T28: one number, the interval since the previous tag in the current group.
- * Null means the group has fewer than two tags, not a missing measurement.
+ * T28: one number, the interval since the previous tag in the current group
+ * (phase, sprite, pattern, aim). Null means the group has fewer than two tags,
+ * not a missing measurement.
  */
 export function readoutInterval(
   tags: readonly Tag[],
-  sticky: Pick<StickySelection, "phaseIndex" | "spriteId" | "kind">,
+  sticky: StickySelection,
 ): number | null {
+  const key = stickyKey(sticky);
   const times = tags
-    .filter(
-      (tag) =>
-        tag.phaseIndex === sticky.phaseIndex &&
-        tag.spriteId === sticky.spriteId &&
-        tag.kind === sticky.kind,
-    )
+    .filter((tag) => groupKey(tag) === key)
     .map((tag) => tag.timeSeconds)
     .sort((first, second) => first - second);
   if (times.length < 2) return null;
   return times[times.length - 1] - times[times.length - 2];
+}
+
+export type BurstMode = "new" | "continue";
+
+/**
+ * Z09: `new` is one more than the highest burst id in the study; `continue`
+ * is the highest id among tags in the sticky group, or null when none exists.
+ */
+export function assignBurst(
+  tags: readonly Tag[],
+  sticky: StickySelection,
+  mode: BurstMode,
+): number | null {
+  if (mode === "new")
+    return tags.reduce((highest, tag) => Math.max(highest, tag.burstId ?? 0), 0) + 1;
+  const key = stickyKey(sticky);
+  let found: number | null = null;
+  for (const tag of tags)
+    if (tag.burstId !== undefined && groupKey(tag) === key)
+      found = Math.max(found ?? 0, tag.burstId);
+  return found;
+}
+
+export type TagChange =
+  | Readonly<{ field: "timeSeconds"; value: number }>
+  | Readonly<{ field: "phaseIndex"; value: number }>
+  | Readonly<{ field: "spriteId"; value: string }>
+  | Readonly<{ field: "pattern"; value: TagPattern }>
+  | Readonly<{ field: "aim"; value: TagAim }>
+  | Readonly<{ field: "shots"; value: number }>
+  /** Null removes the burst id (blank field). */
+  | Readonly<{ field: "burstId"; value: number | null }>;
+
+export type EditResult =
+  | Readonly<{ ok: true; tag: Tag }>
+  | Readonly<{ ok: false; error: string }>;
+
+function fail(error: string): EditResult {
+  return { ok: false, error };
+}
+
+/**
+ * Z20/Z21: a pure row edit. Invalid input yields an error and the caller keeps
+ * the old tag. A valid time change permanently marks the tag typed.
+ */
+export function editTag(
+  tag: Tag,
+  change: TagChange,
+  durationSeconds: number,
+): EditResult {
+  switch (change.field) {
+    case "timeSeconds":
+      if (
+        !Number.isFinite(change.value) ||
+        change.value < 0 ||
+        change.value > durationSeconds
+      )
+        return fail(`Time must be between 0 and ${durationSeconds.toFixed(3)} s.`);
+      return {
+        ok: true,
+        tag: { ...tag, timeSeconds: change.value, timeSource: "typed" },
+      };
+    case "phaseIndex":
+      if (!Number.isInteger(change.value) || change.value < 0)
+        return fail("Phase must be a nonnegative whole number.");
+      return { ok: true, tag: { ...tag, phaseIndex: change.value } };
+    case "spriteId":
+      if (change.value.trim().length === 0) return fail("Sprite must not be blank.");
+      return { ok: true, tag: { ...tag, spriteId: change.value } };
+    case "pattern": {
+      if (!OFFERABLE_PATTERNS.includes(change.value))
+        return fail("That pattern cannot be chosen.");
+      const { aim, ...rest } = tag;
+      return {
+        ok: true,
+        tag: patternTakesAim(change.value)
+          ? { ...rest, pattern: change.value, aim: aim ?? DEFAULT_AIM }
+          : { ...rest, pattern: change.value },
+      };
+    }
+    case "aim":
+      if (!patternTakesAim(tag.pattern))
+        return fail("Only spread and scatter have an aim.");
+      if (!TAG_AIMS.includes(change.value)) return fail("Aim must be player or fixed.");
+      return { ok: true, tag: { ...tag, aim: change.value } };
+    case "shots":
+      if (!Number.isInteger(change.value) || change.value < 1)
+        return fail("Shots must be a positive whole number.");
+      return { ok: true, tag: { ...tag, shots: change.value } };
+    case "burstId": {
+      if (change.value === null) {
+        const { burstId: _removed, ...rest } = tag;
+        return { ok: true, tag: rest };
+      }
+      if (!Number.isInteger(change.value) || change.value < 1)
+        return fail("Burst must be blank or a positive whole number.");
+      return { ok: true, tag: { ...tag, burstId: change.value } };
+    }
+  }
+}
+
+/** Z23: display order, newest footage first. Ties keep later-recorded rows first. */
+export function sortNewestFirst(
+  tags: readonly Tag[],
+): readonly Readonly<{ tag: Tag; index: number }>[] {
+  return tags
+    .map((tag, index) => ({ tag, index }))
+    .sort(
+      (first, second) =>
+        second.tag.timeSeconds - first.tag.timeSeconds ||
+        second.index - first.index,
+    );
 }
 
 /**
@@ -139,9 +289,48 @@ export function assembleExport(input: {
     (first, second) => first.timeSeconds - second.timeSeconds,
   );
   return validateObservationExport({
+    schemaVersion: 2,
     encounterId: input.encounterId,
     provenance: input.provenance,
     recordedAt: input.recordedAt,
     tags,
-  });
+  }) as ObservationExport;
+}
+
+export type SummaryRow = Readonly<{
+  phase: string;
+  sprite: string;
+  pattern: string;
+  aim: string;
+  scope: string;
+  sampleCount: number;
+  mean: string;
+  deviation: string;
+  intervals: string;
+}>;
+
+/**
+ * Z11: display strings for one summary result. An unknown phase index shows
+ * raw; an empty interval list shows an em dash.
+ */
+export function formatSummaryRow(
+  summary: IntervalSummary,
+  phases: readonly PhaseOption[],
+): SummaryRow {
+  const phase = phases.find((option) => option.index === summary.phaseIndex);
+  const seconds = (value: number) => `${value.toFixed(3)} s`;
+  return {
+    phase: phase ? phase.label : String(summary.phaseIndex),
+    sprite: summary.spriteId,
+    pattern: summary.pattern,
+    aim: summary.aim ?? "—",
+    scope: summary.scope,
+    sampleCount: summary.sampleCount,
+    mean: summary.sampleCount === 0 ? "—" : seconds(summary.meanSeconds),
+    deviation: summary.sampleCount === 0 ? "—" : seconds(summary.stdevSeconds),
+    intervals:
+      summary.intervalsSeconds.length === 0
+        ? "—"
+        : summary.intervalsSeconds.map((value) => value.toFixed(3)).join(", "),
+  };
 }
