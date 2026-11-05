@@ -775,6 +775,51 @@ export default function App() {
                 aria-labelledby="changelog-title"
               >
                 <h2 id="changelog-title">Changelog</h2>
+                <time dateTime="2026-11-04">4 Nov 2026</time>
+                <ul>
+                  <li>
+                    Killer Bee Queen phase 3 is retuned from tagged reference
+                    footage.
+                  </li>
+                  <li>
+                    The Nest is now an octagonal boss room with Killer Honey:
+                    the centre pond and outer ring slow you and deal 60
+                    armor-piercing damage every second.
+                  </li>
+                  <li>
+                    Phase-3 drills start the Queen at the arena centre instead
+                    of walking her in.
+                  </li>
+                  <li>
+                    Sprites are re-scaled to the measured 9-pixel tile grid;
+                    both encounters have a new comparison identity, so earlier
+                    attempts remain as other rules.
+                  </li>
+                  <li>
+                    HUD controls now wrap on narrow screens instead of
+                    overflowing.
+                  </li>
+                </ul>
+                <time dateTime="2026-11-03">3 Nov 2026</time>
+                <ul>
+                  <li>
+                    New phase selector: train the full fight or any set of
+                    phases, loop them, and apply a change live from the HUD.
+                  </li>
+                  <li>The live panel shows which phase is playing.</li>
+                </ul>
+                <time dateTime="2026-10-30">30 Oct 2026</time>
+                <ul>
+                  <li>
+                    The Queen's projectiles are pixel art now, with hitboxes
+                    that follow each sprite's shape.
+                  </li>
+                  <li>Bombs play a five-frame detonation effect.</li>
+                  <li>
+                    New Queen comparison identity; earlier attempts no longer
+                    count toward the best.
+                  </li>
+                </ul>
                 <time dateTime="2026-10-29">29 Oct 2026</time>
                 <ul>
                   <li>
