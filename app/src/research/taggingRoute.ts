@@ -165,3 +165,48 @@ export function clampSeekTarget(target: number, limitSeconds: number): number {
   const floored = Math.max(0, target);
   return limitSeconds > 0 ? Math.min(floored, limitSeconds) : floored;
 }
+
+/** One `requestVideoFrameCallback` report: the frame's time and running count. */
+export type FrameSample = Readonly<{
+  mediaTime: number;
+  presentedFrames: number;
+}>;
+
+/** Rates a recording is commonly presented at; a measured rate snaps to one. */
+export const COMMON_FRAME_RATES: readonly number[] = [
+  23.976, 24, 25, 29.97, 30, 48, 50, 59.94, 60, 120,
+];
+
+const MIN_FRAME_GAPS = 10;
+const FRAME_RATE_SNAP_TOLERANCE = 0.01;
+
+/**
+ * Estimates the presented frame rate from consecutive frame reports during
+ * playback. Only gaps between frames the browser presented back to back
+ * (`presentedFrames` up by one) count, so dropped frames cannot stretch a
+ * gap. The median gap is snapped to the nearest common rate within 1%; null when there
+ * are too few gaps or no common rate fits.
+ */
+export function estimateFrameRate(
+  samples: readonly FrameSample[],
+): number | null {
+  const gaps: number[] = [];
+  for (let index = 1; index < samples.length; index++) {
+    const gap = samples[index]!.mediaTime - samples[index - 1]!.mediaTime;
+    if (
+      samples[index]!.presentedFrames - samples[index - 1]!.presentedFrames ===
+        1 &&
+      gap > 0
+    )
+      gaps.push(gap);
+  }
+  if (gaps.length < MIN_FRAME_GAPS) return null;
+  gaps.sort((first, second) => first - second);
+  const measured = 1 / gaps[Math.floor(gaps.length / 2)]!;
+  const nearest = COMMON_FRAME_RATES.reduce((best, rate) =>
+    Math.abs(measured - rate) < Math.abs(measured - best) ? rate : best,
+  );
+  return Math.abs(measured - nearest) / nearest <= FRAME_RATE_SNAP_TOLERANCE
+    ? nearest
+    : null;
+}

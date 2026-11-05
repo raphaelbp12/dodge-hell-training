@@ -22,7 +22,7 @@ export type ShardCollisionContext = Readonly<{
  * which keeps `linear` on the same code path as `boomerang` with no second
  * branch to maintain.
  */
-function resolveShardLifetime(
+export function resolveShardLifetime(
   projectile: ProjectileSpec,
 ): { lifetimeSeconds: number; reversalAgeSeconds: number } {
   const { motion } = projectile;
@@ -49,12 +49,12 @@ function resolveShardLifetime(
  * sweeps a straight chord between the exact positions at a step's start and
  * end ages, which is why this is the only place either path is evaluated.
  */
-type CurvedProjectileMotion = Extract<
+export type CurvedProjectileMotion = Extract<
   ProjectileSpec["motion"],
   { kind: "turning" | "wavy" }
 >;
 
-function curvedShardPositionAtAge(
+export function curvedShardPositionAtAge(
   motion: CurvedProjectileMotion,
   speedTilesPerSecond: number,
   spawnPositionTiles: Vector2,
@@ -92,7 +92,7 @@ function curvedShardPositionAtAge(
 }
 
 /** Heading a `turning` or `wavy` shard's body should face at age `t`. */
-function curvedShardOrientationAtAge(
+export function curvedShardOrientationAtAge(
   motion: CurvedProjectileMotion,
   speedTilesPerSecond: number,
   spawnOrientationRadians: number,
@@ -128,7 +128,7 @@ function isCurvedMotion(
  * distance the shard can cover in its travel time; otherwise it is the
  * emitter point plus the firing direction times that same maximum distance.
  */
-function resolveLobDestination(
+export function resolveLobDestination(
   projectile: ProjectileSpec,
   travelSeconds: number,
   positionTiles: Vector2,

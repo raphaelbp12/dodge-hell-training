@@ -1,0 +1,37 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.canvas {
+  display: block;
+  border: 1px solid #2a3140;
+  border-radius: 0.4rem;
+  background: #000;
+  cursor: grab;
+  touch-action: none;
+}
+
+.note {
+  margin: 0;
+  color: #a7b0c0;
+  font-size: 0.85rem;
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr 3rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #a7b0c0;
+}

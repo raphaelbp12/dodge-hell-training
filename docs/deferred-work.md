@@ -261,6 +261,16 @@ Rules for this register:
 
 **Fidelity gap this leaves.** The encounter authors `bee-shot` as one 4-arm volley with `clockwiseDegreesPerSecond: 0` every 3.04 s, while the user reads the footage as a burst fired by rotating arms. Until this is resolved, the attack's rate and motion may differ from the real fight. Tag spacing of one video frame also means a new tagging run may not fully separate distinct volleys from one event stepped across frames.
 
+### D26 - Tag Preview Without A Video
+
+**What.** Let the tagger's preview play a study on its own clock (play, pause, restart) when no video is open, for example a study loaded or restored without its footage.
+
+**Why deferred.** Plan V14's M01 chose the video's `mediaTime` as the preview's only clock, because it gives play, pause, stepping and seeking with no extra transport and keeps the preview frame-aligned with the footage. A second clock would add its own controls and break that alignment, and M15 leaves the canvas black without a video.
+
+**Blocked on.** Completion of plan V14's phases 46-47 and an explicit user decision to add a video-free clock.
+
+**Fidelity gap this leaves.** None for gameplay. It is a capability gap: a study opened without its video (Z14) cannot be previewed until the video is chosen.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

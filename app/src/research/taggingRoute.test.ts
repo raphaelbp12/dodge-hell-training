@@ -3,6 +3,7 @@ import { validateObservationExport } from "./tagging";
 import {
   actionForKey,
   clampSeekTarget,
+  estimateFrameRate,
   buildProvenance,
   frameStepSeconds,
   isActivationTarget,
@@ -213,5 +214,47 @@ describe("clampSeekTarget", () => {
   test("only floors when the limit is unknown", () => {
     expect(clampSeekTarget(500, 0)).toBe(500);
     expect(clampSeekTarget(-1, 0)).toBe(0);
+  });
+});
+
+describe("estimateFrameRate", () => {
+  const samples = (rate: number, count: number) =>
+    Array.from({ length: count }, (_value, index) => ({
+      mediaTime: index / rate,
+      presentedFrames: index + 1,
+    }));
+
+  test("snaps a steady playback to the common rate", () => {
+    expect(estimateFrameRate(samples(30, 20))).toBe(30);
+    expect(estimateFrameRate(samples(60, 20))).toBe(60);
+    expect(estimateFrameRate(samples(24, 20))).toBe(24);
+    expect(estimateFrameRate(samples(29.97, 20))).toBe(29.97);
+    expect(estimateFrameRate(samples(23.976, 20))).toBe(23.976);
+  });
+
+  test("ignores gaps across dropped frames", () => {
+    const base = samples(30, 20);
+    const dropped = base.map((sample, index) => ({
+      ...sample,
+      presentedFrames: sample.presentedFrames + (index === 10 ? 3 : index > 10 ? 3 : 0),
+    }));
+    expect(estimateFrameRate(dropped)).toBe(30);
+  });
+
+  test("needs enough consecutive gaps", () => {
+    expect(estimateFrameRate(samples(30, 5))).toBeNull();
+    expect(estimateFrameRate([])).toBeNull();
+  });
+
+  test("returns null when no common rate fits", () => {
+    expect(estimateFrameRate(samples(37, 20))).toBeNull();
+  });
+
+  test("ignores a single late frame", () => {
+    const late = samples(30, 40).map((sample, index) => ({
+      ...sample,
+      mediaTime: sample.mediaTime + (index === 20 ? 0.01 : 0),
+    }));
+    expect(estimateFrameRate(late)).toBe(30);
   });
 });

@@ -14,6 +14,9 @@ function parseHex(hex: string): readonly [number, number, number] {
   ];
 }
 
+/** Trainer-authored placeholder: the wiki strip gives no frame timing. */
+export const BOMB_EXPLOSION_FRAME_SECONDS = 0.04;
+
 /** Selects the zero-based bomb explosion frame, holding the last frame. */
 export function bombExplosionFrameIndex(
   ageSeconds: number,

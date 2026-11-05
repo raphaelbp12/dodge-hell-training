@@ -2728,3 +2728,64 @@ test("the Killer Bee Queen plays a bomb detonation effect", async ({
   expect(afterCleanup.phase).toBe("playing");
   expect(afterCleanup.player.healthHp).toBeGreaterThan(0);
 });
+
+test("the tagger preview panel shows, resizes and persists without a video", async ({
+  page,
+}) => {
+  await page.goto("./?tagger=1");
+  const dismiss = page.getByRole("button", { name: "Dismiss list" });
+  if (await dismiss.isVisible()) await dismiss.click();
+  const study = {
+    schemaVersion: 2,
+    encounterId: "killer-bee-queen",
+    provenance: {
+      sourceUrl: null,
+      fileName: "preview.mp4",
+      frameRate: 30,
+      durationSeconds: 60,
+    },
+    recordedAt: "2026-11-05",
+    tags: [
+      {
+        timeSeconds: 10,
+        phaseIndex: 0,
+        spriteId: "bee-shot",
+        pattern: "fixed-ring",
+        shots: 4,
+      },
+    ],
+  };
+  await page.locator('input[type="file"][accept*="json"]').setInputFiles({
+    name: "study.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(study)),
+  });
+  const canvas = page.getByLabel("Tag preview canvas");
+  const side = async () => {
+    const box = (await canvas.boundingBox())!;
+    return [Math.round(box.width), Math.round(box.height)];
+  };
+  await expect(canvas).toBeVisible();
+  expect(await side()).toEqual([480, 480]);
+  await expect(page.getByText("Open a video to see the preview")).toBeVisible();
+
+  await page.getByRole("button", { name: "Hide preview" }).click();
+  await expect(canvas).toHaveCount(0);
+  await page.getByRole("button", { name: "Show preview" }).click();
+  await expect(canvas).toBeVisible();
+
+  await page.getByRole("button", { name: "Small", exact: true }).click();
+  expect(await side()).toEqual([320, 320]);
+  await page.getByRole("button", { name: "Large", exact: true }).click();
+  expect(await side()).toEqual([720, 720]);
+
+  await page.getByRole("button", { name: "Video size large" }).click();
+  await page.getByRole("button", { name: "Hide preview" }).click();
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Video size large" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveCount(0);
+  await page.getByRole("button", { name: "Show preview" }).click();
+  expect(await side()).toEqual([720, 720]);
+});

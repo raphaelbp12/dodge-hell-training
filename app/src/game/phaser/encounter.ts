@@ -22,7 +22,10 @@ import type { AcceptedHit, DrillSelection, ShardState, Vector2 } from "../models
 import { SessionController, type AttemptResult } from "../session/session";
 import type { DetonationEvent } from "../simulation/simulation";
 import { HitAudio } from "./hit-audio";
-import { bombExplosionFrameIndex } from "./appearance-pixels";
+import {
+  BOMB_EXPLOSION_FRAME_SECONDS,
+  bombExplosionFrameIndex,
+} from "./appearance-pixels";
 import { phaseViewOf } from "./view";
 import { octagonStaircaseRows } from "./arena-staircase";
 import { hazardOutlinesOf } from "./terrain-art";
@@ -107,8 +110,7 @@ const presentation = {
     lineWidthCssPixels: 2,
   },
   bombExplosion: {
-    /** Trainer-authored placeholder: the wiki strip gives no frame timing. */
-    frameSeconds: 0.04,
+    frameSeconds: BOMB_EXPLOSION_FRAME_SECONDS,
   },
   hitNumbers: {
     lifetimeSeconds: 0.9,

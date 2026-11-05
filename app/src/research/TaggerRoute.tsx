@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -19,7 +20,9 @@ import {
   frameStepSeconds,
   isActivationTarget,
   isEditableTarget,
+  estimateFrameRate,
   parseFrameRate,
+  type FrameSample,
 } from "./taggingRoute";
 import {
   appearanceOptions,
@@ -57,11 +60,22 @@ import {
   type SessionListEntry,
 } from "./taggerSessions";
 import type { StudyState } from "./tagging";
+import { PreviewPanel } from "./PreviewPanel";
+import {
+  PreviewPreference,
+  VIDEO_SIZE_PIXELS,
+  type PreviewPreferenceValue,
+  type PreviewSize,
+} from "./previewPreference";
+import { highlightedTagIndices, selectionAfterDelete } from "./previewModel";
 import styles from "./TaggerRoute.module.css";
 
 const THUMBNAIL_SCALE_PIXELS = 6;
 
-type FrameMetadata = Readonly<{ mediaTime: number }>;
+/** Frames kept for the playback frame-rate estimate. */
+const FRAME_SAMPLE_WINDOW = 60;
+
+type FrameMetadata = Readonly<{ mediaTime: number; presentedFrames: number }>;
 
 function AppearanceThumbnail({ spec }: { spec: ProjectileAppearanceSpec }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -223,6 +237,17 @@ export function TaggerRoute() {
   const [frameRateText, setFrameRateText] = useState("");
   const [sourceUrlText, setSourceUrlText] = useState("");
   const [tags, setTags] = useState<readonly Tag[]>([]);
+  const [layoutPreference] = useState(
+    () => new PreviewPreference(() => window.localStorage),
+  );
+  const [layout, setLayout] = useState<PreviewPreferenceValue>(() =>
+    layoutPreference.get(),
+  );
+  const changeLayout = (next: PreviewPreferenceValue) => {
+    layoutPreference.set(next);
+    setLayout(next);
+  };
+  const [selectedTagIndex, setSelectedTagIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // The loaded or restored study's file name and duration (Z14, Z16).
@@ -243,12 +268,25 @@ export function TaggerRoute() {
   const [sessionListError, setSessionListError] = useState<string | null>(null);
   const [sessionsDismissed, setSessionsDismissed] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
+  const highlighted = useMemo(
+    () => highlightedTagIndices(tags, selectedTagIndex),
+    [tags, selectedTagIndex],
+  );
   // A seek has not yet produced a presented frame, so `mediaTime` still names
   // the previous frame. Recording waits for the callback rather than reading
   // the seek target (T19). The timeout is a safety net for a seek that lands
   // on the frame already displayed and therefore presents no callback.
   const seekPendingRef = useRef(false);
   const seekTimeoutRef = useRef<number | null>(null);
+  const detectedFrameRateRef = useRef<((rate: number) => void) | null>(null);
+  const [rateDetected, setRateDetected] = useState(false);
+  detectedFrameRateRef.current = (rate) => {
+    // Fill a blank field only: a typed or restored rate always wins.
+    if (frameRateText !== "") return;
+    setFrameRateText(String(rate));
+    setRateDetected(true);
+    if (tags.length > 0) setDirty(true);
+  };
 
   const frameRate = parseFrameRate(frameRateText);
   const selectedPhase = phases[sticky.phaseIndex] ?? phases[0];
@@ -335,6 +373,7 @@ export function TaggerRoute() {
     if (!element || !videoUrl) return;
     let cancelled = false;
     let handle: number | null = null;
+    const samples: FrameSample[] = [];
     const onFrame = (_now: number, metadata: FrameMetadata) => {
       if (cancelled) return;
       if (seekTimeoutRef.current !== null) {
@@ -344,6 +383,16 @@ export function TaggerRoute() {
       seekPendingRef.current = false;
       setSeekPending(false);
       setMediaTime(metadata.mediaTime);
+      if (element.paused) samples.length = 0;
+      else {
+        samples.push({
+          mediaTime: metadata.mediaTime,
+          presentedFrames: metadata.presentedFrames,
+        });
+        if (samples.length > FRAME_SAMPLE_WINDOW) samples.shift();
+        const detected = estimateFrameRate(samples);
+        if (detected !== null) detectedFrameRateRef.current?.(detected);
+      }
       handle = element.requestVideoFrameCallback(onFrame);
     };
     handle = element.requestVideoFrameCallback(onFrame);
@@ -510,7 +559,9 @@ export function TaggerRoute() {
     } else {
       setSourceUrlText("");
       setFrameRateText("");
+      setRateDetected(false);
       setTags([]);
+      setSelectedTagIndex(null);
       setStudyMeta(null);
       setDirty(false);
     }
@@ -538,6 +589,7 @@ export function TaggerRoute() {
     // One video is one fight (T16): tags recorded under the previous encounter
     // cannot be relabelled by a later selector change.
     setTags([]);
+    setSelectedTagIndex(null);
     setStudyMeta(null);
     setKeepTagsOnNextVideo(false);
     setDirty(false);
@@ -558,6 +610,7 @@ export function TaggerRoute() {
       study.provenance.frameRate === null ? "" : String(study.provenance.frameRate),
     );
     setTags(study.tags);
+    setSelectedTagIndex(null);
     setStudyMeta({
       fileName: study.provenance.fileName,
       durationSeconds: study.provenance.durationSeconds,
@@ -819,7 +872,10 @@ export function TaggerRoute() {
             />
           </label>
           <label className={styles.field}>
-            <span>Video's presented frame rate (fps, required)</span>
+            <span>
+              Video's presented frame rate (fps, required)
+              {rateDetected && " - detected from playback"}
+            </span>
             <input
               type="number"
               min="1"
@@ -827,6 +883,7 @@ export function TaggerRoute() {
               value={frameRateText}
               onChange={(event) => {
                 setFrameRateText(event.target.value);
+                setRateDetected(false);
                 if (tags.length > 0) setDirty(true);
               }}
             />
@@ -847,10 +904,29 @@ export function TaggerRoute() {
             duration.
           </p>
         )}
+        <div className={styles.stage}>
+          <div className={styles.stageMain}>
+            <div className={styles.sizeControls} role="group" aria-label="Video size">
+              <span>Video size</span>
+              {(["small", "medium", "large"] as const satisfies readonly PreviewSize[]).map(
+                (option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-label={`Video size ${option}`}
+                    aria-pressed={layout.videoSize === option}
+                    onClick={() => changeLayout({ ...layout, videoSize: option })}
+                  >
+                    {option[0]!.toUpperCase() + option.slice(1)}
+                  </button>
+                ),
+              )}
+            </div>
         {videoUrl && (
           <video
             ref={video}
             className={styles.video}
+            style={{ width: VIDEO_SIZE_PIXELS[layout.videoSize] }}
             src={videoUrl}
             playsInline
             onLoadedMetadata={() => {
@@ -872,6 +948,18 @@ export function TaggerRoute() {
             still load, edit and export a study. Nothing is uploaded.
           </p>
         )}
+          </div>
+          <PreviewPanel
+            key={encounterId}
+            tags={tags}
+            mediaTime={mediaTime}
+            hasVideo={videoUrl !== null}
+            config={config}
+            highlightedTagIndices={highlighted}
+            layout={layout}
+            onLayoutChange={changeLayout}
+          />
+        </div>
         <div className={styles.transport}>
           <button type="button" onClick={togglePlayback} disabled={!videoUrl}>
             {playing ? "Pause" : "Play"}
@@ -1143,7 +1231,24 @@ export function TaggerRoute() {
               </thead>
               <tbody>
                 {rows.map(({ tag, index }) => (
-                  <tr key={index}>
+                  <tr
+                    key={index}
+                    className={
+                      selectedTagIndex === index ? styles.selectedRow : undefined
+                    }
+                    onClick={(event) => {
+                      if (
+                        (event.target as HTMLElement).closest(
+                          "input, select, button, textarea",
+                        )
+                      )
+                        return;
+                      setSelectedTagIndex((current) =>
+                        current === index ? null : index,
+                      );
+                      if (videoUrl) seekTo(tag.timeSeconds);
+                    }}
+                  >
                     <td>
                       <CommitInput
                         label={`Time of tag ${index + 1}`}
@@ -1262,6 +1367,9 @@ export function TaggerRoute() {
                         type="button"
                         onClick={() => {
                           setDirty(true);
+                          setSelectedTagIndex((current) =>
+                            selectionAfterDelete(current, index),
+                          );
                           setTags((current) =>
                             current.filter((_entry, at) => at !== index),
                           );

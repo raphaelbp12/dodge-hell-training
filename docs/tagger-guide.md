@@ -69,6 +69,21 @@ A v1 file (from the first pilot) loads with a blank frame rate. Enter the presen
 
 Press **Export JSON**. The file is `<encounter-id>-observations.json`, schema version 2, tags sorted by time. Move it into `docs/` by hand if it is evidence. Do not edit committed evidence files; load them, correct them and export a new version instead.
 
+## Preview
+
+A square preview sits to the right of the video. It follows the presented video frame, so play, pause, frame steps, jumps and seeks all move it with no extra controls. While a seek is pending it keeps showing the previous presented frame.
+
+The preview shows your tags played with the game's current geometry, not geometry measured from the footage. Each tag borrows its speed, motion, range, pattern shape and emitter offset from the matching authored attack: the first attack in the tag's phase that fires the tag's sprite in the same pattern family. Rings do not rotate, and scatter shots are spread evenly across the cone instead of randomly.
+
+A tag with no matching attack, an unknown sprite or phase, or the `volley` pattern is not drawn. The panel shows "N tags not previewed" under the canvas when any such tag exists.
+
+- **Player sliders.** The x and y sliders place the player point, which player-aimed spread and scatter volleys aim at. It starts at the encounter's player spawn and resets when you reload or change the encounter.
+- **Zoom and pan.** The mouse wheel over the canvas zooms 1×, 2× and 4× about the cursor, dragging pans within the arena, and Reset view returns to the fitted view.
+- **Size and visibility.** Hide preview collapses the panel; Small, Medium and Large set a 320, 480 or 720 pixel square. Only visibility and size are remembered across reloads.
+- **Burst highlight.** Clicking a tag row seeks the video and outlines every volley of that tag's burst, or just that tag when it has no burst. The outline stays while you scrub; click another row to move it, or the same row to clear it.
+
+Without an open video the canvas is black with a note asking you to open one.
+
 ## Good practice
 
 - Tag the first frame where the projectile is visible, and be consistent about it.

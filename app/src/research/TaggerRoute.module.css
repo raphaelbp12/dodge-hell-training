@@ -115,8 +115,8 @@
 
 .video {
   display: block;
-  width: 100%;
-  max-height: 52vh;
+  max-width: 100%;
+  height: auto;
   margin: 0.75rem 0;
   border-radius: 0.4rem;
   background: #000;
@@ -304,4 +304,29 @@
   max-width: 24rem;
   overflow-x: auto;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.stageMain {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+.selectedRow {
+  background: #232b3b;
+}
+
+.sizeControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: #a7b0c0;
+  font-size: 0.85rem;
 }
