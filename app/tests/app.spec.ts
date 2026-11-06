@@ -2789,3 +2789,100 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
   await page.getByRole("button", { name: "Show preview" }).click();
   expect(await side()).toEqual([720, 720]);
 });
+
+test("the tagger records a linked repeat, ends it, tunes it and exports the saved attack", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("./?tagger=1");
+  const dismiss = page.getByRole("button", { name: "Dismiss list" });
+  if (await dismiss.isVisible()) await dismiss.click();
+
+  // A short WebM generated in the page, so no video file is ever stored.
+  const base64 = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext("2d")!;
+    const recorder = new MediaRecorder(canvas.captureStream(30), {
+      mimeType: "video/webm",
+    });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => chunks.push(event.data);
+    const stopped = new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+    });
+    recorder.start();
+    let frame = 0;
+    const timer = setInterval(() => {
+      context.fillStyle = `hsl(${(frame * 12) % 360}, 80%, 50%)`;
+      context.fillRect(0, 0, 64, 64);
+      frame += 1;
+    }, 33);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    clearInterval(timer);
+    recorder.stop();
+    await stopped;
+    const bytes = new Uint8Array(
+      await new Blob(chunks, { type: "video/webm" }).arrayBuffer(),
+    );
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  });
+  await page.locator('input[type="file"][accept="video/*"]').setInputFiles({
+    name: "clip.webm",
+    mimeType: "video/webm",
+    buffer: Buffer.from(base64, "base64"),
+  });
+  await page.getByLabel(/presented frame rate/i).fill("30");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  const frameTime = async () =>
+    Number.parseFloat(
+      (await page.getByLabel("Current frame time").textContent()) ?? "0",
+    );
+  await expect.poll(frameTime).toBeGreaterThan(0.3);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+
+  // A rotating arm of red balls in phase 3, saved as a named attack with a typed cadence.
+  await page.getByRole("button", { name: "red-ball", exact: true }).click();
+  await page
+    .locator("label", { has: page.locator("span", { hasText: /^Phase$/ }) })
+    .locator("select")
+    .selectOption("2");
+  await page.getByLabel("Clockwise degrees per second").fill("30");
+  await expect(page.getByRole("status", { name: "Match status" })).toContainText(
+    "Plays as",
+  );
+  await page.getByRole("button", { name: "Save as attack" }).click();
+  await page.getByLabel("Saved attack name").fill("Slow spiral");
+  await page.getByLabel("Saved attack cooldown in seconds").fill("0.4");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+
+  await page.getByRole("button", { name: "Record tag" }).click();
+  const attackCell = page
+    .getByRole("region", { name: /^Tags/ })
+    .getByRole("cell", { name: "Slow spiral" });
+  await expect(attackCell).toBeVisible();
+
+  // Move on, wait for the seeked frame, then end the repeat there.
+  await page.getByLabel("Go to time").fill("1.5");
+  await page.getByLabel("Go to time").press("Enter");
+  await expect.poll(frameTime).toBeGreaterThan(1);
+  await expect(page.getByRole("button", { name: "Record tag" })).toBeEnabled();
+  await page.getByRole("button", { name: "Start burst (B)" }).focus();
+  await page.getByRole("button", { name: "End repeat here" }).click();
+  await expect(page.getByLabel("Repeat end of tag 1")).not.toHaveValue("");
+  await expect(page.getByText(/not previewed/)).toHaveCount(0);
+
+  // Select the row and tune the saved attack's rotation rate in the preview.
+  await attackCell.click();
+  await page.getByLabel("Tune rotation rate, degrees per second").fill("45");
+  await page.getByLabel("Tune rotation rate, degrees per second").press("Enter");
+
+  await page.getByRole("button", { name: /Export tag at .* as an attack/ }).click();
+  const exported = await page.getByLabel("Attack JSON for tag 1").inputValue();
+  expect(exported).toContain('"id": "slow-spiral-tagged"');
+  expect(exported).toContain('"cooldownAfterLastShotSeconds": 0.4');
+  expect(exported).toContain('"clockwiseDegreesPerSecond": 45');
+});

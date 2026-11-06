@@ -13,7 +13,6 @@ import {
 } from "../game/config/encounter";
 import {
   summarizeTags,
-  type Tag,
   type TagAim,
   type TagArmPattern,
   type TagPattern,
@@ -39,7 +38,6 @@ import {
   createTag,
   DEFAULT_ARM_ARC_DEGREES,
   DEFAULT_SHOTS_PER_ARM,
-  editTag,
   formatSummaryRow,
   OFFERABLE_PATTERNS,
   patternTakesAim,
@@ -49,11 +47,13 @@ import {
   rotationAllowed,
   shotsLabel,
   sortNewestFirst,
+  stickyFromTag,
   TAG_AIMS,
   type AppearanceOption,
   type PhaseOption,
   type StickySelection,
   type TagChange,
+  type TypedNumberField,
 } from "./taggingOptions";
 import {
   currentDuration,
@@ -62,6 +62,7 @@ import {
   parseStudyFile,
   resolveProvenance,
   videoChoiceDecision,
+  encounterChangeDecision,
 } from "./studyLoad";
 import {
   buildDraft,
@@ -70,8 +71,35 @@ import {
   TaggerSessions,
   type SessionListEntry,
 } from "./taggerSessions";
-import type { StudyState } from "./tagging";
-import { PreviewPanel } from "./PreviewPanel";
+import {
+  resolveTags,
+  type SavedAttack,
+  type SavedAttackCadence,
+  type StoredTag,
+  type StudyState,
+} from "./tagging";
+import { PreviewPanel, type TuningProps } from "./PreviewPanel";
+import { applyTuning, tunableValuesFor } from "./tuning";
+import { SavedAttackPanel } from "./SavedAttackPanel";
+import { clearRepeatEnd, endRepeatTarget, setRepeatEnd, volleyTimesOf } from "./repeat";
+import {
+  createSavedAttack,
+  deleteSavedAttack,
+  detachTag,
+  editStoredTag,
+  isStickyModified,
+  linkedAttackIdOf,
+  recordStoredTag,
+  renameSavedAttack,
+  stickyFromSavedAttack,
+  updateFromSticky,
+} from "./savedAttacks";
+import {
+  CommitInput,
+  RowTypedFields,
+  StickyTypedFields,
+  rowHasTypedFields,
+} from "./TypedFieldControls";
 import {
   attackJson,
   authoredAttackFromTag,
@@ -83,7 +111,19 @@ import {
   type PreviewPreferenceValue,
   type PreviewSize,
 } from "./previewPreference";
-import { highlightedTagIndices, selectionAfterDelete } from "./previewModel";
+import { TaggerTimeline } from "./TaggerTimeline";
+import {
+  nextVolleyTime,
+  previousVolleyTime,
+  volleyStepTolerance,
+} from "./timelineModel";
+import {
+  highlightedTagIndices,
+  matchesLinearBullet,
+  matchStatusText,
+  selectionAfterDelete,
+  tagMatchStatus,
+} from "./previewModel";
 import styles from "./TaggerRoute.module.css";
 
 const THUMBNAIL_SCALE_PIXELS = 6;
@@ -188,53 +228,21 @@ function phaseChoices(phases: readonly PhaseOption[]) {
   }));
 }
 
-/**
- * A number input that commits on blur or Enter and restores its text when the
- * edit is refused, so a rejected value never lingers in the row.
- */
-function CommitInput({
-  value,
-  label,
-  onCommit,
-  blankAllowed = false,
-  step = "1",
-}: {
-  value: string;
-  label: string;
-  onCommit: (text: string) => boolean;
-  blankAllowed?: boolean;
-  step?: string;
-}) {
-  return (
-    <input
-      key={value}
-      className={styles.cellInput}
-      type="number"
-      step={step}
-      aria-label={label}
-      defaultValue={value}
-      onBlur={(event) => {
-        const text = event.currentTarget.value;
-        if (text === value || (blankAllowed && text === "" && value === ""))
-          return;
-        if (!onCommit(text)) event.currentTarget.value = value;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.currentTarget.blur();
-      }}
-    />
-  );
-}
-
 function ExportBox({
   tagNumber,
   result,
+  statusText,
+  linked,
   note,
   onCopy,
   onClose,
 }: {
   tagNumber: number;
   result: ReturnType<typeof authoredAttackFromTag>;
+  /** The same sentence the Tag panel and row badge show (S18). */
+  statusText: string;
+  /** The tag links to a saved attack, so its cadence is typed (S45). */
+  linked: boolean;
   note: string | null;
   onCopy: (text: string) => void;
   onClose: () => void;
@@ -243,9 +251,8 @@ function ExportBox({
     return (
       <div className={styles.exportBox} role="status">
         <p>
-          Tag {tagNumber} cannot export: no authored attack in its phase fires
-          this sprite in this pattern, so the cadence and projectile have
-          nothing to come from.
+          Tag {tagNumber} cannot export. {statusText}. Its cadence and
+          projectile have nothing to come from until it previews.
         </p>
         <button type="button" onClick={onClose}>
           Close
@@ -253,6 +260,9 @@ function ExportBox({
       </div>
     );
   const text = attackJson(result.attack);
+  const variantText = result.projectileVariant
+    ? JSON.stringify({ [result.projectileVariant.id]: result.projectileVariant.entry }, null, 2)
+    : null;
   return (
     <div className={styles.exportBox}>
       <label className={styles.field}>
@@ -267,13 +277,38 @@ function ExportBox({
       </label>
       <p className={styles.note}>
         Paste this into the archetype&apos;s attacks in enemies.json by hand;
-        nothing is written for you. Rotation phase is measured at the first
-        tag of its group, and cadence is copied from the matched attack.
+        nothing is written for you. Rotation phase is taken at the first tag
+        of its group.{" "}
+        {linked
+          ? "The cadence is typed in the saved attack, not measured, and the phase is at its first volley (a repeat counts once, at its first volley)."
+          : "The cadence is copied from the matched attack."}
       </p>
       {result.aimsFront && <p className={styles.note}>{FRONT_EXPORT_NOTE}</p>}
       <button type="button" onClick={() => onCopy(text)}>
         Copy JSON
       </button>{" "}
+      {variantText !== null && (
+        <>
+          <label className={styles.field}>
+            <span>Projectile JSON for tag {tagNumber}</span>
+            <textarea
+              readOnly
+              rows={12}
+              value={variantText}
+              aria-label={`Projectile JSON for tag ${tagNumber}`}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </label>
+          <p className={styles.note}>
+            Paste this under <code>projectiles</code> in projectiles.json by
+            hand, beside the attack that references it. Its values are typed
+            estimates, and no speed is calculated or written for a bomb.
+          </p>
+          <button type="button" onClick={() => onCopy(variantText)}>
+            Copy projectile JSON
+          </button>{" "}
+        </>
+      )}
       <button type="button" onClick={onClose}>
         Close
       </button>
@@ -308,7 +343,13 @@ export function TaggerRoute() {
   // Z26: the presented rate has no default; it must be typed.
   const [frameRateText, setFrameRateText] = useState("");
   const [sourceUrlText, setSourceUrlText] = useState("");
-  const [tags, setTags] = useState<readonly Tag[]>([]);
+  // V16 S29: the study stores tags as written; every reader gets them resolved.
+  const [storedTags, setTags] = useState<readonly StoredTag[]>([]);
+  const [savedAttacks, setSavedAttacks] = useState<readonly SavedAttack[]>([]);
+  const tags = useMemo(
+    () => resolveTags(storedTags, savedAttacks),
+    [storedTags, savedAttacks],
+  );
   const [layoutPreference] = useState(
     () => new PreviewPreference(() => window.localStorage),
   );
@@ -365,7 +406,12 @@ export function TaggerRoute() {
 
   const frameRate = parseFrameRate(frameRateText);
   const selectedPhase = phases[sticky.phaseIndex] ?? phases[0];
-  const interval = readoutInterval(tags, sticky);
+  const linkedAttackId = linkedAttackIdOf(sticky, savedAttacks);
+  const chosenAttack =
+    savedAttacks.find((entry) => entry.id === sticky.savedAttackId) ?? null;
+  const interval = readoutInterval(tags, sticky, linkedAttackId);
+  const phaseName = (index: number) => phases[index]?.label ?? `phase ${index + 1}`;
+  const stickyShowsBullet = matchesLinearBullet(createTag(0, sticky), config);
   const duration = currentDuration(
     durationSeconds,
     studyMeta?.durationSeconds ?? null,
@@ -375,7 +421,7 @@ export function TaggerRoute() {
     videoUrl ? fileName : null,
   );
   const summaryRows = summarizeTags(tags).map((summary) =>
-    formatSummaryRow(summary, phases),
+    formatSummaryRow(summary, phases, savedAttacks),
   );
 
   const refreshSessions = () => {
@@ -414,7 +460,8 @@ export function TaggerRoute() {
         frameRate,
         durationSeconds: source.durationSeconds,
       },
-      tags,
+      savedAttacks,
+      tags: storedTags,
     };
     const result = sessions.write(
       buildDraft({ study, sticky, savedAt: new Date().toISOString() }),
@@ -422,7 +469,9 @@ export function TaggerRoute() {
     setAutosaveError(result.ok ? null : result.error);
   }, [
     dirty,
-    tags,
+    tags.length,
+    storedTags,
+    savedAttacks,
     sticky,
     sourceUrlText,
     frameRate,
@@ -548,6 +597,28 @@ export function TaggerRoute() {
 
   const jumpBy = (seconds: number) => seekBy(seconds);
 
+  /** Every volley's time, for the timeline markers and `[` / `]` (V16 S16, S17). */
+  const volleyTimes = useMemo(
+    () =>
+      tags.flatMap((entry) =>
+        volleyTimesOf(
+          entry,
+          savedAttacks.find((attack) => attack.id === entry.savedAttackId)?.cadence,
+        ),
+      ),
+    [tags, savedAttacks],
+  );
+
+  /** Seeks to the previous or next volley from the presented frame; a no-op at the ends. */
+  const stepVolley = (direction: -1 | 1) => {
+    const tolerance = volleyStepTolerance(frameRate);
+    const target =
+      direction === 1
+        ? nextVolleyTime(volleyTimes, mediaTime, tolerance)
+        : previousVolleyTime(volleyTimes, mediaTime, tolerance);
+    if (target !== null && videoUrl) seekTo(target);
+  };
+
   const recordTag = (mode: "standalone" | "new-burst" | "continue-burst") => {
     if (!videoUrl) {
       setError("Load a video before recording a tag.");
@@ -567,6 +638,7 @@ export function TaggerRoute() {
         tags,
         sticky,
         mode === "new-burst" ? "new" : "continue",
+        linkedAttackId,
       );
       if (assigned === null) {
         setError(
@@ -578,7 +650,10 @@ export function TaggerRoute() {
     }
     setError(null);
     setDirty(true);
-    setTags((current) => [...current, createTag(mediaTime, sticky, burstId)]);
+    setTags((current) => [
+      ...current,
+      recordStoredTag(mediaTime, sticky, savedAttacks, burstId),
+    ]);
   };
 
   useEffect(() => {
@@ -609,6 +684,7 @@ export function TaggerRoute() {
         stepFrame(action.direction, action.deltaSeconds);
       else if (action.kind === "play-pause") togglePlayback();
       else if (action.kind === "record") recordTag(action.mode);
+      else if (action.kind === "step-volley") stepVolley(action.direction);
       else
         setSticky((current) => ({ ...current, shots: action.shots }));
     };
@@ -650,6 +726,21 @@ export function TaggerRoute() {
       return { ...rest, [field]: value };
     });
 
+  /** A blank field removes a sticky typed estimate; anything else must be a finite number. */
+  const setStickyTyped = (field: TypedNumberField, text: string) =>
+    setSticky((current) => {
+      const { [field]: _removed, ...rest } = current;
+      if (text.trim() === "") return rest;
+      const value = Number(text);
+      return Number.isFinite(value) ? { ...rest, [field]: value } : current;
+    });
+
+  const setStickyTarget = (targeted: boolean) =>
+    setSticky((current) => {
+      const { target: _removed, ...rest } = current;
+      return targeted ? { ...rest, target: "player" } : rest;
+    });
+
   const resetSeek = () => {
     clearSeekTimeout();
     seekPendingRef.current = false;
@@ -670,6 +761,7 @@ export function TaggerRoute() {
       setFrameRateText("");
       setRateDetected(false);
       setTags([]);
+      setSavedAttacks([]);
       setSelectedTagIndex(null);
       setStudyMeta(null);
       setDirty(false);
@@ -694,10 +786,28 @@ export function TaggerRoute() {
   };
 
   const chooseEncounter = (id: string) => {
+    if (id === encounterId) return;
+    if (
+      encounterChangeDecision({
+        tagCount: tags.length,
+        savedAttackCount: savedAttacks.length,
+      }) === "confirm"
+    ) {
+      setConfirmation({
+        message: `Changing encounter clears the ${tags.length} tag(s) and ${savedAttacks.length} saved attack(s) in this session. Saved sessions are not affected.`,
+        onConfirm: () => applyEncounter(id),
+      });
+      return;
+    }
+    applyEncounter(id);
+  };
+
+  const applyEncounter = (id: string) => {
     setEncounterId(id);
     // One video is one fight (T16): tags recorded under the previous encounter
     // cannot be relabelled by a later selector change.
     setTags([]);
+    setSavedAttacks([]);
     setSelectedTagIndex(null);
     setStudyMeta(null);
     setKeepTagsOnNextVideo(false);
@@ -719,6 +829,7 @@ export function TaggerRoute() {
       study.provenance.frameRate === null ? "" : String(study.provenance.frameRate),
     );
     setTags(study.tags);
+    setSavedAttacks(study.savedAttacks);
     setSelectedTagIndex(null);
     setStudyMeta({
       fileName: study.provenance.fileName,
@@ -775,11 +886,14 @@ export function TaggerRoute() {
     const restored = restoreSticky(
       draft.sticky,
       encounterConfigOf(draft.study.encounterId),
+      draft.study.savedAttacks,
     );
     const notices = restored.notices.map((entry) =>
       entry === "sprite-missing"
         ? "The saved sprite no longer exists; the default sprite is selected."
-        : "The saved phase no longer exists; the first phase is selected.",
+        : entry === "attack-missing"
+          ? "The saved attack no longer exists; no attack is selected."
+          : "The saved phase no longer exists; the first phase is selected.",
     );
     requestApply(
       `Restoring "${draft.study.provenance.fileName}" replaces the ${tags.length} tag(s) in this session.`,
@@ -799,7 +913,7 @@ export function TaggerRoute() {
   };
 
   const applyEdit = (index: number, change: TagChange) => {
-    const result = editTag(tags[index], change, duration);
+    const result = editStoredTag(storedTags[index], tags[index], change, duration);
     if (!result.ok) {
       setError(result.error);
       return false;
@@ -810,6 +924,166 @@ export function TaggerRoute() {
       current.map((entry, at) => (at === index ? result.tag : entry)),
     );
     return true;
+  };
+
+  /** S32: choosing an attack copies its values into the sticky controls. */
+  const chooseAttack = (id: string | null) => {
+    const attack = savedAttacks.find((entry) => entry.id === id);
+    setSticky((current) => {
+      if (!attack) {
+        const { savedAttackId: _removed, ...rest } = current;
+        return rest;
+      }
+      return stickyFromSavedAttack(attack, current);
+    });
+  };
+
+  const saveAttack = (name: string, cadence: SavedAttackCadence) => {
+    const result = createSavedAttack(name, sticky, cadence, savedAttacks);
+    if (!result.ok) {
+      setError(result.error);
+      return false;
+    }
+    setError(null);
+    setDirty(true);
+    setSavedAttacks((current) => [...current, result.value]);
+    setSticky((current) => ({ ...current, savedAttackId: result.value.id }));
+    return true;
+  };
+
+  const updateAttack = () => {
+    if (!chosenAttack) return;
+    setError(null);
+    setDirty(true);
+    setSavedAttacks((current) =>
+      current.map((entry) =>
+        entry.id === chosenAttack.id ? updateFromSticky(entry, sticky) : entry,
+      ),
+    );
+  };
+
+  const renameAttack = (name: string) => {
+    if (!chosenAttack) return false;
+    const result = renameSavedAttack(chosenAttack.id, name, savedAttacks);
+    if (!result.ok) {
+      setError(result.error);
+      return false;
+    }
+    setError(null);
+    setDirty(true);
+    setSavedAttacks(result.value);
+    return true;
+  };
+
+  const deleteAttack = () => {
+    if (!chosenAttack) return;
+    const result = deleteSavedAttack(chosenAttack.id, savedAttacks, storedTags);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setError(null);
+    setDirty(true);
+    setSavedAttacks(result.value);
+    setSticky((current) => {
+      const { savedAttackId: _removed, ...rest } = current;
+      return rest;
+    });
+  };
+
+  const detachRow = (index: number) => {
+    const stored = storedTags[index];
+    const attack =
+      "savedAttackId" in stored
+        ? savedAttacks.find((entry) => entry.id === stored.savedAttackId)
+        : undefined;
+    if (!attack) return;
+    const result = detachTag(stored, attack);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setError(null);
+    setDirty(true);
+    setTags((current) =>
+      current.map((entry, at) => (at === index ? result.value : entry)),
+    );
+  };
+
+  /** Applies a repeat-end change to a stored row; every refusal reports through `error`. */
+  const applyRepeatEnd = (
+    index: number,
+    next: (stored: StoredTag) => ReturnType<typeof setRepeatEnd> | StoredTag,
+  ) => {
+    const result = next(storedTags[index]);
+    const tag = "ok" in result ? (result.ok ? result.tag : null) : result;
+    if (tag === null) {
+      setError("ok" in result && !result.ok ? result.error : null);
+      return false;
+    }
+    setError(null);
+    setDirty(true);
+    setTags((current) => current.map((entry, at) => (at === index ? tag : entry)));
+    return true;
+  };
+
+  /** S40: ends a repeat at the presented frame, with no key. */
+  const endRepeatHere = () => {
+    if (!videoUrl) {
+      setError("Load a video before ending a repeat.");
+      return;
+    }
+    if (frameRate === null) {
+      setError("Enter the video's presented frame rate before ending a repeat.");
+      return;
+    }
+    if (seekPendingRef.current) {
+      setError("Wait for the seeked frame to appear before ending a repeat.");
+      return;
+    }
+    const target = endRepeatTarget(
+      storedTags,
+      selectedTagIndex,
+      sticky.savedAttackId ?? null,
+      mediaTime,
+    );
+    if (target === null) {
+      setError(
+        "No repeat to end: select a linked tag, or choose its saved attack and move past its first tag.",
+      );
+      return;
+    }
+    applyRepeatEnd(target, (stored) => setRepeatEnd(stored, mediaTime, "frame"));
+  };
+
+  /** V16 S48: the selected row tunes its saved attack when linked, otherwise only itself. */
+  const selectedTag = selectedTagIndex === null ? undefined : tags[selectedTagIndex];
+  const selectedAttack = savedAttacks.find(
+    (entry) => entry.id === selectedTag?.savedAttackId,
+  );
+  const tuning: TuningProps = {
+    target:
+      selectedTag === undefined
+        ? null
+        : selectedAttack
+          ? `Tuning saved attack "${selectedAttack.name}": ${
+              tags.filter((entry) => entry.savedAttackId === selectedAttack.id).length
+            } tag(s)`
+          : "Tuning this tag only",
+    values: selectedTag ? tunableValuesFor(selectedTag, selectedAttack) : [],
+    onChange: (change) => {
+      if (selectedTagIndex === null) return false;
+      const result = applyTuning({ tags: storedTags, savedAttacks }, selectedTagIndex, change);
+      if (!result.ok) {
+        setError(result.error);
+        return false;
+      }
+      setError(null);
+      setDirty(true);
+      setTags(result.study.tags);
+      setSavedAttacks(result.study.savedAttacks);
+      return true;
+    },
   };
 
   const exportTags = () => {
@@ -824,7 +1098,8 @@ export function TaggerRoute() {
       const exported = assembleExport({
         encounterId,
         provenance,
-        tags,
+        savedAttacks,
+        tags: storedTags,
         recordedAt: new Date().toISOString(),
       });
       const blob = new Blob([JSON.stringify(exported, null, 2)], {
@@ -855,7 +1130,7 @@ export function TaggerRoute() {
       <header className={styles.header}>
         <div>
           <span className={styles.eyebrow}>Development only</span>
-          <h1>Killer Bee Queen tagger</h1>
+          <h1>{ENCOUNTER_LIST.find((entry) => entry.id === encounterId)?.displayName} tagger</h1>
         </div>
         <p className={styles.note}>
           Tag spawns at the presented frame. The video is never uploaded or
@@ -1061,10 +1336,12 @@ export function TaggerRoute() {
           <PreviewPanel
             key={encounterId}
             tags={tags}
+            savedAttacks={savedAttacks}
             mediaTime={mediaTime}
             hasVideo={videoUrl !== null}
             config={config}
             highlightedTagIndices={highlighted}
+            tuning={tuning}
             layout={layout}
             onLayoutChange={changeLayout}
           />
@@ -1115,8 +1392,15 @@ export function TaggerRoute() {
             {mediaTime.toFixed(3)} s
           </output>
         </div>
+        <TaggerTimeline
+          durationSeconds={duration}
+          mediaTime={mediaTime}
+          volleyTimes={volleyTimes}
+          enabled={videoUrl !== null}
+          onSeek={seekTo}
+        />
         <p className={styles.note}>
-          Space plays or pauses, arrows step one frame, Shift+arrows jump{" "}
+          Space plays or pauses, [ and ] seek to the previous and next volley, arrows step one frame, Shift+arrows jump{" "}
           {FINE_JUMP_SECONDS} seconds, PageUp/PageDown jump {COARSE_JUMP_SECONDS}{" "}
           seconds, Enter records a standalone tag, B records a volley that
           starts a new burst, Shift+Enter adds a volley to the latest matching
@@ -1127,7 +1411,7 @@ export function TaggerRoute() {
       <section className={styles.panel} aria-labelledby="tag-title">
         <h2 id="tag-title">Tag</h2>
         <p className={styles.sticky} aria-live="polite">
-          Recording: <strong>{sticky.spriteId}</strong> ·{" "}
+          Recording: {chosenAttack && <><strong>{chosenAttack.name}</strong> · </>}<strong>{sticky.spriteId}</strong> ·{" "}
           {selectedPhase ? selectedPhase.label : "No phase"} ({selectedPhase?.id}
           ) · <strong>{sticky.pattern}</strong>
           {patternTakesAim(sticky.pattern) && (
@@ -1145,7 +1429,20 @@ export function TaggerRoute() {
             </>
           )}
         </p>
+        <p className={styles.note} role="status" aria-label="Match status">
+          {matchStatusText(tagMatchStatus(createTag(0, sticky), config), phaseName)}
+        </p>
         <div className={styles.controls}>
+          <SavedAttackPanel
+            savedAttacks={savedAttacks}
+            chosen={chosenAttack}
+            modified={chosenAttack !== null && isStickyModified(sticky, chosenAttack)}
+            onChoose={chooseAttack}
+            onSave={saveAttack}
+            onUpdate={updateAttack}
+            onRename={renameAttack}
+            onDelete={deleteAttack}
+          />
           <label className={styles.field}>
             <span>Phase</span>
             <select
@@ -1300,6 +1597,12 @@ export function TaggerRoute() {
               </small>
             </fieldset>
           )}
+          <StickyTypedFields
+            sticky={sticky}
+            showBullet={stickyShowsBullet}
+            onNumber={setStickyTyped}
+            onTarget={setStickyTarget}
+          />
         </div>
         <div className={styles.recordRow}>
           <button
@@ -1323,6 +1626,13 @@ export function TaggerRoute() {
             disabled={!videoUrl || seekPending}
           >
             Add to burst (Shift+Enter)
+          </button>
+          <button
+            type="button"
+            onClick={endRepeatHere}
+            disabled={!videoUrl || seekPending}
+          >
+            End repeat here
           </button>
           <output className={styles.readout} aria-label="Interval since previous tag">
             {seekPending
@@ -1371,6 +1681,11 @@ export function TaggerRoute() {
 
       <section className={styles.panel} aria-labelledby="summary-title">
         <h2 id="summary-title">Summary</h2>
+        <p className={styles.note}>
+          A repeat counts once, at its first volley. Intervals between rows come
+          from video times; a saved attack&apos;s cadence is typed and is never
+          measured here.
+        </p>
         {summaryRows.length === 0 ? (
           <p className={styles.empty}>No tags to summarise yet.</p>
         ) : (
@@ -1383,6 +1698,8 @@ export function TaggerRoute() {
                   <th scope="col">Pattern</th>
                   <th scope="col">Aim</th>
                   <th scope="col">Arm pattern</th>
+                  <th scope="col">Target</th>
+                  <th scope="col">Attack</th>
                   <th scope="col">Scope</th>
                   <th scope="col">Samples</th>
                   <th scope="col">Mean</th>
@@ -1392,12 +1709,14 @@ export function TaggerRoute() {
               </thead>
               <tbody>
                 {summaryRows.map((row) => (
-                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.armPattern}|${row.scope}`}>
+                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.armPattern}|${row.target}|${row.attack}|${row.scope}`}>
                     <td>{row.phase}</td>
                     <td>{row.sprite}</td>
                     <td>{row.pattern}</td>
                     <td>{row.aim}</td>
                     <td>{row.armPattern}</td>
+                    <td>{row.target}</td>
+                    <td>{row.attack}</td>
                     <td>{row.scope}</td>
                     <td>{row.sampleCount}</td>
                     <td>{row.mean}</td>
@@ -1417,24 +1736,31 @@ export function TaggerRoute() {
           <p className={styles.empty}>No tags recorded yet.</p>
         ) : (
           <div className={styles.tableWrap}>
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.compactTable}`}>
               <thead>
                 <tr>
                   <th scope="col">Time (s)</th>
                   <th scope="col">Sprite</th>
                   <th scope="col">Phase</th>
+                  <th scope="col">Attack</th>
                   <th scope="col">Pattern</th>
                   <th scope="col">Aim</th>
                   <th scope="col">Shots / arms</th>
                   <th scope="col">Geometry (typed)</th>
                   <th scope="col">Burst</th>
-                  <th scope="col">
+                  <th scope="col">Repeat end (s)</th>
+                  <th scope="col">Preview</th>
+                  <th scope="col" className={styles.stickyActions}>
                     <span className={styles.visuallyHidden}>Actions</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ tag, index }) => (
+                {rows.map(({ tag, index }) => {
+                  const stored = storedTags[index];
+                  const linked = "savedAttackId" in stored;
+                  const repeats = linked && stored.repeatEndSeconds !== undefined;
+                  return (
                   <tr
                     key={index}
                     className={
@@ -1471,6 +1797,7 @@ export function TaggerRoute() {
                       )}
                     </td>
                     <td>
+<fieldset disabled={linked} className={styles.cellFieldset}>
                       <RawOrKnownSelect
                         label={`Sprite of tag ${index + 1}`}
                         value={tag.spriteId}
@@ -1482,7 +1809,8 @@ export function TaggerRoute() {
                           applyEdit(index, { field: "spriteId", value })
                         }
                       />
-                    </td>
+                    </fieldset>
+</td>
                     <td>
                       <RawOrKnownSelect
                         label={`Phase of tag ${index + 1}`}
@@ -1497,6 +1825,12 @@ export function TaggerRoute() {
                       />
                     </td>
                     <td>
+                      {linked
+                        ? (savedAttacks.find((entry) => entry.id === stored.savedAttackId)?.name ?? stored.savedAttackId)
+                        : "—"}
+                    </td>
+                    <td>
+<fieldset disabled={linked} className={styles.cellFieldset}>
                       <RawOrKnownSelect
                         label={`Pattern of tag ${index + 1}`}
                         value={tag.pattern}
@@ -1511,8 +1845,10 @@ export function TaggerRoute() {
                           })
                         }
                       />
-                    </td>
+                    </fieldset>
+</td>
                     <td>
+<fieldset disabled={linked} className={styles.cellFieldset}>
                       {tag.aim === undefined ? (
                         "—"
                       ) : (
@@ -1534,8 +1870,10 @@ export function TaggerRoute() {
                           ))}
                         </select>
                       )}
-                    </td>
+                    </fieldset>
+</td>
                     <td>
+<fieldset disabled={linked} className={styles.cellFieldset}>
                       <CommitInput
                         label={`Shots of tag ${index + 1}`}
                         value={String(tag.shots)}
@@ -1544,15 +1882,25 @@ export function TaggerRoute() {
                           applyEdit(index, { field: "shots", value: Number(text) })
                         }
                       />
-                    </td>
+                    </fieldset>
+</td>
                     <td>
+<fieldset disabled={linked} className={styles.cellFieldset}>
                       {!armPatternAllowed(tag.pattern) &&
-                      !rotationAllowed(tag.pattern) ? (
+                      !rotationAllowed(tag.pattern) &&
+                      !rowHasTypedFields(tag, matchesLinearBullet(tag, config)) ? (
                         "—"
                       ) : (
                         <>
+                          <RowTypedFields
+                            tag={tag}
+                            index={index}
+                            showBullet={matchesLinearBullet(tag, config)}
+                            onEdit={(change) => applyEdit(index, change)}
+                          />
                           {armPatternAllowed(tag.pattern) && (
                             <>
+                              <small className={styles.cellCaptionText}>Arm</small>
                               <select
                                 className={styles.cellSelect}
                                 aria-label={`Arm pattern of tag ${index + 1}`}
@@ -1580,6 +1928,7 @@ export function TaggerRoute() {
                               {tag.armPattern && (
                                 <CommitInput
                                   label={`Shots per arm of tag ${index + 1}`}
+                                  caption="Per arm"
                                   value={String(tag.shotsPerArm ?? "")}
                                   onCommit={(text) =>
                                     text.trim() !== "" &&
@@ -1593,6 +1942,7 @@ export function TaggerRoute() {
                               {tag.armPattern && armPatternTakesArc(tag.armPattern) && (
                                 <CommitInput
                                   label={`Cone width of tag ${index + 1}`}
+                                  caption="Cone °"
                                   value={String(tag.armArcDegrees ?? "")}
                                   step="any"
                                   onCommit={(text) =>
@@ -1610,6 +1960,7 @@ export function TaggerRoute() {
                             <>
                               <CommitInput
                                 label={`Rotation rate of tag ${index + 1}`}
+                                  caption="Rate °/s"
                                 value={
                                   tag.clockwiseDegreesPerSecond === undefined
                                     ? ""
@@ -1626,6 +1977,7 @@ export function TaggerRoute() {
                               />
                               <CommitInput
                                 label={`Initial phase of tag ${index + 1}`}
+                                  caption="Phase °"
                                 value={
                                   tag.initialPhaseDegrees === undefined
                                     ? ""
@@ -1644,8 +1996,10 @@ export function TaggerRoute() {
                           )}
                         </>
                       )}
-                    </td>
+                    </fieldset>
+</td>
                     <td>
+                      <fieldset disabled={repeats} className={styles.cellFieldset}>
                       <CommitInput
                         label={`Burst of tag ${index + 1}`}
                         value={tag.burstId === undefined ? "" : String(tag.burstId)}
@@ -1657,8 +2011,55 @@ export function TaggerRoute() {
                           })
                         }
                       />
+                    </fieldset>
                     </td>
                     <td>
+                      {linked ? (
+                        <fieldset
+                          disabled={stored.burstId !== undefined}
+                          className={styles.cellFieldset}
+                        >
+                          <CommitInput
+                            label={`Repeat end of tag ${index + 1}`}
+                            value={
+                              stored.repeatEndSeconds === undefined
+                                ? ""
+                                : stored.repeatEndSeconds.toFixed(3)
+                            }
+                            step="0.001"
+                            blankAllowed
+                            onCommit={(text) =>
+                              applyRepeatEnd(index, (current) =>
+                                text.trim() === ""
+                                  ? clearRepeatEnd(current)
+                                  : setRepeatEnd(current, Number(text), "typed"),
+                              )
+                            }
+                          />
+                          {stored.repeatEndSource === "typed" && (
+                            <small className={styles.note}> typed</small>
+                          )}
+                        </fieldset>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <small className={styles.note}>
+                        {matchStatusText(tagMatchStatus(tag, config), phaseName)}
+                      </small>
+                    </td>
+                    <td className={styles.stickyActions}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSticky((current) => stickyFromTag(tag, current));
+                          setSelectedTagIndex(index);
+                        }}
+                        aria-label={`Use the settings of tag ${index + 1}`}
+                      >
+                        Use these settings
+                      </button>{" "}
                       <button
                         type="button"
                         onClick={() => {
@@ -1679,6 +2080,19 @@ export function TaggerRoute() {
                       >
                         Go to
                       </button>{" "}
+                      {linked && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => detachRow(index)}
+                            disabled={repeats}
+                            title={repeats ? "Clear the repeat end or delete the row first." : undefined}
+                            aria-label={`Detach tag ${index + 1} from its saved attack`}
+                          >
+                            Detach
+                          </button>{" "}
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -1699,7 +2113,8 @@ export function TaggerRoute() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1707,7 +2122,13 @@ export function TaggerRoute() {
         {exportIndex !== null && tags[exportIndex] && (
           <ExportBox
             tagNumber={exportIndex + 1}
-            result={authoredAttackFromTag(tags[exportIndex], config)}
+            result={authoredAttackFromTag(
+              tags[exportIndex],
+              config,
+              savedAttacks.find((entry) => entry.id === tags[exportIndex].savedAttackId),
+            )}
+            linked={tags[exportIndex].savedAttackId !== undefined}
+            statusText={matchStatusText(tagMatchStatus(tags[exportIndex], config), phaseName)}
             note={copyNote}
             onCopy={(text) => {
               // N41: a failing clipboard only leaves the box for manual copying.

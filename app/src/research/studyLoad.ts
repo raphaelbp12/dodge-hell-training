@@ -56,6 +56,14 @@ export function videoChoiceDecision(input: {
   return input.tagCount > 0 ? "confirm-reset" : "reset";
 }
 
+/** V16 S19: changing encounter asks whenever tags or saved attacks would be cleared. */
+export function encounterChangeDecision(input: {
+  tagCount: number;
+  savedAttackCount: number;
+}): "change" | "confirm" {
+  return input.tagCount > 0 || input.savedAttackCount > 0 ? "confirm" : "change";
+}
+
 /** Z16: warn, never block, when the study and the open video differ by name. */
 export function fileNameMismatch(
   studyFileName: string | null,

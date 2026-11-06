@@ -37,6 +37,13 @@ describe("frameStepSeconds", () => {
   );
 });
 
+describe("actionForKey volley stepping", () => {
+  test("[ and ] step between volleys and need no usable frame rate", () => {
+    expect(actionForKey("[", 0)).toEqual({ kind: "step-volley", direction: -1 });
+    expect(actionForKey("]", Number.NaN)).toEqual({ kind: "step-volley", direction: 1 });
+  });
+});
+
 describe("actionForKey", () => {
   test("maps transport and tagging keys", () => {
     expect(actionForKey("ArrowLeft", 60)).toEqual({

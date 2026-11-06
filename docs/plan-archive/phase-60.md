@@ -4,7 +4,7 @@
 
 ### Step 60.1 - The Bomb Controls
 
-Status: pending. Dependencies: phase 59.
+Status: complete. Dependencies: phase 59.
 
 **Implementation prompt**
 
@@ -25,7 +25,7 @@ No selection can produce a tag `validateTag` rejects, and a bullet sprite shows 
 
 ### Step 60.2 - Bombs In The Preview
 
-Status: pending. Dependencies: 60.1.
+Status: complete. Dependencies: 60.1.
 
 **Implementation prompt**
 
@@ -46,7 +46,7 @@ Every bomb sprite the Queen's encounter fires can be drawn in every phase and pa
 
 ### Step 60.3 - Exporting A Projectile Variant
 
-Status: pending. Dependencies: 60.2.
+Status: complete. Dependencies: 60.2.
 
 **Implementation prompt**
 
@@ -66,7 +66,7 @@ Every exported pair is valid to paste, and no calculated speed appears anywhere 
 
 ### Step 60.4 - Linear Bullets
 
-Status: pending. Dependencies: 60.3.
+Status: complete. Dependencies: 60.3.
 
 **Implementation prompt**
 
@@ -79,3 +79,15 @@ Write failing `previewModel.test.ts` and `exportAttack.test.ts` cases first: typ
 **Acceptance**
 
 Authored data is unchanged, and non-`linear` motion behaves exactly as before.
+
+## Execution record
+
+**60.1** `isBombSprite`, a "Targets the player" checkbox (enabled only for a one-shot player-aimed spread, with the reason shown), bomb range and flight time (range disabled while targeted), with every drop rule in `conformAttackFields`. `target` and the saved attack id join `groupKey`, `IntervalSummary` and `compareSummaries`.
+
+**60.2** Targeting comes only from `tag.target`. A bomb matches the first attack of its phase firing its sprite in any family, otherwise the first in any phase (reported as `borrowedFromPhaseIndex`); a cross-family pattern is built from the tag with neutral defaults, borrowing only the projectile and emitter radius, and a scatter with no cone reports `needs-cone`. Typed range and time overlay a copy of the matched bomb spec, so the game's `resolveBombDestination` is reused.
+
+**60.3** `authoredAttackFromTag` derives `target` from the tag and adds a `projectileVariant` (the matched authored entry with typed values, `id` removed, `type` kept only for a bomb, a typed-estimate `source`, id plus `-tagged`); the export box shows it in a second read-only box with its own copy button. Variants pass `validateProjectile`; their attacks pass `validateAttack`. The paste-into-a-local-copy manual check was not performed, and no data file was changed.
+
+**60.4** Typed bullet speed and range show only for a `linear` match, overlay a copy of the matched bullet so `resolveShardLifetime` derives the lifetime, and export as a variant. Non-`linear` motion is unchanged. The note on a non-`linear` match is satisfied by hiding the fields; no separate note was added. In the shipped data every tagged bullet sprite is `linear`, so the non-linear case is covered by a preview test only.
+
+`npm run verify` passed.

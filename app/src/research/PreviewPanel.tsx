@@ -20,7 +20,15 @@ import {
   zoomAbout,
   type PreviewView,
 } from "./previewView";
-import type { Tag } from "./tagging";
+import type { SavedAttack, Tag } from "./tagging";
+import {
+  DEFAULT_TUNING_SHOT_INTERVAL_SECONDS,
+  TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND,
+  type TunableValue,
+  type TuningChange,
+  type TuningField,
+} from "./tuning";
+import { CommitInput } from "./TypedFieldControls";
 import styles from "./PreviewPanel.module.css";
 
 const PLAYER_SLIDER_STEP_TILES = 0.1;
@@ -29,12 +37,40 @@ const HEADING_SLIDER_STEP_DEGREES = 1;
 const SIZES: readonly PreviewSize[] = ["small", "medium", "large"];
 const NO_VIDEO_NOTE = "Open a video to see the preview";
 
+/** What the tuning section edits and how (V16 S48, S49). */
+export type TuningProps = Readonly<{
+  /** "Tuning saved attack ...", "Tuning this tag only", or null with no row selected. */
+  target: string | null;
+  values: readonly TunableValue[];
+  /** Returns whether the change was accepted, so a refused input restores its text. */
+  onChange: (change: TuningChange) => boolean;
+}>;
+
+const TUNING_LABEL: Readonly<Record<TuningField, string>> = {
+  clockwiseDegreesPerSecond: "Rotation rate, degrees per second",
+  initialPhaseDegrees: "Initial phase, degrees",
+  emitterRadiusTiles: "Emitter radius, tiles",
+  shotsPerBurst: "Shots per burst",
+  shotIntervalSeconds: "Shot interval, seconds",
+  cooldownAfterLastShotSeconds: "Cooldown after the last shot, seconds",
+};
+
+/** Optional values may be blanked; the cadence values may not. */
+const BLANK_ALLOWED: readonly TuningField[] = [
+  "clockwiseDegreesPerSecond",
+  "initialPhaseDegrees",
+  "emitterRadiusTiles",
+];
+
 type Props = Readonly<{
   tags: readonly Tag[];
+  /** Needed to expand repeat rows into volleys. */
+  savedAttacks: readonly SavedAttack[];
   mediaTime: number;
   hasVideo: boolean;
   config: EncounterConfig;
   highlightedTagIndices: readonly number[];
+  tuning: TuningProps;
   /** The persisted layout, owned by the route (shown and size). */
   layout: PreviewPreferenceValue;
   onLayoutChange: (next: PreviewPreferenceValue) => void;
@@ -46,10 +82,12 @@ type Props = Readonly<{
  */
 export function PreviewPanel({
   tags,
+  savedAttacks,
   mediaTime,
   hasVideo,
   config,
   highlightedTagIndices,
+  tuning,
   layout,
   onLayoutChange,
 }: Props) {
@@ -92,6 +130,7 @@ export function PreviewPanel({
       context,
       previewAt({
         tags,
+        savedAttacks,
         timeSeconds: mediaTime,
         config,
         playerTiles,
@@ -105,6 +144,7 @@ export function PreviewPanel({
     shown,
     hasVideo,
     tags,
+    savedAttacks,
     mediaTime,
     config,
     playerTiles,
@@ -231,8 +271,75 @@ export function PreviewPanel({
             />
             <output>{headingDegrees.toFixed(0)}</output>
           </label>
+          <TuningSection tuning={tuning} />
         </>
       )}
     </aside>
+  );
+}
+
+/**
+ * The tuning controls (V16 S47-S50): number fields for the selected row's typed
+ * estimates, plus a rate slider. They edit only the study, never game data, and
+ * redraw through the one preview effect.
+ */
+function TuningSection({ tuning }: Readonly<{ tuning: TuningProps }>) {
+  if (tuning.target === null)
+    return (
+      <p className={styles.note}>
+        Select a tag row to tune its typed estimates while watching the
+        preview.
+      </p>
+    );
+  const spb = tuning.values.find((entry) => entry.field === "shotsPerBurst")?.value;
+  const hasInterval = tuning.values.some((entry) => entry.field === "shotIntervalSeconds");
+  return (
+    <fieldset className={styles.tuning}>
+      <legend>Tuning (typed estimates)</legend>
+      <p className={styles.note}>{tuning.target}</p>
+      {tuning.values.length === 0 && (
+        <p className={styles.note}>Nothing on this tag can be tuned here.</p>
+      )}
+      {tuning.values.map(({ field, value }) => (
+        <div key={field} className={styles.tuningRow}>
+          <CommitInput
+            label={`Tune ${TUNING_LABEL[field].toLowerCase()}`}
+            caption={`${TUNING_LABEL[field]} (typed estimate)`}
+            value={value === undefined ? "" : String(value)}
+            step="any"
+            blankAllowed={BLANK_ALLOWED.includes(field)}
+            onCommit={(text) => {
+              const blank = text.trim() === "";
+              const next = blank ? null : Number(text);
+              const raisesBurst =
+                field === "shotsPerBurst" && next !== null && next > 1 && !hasInterval;
+              return tuning.onChange({
+                field,
+                value: next,
+                ...(raisesBurst && spb !== undefined
+                  ? { shotIntervalSeconds: DEFAULT_TUNING_SHOT_INTERVAL_SECONDS }
+                  : {}),
+              });
+            }}
+          />
+          {field === "clockwiseDegreesPerSecond" && (
+            <input
+              type="range"
+              aria-label="Rotation rate slider"
+              min={-TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND}
+              max={TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND}
+              step={1}
+              value={Math.max(
+                -TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND,
+                Math.min(TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND, value ?? 0),
+              )}
+              onChange={(event) =>
+                tuning.onChange({ field, value: Number(event.target.value) })
+              }
+            />
+          )}
+        </div>
+      ))}
+    </fieldset>
   );
 }

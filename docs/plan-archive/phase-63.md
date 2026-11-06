@@ -4,7 +4,7 @@
 
 ### Step 63.1 - The Boundary And The Pure Mapping
 
-Status: pending. Dependencies: phase 62.
+Status: complete. Dependencies: phase 62.
 
 **Implementation prompt**
 
@@ -22,7 +22,7 @@ The mapping depends on no DOM or React, and nothing here imports a game data wri
 
 ### Step 63.2 - The Controls
 
-Status: pending. Dependencies: 63.1.
+Status: complete. Dependencies: 63.1.
 
 **Implementation prompt**
 
@@ -35,3 +35,11 @@ Extend `tuning.test.ts` for anything pure added here. Manual, recorded as perfor
 **Acceptance**
 
 Tuning redraws only through the existing preview effect, adds no per-projectile React state, and changes no file under `app/src/game/`.
+
+## Execution record
+
+**63.1** `AGENTS.md` gained one sentence stating a development-only tagger control that edits only a study's typed estimates is not a tuning UI. `tuning.ts` is pure: `tunableValuesFor`, `applyTuning` (a linked row edits its saved attack, an unlinked row only itself; the S28 rule applies and raising shots per burst from one needs an interval) and the named constant `TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND = 720`. `DEFAULT_TUNING_SHOT_INTERVAL_SECONDS = 0.1` is an input convenience, labelled as such, used by the UI when a person raises shots per burst from one.
+
+**63.2** `PreviewPanel` has a Tuning section for the selected row with number fields, a ±720 rate slider (a typed number may exceed it) and the target text ("Tuning saved attack ...: N tag(s)" or "Tuning this tag only"). Changes update React state and autosave, and redraw through the existing preview effect. The paused-redraw manual check was not performed; the Playwright case tunes the rate and asserts it in the export.
+
+`npm run verify` passed. No file under `app/src/game/` changed.

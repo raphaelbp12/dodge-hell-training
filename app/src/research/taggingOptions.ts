@@ -13,12 +13,16 @@ import {
 import {
   armArcProblem,
   groupKey,
+  TAG_ATTACK_FIELD_KEYS,
   validateObservationExport,
   type IntervalSummary,
   type ObservationExport,
+  type SavedAttack,
+  type StoredTag,
   type Tag,
   type TagAim,
   type TagArmPattern,
+  type TagAttackFields,
   type TagPattern,
   type VideoProvenance,
 } from "./tagging";
@@ -138,6 +142,19 @@ export function shotsLabel(pattern: TagPattern): "arms" | "shots" {
     : "shots";
 }
 
+/** The attack fields a sticky selection always holds; every other one is optional. */
+type RequiredStickyKeys = "spriteId" | "pattern" | "shots";
+
+/**
+ * The optional attack fields a sticky selection may carry (N35, V16 S22-S25).
+ * Each is kept even when the pattern ignores it, so the choice survives a
+ * switch, and applied to a new tag only where `attackFieldApplies` allows it.
+ */
+export const STICKY_OPTIONAL_KEYS = TAG_ATTACK_FIELD_KEYS.filter(
+  (key): key is Exclude<keyof TagAttackFields, RequiredStickyKeys | "aim"> =>
+    key !== "spriteId" && key !== "pattern" && key !== "shots" && key !== "aim",
+);
+
 export type StickySelection = Readonly<{
   phaseIndex: number;
   spriteId: string;
@@ -145,46 +162,90 @@ export type StickySelection = Readonly<{
   /** Kept even when the pattern ignores it, so the choice survives a switch. */
   aim: TagAim;
   shots: number;
-  /**
-   * N35: typed-geometry choices, each optional and kept even when the pattern
-   * ignores it, so the choice survives a switch. Applied to a new tag only
-   * where the sticky pattern allows it.
-   */
-  armPattern?: TagArmPattern;
-  shotsPerArm?: number;
-  armArcDegrees?: number;
-  clockwiseDegreesPerSecond?: number;
-  initialPhaseDegrees?: number;
-}>;
+}> &
+  Readonly<
+    Partial<
+      Pick<TagAttackFields, (typeof STICKY_OPTIONAL_KEYS)[number]>
+    >
+  > &
+  Readonly<{
+    /** V16 S32: the chosen saved attack; absent means None. */
+    savedAttackId?: string;
+  }>;
+
+/** T20: whether a sprite is one of the catalog's bombs. */
+export function isBombSprite(spriteId: string): boolean {
+  return PROJECTILE_APPEARANCES[spriteId]?.bomb !== undefined;
+}
 
 /**
- * The composite and typed-geometry fields a new tag takes from the sticky
- * selection. A composite needs its shots per arm, and a spread or scatter arm
- * its cone; a selection missing one records a plain ring instead, so no tag is
- * ever produced that `validateTag` rejects.
+ * Whether an attack field means anything for a tag of this shape (N31, N35,
+ * V16 S08, S22-S25). Creation, editing and "use these settings" all ask this
+ * one question, so a selection can never produce a tag `validateTag` rejects.
  */
-function stickyGeometry(sticky: StickySelection): Partial<Tag> {
-  const geometry: {
-    -readonly [Field in keyof Tag]?: Tag[Field];
-  } = {};
-  const { armPattern, shotsPerArm, armArcDegrees } = sticky;
-  if (
-    armPatternAllowed(sticky.pattern) &&
-    armPattern !== undefined &&
-    shotsPerArm !== undefined &&
-    (!armPatternTakesArc(armPattern) || armArcDegrees !== undefined)
-  ) {
-    geometry.armPattern = armPattern;
-    geometry.shotsPerArm = shotsPerArm;
-    if (armPatternTakesArc(armPattern)) geometry.armArcDegrees = armArcDegrees;
+export function attackFieldApplies(
+  field: keyof TagAttackFields,
+  shape: Readonly<{ pattern: TagPattern; aim?: TagAim; shots: number; spriteId: string }>,
+): boolean {
+  const takesAim = patternTakesAim(shape.pattern);
+  switch (field) {
+    case "armPattern":
+    case "shotsPerArm":
+    case "armArcDegrees":
+    case "emitterRadiusTiles":
+      return armPatternAllowed(shape.pattern);
+    case "clockwiseDegreesPerSecond":
+    case "initialPhaseDegrees":
+      return rotationAllowed(shape.pattern);
+    case "coneDegrees":
+      return takesAim;
+    case "fixedBearingDegrees":
+      return takesAim && shape.aim === "fixed";
+    case "frontOffsetDegrees":
+      return takesAim && shape.aim === "front";
+    case "target":
+      return (
+        isBombSprite(shape.spriteId) &&
+        shape.pattern === "spread" &&
+        shape.shots === 1 &&
+        shape.aim === "player"
+      );
+    case "bombRangeTiles":
+    case "bombTravelSeconds":
+      return isBombSprite(shape.spriteId);
+    case "bulletSpeedTilesPerSecond":
+    case "bulletRangeTiles":
+      return !isBombSprite(shape.spriteId);
+    default:
+      return true;
   }
-  if (rotationAllowed(sticky.pattern)) {
-    if (sticky.clockwiseDegreesPerSecond !== undefined)
-      geometry.clockwiseDegreesPerSecond = sticky.clockwiseDegreesPerSecond;
-    if (sticky.initialPhaseDegrees !== undefined)
-      geometry.initialPhaseDegrees = sticky.initialPhaseDegrees;
+}
+
+/**
+ * Drops every attack field the tag's shape disallows, and a composite whose
+ * parts are incomplete (a spread or scatter arm needs its cone, every arm
+ * pattern its shots per arm), so no tag is ever produced that `validateTag`
+ * rejects. A targeted bomb lands on the player at any distance, so its range
+ * goes too (S12).
+ */
+export function conformAttackFields<T extends TagAttackFields>(tag: T): T {
+  const out: Record<string, unknown> = { ...tag };
+  for (const key of TAG_ATTACK_FIELD_KEYS)
+    if (out[key] !== undefined && !attackFieldApplies(key, tag)) delete out[key];
+  if (armPatternAllowed(tag.pattern)) {
+    const armPattern = out.armPattern as TagArmPattern | undefined;
+    const incomplete =
+      armPattern === undefined ||
+      out.shotsPerArm === undefined ||
+      (armPatternTakesArc(armPattern) && out.armArcDegrees === undefined);
+    if (incomplete) {
+      delete out.armPattern;
+      delete out.shotsPerArm;
+      delete out.armArcDegrees;
+    } else if (armPattern === "ring") delete out.armArcDegrees;
   }
-  return geometry;
+  if (out.target !== undefined) delete out.bombRangeTiles;
+  return out as T;
 }
 
 /** T22: one keypress records the sticky selection at the presented frame time. */
@@ -193,25 +254,55 @@ export function createTag(
   sticky: StickySelection,
   burstId?: number,
 ): Tag {
+  const fields: Record<string, unknown> = {};
+  for (const key of STICKY_OPTIONAL_KEYS)
+    if (sticky[key] !== undefined) fields[key] = sticky[key];
   return {
     timeSeconds: mediaTimeSeconds,
     phaseIndex: sticky.phaseIndex,
-    spriteId: sticky.spriteId,
-    pattern: sticky.pattern,
-    ...(patternTakesAim(sticky.pattern) ? { aim: sticky.aim } : {}),
-    shots: sticky.shots,
-    ...stickyGeometry(sticky),
+    ...conformAttackFields({
+      spriteId: sticky.spriteId,
+      pattern: sticky.pattern,
+      ...(patternTakesAim(sticky.pattern) ? { aim: sticky.aim } : {}),
+      shots: sticky.shots,
+      ...fields,
+    }),
     ...(burstId === undefined ? {} : { burstId }),
   };
 }
 
-function stickyKey(sticky: StickySelection): string {
+/**
+ * V16 S20: copies a resolved tag's phase and attack fields into a sticky
+ * selection. A field the tag's shape ignores keeps `current`'s value, so a
+ * choice survives a pattern switch as it does today.
+ */
+export function stickyFromTag(tag: Tag, current: StickySelection): StickySelection {
+  const next: Record<string, unknown> = {
+    ...current,
+    phaseIndex: tag.phaseIndex,
+    spriteId: tag.spriteId,
+    pattern: tag.pattern,
+    aim: tag.aim ?? current.aim,
+    shots: tag.shots,
+  };
+  for (const key of STICKY_OPTIONAL_KEYS) {
+    if (tag[key] !== undefined) next[key] = tag[key];
+    else if (attackFieldApplies(key, tag)) delete next[key];
+  }
+  if (tag.savedAttackId === undefined) delete next.savedAttackId;
+  else next.savedAttackId = tag.savedAttackId;
+  return next as StickySelection;
+}
+
+/**
+ * The grouping key a new tag from `sticky` would have. A tag that would link
+ * to a saved attack groups by that attack (V16 S14, S32), so the caller passes
+ * `linkedAttackId` when the selection is unmodified.
+ */
+function stickyKey(sticky: StickySelection, linkedAttackId: string | null): string {
   return groupKey({
-    phaseIndex: sticky.phaseIndex,
-    spriteId: sticky.spriteId,
-    pattern: sticky.pattern,
-    aim: patternTakesAim(sticky.pattern) ? sticky.aim : undefined,
-    armPattern: stickyGeometry(sticky).armPattern,
+    ...createTag(0, sticky),
+    savedAttackId: linkedAttackId ?? undefined,
   });
 }
 
@@ -223,8 +314,9 @@ function stickyKey(sticky: StickySelection): string {
 export function readoutInterval(
   tags: readonly Tag[],
   sticky: StickySelection,
+  linkedAttackId: string | null = null,
 ): number | null {
-  const key = stickyKey(sticky);
+  const key = stickyKey(sticky, linkedAttackId);
   const times = tags
     .filter((tag) => groupKey(tag) === key)
     .map((tag) => tag.timeSeconds)
@@ -243,10 +335,11 @@ export function assignBurst(
   tags: readonly Tag[],
   sticky: StickySelection,
   mode: BurstMode,
+  linkedAttackId: string | null = null,
 ): number | null {
   if (mode === "new")
     return tags.reduce((highest, tag) => Math.max(highest, tag.burstId ?? 0), 0) + 1;
-  const key = stickyKey(sticky);
+  const key = stickyKey(sticky, linkedAttackId);
   let found: number | null = null;
   for (const tag of tags)
     if (tag.burstId !== undefined && groupKey(tag) === key)
@@ -276,7 +369,40 @@ export type TagChange =
   | Readonly<{ field: "clockwiseDegreesPerSecond"; value: number | null }>
   | Readonly<{ field: "initialPhaseDegrees"; value: number | null }>
   /** Null removes the burst id (blank field). */
-  | Readonly<{ field: "burstId"; value: number | null }>;
+  | Readonly<{ field: "burstId"; value: number | null }>
+  /** V16 S22-S25, S11, S24: typed estimates; null (a blank field) removes the value. */
+  | Readonly<{ field: TypedNumberField; value: number | null }>
+  /** V16 S08: a bomb thrown at the player; true needs a one-shot player-aimed spread. */
+  | Readonly<{ field: "target"; value: boolean }>;
+
+/** The attack fields that are a single optional typed number. */
+export type TypedNumberField =
+  | "coneDegrees"
+  | "fixedBearingDegrees"
+  | "frontOffsetDegrees"
+  | "emitterRadiusTiles"
+  | "bombRangeTiles"
+  | "bombTravelSeconds"
+  | "bulletSpeedTilesPerSecond"
+  | "bulletRangeTiles";
+
+const POSITIVE_TYPED_FIELDS: readonly TypedNumberField[] = [
+  "bombRangeTiles",
+  "bombTravelSeconds",
+  "bulletSpeedTilesPerSecond",
+  "bulletRangeTiles",
+];
+
+const TYPED_FIELD_LABEL: Readonly<Record<TypedNumberField, string>> = {
+  coneDegrees: "Cone width",
+  fixedBearingDegrees: "Bearing",
+  frontOffsetDegrees: "Front offset",
+  emitterRadiusTiles: "Emitter radius",
+  bombRangeTiles: "Bomb range",
+  bombTravelSeconds: "Bomb flight time",
+  bulletSpeedTilesPerSecond: "Bullet speed",
+  bulletRangeTiles: "Bullet range",
+};
 
 export type EditResult =
   | Readonly<{ ok: true; tag: Tag }>
@@ -291,6 +417,16 @@ function fail(error: string): EditResult {
  * the old tag. A valid time change permanently marks the tag typed.
  */
 export function editTag(
+  tag: Tag,
+  change: TagChange,
+  durationSeconds: number,
+): EditResult {
+  const result = editTagRaw(tag, change, durationSeconds);
+  // Every edit then drops what the new shape disallows (V16 S22-S25, S08).
+  return result.ok ? { ok: true, tag: conformAttackFields(result.tag) } : result;
+}
+
+function editTagRaw(
   tag: Tag,
   change: TagChange,
   durationSeconds: number,
@@ -420,6 +556,43 @@ export function editTag(
         return fail("Rotation values must be finite numbers of degrees.");
       return { ok: true, tag: { ...tag, [change.field]: change.value } };
     }
+    case "target": {
+      const { target: _removed, ...rest } = tag;
+      if (!change.value) return { ok: true, tag: rest };
+      if (!attackFieldApplies("target", tag))
+        return fail(
+          'A targeted bomb needs a bomb sprite fired as a one-shot spread with aim "player".',
+        );
+      return { ok: true, tag: { ...rest, target: "player" } };
+    }
+    case "coneDegrees":
+    case "fixedBearingDegrees":
+    case "frontOffsetDegrees":
+    case "emitterRadiusTiles":
+    case "bombRangeTiles":
+    case "bombTravelSeconds":
+    case "bulletSpeedTilesPerSecond":
+    case "bulletRangeTiles": {
+      const field = change.field;
+      const { [field]: _removed, ...rest } = tag;
+      if (change.value === null) return { ok: true, tag: rest };
+      if (!attackFieldApplies(field, tag))
+        return fail(`${TYPED_FIELD_LABEL[field]} does not apply to this tag.`);
+      if (!Number.isFinite(change.value))
+        return fail(`${TYPED_FIELD_LABEL[field]} must be a finite number.`);
+      if (field === "coneDegrees") {
+        const problem = armArcProblem(
+          tag.pattern === "scatter" ? "scatter" : "spread",
+          change.value,
+        );
+        if (problem) return fail(`Cone width ${problem}.`);
+      }
+      if (field === "emitterRadiusTiles" && change.value < 0)
+        return fail("Emitter radius must not be negative.");
+      if (POSITIVE_TYPED_FIELDS.includes(field) && change.value <= 0)
+        return fail(`${TYPED_FIELD_LABEL[field]} must be above 0.`);
+      return { ok: true, tag: { ...tag, [field]: change.value } };
+    }
     case "burstId": {
       if (change.value === null) {
         const { burstId: _removed, ...rest } = tag;
@@ -453,17 +626,19 @@ export function sortNewestFirst(
 export function assembleExport(input: {
   encounterId: string;
   provenance: VideoProvenance;
-  tags: readonly Tag[];
+  savedAttacks?: readonly SavedAttack[];
+  tags: readonly StoredTag[];
   recordedAt: string;
 }): ObservationExport {
   const tags = [...input.tags].sort(
     (first, second) => first.timeSeconds - second.timeSeconds,
   );
   return validateObservationExport({
-    schemaVersion: 2,
+    schemaVersion: 3,
     encounterId: input.encounterId,
     provenance: input.provenance,
     recordedAt: input.recordedAt,
+    savedAttacks: input.savedAttacks ?? [],
     tags,
   }) as ObservationExport;
 }
@@ -474,6 +649,10 @@ export type SummaryRow = Readonly<{
   pattern: string;
   aim: string;
   armPattern: string;
+  /** V16 S14: "player" for a targeted bomb throw, else a dash. */
+  target: string;
+  /** V16 S46: the saved attack's name, else a dash. */
+  attack: string;
   scope: string;
   sampleCount: number;
   mean: string;
@@ -488,6 +667,7 @@ export type SummaryRow = Readonly<{
 export function formatSummaryRow(
   summary: IntervalSummary,
   phases: readonly PhaseOption[],
+  savedAttacks: readonly SavedAttack[] = [],
 ): SummaryRow {
   const phase = phases.find((option) => option.index === summary.phaseIndex);
   const seconds = (value: number) => `${value.toFixed(3)} s`;
@@ -497,6 +677,12 @@ export function formatSummaryRow(
     pattern: summary.pattern,
     aim: summary.aim ?? "—",
     armPattern: summary.armPattern ?? "—",
+    target: summary.target ?? "—",
+    attack:
+      summary.savedAttackId === undefined
+        ? "—"
+        : (savedAttacks.find((entry) => entry.id === summary.savedAttackId)?.name ??
+          summary.savedAttackId),
     scope: summary.scope,
     sampleCount: summary.sampleCount,
     mean: summary.sampleCount === 0 ? "—" : seconds(summary.meanSeconds),

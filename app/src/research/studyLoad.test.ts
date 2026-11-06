@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
   currentDuration,
+  encounterChangeDecision,
   fileNameMismatch,
   loadDecision,
   parseStudyFile,
@@ -63,7 +64,7 @@ describe("parseStudyFile", () => {
 
   test("accepts an unknown sprite and out-of-range phase", () => {
     const study = parseStudyFile(file(), KNOWN);
-    expect(study.tags[0].spriteId).toBe("gone-sprite");
+    expect(study.tags[0]).toMatchObject({ spriteId: "gone-sprite" });
     expect(study.tags[0].phaseIndex).toBe(99);
     expect(study.provenance.frameRate).toBe(30);
   });
@@ -132,4 +133,12 @@ test("currentDuration prefers the open video", () => {
   expect(currentDuration(40, 100)).toBe(40);
   expect(currentDuration(0, 100)).toBe(100);
   expect(currentDuration(0, null)).toBe(0);
+});
+
+describe("encounterChangeDecision", () => {
+  test("changes at once only with no tags and no saved attacks", () => {
+    expect(encounterChangeDecision({ tagCount: 0, savedAttackCount: 0 })).toBe("change");
+    expect(encounterChangeDecision({ tagCount: 2, savedAttackCount: 0 })).toBe("confirm");
+    expect(encounterChangeDecision({ tagCount: 0, savedAttackCount: 1 })).toBe("confirm");
+  });
 });

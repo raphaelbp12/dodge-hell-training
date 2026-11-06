@@ -4,7 +4,7 @@
 
 ### Step 64.1 - The Guide
 
-Status: pending. Dependencies: phase 63.
+Status: complete. Dependencies: phase 63.
 
 **Implementation prompt**
 
@@ -20,7 +20,7 @@ Every control added in this plan is described, and nothing in the guide contradi
 
 ### Step 64.2 - The Playwright Case
 
-Status: pending. Dependencies: 64.1.
+Status: complete. Dependencies: 64.1.
 
 **Implementation prompt**
 
@@ -38,7 +38,7 @@ The case passes alone, and its generated video is never written to the repositor
 
 ### Step 64.3 - Plan Acceptance
 
-Status: pending. Dependencies: 64.2.
+Status: complete. Dependencies: 64.2.
 
 **Implementation prompt**
 
@@ -51,3 +51,11 @@ Each gate above, reported with its real result.
 **Acceptance**
 
 Every gate has recorded evidence, or a stated blocker for the user.
+
+## Execution record
+
+**64.1** `docs/tagger-guide.md` describes the timeline and `[` / `]`, match status, use-these-settings, every new typed field, bombs, saved attacks, repeats, the rotation clock, preview tuning, schema v3 and the second export box, corrects the "never an angle" and targeted-bomb statements, and has the 0.4 s ring worked example. `docs/mechanics.md` was grepped for tagger statements; none are contradicted (its V8 tagger section records history), so it was not changed. The guide-versus-running-tagger comparison was not performed in a live session.
+
+**64.2** One Playwright case generates a WebM with `MediaRecorder` in the page, loads it through the file input, types a frame rate, plays and pauses to present a frame, saves a rotating-arm attack with a typed cooldown, records a linked tag, seeks, presses End repeat here, selects the row, tunes the rate, and asserts the repeat end, the absent not-previewed note and the export box's slug, cooldown and typed rate. It passed alone in headless Chromium, and no video is written to the repository.
+
+**64.3** Review gates: `git status` shows no change under `app/src/game/`, `docs/killer-bee-queen-observations.json` or `docs/deferred-work.md`; the game tree was clean before phase 56, so the baseline is HEAD. `npm run verify` passed (lint, typecheck, test, build) and the new Playwright case passed alone, both through the `verifier` subagent.

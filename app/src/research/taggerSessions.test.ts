@@ -47,6 +47,7 @@ function study(fileName = "a.mp4", frameRate: number | null = 30): StudyState {
   return {
     encounterId: "killer-bee-queen",
     provenance: { sourceUrl: null, fileName, frameRate, durationSeconds: 100 },
+    savedAttacks: [],
     tags: [
       { timeSeconds: 1, phaseIndex: 0, spriteId: "x", pattern: "rotating-arm", shots: 2 },
     ],
@@ -179,7 +180,7 @@ test("buildDraft carries sticky selection and a null frame rate", () => {
   const built = draft("a.mp4", null);
   expect(built.sticky).toEqual(STICKY);
   expect(built.study.provenance.frameRate).toBeNull();
-  expect(built.draftVersion).toBe(1);
+  expect(built.draftVersion).toBe(2);
 });
 
 describe("restoreSticky", () => {
@@ -198,5 +199,78 @@ describe("restoreSticky", () => {
     expect(result.sticky.spriteId).toBe(appearanceOptions()[0].id);
     expect(result.sticky.phaseIndex).toBe(0);
     expect(result.notices).toEqual(["sprite-missing", "phase-missing"]);
+  });
+});
+
+describe("draft version 2 (plan V16 S05)", () => {
+  const attack = {
+    id: "a1",
+    name: "Spiral",
+    spriteId: "x",
+    pattern: "rotating-arm" as const,
+    shots: 3,
+    cadence: { shotsPerBurst: 1, cooldownAfterLastShotSeconds: 0.5 },
+  };
+
+  test("a version 1 draft restores with its tags intact and no saved attacks", () => {
+    const { savedAttacks: _omit, ...v1Study } = study();
+    const v1 = {
+      draftVersion: 1,
+      savedAt: "2026-11-05T12:00:00.000Z",
+      study: v1Study,
+      sticky: STICKY,
+    };
+    const upgraded = validateSessionDraft(v1);
+    expect(upgraded.draftVersion).toBe(2);
+    expect(upgraded.study.savedAttacks).toEqual([]);
+    expect(upgraded.study.tags).toEqual(v1Study.tags);
+  });
+
+  test("a version 2 draft with a linked tag round-trips", () => {
+    const withAttack: StudyState = {
+      ...study(),
+      savedAttacks: [attack],
+      tags: [{ timeSeconds: 2, phaseIndex: 0, savedAttackId: "a1" }],
+    };
+    const value = buildDraft({
+      study: withAttack,
+      sticky: { ...STICKY, savedAttackId: "a1" },
+      savedAt: "2026-11-05T12:00:00.000Z",
+    });
+    expect(validateSessionDraft(JSON.parse(JSON.stringify(value)))).toEqual(value);
+  });
+
+  test("rejects a linked tag naming a missing attack", () => {
+    const value = buildDraft({
+      study: { ...study(), tags: [{ timeSeconds: 2, phaseIndex: 0, savedAttackId: "no" }] },
+      sticky: STICKY,
+      savedAt: "2026-11-05T12:00:00.000Z",
+    });
+    expect(() => validateSessionDraft(value)).toThrow(/savedAttackId/);
+  });
+
+  test("a missing chosen attack is cleared with a notice", () => {
+    const restored = restoreSticky(
+      { ...STICKY, savedAttackId: "gone" },
+      ENCOUNTER_CONFIG,
+      [attack],
+    );
+    expect(restored.sticky).not.toHaveProperty("savedAttackId");
+    expect(restored.notices).toContain("attack-missing");
+    const kept = restoreSticky({ ...STICKY, savedAttackId: "a1" }, ENCOUNTER_CONFIG, [attack]);
+    expect(kept.sticky.savedAttackId).toBe("a1");
+    expect(kept.notices).not.toContain("attack-missing");
+  });
+
+  test("the session list reads both versions", () => {
+    const storage = new FakeStorage();
+    const { savedAttacks: _omit, ...v1Study } = study("old.mp4");
+    storage.data.set(
+      `${TAGGER_SESSION_KEY_PREFIX}old.mp4`,
+      JSON.stringify({ draftVersion: 1, savedAt: "2026-11-05T12:00:00.000Z", study: v1Study, sticky: STICKY }),
+    );
+    new TaggerSessions(() => storage).write(draft("new.mp4"));
+    const listed = new TaggerSessions(() => storage).list();
+    expect(listed.ok && listed.value.every((entry) => entry.readable)).toBe(true);
   });
 });

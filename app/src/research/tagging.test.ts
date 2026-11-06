@@ -2,10 +2,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
+  resolveTags,
   studyFromExport,
   summarizeTags,
   validateObservationExport,
   type ObservationExport,
+  type SavedAttack,
   type Tag,
   type TagV1,
 } from "./tagging";
@@ -243,7 +245,7 @@ describe("validateObservationExport v2", () => {
 
   test("rejects an unknown schema version", () => {
     expect(() =>
-      validateObservationExport(observation2([tag2()], { schemaVersion: 3 })),
+      validateObservationExport(observation2([tag2()], { schemaVersion: 4 })),
     ).toThrow(/schemaVersion/);
     expect(() =>
       validateObservationExport(observation2([tag2()], { schemaVersion: 1 })),
@@ -285,7 +287,7 @@ describe("studyFromExport", () => {
     );
     expect(JSON.stringify(value)).toBe(before);
     expect(study.provenance.frameRate).toBeNull();
-    expect(study.tags.map((entry) => entry.pattern)).toEqual([
+    expect(resolveTags(study.tags, study.savedAttacks).map((entry) => entry.pattern)).toEqual([
       "volley",
       "rotating-arm",
     ]);
@@ -404,7 +406,7 @@ describe("summarizeTags", () => {
     const study = studyFromExport(
       validateObservationExport(JSON.parse(readFileSync(exportUrl, "utf8"))),
     );
-    const summaries = summarizeTags(study.tags);
+    const summaries = summarizeTags(resolveTags(study.tags, study.savedAttacks));
     expect(summaries.length).toBeGreaterThan(0);
     expect(summaries.every((s) => s.scope === "all")).toBe(true);
   });
@@ -545,5 +547,238 @@ describe("composite and typed-geometry tag fields (plan V15 phase 53)", () => {
     ]);
     expect(summaries).toHaveLength(1);
     expect(summaries[0].sampleCount).toBe(1);
+  });
+});
+
+function savedAttack(overrides: Partial<SavedAttack> = {}): SavedAttack {
+  return {
+    id: "a1",
+    name: "Spiral",
+    spriteId: "red-glaive",
+    pattern: "rotating-arm",
+    shots: 4,
+    cadence: { shotsPerBurst: 1, cooldownAfterLastShotSeconds: 0.4 },
+    ...overrides,
+  };
+}
+
+function observation3(
+  tags: readonly unknown[],
+  savedAttacks: readonly unknown[] = [],
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return { ...observation({ tags }), schemaVersion: 3, savedAttacks, ...extra };
+}
+
+const linked = { timeSeconds: 5, phaseIndex: 1, savedAttackId: "a1" };
+
+describe("validateObservationExport v3", () => {
+  test("round-trips a v3 file with a linked repeat", () => {
+    const value = observation3(
+      [tag2(), { ...linked, repeatEndSeconds: 9, repeatEndSource: "typed" }],
+      [savedAttack()],
+    );
+    expect(validateObservationExport(value)).toBe(value);
+    const study = studyFromExport(validateObservationExport(value));
+    expect(study.savedAttacks).toHaveLength(1);
+    expect(study.tags).toHaveLength(2);
+  });
+
+  test("v1 and v2 files load with empty saved attacks", () => {
+    expect(
+      studyFromExport(validateObservationExport(observation())).savedAttacks,
+    ).toEqual([]);
+    expect(
+      studyFromExport(validateObservationExport(observation2([tag2()]))).savedAttacks,
+    ).toEqual([]);
+  });
+
+  test("the committed evidence file still validates and loads", () => {
+    const exportUrl = new URL(
+      "../../../docs/killer-bee-queen-observations.json",
+      import.meta.url,
+    );
+    const study = studyFromExport(
+      validateObservationExport(JSON.parse(readFileSync(exportUrl, "utf8"))),
+    );
+    expect(study.savedAttacks).toEqual([]);
+  });
+
+  const cases: [string, Record<string, unknown>, RegExp][] = [
+    ["missing savedAttacks", { ...observation({ tags: [tag2()] }), schemaVersion: 3 }, /savedAttacks/],
+    [
+      "duplicate attack name",
+      observation3([], [savedAttack(), savedAttack({ id: "a2" })]),
+      /savedAttacks\[1\]\.name/,
+    ],
+    [
+      "duplicate attack id",
+      observation3([], [savedAttack(), savedAttack({ name: "Other" })]),
+      /savedAttacks\[1\]\.id/,
+    ],
+    ["blank attack name", observation3([], [savedAttack({ name: " " })]), /savedAttacks\[0\]\.name/],
+    [
+      "a cadence with no cooldown",
+      observation3([], [savedAttack({ cadence: { shotsPerBurst: 1 } as never })]),
+      /cooldownAfterLastShotSeconds/,
+    ],
+    [
+      "a multi-shot cadence with no interval",
+      observation3([], [savedAttack({ cadence: { shotsPerBurst: 3, cooldownAfterLastShotSeconds: 1 } })]),
+      /shotIntervalSeconds/,
+    ],
+    [
+      "an interval at one shot per burst",
+      observation3([], [
+        savedAttack({
+          cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1 },
+        }),
+      ]),
+      /shotIntervalSeconds/,
+    ],
+    ["an unknown saved attack id", observation3([linked], []), /tags\[0\]\.savedAttackId/],
+    [
+      "attack fields on a linked tag",
+      observation3([{ ...linked, spriteId: "x" }], [savedAttack()]),
+      /tags\[0\]\.spriteId/,
+    ],
+    [
+      "a repeat end not after the time",
+      observation3([{ ...linked, repeatEndSeconds: 5 }], [savedAttack()]),
+      /repeatEndSeconds/,
+    ],
+    [
+      "a repeat end source without an end",
+      observation3([{ ...linked, repeatEndSource: "typed" }], [savedAttack()]),
+      /repeatEndSource/,
+    ],
+    [
+      "a burst id on a repeat",
+      observation3([{ ...linked, repeatEndSeconds: 9, burstId: 1 }], [savedAttack()]),
+      /burstId/,
+    ],
+    [
+      "an emitter radius off a ring",
+      observation3([tag2({ pattern: "spread", aim: "player", emitterRadiusTiles: 1 })]),
+      /emitterRadiusTiles/,
+    ],
+    [
+      "a cone on a ring",
+      observation3([tag2({ coneDegrees: 30 })]),
+      /coneDegrees/,
+    ],
+    [
+      "a bearing without aim fixed",
+      observation3([tag2({ pattern: "spread", aim: "player", fixedBearingDegrees: 3 })]),
+      /fixedBearingDegrees/,
+    ],
+    [
+      "a front offset without aim front",
+      observation3([tag2({ pattern: "spread", aim: "player", frontOffsetDegrees: 3 })]),
+      /frontOffsetDegrees/,
+    ],
+    [
+      "a target on a multi-shot spread",
+      observation3([tag2({ pattern: "spread", aim: "player", shots: 3, target: "player" })]),
+      /target/,
+    ],
+    [
+      "a target with a range",
+      observation3([
+        tag2({ pattern: "spread", aim: "player", shots: 1, target: "player", bombRangeTiles: 4 }),
+      ]),
+      /bombRangeTiles/,
+    ],
+    [
+      "a nonpositive bomb time",
+      observation3([tag2({ bombTravelSeconds: 0 })]),
+      /bombTravelSeconds/,
+    ],
+    ["a nonpositive bullet speed", observation3([tag2({ bulletSpeedTilesPerSecond: -1 })]), /bulletSpeedTilesPerSecond/],
+  ];
+
+  test.each(cases)("rejects %s with its path", (_label, value, path) => {
+    expect(() => validateObservationExport(value)).toThrow(path);
+  });
+
+  test("accepts the new typed fields where they apply", () => {
+    const value = observation3([
+      tag2({ pattern: "fixed-ring", emitterRadiusTiles: 0.5 }),
+      tag2({ pattern: "spread", aim: "fixed", coneDegrees: 40, fixedBearingDegrees: 90 }),
+      tag2({ pattern: "spread", aim: "front", frontOffsetDegrees: 10 }),
+      tag2({ pattern: "spread", aim: "player", shots: 1, target: "player", bombTravelSeconds: 1.2 }),
+      tag2({ bombRangeTiles: 5, bulletRangeTiles: 6, bulletSpeedTilesPerSecond: 7 }),
+    ]);
+    expect(validateObservationExport(value)).toBe(value);
+  });
+});
+
+describe("resolveTags", () => {
+  test("fills a linked tag from its saved attack and passes an unlinked tag through", () => {
+    const plain = tag2();
+    const resolved = resolveTags([plain, linked], [savedAttack({ shots: 6 })]);
+    expect(resolved[0]).toBe(plain);
+    expect(resolved[1]).toMatchObject({
+      spriteId: "red-glaive",
+      shots: 6,
+      pattern: "rotating-arm",
+      savedAttackId: "a1",
+      timeSeconds: 5,
+      phaseIndex: 1,
+    });
+    expect(resolved[1]).not.toHaveProperty("cadence");
+    expect(resolved[1]).not.toHaveProperty("name");
+  });
+
+  test("throws on an unknown id", () => {
+    expect(() => resolveTags([linked], [])).toThrow(/a1/);
+  });
+});
+
+describe("grouping with target and saved attack (V16 S14)", () => {
+  const bomb = { spriteId: "white-bomb", pattern: "spread" as const, aim: "player" as const, shots: 1 };
+
+  test("targeted and untargeted throws summarize as separate groups", () => {
+    const summaries = summarizeTags([
+      tag2({ ...bomb, timeSeconds: 1 }),
+      tag2({ ...bomb, timeSeconds: 2, target: "player" }),
+      tag2({ ...bomb, timeSeconds: 4, target: "player" }),
+    ]);
+    expect(summaries).toHaveLength(2);
+    expect(summaries.find((row) => row.target === "player")?.intervalsSeconds).toEqual([2]);
+  });
+
+  test("a study with neither field groups as before", () => {
+    const summaries = summarizeTags([tag2({ timeSeconds: 1 }), tag2({ timeSeconds: 3 })]);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).not.toHaveProperty("target");
+    expect(summaries[0]).not.toHaveProperty("savedAttackId");
+  });
+
+  test("a saved attack's tags summarize apart from loose ones", () => {
+    const summaries = summarizeTags([
+      tag2({ timeSeconds: 1 }),
+      tag2({ timeSeconds: 3, savedAttackId: "a1" }),
+    ]);
+    expect(summaries).toHaveLength(2);
+  });
+});
+
+describe("repeat rows in the summary (V16 S46)", () => {
+  test("a repeat row and a later row of one attack give one interval between their start times", () => {
+    const summaries = summarizeTags([
+      tag2({ timeSeconds: 10, savedAttackId: "a1", repeatEndSeconds: 40 }),
+      tag2({ timeSeconds: 52, savedAttackId: "a1" }),
+    ]);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]!.sampleCount).toBe(1);
+    expect(summaries[0]!.intervalsSeconds).toEqual([42]);
+  });
+
+  test("a lone repeat row contributes no interval", () => {
+    const summaries = summarizeTags([
+      tag2({ timeSeconds: 10, savedAttackId: "a1", repeatEndSeconds: 40 }),
+    ]);
+    expect(summaries[0]!.sampleCount).toBe(0);
   });
 });

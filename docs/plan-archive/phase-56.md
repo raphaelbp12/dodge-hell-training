@@ -4,7 +4,7 @@
 
 ### Step 56.1 - Stored Tags And Schema V3
 
-Status: pending. Dependencies: V15 phase 55.
+Status: complete. Dependencies: V15 phase 55.
 
 **Implementation prompt**
 
@@ -29,7 +29,7 @@ Export always writes v3, every older file still loads, and the committed evidenc
 
 ### Step 56.2 - Draft Version 2
 
-Status: pending. Dependencies: 56.1.
+Status: complete. Dependencies: 56.1.
 
 **Implementation prompt**
 
@@ -45,7 +45,7 @@ No existing draft becomes unreadable, and no version 1 draft is rewritten until 
 
 ### Step 56.3 - The Route Holds Stored Tags
 
-Status: pending. Dependencies: 56.2.
+Status: complete. Dependencies: 56.2.
 
 **Implementation prompt**
 
@@ -58,3 +58,13 @@ No new behaviour is visible, so `npm run verify` is the check. Manual, recorded 
 **Acceptance**
 
 Export differs from before only by `schemaVersion` and an empty `savedAttacks`.
+
+## Execution record
+
+**56.1** Added `TagAttackFields`, `UnlinkedTag`, `LinkedTag`, `StoredTag`, `SavedAttack`, `ObservationExportV3` and `resolveTags` in `research/tagging.ts`; `validateObservationExport` and `studyFromExport` accept schema 1, 2 and 3 (older files load with empty `savedAttacks`), with the saved-attack, link, repeat-end, burst-exclusion and new typed-field rules; `assembleExport` writes `schemaVersion: 3`. The committed `docs/killer-bee-queen-observations.json` still validates and is unchanged.
+
+**56.2** Drafts are `draftVersion: 2` with `study.savedAttacks`; version 1 drafts upgrade in memory with empty saved attacks and are not rewritten until next dirty; `restoreSticky` clears a missing chosen attack with an `attack-missing` notice.
+
+**56.3** `TaggerRoute` holds `StoredTag[]` plus `savedAttacks`, passes `resolveTags` output (memoised) to every reader, and autosaves and exports the stored form. Export differs from before only by `schemaVersion` and an empty `savedAttacks`.
+
+`npm run verify` passed (lint, typecheck, test, build). The record, edit, export, reload and restore manual check was not performed: no interactive browser session was available; the Playwright case (step 64.2) drove record, edit and export in headless Chromium.

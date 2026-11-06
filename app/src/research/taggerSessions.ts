@@ -5,7 +5,10 @@
  * React or DOM here; the route owns wiring.
  */
 import {
-  validateTag,
+  validateSavedAttackLinks,
+  validateSavedAttacks,
+  validateStoredTag,
+  type SavedAttack,
   type StudyState,
 } from "./tagging";
 import {
@@ -20,7 +23,8 @@ import type { EncounterConfig } from "../game/config/encounter";
 export const TAGGER_SESSION_KEY_PREFIX = "dodge-hell-training.tagger-session.";
 
 export type SessionDraft = Readonly<{
-  draftVersion: 1;
+  /** V16 S05: version 1 drafts upgrade on restore with no saved attacks. */
+  draftVersion: 2;
   /** ISO-8601 time of this write. */
   savedAt: string;
   study: StudyState;
@@ -64,7 +68,8 @@ function positiveFinite(value: unknown, path: string): number {
 /** Structural validation of a saved draft; throws on malformed input. */
 export function validateSessionDraft(value: unknown): SessionDraft {
   const source = record(value, "");
-  if (source.draftVersion !== 1) reject("draftVersion", "must be 1");
+  if (source.draftVersion !== 1 && source.draftVersion !== 2)
+    reject("draftVersion", "must be 1 or 2");
   const savedAt = nonEmptyString(source.savedAt, "savedAt");
   if (Number.isNaN(Date.parse(savedAt))) reject("savedAt", "must be a date");
   const study = record(source.study, "study");
@@ -77,9 +82,14 @@ export function validateSessionDraft(value: unknown): SessionDraft {
     positiveFinite(provenance.frameRate, "study.provenance.frameRate");
   positiveFinite(provenance.durationSeconds, "study.provenance.durationSeconds");
   if (!Array.isArray(study.tags)) reject("study.tags", "must be an array");
-  study.tags.forEach((entry, index) =>
-    validateTag(entry, `study.tags[${index}]`),
+  const savedAttacks =
+    source.draftVersion === 2
+      ? validateSavedAttacks(study.savedAttacks, "study.savedAttacks")
+      : [];
+  const tags = study.tags.map((entry, index) =>
+    validateStoredTag(entry, `study.tags[${index}]`),
   );
+  validateSavedAttackLinks(tags, savedAttacks, "study.tags");
   const sticky = record(source.sticky, "sticky");
   if (
     typeof sticky.phaseIndex !== "number" ||
@@ -114,7 +124,14 @@ export function validateSessionDraft(value: unknown): SessionDraft {
     if (typed !== undefined && (typeof typed !== "number" || !Number.isFinite(typed)))
       reject(`sticky.${field}`, "must be a finite number");
   }
-  return value as SessionDraft;
+  if (sticky.savedAttackId !== undefined)
+    nonEmptyString(sticky.savedAttackId, "sticky.savedAttackId");
+  if (source.draftVersion === 2) return value as SessionDraft;
+  return {
+    ...(value as Record<string, unknown>),
+    draftVersion: 2,
+    study: { ...study, savedAttacks: [] },
+  } as unknown as SessionDraft;
 }
 
 /** Z28/Z30: the draft built from the live session at write time. */
@@ -124,7 +141,7 @@ export function buildDraft(input: {
   savedAt: string;
 }): SessionDraft {
   return {
-    draftVersion: 1,
+    draftVersion: 2,
     savedAt: input.savedAt,
     study: input.study,
     sticky: input.sticky,
@@ -142,7 +159,10 @@ export function shouldWriteDraft(input: {
   return input.dirty && input.tagCount > 0;
 }
 
-export type SessionNotice = "sprite-missing" | "phase-missing";
+export type SessionNotice =
+  | "sprite-missing"
+  | "phase-missing"
+  | "attack-missing";
 
 /**
  * Z33: a restored sticky value naming a missing sprite or phase falls back to
@@ -151,6 +171,7 @@ export type SessionNotice = "sprite-missing" | "phase-missing";
 export function restoreSticky(
   sticky: StickySelection,
   config: EncounterConfig,
+  savedAttacks: readonly SavedAttack[] = [],
 ): { sticky: StickySelection; notices: readonly SessionNotice[] } {
   const notices: SessionNotice[] = [];
   let { spriteId, phaseIndex } = sticky;
@@ -162,7 +183,19 @@ export function restoreSticky(
     phaseIndex = 0;
     notices.push("phase-missing");
   }
-  return { sticky: { ...sticky, spriteId, phaseIndex }, notices };
+  const restored: { -readonly [K in keyof StickySelection]: StickySelection[K] } = {
+    ...sticky,
+    spriteId,
+    phaseIndex,
+  };
+  if (
+    sticky.savedAttackId !== undefined &&
+    !savedAttacks.some((attack) => attack.id === sticky.savedAttackId)
+  ) {
+    delete restored.savedAttackId;
+    notices.push("attack-missing");
+  }
+  return { sticky: restored, notices };
 }
 
 export type SessionListEntry =

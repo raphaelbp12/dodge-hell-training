@@ -4,7 +4,7 @@
 
 ### Step 62.1 - Volley Times And End Rules
 
-Status: pending. Dependencies: phases 58, 61.
+Status: complete. Dependencies: phases 58, 61.
 
 **Implementation prompt**
 
@@ -27,7 +27,7 @@ Volley times agree with the game's cadence formula at any index.
 
 ### Step 62.2 - Repeats And The Rotation Clock In The Preview
 
-Status: pending. Dependencies: 62.1.
+Status: complete. Dependencies: 62.1.
 
 **Implementation prompt**
 
@@ -45,7 +45,7 @@ Write failing `previewModel.test.ts` cases first: volleys appear at their times 
 
 ### Step 62.3 - The Controls And The Timeline
 
-Status: pending. Dependencies: 62.2.
+Status: complete. Dependencies: 62.2.
 
 **Implementation prompt**
 
@@ -63,7 +63,7 @@ Each repeat has one row, and the end only ever comes from the presented frame or
 
 ### Step 62.4 - Summary
 
-Status: pending. Dependencies: 62.3.
+Status: complete. Dependencies: 62.3.
 
 **Implementation prompt**
 
@@ -76,3 +76,15 @@ Write the failing `tagging.test.ts` case first: a repeat row and a later row of 
 **Acceptance**
 
 No generated volley can reach an interval statistic (T32).
+
+## Execution record
+
+**62.1** `repeat.ts` has `volleyTimesOf` (computed from `k` directly per S39, bounded by the named guard `MAX_REPEAT_VOLLEYS`), `setRepeatEnd`, `clearRepeatEnd` and `endRepeatTarget`; `editStoredTag` rejects a burst number on a repeat row and a time at or after its end.
+
+**62.2** `previewAt` expands each row through `volleyTimesOf`, uses each volley's own age and the row's index, skips finished volleys cheaply, and runs the per-saved-attack-and-phase rotation clock for linked rings; unlinked tags keep the group clock. A timing guard (a 60 s repeat at 0.1 s with 8 arms) completes well inside a frame budget.
+
+**62.3** "End repeat here" (no key) is blocked by the same checks as recording; linked rows have a Repeat end field with a `typed` note and a blank clearing it; the Burst and Repeat end fields exclude each other and Detach is disabled on a repeat row. The timeline markers and `[` / `]` cover every volley. The Playwright case covers ending a repeat from the presented frame; typing an end and recapturing it were covered by unit tests only.
+
+**62.4** `summarizeTags` reads only `timeSeconds` per row, so a repeat counts once and generated volleys cannot enter an interval (tested); the Summary and export notes say so.
+
+`npm run verify` passed.

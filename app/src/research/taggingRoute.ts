@@ -48,13 +48,15 @@ export type TaggerAction =
   | Readonly<{ kind: "jump"; direction: -1 | 1; seconds: number }>
   | Readonly<{ kind: "play-pause" }>
   | Readonly<{ kind: "record"; mode: "standalone" | "new-burst" | "continue-burst" }>
-  | Readonly<{ kind: "set-shots"; shots: number }>;
+  | Readonly<{ kind: "set-shots"; shots: number }>
+  | Readonly<{ kind: "step-volley"; direction: -1 | 1 }>;
 
 /**
  * The one key map the route binds: arrows step one frame, Shift+arrows jump
  * five seconds, PageUp/PageDown jump thirty, space toggles playback, Enter
  * records a standalone tag, B records a volley that starts a new burst, Shift+Enter
- * adds a volley to the latest matching burst, and 1-9 set the sticky shot count. Everything else belongs to the
+ * adds a volley to the latest matching burst, 1-9 set the sticky shot count, and [ and ] seek to the
+ * previous and next volley (V16 S17; no frame rate needed). Everything else belongs to the
  * browser or another control.
  */
 export function actionForKey(
@@ -82,6 +84,8 @@ export function actionForKey(
       direction: 1,
       deltaSeconds: frameStepSeconds(frameRate),
     };
+  if (key === "[") return { kind: "step-volley", direction: -1 };
+  if (key === "]") return { kind: "step-volley", direction: 1 };
   if (key === " ") return { kind: "play-pause" };
   if (key === "Enter" && shiftKey)
     return { kind: "record", mode: "continue-burst" };

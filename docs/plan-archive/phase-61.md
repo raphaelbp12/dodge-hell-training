@@ -4,7 +4,7 @@
 
 ### Step 61.1 - The Pure Model
 
-Status: pending. Dependencies: phase 60.
+Status: complete. Dependencies: phase 60.
 
 **Implementation prompt**
 
@@ -28,7 +28,7 @@ Saved attacks pass `validateObservationExport` after every operation.
 
 ### Step 61.2 - Recording And Editing Linked Tags
 
-Status: pending. Dependencies: 61.1.
+Status: complete. Dependencies: 61.1.
 
 **Implementation prompt**
 
@@ -44,7 +44,7 @@ A linked tag stores no attack values, and an attack's edit reaches all its tags 
 
 ### Step 61.3 - The Panel And Columns
 
-Status: pending. Dependencies: 61.2.
+Status: complete. Dependencies: 61.2.
 
 **Implementation prompt**
 
@@ -66,7 +66,7 @@ Rename changes no link, and the panel always says whether the next tag will be l
 
 ### Step 61.4 - Exporting A Saved Attack
 
-Status: pending. Dependencies: 61.3.
+Status: complete. Dependencies: 61.3.
 
 **Implementation prompt**
 
@@ -79,3 +79,15 @@ Write failing `exportAttack.test.ts` cases first: two saved attacks from one mat
 **Acceptance**
 
 No cadence is computed from tag times (T32), and an exported id is always valid.
+
+## Execution record
+
+**61.1** `savedAttacks.ts` is pure: `createSavedAttack`, `renameSavedAttack`, `updateFromSticky`, `deleteSavedAttack` (blocked with a count), `stickyFromSavedAttack`, `isStickyModified`, `detachTag` (refused on a repeat row), results shaped like `EditResult`. Saved attacks pass `validateObservationExport` after creation.
+
+**61.2** `recordStoredTag` records a linked tag when the chosen attack is unmodified and an unlinked one otherwise; `assignBurst` and `readoutInterval` take the linked attack id so continuation and the readout separate attacks. `editStoredTag` edits time, phase and burst on a linked tag and refuses attack fields with "Detach this tag first".
+
+**61.3** `SavedAttackPanel.tsx` adds the Attack dropdown, Save as attack (name and the S28 cadence), Update from sticky, rename and delete, with the Recording line saying whether the next tag will link. Linked rows show their attack fields read-only (disabled fieldsets) with a Detach button; Tags and Summary have Attack columns. The save, record, modify, rename, delete, detach and restore manual check was not performed in full; the Playwright case covers save, linked record and the Attack column.
+
+**61.4** A linked tag exports with `slugOf(name)` plus `-tagged` for the attack and any variant (a symbols-only name falls back to the stable id), taking `shotsPerBurst`, `cooldownAfterLastShotSeconds` and, above one shot, `shotIntervalSeconds` from the saved attack; unlinked export is unchanged.
+
+`npm run verify` passed.

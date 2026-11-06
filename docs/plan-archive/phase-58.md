@@ -4,7 +4,7 @@
 
 ### Step 58.1 - The Pure Model And Keys
 
-Status: pending. Dependencies: phase 56.
+Status: complete. Dependencies: phase 56.
 
 **Implementation prompt**
 
@@ -22,7 +22,7 @@ The model depends on no DOM or React, and `[`/`]` work with no frame rate typed.
 
 ### Step 58.2 - The Bar
 
-Status: pending. Dependencies: 58.1.
+Status: complete. Dependencies: 58.1.
 
 **Implementation prompt**
 
@@ -41,3 +41,11 @@ Manual, recorded as performed or blocked, with a real video: scrub, go to a type
 **Acceptance**
 
 Tag times are still only ever taken from the presented frame, and no element is created per marker.
+
+## Execution record
+
+**58.1** `timelineModel.ts` (`markerFractions`, `previousVolleyTime`, `nextVolleyTime`, `volleyStepTolerance`) is pure and tested for empty lists, both ends, ties and a press from a marker's own frame. `actionForKey` returns `step-volley` for `[` and `]` with no frame rate needed; the route binds it.
+
+**58.2** `TaggerTimeline.tsx` draws one marker per volley on a single canvas behind a range input and adds a go-to-time field; both seek through the route's one `seekTo`, and the playhead is the presented `mediaTime`. The Playwright case drives the go-to-time seek in headless Chromium; scrubbing, `[` / `]` and marker alignment were not exercised against a real video.
+
+`npm run verify` passed.

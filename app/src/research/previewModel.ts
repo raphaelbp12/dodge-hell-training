@@ -5,8 +5,11 @@ import {
   type AttackPattern,
   type AttackSpec,
   type EncounterConfig,
+  type PhaseSpec,
   type ProjectileAppearanceSpec,
   type ProjectileSpec,
+  type ScatterPattern,
+  type SpreadPattern,
 } from "../game/config/encounter";
 import type { ArenaShape, Vector2 } from "../game/models";
 import { BOMB_EXPLOSION_FRAME_SECONDS } from "../game/phaser/appearance-pixels";
@@ -17,7 +20,8 @@ import {
   curvedShardPositionAtAge,
   resolveShardLifetime,
 } from "../game/simulation/projectiles";
-import { groupKey, type Tag, type TagPattern } from "./tagging";
+import { volleyTimesOf } from "./repeat";
+import { groupKey, type SavedAttack, type Tag, type TagPattern } from "./tagging";
 
 /** M03/M05/M06: the matched attack plus the pattern the preview resolves. */
 export type PreviewMatch = Readonly<{
@@ -75,20 +79,53 @@ function armPatternOfTag(tag: Tag): ArmPattern | undefined {
   return undefined;
 }
 
+/** The aim fields a tag states, or null when a `fixed` aim has no bearing anywhere (S23). */
+function aimFieldsOfTag(
+  tag: Tag,
+  authored: SpreadPattern | ScatterPattern | null,
+):
+  | Readonly<{ aim: "player" }>
+  | Readonly<{ aim: "fixed"; fixedBearingDegrees: number }>
+  | Readonly<{ aim: "front"; offsetDegrees: number }>
+  | null {
+  if (tag.aim === "fixed") {
+    const bearing =
+      tag.fixedBearingDegrees ??
+      (authored?.aim === "fixed" ? authored.fixedBearingDegrees : undefined);
+    return bearing === undefined ? null : { aim: "fixed", fixedBearingDegrees: bearing };
+  }
+  if (tag.aim === "front")
+    return {
+      aim: "front",
+      offsetDegrees:
+        tag.frontOffsetDegrees ?? (authored?.aim === "front" ? authored.offsetDegrees : 0),
+    };
+  return { aim: "player" };
+}
+
+/** Why a tag has no pattern to draw; both are fixed by typing the missing value (S23, S10). */
+type PatternProblem = "needs-bearing" | "needs-cone";
+
 /**
  * The pattern the preview draws: the matched attack's pattern with the tag's
- * own geometry laid over it (M05, N36-N39). The tag wins wherever it says
- * something; the attack only supplies what the tag cannot (the projectile's
- * motion, cadence-independent fields, and untyped rotation values).
+ * own geometry laid over it (M05, N36-N39, V16 S22-S25). The tag wins wherever
+ * it says something; the attack only supplies what the tag cannot (the
+ * projectile's motion, cadence-independent fields, and untyped values).
  *
  * - Rings: `arms` is the tag's shots; the arm pattern comes from the tag
  *   alone; `rotating-arm` takes the tag's typed rate and phase where present
- *   and the authored ones otherwise; `fixed-ring` has rate 0.
- * - Spread and scatter: `shots` is the tag's. A tag's `player` or `front`
- *   replaces the authored aim (front keeps the authored offset, else 0); a
- *   tag's `fixed` changes nothing.
+ *   and the authored ones otherwise; `fixed-ring` has rate 0; a typed emitter
+ *   radius replaces the authored one.
+ * - Spread and scatter: `shots` is the tag's and a typed cone replaces the
+ *   authored one. The tag's aim always wins: `player`; `fixed` with its typed
+ *   bearing, else the attack's own when that attack is fixed; `front` with its
+ *   typed offset, else the authored one, else 0. A `fixed` tag with no bearing
+ *   anywhere has no pattern (S23).
  */
-export function withTagGeometry(pattern: AttackPattern, tag: Tag): AttackPattern {
+export function withTagGeometry(
+  pattern: AttackPattern,
+  tag: Tag,
+): AttackPattern | null {
   if (pattern.kind === "ring") {
     const { armPattern: _authoredArms, ...ring } = pattern;
     const armPattern = armPatternOfTag(tag);
@@ -96,6 +133,7 @@ export function withTagGeometry(pattern: AttackPattern, tag: Tag): AttackPattern
     return {
       ...ring,
       arms: tag.shots,
+      emitterRadiusTiles: tag.emitterRadiusTiles ?? pattern.emitterRadiusTiles,
       clockwiseDegreesPerSecond: rotating
         ? (tag.clockwiseDegreesPerSecond ?? pattern.clockwiseDegreesPerSecond)
         : 0,
@@ -106,63 +144,233 @@ export function withTagGeometry(pattern: AttackPattern, tag: Tag): AttackPattern
       ...(armPattern ? { armPattern } : {}),
     };
   }
-  const withCount = { ...pattern, shots: tag.shots };
-  if (tag.aim === "player") {
-    const { aim: _aim, ...rest } = withCount;
-    const { fixedBearingDegrees: _bearing, offsetDegrees: _offset, ...bare } =
-      rest as typeof rest & { fixedBearingDegrees?: number; offsetDegrees?: number };
-    return { ...bare, aim: "player" } as AttackPattern;
-  }
-  if (tag.aim === "front") {
-    const { aim: _aim, ...rest } = withCount;
-    const { fixedBearingDegrees: _bearing, ...bare } = rest as typeof rest & {
-      fixedBearingDegrees?: number;
-    };
-    return {
-      ...bare,
-      aim: "front",
-      offsetDegrees: pattern.aim === "front" ? pattern.offsetDegrees : 0,
-    } as AttackPattern;
-  }
-  return withCount;
+  const aim = aimFieldsOfTag(tag, pattern);
+  if (!aim) return null;
+  const {
+    aim: _aim,
+    fixedBearingDegrees: _bearing,
+    offsetDegrees: _offset,
+    ...bare
+  } = pattern as typeof pattern & { fixedBearingDegrees?: number; offsetDegrees?: number };
+  const shape =
+    pattern.kind === "spread"
+      ? { arcDegrees: tag.coneDegrees ?? pattern.arcDegrees }
+      : { coneDegrees: tag.coneDegrees ?? pattern.coneDegrees };
+  return { ...bare, ...shape, shots: tag.shots, ...aim } as AttackPattern;
 }
 
 /**
- * Finds the first authored attack of the tag's top-level phase (sub-phase
- * attacks included, in authored order) that fires the tag's sprite in the
- * tag's pattern family (M03, M04).
+ * A pattern built from the tag alone, for a bomb fired in another family than
+ * the tag's (S10). Only the attack's emitter radius is borrowed. A ring's
+ * missing phase and rate are 0 and a spread's missing arc is 0: neutral
+ * defaults, not observations. A scatter with no typed cone has no pattern.
  */
+function patternFromTag(
+  tag: Tag,
+  family: AttackPattern["kind"],
+  borrowedRadiusTiles: number,
+): AttackPattern | PatternProblem {
+  const emitterRadiusTiles = tag.emitterRadiusTiles ?? borrowedRadiusTiles;
+  if (family === "ring") {
+    const armPattern = armPatternOfTag(tag);
+    const rotating = tag.pattern === "rotating-arm";
+    return {
+      kind: "ring",
+      arms: tag.shots,
+      emitterRadiusTiles,
+      initialPhaseRadians: degreesToRadians(rotating ? (tag.initialPhaseDegrees ?? 0) : 0),
+      clockwiseDegreesPerSecond: rotating ? (tag.clockwiseDegreesPerSecond ?? 0) : 0,
+      ...(armPattern ? { armPattern } : {}),
+    };
+  }
+  const aim = aimFieldsOfTag(tag, null);
+  if (!aim) return "needs-bearing";
+  if (family === "spread")
+    return {
+      kind: "spread",
+      shots: tag.shots,
+      arcDegrees: tag.coneDegrees ?? 0,
+      emitterRadiusTiles,
+      ...aim,
+    } as AttackPattern;
+  if (tag.coneDegrees === undefined) return "needs-cone";
+  return {
+    kind: "scatter",
+    shots: tag.shots,
+    coneDegrees: tag.coneDegrees,
+    emitterRadiusTiles,
+    ...aim,
+  } as AttackPattern;
+}
+
+/**
+ * Lays a tag's typed projectile values over a copy of the matched spec, so the
+ * game's own `resolveBombDestination`, `poseAtAge` and `resolveShardLifetime`
+ * work unchanged and speed stays derived (S11, S24, N25). A typed bullet value
+ * applies to `linear` motion only.
+ */
+function withTypedProjectileValues(projectile: ProjectileSpec, tag: Tag): ProjectileSpec {
+  if (projectile.type === "bomb")
+    return {
+      ...projectile,
+      rangeTiles: tag.bombRangeTiles ?? projectile.rangeTiles,
+      travelSeconds: tag.bombTravelSeconds ?? projectile.travelSeconds,
+    };
+  if (
+    projectile.motion.kind !== "linear" ||
+    (tag.bulletSpeedTilesPerSecond === undefined && tag.bulletRangeTiles === undefined)
+  )
+    return projectile;
+  return {
+    ...projectile,
+    speedTilesPerSecond: tag.bulletSpeedTilesPerSecond ?? projectile.speedTilesPerSecond,
+    motion: {
+      ...projectile.motion,
+      rangeTiles: tag.bulletRangeTiles ?? projectile.motion.rangeTiles,
+    },
+  };
+}
+
+/** S18: what a tag would do in the preview and the export. */
+export type TagMatchStatus =
+  | Readonly<{
+      kind: "plays-as";
+      attackId: string;
+      /** S10: the phase a bomb was borrowed from, when it is not the tag's own. */
+      borrowedFromPhaseIndex?: number;
+    }>
+  | Readonly<{
+      kind: "wont-preview";
+      reason:
+        | "no-attack"
+        | "needs-bearing"
+        | "needs-cone"
+        | "legacy-volley"
+        | "unknown-phase";
+    }>;
+
+type Resolved =
+  | Readonly<{ ok: true; match: PreviewMatch; borrowedFromPhaseIndex?: number }>
+  | Readonly<{ ok: false; reason: Extract<TagMatchStatus, { kind: "wont-preview" }>["reason"] }>;
+
+function attacksOfPhase(phase: PhaseSpec): readonly AttackSpec[] {
+  return [
+    ...phase.attacks,
+    ...(phase.subPhases ?? []).flatMap((subPhase) => subPhase.attacks),
+  ];
+}
+
+/**
+ * M03/M04, extended for bombs by S10. A bullet tag matches the first attack of
+ * its phase firing its sprite in its pattern family. A bomb tag matches the
+ * first attack of its phase firing its sprite whatever the family, otherwise
+ * the first in any phase, in authored order.
+ */
+function resolveTagMatch(tag: Tag, config: EncounterConfig): Resolved {
+  const family = FAMILY_BY_TAG_PATTERN[tag.pattern];
+  if (!family) return { ok: false, reason: "legacy-volley" };
+  const phases = primaryArchetype(config).phases;
+  const phase = phases[tag.phaseIndex];
+  if (!phase) return { ok: false, reason: "unknown-phase" };
+  const firesSprite = (attack: AttackSpec) =>
+    config.projectiles[attack.projectileId]?.appearance?.id === tag.spriteId;
+  const bomb = Object.values(config.projectiles).some(
+    (spec) => spec.type === "bomb" && spec.appearance?.id === tag.spriteId,
+  );
+  let attack = attacksOfPhase(phase).find(
+    (candidate) => firesSprite(candidate) && (bomb || candidate.pattern.kind === family),
+  );
+  let borrowedFromPhaseIndex: number | undefined;
+  if (!attack && bomb)
+    phases.some((other, index) => {
+      attack = attacksOfPhase(other).find(firesSprite);
+      if (attack) borrowedFromPhaseIndex = index;
+      return attack !== undefined;
+    });
+  if (!attack) return { ok: false, reason: "no-attack" };
+  const projectile = withTypedProjectileValues(config.projectiles[attack.projectileId], tag);
+  const built =
+    attack.pattern.kind === family
+      ? (withTagGeometry(attack.pattern, tag) ?? "needs-bearing")
+      : patternFromTag(tag, family, attack.pattern.emitterRadiusTiles);
+  if (typeof built === "string") return { ok: false, reason: built };
+  return {
+    ok: true,
+    match: { attack, projectile, pattern: built },
+    ...(borrowedFromPhaseIndex === undefined ? {} : { borrowedFromPhaseIndex }),
+  };
+}
+
+/** M03/M04/S10: the attack, projectile and pattern a tag draws, or null when it draws nothing. */
 export function matchTagAttack(
   tag: Tag,
   config: EncounterConfig,
 ): PreviewMatch | null {
-  const family = FAMILY_BY_TAG_PATTERN[tag.pattern];
-  const phase = primaryArchetype(config).phases[tag.phaseIndex];
-  if (!family || !phase) return null;
-  const attacks = [
-    ...phase.attacks,
-    ...(phase.subPhases ?? []).flatMap((subPhase) => subPhase.attacks),
-  ];
-  for (const attack of attacks) {
-    const projectile = config.projectiles[attack.projectileId];
-    if (
-      projectile?.appearance?.id === tag.spriteId &&
-      attack.pattern.kind === family
-    )
-      return {
-        attack,
-        projectile,
-        pattern: withTagGeometry(attack.pattern, tag),
-      };
+  const resolved = resolveTagMatch(tag, config);
+  return resolved.ok ? resolved.match : null;
+}
+
+/** S18: the one answer behind the Tag panel, the row badges, the export refusal and the unmatched count. */
+export function tagMatchStatus(tag: Tag, config: EncounterConfig): TagMatchStatus {
+  const resolved = resolveTagMatch(tag, config);
+  if (!resolved.ok) return { kind: "wont-preview", reason: resolved.reason };
+  return {
+    kind: "plays-as",
+    attackId: resolved.match.attack.id,
+    ...(resolved.borrowedFromPhaseIndex === undefined
+      ? {}
+      : { borrowedFromPhaseIndex: resolved.borrowedFromPhaseIndex }),
+  };
+}
+
+/** Plain words for a `wont-preview` reason, shared by every place that shows one. */
+export function wontPreviewText(
+  reason: Extract<TagMatchStatus, { kind: "wont-preview" }>["reason"],
+): string {
+  switch (reason) {
+    case "no-attack":
+      return "no attack in this phase fires this sprite in this pattern";
+    case "needs-bearing":
+      return "needs a bearing (type one for aim fixed)";
+    case "needs-cone":
+      return "needs a cone width (type one for a scatter)";
+    case "legacy-volley":
+      return "a legacy volley tag has no shape to draw";
+    case "unknown-phase":
+      return "this phase does not exist in the encounter";
   }
-  return null;
+}
+
+/** The one-line text for a status, in the Tag panel, a row badge and the export refusal (S18). */
+export function matchStatusText(
+  status: TagMatchStatus,
+  phaseName: (phaseIndex: number) => string = (index) => `phase ${index + 1}`,
+): string {
+  if (status.kind === "wont-preview")
+    return `Won't preview: ${wontPreviewText(status.reason)}`;
+  return status.borrowedFromPhaseIndex === undefined
+    ? `Plays as ${status.attackId}`
+    : `Plays as ${status.attackId} (borrowed from ${phaseName(status.borrowedFromPhaseIndex)})`;
+}
+
+/**
+ * V16 S24: whether the tag's matched projectile is a `linear` bullet, the only
+ * kind whose speed and range a tag may type.
+ */
+export function matchesLinearBullet(tag: Tag, config: EncounterConfig): boolean {
+  const projectile = matchTagAttack(tag, config)?.projectile;
+  return (
+    projectile !== undefined &&
+    projectile.type !== "bomb" &&
+    projectile.motion.kind === "linear"
+  );
 }
 
 export function countUnmatchedTags(
   tags: readonly Tag[],
   config: EncounterConfig,
 ): number {
-  return tags.filter((tag) => matchTagAttack(tag, config) === null).length;
+  return tags.filter((tag) => tagMatchStatus(tag, config).kind === "wont-preview").length;
 }
 
 /**
@@ -293,91 +501,143 @@ function firstTimeByGroup(tags: readonly Tag[]): Map<string, number> {
 }
 
 /**
+ * S44: a linked ring's rotation clock is keyed by saved attack and phase and
+ * starts at that key's earliest row, turning through the gaps between rows.
+ */
+function rotationClockKey(tag: Tag): string | null {
+  return tag.savedAttackId === undefined
+    ? null
+    : `${tag.savedAttackId}\u0000${tag.phaseIndex}`;
+}
+
+function firstTimeByRotationClock(tags: readonly Tag[]): Map<string, number> {
+  const first = new Map<string, number>();
+  for (const entry of tags) {
+    const key = rotationClockKey(entry);
+    if (key === null) continue;
+    const seen = first.get(key);
+    if (seen === undefined || entry.timeSeconds < seen)
+      first.set(key, entry.timeSeconds);
+  }
+  return first;
+}
+
+/** How long after firing a projectile can still be drawn: in flight, or exploding. */
+function drawnLifetimeSeconds(projectile: ProjectileSpec, explosionSeconds: number): number {
+  return projectile.type === "bomb"
+    ? projectile.travelSeconds + explosionSeconds
+    : resolveShardLifetime(projectile).lifetimeSeconds;
+}
+
+/**
  * Every live tagged projectile and detonation at `timeSeconds`, computed
- * from each tag's age alone (M01). A pure function of its inputs: no clock,
+ * from each volley's age alone (M01). A pure function of its inputs: no clock,
  * no state between calls. `headingRadians` is the preview's enemy-rotation
- * slider (N20); it only turns `front`-aimed shots.
+ * slider (N20); it only turns `front`-aimed shots. A repeat row expands to its
+ * saved attack's volleys (S38), each drawn from the row's index so the M31
+ * highlight outlines the whole repeat.
  */
 export function previewAt(input: {
   tags: readonly Tag[];
+  /** Needed only to expand repeat rows; absent means every row is one volley. */
+  savedAttacks?: readonly SavedAttack[];
   timeSeconds: number;
   config: EncounterConfig;
   playerTiles: Vector2;
   headingRadians?: number;
 }): PreviewFrame {
-  const { tags, timeSeconds, config, playerTiles, headingRadians = 0 } = input;
+  const {
+    tags,
+    savedAttacks = [],
+    timeSeconds,
+    config,
+    playerTiles,
+    headingRadians = 0,
+  } = input;
   const emitterTiles = emitterTilesOf(config);
   const projectiles: PreviewProjectile[] = [];
   const detonations: PreviewDetonation[] = [];
   const firstTimes = firstTimeByGroup(tags);
+  const clockStarts = firstTimeByRotationClock(tags);
   tags.forEach((tag, tagIndex) => {
     if (tag.timeSeconds > timeSeconds) return;
     const match = matchTagAttack(tag, config);
     if (!match) return;
-    const { projectile, pattern, attack } = match;
-    // N37: arm 0 sits at the pattern's phase plus its rate times the time since
-    // the group's first tag. Per-burst advance and arm spread stay excluded
-    // (N38), so burstsFired and secondsSinceEpoch are 0.
-    const groupElapsedSeconds =
-      tag.timeSeconds - (firstTimes.get(groupKey(tag)) ?? tag.timeSeconds);
-    const bearings = resolveBearings(pattern, {
-      enemyPositionTiles: emitterTiles,
-      playerPositionTiles: playerTiles,
-      enemyHeadingRadians: headingRadians,
-      ringPhaseRadians:
-        pattern.kind === "ring"
-          ? pattern.initialPhaseRadians +
-            degreesToRadians(pattern.clockwiseDegreesPerSecond) * groupElapsedSeconds
-          : 0,
-      volleyIndexInBurst: 0,
-      burstsFired: 0,
-      secondsSinceEpoch: 0,
-      drawnUnitRandoms: evenDrawsFor(pattern),
-    });
-    // N40: a targeted bomb lands on the preview's player point, but only when
-    // the resolved pattern is one shot; otherwise the tag's count wins and the
-    // bomb uses its range.
+    const { projectile, pattern } = match;
+    const appearance = projectile.appearance;
+    if (!appearance) return;
+    const explosionSeconds = appearance.bomb
+      ? appearance.bomb.frameOuterPixels.length * BOMB_EXPLOSION_FRAME_SECONDS
+      : 0;
+    const lifetimeSeconds = drawnLifetimeSeconds(projectile, explosionSeconds);
+    const cadence = savedAttacks.find((entry) => entry.id === tag.savedAttackId)?.cadence;
+    const clockKey = rotationClockKey(tag);
+    const clockStart =
+      clockKey === null
+        ? (firstTimes.get(groupKey(tag)) ?? tag.timeSeconds)
+        : (clockStarts.get(clockKey) ?? tag.timeSeconds);
+    // N40/S09: a tag marked as targeting lands on the preview's player point,
+    // but only when the resolved pattern is one shot; any other tag lands at
+    // its range. The matched attack's own `target` is ignored.
     const targetTiles =
-      attack.target === "player" && pattern.kind === "spread" && pattern.shots === 1
+      tag.target === "player" && pattern.kind === "spread" && pattern.shots === 1
         ? playerTiles
         : undefined;
-    const ageSeconds = timeSeconds - tag.timeSeconds;
-    for (const bearing of bearings) {
-      const spawnTiles = {
-        x: emitterTiles.x + Math.cos(bearing.bearingRadians) * bearing.emitterRadiusTiles,
-        y: emitterTiles.y + Math.sin(bearing.bearingRadians) * bearing.emitterRadiusTiles,
-      };
-      const appearance = projectile.appearance;
-      if (!appearance) continue;
-      const pose = poseAtAge(
-        projectile,
-        spawnTiles,
-        bearing.bearingRadians,
-        ageSeconds,
-        targetTiles,
-      );
-      if (pose) {
-        projectiles.push({ tagIndex, appearance, ...pose });
-        continue;
+    for (const volleyTimeSeconds of volleyTimesOf(tag, cadence)) {
+      if (volleyTimeSeconds > timeSeconds) break;
+      const ageSeconds = timeSeconds - volleyTimeSeconds;
+      // A volley that has finished flying and exploding draws nothing; skipping
+      // it here keeps a long repeat cheap on each presented frame.
+      if (ageSeconds >= lifetimeSeconds) continue;
+      // N37/S44: arm 0 sits at the pattern's phase plus its rate times the time
+      // since the clock started. Per-burst advance and arm spread stay excluded
+      // (N38), so burstsFired and secondsSinceEpoch are 0.
+      const clockElapsedSeconds = volleyTimeSeconds - clockStart;
+      const bearings = resolveBearings(pattern, {
+        enemyPositionTiles: emitterTiles,
+        playerPositionTiles: playerTiles,
+        enemyHeadingRadians: headingRadians,
+        ringPhaseRadians:
+          pattern.kind === "ring"
+            ? pattern.initialPhaseRadians +
+              degreesToRadians(pattern.clockwiseDegreesPerSecond) * clockElapsedSeconds
+            : 0,
+        volleyIndexInBurst: 0,
+        burstsFired: 0,
+        secondsSinceEpoch: 0,
+        drawnUnitRandoms: evenDrawsFor(pattern),
+      });
+      for (const bearing of bearings) {
+        const spawnTiles = {
+          x: emitterTiles.x + Math.cos(bearing.bearingRadians) * bearing.emitterRadiusTiles,
+          y: emitterTiles.y + Math.sin(bearing.bearingRadians) * bearing.emitterRadiusTiles,
+        };
+        const pose = poseAtAge(
+          projectile,
+          spawnTiles,
+          bearing.bearingRadians,
+          ageSeconds,
+          targetTiles,
+        );
+        if (pose) {
+          projectiles.push({ tagIndex, appearance, ...pose });
+          continue;
+        }
+        if (projectile.type !== "bomb" || !appearance.bomb) continue;
+        const { travelSeconds, detonationRadiusTiles } = projectile;
+        const sinceLandingSeconds = ageSeconds - travelSeconds;
+        if (sinceLandingSeconds >= 0 && sinceLandingSeconds < explosionSeconds)
+          detonations.push({
+            tagIndex,
+            positionTiles: resolveBombDestination(
+              projectile,
+              spawnTiles,
+              bearing.bearingRadians,
+              targetTiles,
+            ),
+            radiusTiles: detonationRadiusTiles,
+          });
       }
-      if (projectile.type !== "bomb" || !appearance.bomb) continue;
-      const { travelSeconds, detonationRadiusTiles } = projectile;
-      const sinceLandingSeconds = ageSeconds - travelSeconds;
-      if (
-        sinceLandingSeconds >= 0 &&
-        sinceLandingSeconds <
-          appearance.bomb.frameOuterPixels.length * BOMB_EXPLOSION_FRAME_SECONDS
-      )
-        detonations.push({
-          tagIndex,
-          positionTiles: resolveBombDestination(
-            projectile,
-            spawnTiles,
-            bearing.bearingRadians,
-            targetTiles,
-          ),
-          radiusTiles: detonationRadiusTiles,
-        });
     }
   });
   return {

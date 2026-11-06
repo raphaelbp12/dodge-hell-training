@@ -4,8 +4,11 @@ import { phaseLabel } from "../game/config/drill";
 import { validateTag, type Tag } from "./tagging";
 import {
   appearanceOptions,
+  attackFieldApplies,
+  isBombSprite,
   assembleExport,
   createTag,
+  stickyFromTag,
   phaseOptions,
   pixelGridCells,
   assignBurst,
@@ -195,7 +198,8 @@ describe("assembleExport", () => {
       recordedAt: "2026-11-03T12:00:00.000Z",
     });
     expect(exported.tags.map((entry) => entry.timeSeconds)).toEqual([10, 12]);
-    expect(exported.schemaVersion).toBe(2);
+    expect(exported.schemaVersion).toBe(3);
+    expect(exported.savedAttacks).toEqual([]);
     expect(exported.encounterId).toBe("killer-bee-queen");
     expect(exported.provenance).toBe(provenance);
     expect(exported.recordedAt).toBe("2026-11-03T12:00:00.000Z");
@@ -526,5 +530,243 @@ describe("composite and typed-geometry options (plan V15 phase 53)", () => {
     };
     expect(formatSummaryRow(base, phaseOptions(QUEEN)).armPattern).toBe("—");
     expect(formatSummaryRow({ ...base, armPattern: "ring" }, phaseOptions(QUEEN)).armPattern).toBe("ring");
+  });
+});
+
+describe("stickyFromTag", () => {
+  test("a composite rotating ring round-trips through createTag", () => {
+    const source = createTag(
+      3,
+      {
+        ...STICKY,
+        pattern: "rotating-arm",
+        shots: 4,
+        armPattern: "spread",
+        shotsPerArm: 3,
+        armArcDegrees: 40,
+        clockwiseDegreesPerSecond: 90,
+        initialPhaseDegrees: 10,
+      },
+      2,
+    );
+    const again = createTag(9, stickyFromTag({ ...source, phaseIndex: 2 }, STICKY));
+    expect(again).toEqual({ ...source, timeSeconds: 9, phaseIndex: 2, burstId: undefined });
+    expect(again).not.toHaveProperty("burstId", 2);
+  });
+
+  test("a player-aimed spread round-trips and keeps ignored fields from current", () => {
+    const current = { ...STICKY, clockwiseDegreesPerSecond: 77 };
+    const source = createTag(3, { ...current, pattern: "spread", aim: "fixed", shots: 5 });
+    const sticky = stickyFromTag(source, current);
+    expect(sticky.clockwiseDegreesPerSecond).toBe(77);
+    expect(createTag(8, sticky)).toEqual({ ...source, timeSeconds: 8 });
+  });
+});
+
+describe("typed geometry fields (V16 phase 59)", () => {
+  const spread = (overrides: Partial<StickySelection> = {}): StickySelection => ({
+    ...STICKY,
+    pattern: "spread",
+    aim: "player",
+    ...overrides,
+  });
+
+  test("createTag applies each field only where the shape allows it", () => {
+    const sticky = spread({
+      coneDegrees: 40,
+      fixedBearingDegrees: 90,
+      frontOffsetDegrees: 10,
+      emitterRadiusTiles: 2,
+    });
+    expect(createTag(1, sticky)).toMatchObject({ coneDegrees: 40 });
+    expect(createTag(1, sticky)).not.toHaveProperty("fixedBearingDegrees");
+    expect(createTag(1, sticky)).not.toHaveProperty("frontOffsetDegrees");
+    expect(createTag(1, sticky)).not.toHaveProperty("emitterRadiusTiles");
+    expect(createTag(1, { ...sticky, aim: "fixed" })).toMatchObject({
+      fixedBearingDegrees: 90,
+    });
+    expect(createTag(1, { ...sticky, aim: "front" })).toMatchObject({
+      frontOffsetDegrees: 10,
+    });
+    expect(createTag(1, { ...sticky, pattern: "fixed-ring" })).toMatchObject({
+      emitterRadiusTiles: 2,
+    });
+    expect(createTag(1, { ...sticky, pattern: "fixed-ring" })).not.toHaveProperty(
+      "coneDegrees",
+    );
+  });
+
+  test("a sticky value survives a pattern switch", () => {
+    const sticky = spread({ coneDegrees: 40 });
+    expect(createTag(1, { ...sticky, pattern: "rotating-arm" })).not.toHaveProperty(
+      "coneDegrees",
+    );
+    expect(createTag(1, sticky)).toMatchObject({ coneDegrees: 40 });
+  });
+
+  test("editTag sets, removes and drops fields on a pattern or aim change", () => {
+    const base = tag({ pattern: "spread", aim: "fixed", fixedBearingDegrees: 30 });
+    const edited = editTag(base, { field: "coneDegrees", value: 50 }, 100);
+    expect(edited).toMatchObject({ ok: true, tag: { coneDegrees: 50 } });
+    if (!edited.ok) return;
+    const removed = editTag(edited.tag, { field: "coneDegrees", value: null }, 100);
+    expect(removed.ok && removed.tag).not.toHaveProperty("coneDegrees");
+    const aimed = editTag(edited.tag, { field: "aim", value: "player" }, 100);
+    expect(aimed.ok && aimed.tag).not.toHaveProperty("fixedBearingDegrees");
+    expect(aimed.ok && aimed.tag).toMatchObject({ coneDegrees: 50 });
+    const ring = editTag(edited.tag, { field: "pattern", value: "fixed-ring" }, 100);
+    expect(ring.ok && ring.tag).not.toHaveProperty("coneDegrees");
+    expect(ring.ok && ring.tag).not.toHaveProperty("fixedBearingDegrees");
+  });
+
+  test("an out-of-range or inapplicable value is rejected", () => {
+    const base = tag({ pattern: "spread", aim: "player" });
+    for (const change of [
+      { field: "coneDegrees", value: 360 },
+      { field: "coneDegrees", value: Number.NaN },
+      { field: "fixedBearingDegrees", value: 5 },
+      { field: "frontOffsetDegrees", value: 5 },
+      { field: "emitterRadiusTiles", value: 1 },
+    ] as const)
+      expect(editTag(base, change, 100).ok).toBe(false);
+    const ring = tag({ pattern: "fixed-ring" });
+    expect(editTag(ring, { field: "emitterRadiusTiles", value: -1 }, 100).ok).toBe(false);
+    expect(editTag(ring, { field: "emitterRadiusTiles", value: 1.5 }, 100).ok).toBe(true);
+  });
+
+  test("no selection produces a tag validateTag rejects", () => {
+    const everything: StickySelection = {
+      ...STICKY,
+      coneDegrees: 40,
+      fixedBearingDegrees: 90,
+      frontOffsetDegrees: 10,
+      emitterRadiusTiles: 2,
+      target: "player",
+      bombRangeTiles: 4,
+      bombTravelSeconds: 1,
+      bulletSpeedTilesPerSecond: 3,
+      bulletRangeTiles: 5,
+      armPattern: "spread",
+    };
+    for (const spriteId of ["red-glaive", "white-bomb"])
+      for (const pattern of OFFERABLE_PATTERNS)
+        for (const aim of TAG_AIMS)
+          for (const shots of [1, 3])
+            expect(() =>
+              validateTag(createTag(1, { ...everything, spriteId, pattern, aim, shots }), "tag"),
+            ).not.toThrow();
+  });
+});
+
+describe("bomb controls (V16 step 60.1)", () => {
+  const bombSpread: StickySelection = {
+    ...STICKY,
+    spriteId: "white-bomb",
+    pattern: "spread",
+    aim: "player",
+    shots: 1,
+  };
+
+  test("recognises bomb sprites", () => {
+    expect(isBombSprite("white-bomb")).toBe(true);
+    expect(isBombSprite("red-glaive")).toBe(false);
+    expect(attackFieldApplies("target", { ...tag(), pattern: "spread", aim: "player", shots: 1, spriteId: "white-bomb" })).toBe(true);
+  });
+
+  test("a targeted tag drops range and keeps flight time", () => {
+    const targeted = createTag(1, {
+      ...bombSpread,
+      target: "player",
+      bombRangeTiles: 4,
+      bombTravelSeconds: 1.5,
+    });
+    expect(targeted).toMatchObject({ target: "player", bombTravelSeconds: 1.5 });
+    expect(targeted).not.toHaveProperty("bombRangeTiles");
+  });
+
+  test("target is dropped when shots, aim, pattern or sprite stop allowing it", () => {
+    const targeted = tag({
+      spriteId: "white-bomb",
+      pattern: "spread",
+      aim: "player",
+      shots: 1,
+      target: "player",
+      bombTravelSeconds: 1,
+    });
+    for (const change of [
+      { field: "shots", value: 2 },
+      { field: "aim", value: "fixed" },
+      { field: "pattern", value: "scatter" },
+      { field: "spriteId", value: "red-glaive" },
+    ] as const) {
+      const result = editTag(targeted, change, 100);
+      expect(result.ok && result.tag).not.toHaveProperty("target");
+    }
+    const bullet = editTag(targeted, { field: "spriteId", value: "red-glaive" }, 100);
+    expect(bullet.ok && bullet.tag).not.toHaveProperty("bombTravelSeconds");
+  });
+
+  test("setting target drops a typed range; a bullet sprite cannot be targeted", () => {
+    const base = tag({
+      spriteId: "white-bomb",
+      pattern: "spread",
+      aim: "player",
+      shots: 1,
+      bombRangeTiles: 5,
+    });
+    const result = editTag(base, { field: "target", value: true }, 100);
+    expect(result.ok && result.tag).toMatchObject({ target: "player" });
+    expect(result.ok && result.tag).not.toHaveProperty("bombRangeTiles");
+    expect(
+      editTag(tag({ pattern: "spread", aim: "player", shots: 1 }), { field: "target", value: true }, 100).ok,
+    ).toBe(false);
+  });
+
+  test("positive-only fields reject zero", () => {
+    const base = tag({ spriteId: "white-bomb", pattern: "spread", aim: "player" });
+    expect(editTag(base, { field: "bombRangeTiles", value: 0 }, 100).ok).toBe(false);
+    expect(editTag(base, { field: "bombTravelSeconds", value: 0.8 }, 100).ok).toBe(true);
+  });
+});
+
+describe("burst continuation across targeted and untargeted bombs", () => {
+  test("a continuation does not join a burst of the other kind", () => {
+    const sticky: StickySelection = {
+      ...STICKY,
+      spriteId: "white-bomb",
+      pattern: "spread",
+      aim: "player",
+      shots: 1,
+    };
+    const untargetedBurst = [createTag(1, sticky, 1)];
+    expect(assignBurst(untargetedBurst, { ...sticky, target: "player" }, "continue")).toBeNull();
+    expect(assignBurst(untargetedBurst, sticky, "continue")).toBe(1);
+  });
+});
+
+describe("formatSummaryRow attack column (V16 S46)", () => {
+  test("resolves a saved attack's name, with a dash for none", () => {
+    const base = {
+      phaseIndex: 0,
+      spriteId: "red-glaive",
+      pattern: "rotating-arm" as const,
+      scope: "all" as const,
+      sampleCount: 0,
+      meanSeconds: 0,
+      stdevSeconds: 0,
+      intervalsSeconds: [],
+    };
+    const attack = {
+      id: "attack-1",
+      name: "Spiral",
+      spriteId: "red-glaive",
+      pattern: "rotating-arm" as const,
+      shots: 2,
+      cadence: { shotsPerBurst: 1, cooldownAfterLastShotSeconds: 1 },
+    };
+    const phases = phaseOptions(QUEEN);
+    expect(formatSummaryRow({ ...base, savedAttackId: "attack-1" }, phases, [attack]).attack).toBe("Spiral");
+    expect(formatSummaryRow(base, phases, [attack]).attack).toBe("—");
+    expect(formatSummaryRow({ ...base, target: "player" }, phases).target).toBe("player");
   });
 });

@@ -4,7 +4,7 @@
 
 ### Step 57.1 - Title And Encounter Confirmation
 
-Status: pending. Dependencies: phase 56.
+Status: complete. Dependencies: phase 56.
 
 **Implementation prompt**
 
@@ -20,7 +20,7 @@ An encounter change can no longer clear tags without a confirmation.
 
 ### Step 57.2 - Use These Settings
 
-Status: pending. Dependencies: 57.1.
+Status: complete. Dependencies: 57.1.
 
 **Implementation prompt**
 
@@ -36,7 +36,7 @@ Recording after pressing the button produces a row equal to the source except fo
 
 ### Step 57.3 - Labels And Width
 
-Status: pending. Dependencies: 57.2.
+Status: complete. Dependencies: 57.2.
 
 **Implementation prompt**
 
@@ -49,3 +49,13 @@ Manual, recorded as performed or blocked: at 1440x900, with a composite rotating
 **Acceptance**
 
 No row's meaning depends on an unlabelled input, and no action needs horizontal scrolling at 1440 pixels.
+
+## Execution record
+
+**57.1** The heading names the selected encounter's display name. `chooseEncounter` confirms through the existing banner whenever tags or saved attacks exist, naming both counts, and changes nothing on Cancel (the controlled `<select>` keeps the current encounter). `encounterChangeDecision` lives beside `videoChoiceDecision` in `studyLoad.ts` with its case in `studyLoad.test.ts`, not in `taggingRoute.test.ts` as the prompt named.
+
+**57.2** `stickyFromTag` copies a resolved tag's phase and attack fields (and its saved attack) into the sticky selection, keeping fields the tag's shape ignores from the current selection; a composite ring and a player-aimed spread round-trip through `createTag`. Each row has a "Use these settings" button.
+
+**57.3** Row geometry inputs carry short visible captions while keeping their `aria-label`s; the Tags table is compacted and its actions column is sticky at the right. The 1440x900 manual check was not performed (no interactive browser session).
+
+`npm run verify` passed.

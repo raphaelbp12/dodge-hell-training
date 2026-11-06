@@ -22,7 +22,7 @@ This file is the reusable process for every planning effort in this repository: 
 | V13 | 43-45 | drafted | Z | [`docs/plan-v13.md`](docs/plan-v13.md) |
 | V14 | 46-48 | drafted | M | [`docs/plan-v14.md`](docs/plan-v14.md) |
 | V15 | 49-55 | active | N | [`docs/plan-v15.md`](docs/plan-v15.md) |
-| V16 | 56-64 | drafted | S | [`docs/plan-v16.md`](docs/plan-v16.md) |
+| V16 | 56-64 | active | S | [`docs/plan-v16.md`](docs/plan-v16.md) |
 
 (V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 

@@ -4,7 +4,7 @@
 
 ### Step 59.1 - Typed Fields
 
-Status: pending. Dependencies: phase 57.
+Status: complete. Dependencies: phase 57.
 
 **Implementation prompt**
 
@@ -20,7 +20,7 @@ No selection can produce a tag `validateTag` rejects.
 
 ### Step 59.2 - Geometry In The Preview And Export
 
-Status: pending. Dependencies: 59.1.
+Status: complete. Dependencies: 59.1.
 
 **Implementation prompt**
 
@@ -41,7 +41,7 @@ A `fixed` tag can never draw or export as player-aimed.
 
 ### Step 59.3 - Match Status
 
-Status: pending. Dependencies: 59.2.
+Status: complete. Dependencies: 59.2.
 
 **Implementation prompt**
 
@@ -60,3 +60,13 @@ Write failing `previewModel.test.ts` cases first, one per status and reason, and
 **Acceptance**
 
 A person can tell before recording whether a tag will draw, and which tag is the "not previewed" one.
+
+## Execution record
+
+**59.1** The sticky selection and `TagChange` gained `coneDegrees`, `fixedBearingDegrees`, `frontOffsetDegrees` and `emitterRadiusTiles` through one rule, `attackFieldApplies`, shared by `createTag`, `editTag` (via `conformAttackFields`) and `stickyFromTag`, so no selection produces a tag `validateTag` rejects (checked exhaustively over sprite, pattern, aim and shots). Controls are in the new `TypedFieldControls.tsx`.
+
+**59.2** `withTagGeometry` now lets a typed cone and emitter radius replace the authored ones and makes the tag's aim always win: `fixed` uses its typed bearing, else a fixed attack's bearing, else no pattern (S23); `front` uses its typed offset, else the authored one, else 0. The export uses the same path, so a `fixed` tag can no longer draw or export as player-aimed. Existing tests that asserted the old N39 behaviour were updated.
+
+**59.3** `tagMatchStatus` and `matchStatusText` are the one answer behind the Tag panel line, each row's Preview badge and the export refusal; `countUnmatchedTags` is built on it.
+
+`npm run verify` passed. The status-follows-controls manual check was not performed.

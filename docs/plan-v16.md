@@ -260,48 +260,48 @@ export type TagMatchStatus =
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 56 | Schema V3 And Stored Tags | pending | V15 phase 55 |
-| 57 | Tagger Housekeeping | pending | Phase 56 |
-| 58 | The Timeline | pending | Phase 56 |
-| 59 | Typed Geometry And Match Status | pending | Phase 57 |
-| 60 | Bomb Throws And Typed Projectile Values | pending | Phase 59 |
-| 61 | Saved Attacks | pending | Phase 60 |
-| 62 | Repeats | pending | Phases 58, 61 |
-| 63 | Tuning In The Preview | pending | Phase 62 |
-| 64 | Guide And Acceptance | pending | Phase 63 |
+| 56 | Schema V3 And Stored Tags | complete | V15 phase 55 |
+| 57 | Tagger Housekeeping | complete | Phase 56 |
+| 58 | The Timeline | complete | Phase 56 |
+| 59 | Typed Geometry And Match Status | complete | Phase 57 |
+| 60 | Bomb Throws And Typed Projectile Values | complete | Phase 59 |
+| 61 | Saved Attacks | complete | Phase 60 |
+| 62 | Repeats | complete | Phases 58, 61 |
+| 63 | Tuning In The Preview | complete | Phase 62 |
+| 64 | Guide And Acceptance | complete | Phase 63 |
 
 ## Phase 56: Schema V3 And Stored Tags
 
-Status: pending. Dependencies: V15 phase 55. Steps: [`phase-56.md`](plan/phase-56.md).
+Status: complete. Dependencies: V15 phase 55. Outcome: Added schema v3, stored and linked tags, saved-attack validation, draft version 2 and a route that holds stored tags. Archive: [`phase-56.md`](plan-archive/phase-56.md).
 
 ## Phase 57: Tagger Housekeeping
 
-Status: pending. Dependencies: phase 56. Steps: [`phase-57.md`](plan/phase-57.md).
+Status: complete. Dependencies: phase 56. Outcome: Titled the page by encounter, confirmed encounter changes, added Use these settings and labelled, compacted rows. Archive: [`phase-57.md`](plan-archive/phase-57.md).
 
 ## Phase 58: The Timeline
 
-Status: pending. Dependencies: phase 56. Steps: [`phase-58.md`](plan/phase-58.md).
+Status: complete. Dependencies: phase 56. Outcome: Added the pure marker model, `[` and `]` volley stepping and the scrub bar with a go-to-time field. Archive: [`phase-58.md`](plan-archive/phase-58.md).
 
 ## Phase 59: Typed Geometry And Match Status
 
-Status: pending. Dependencies: phase 57. Steps: [`phase-59.md`](plan/phase-59.md).
+Status: complete. Dependencies: phase 57. Outcome: Added typed cone, bearing, offset and emitter radius, made the tag's aim win, and added one match status. Archive: [`phase-59.md`](plan-archive/phase-59.md).
 
 ## Phase 60: Bomb Throws And Typed Projectile Values
 
-Status: pending. Dependencies: phase 59. Steps: [`phase-60.md`](plan/phase-60.md).
+Status: complete. Dependencies: phase 59. Outcome: Added bomb targeting, range and time, wider bomb matching, typed linear-bullet values and projectile-variant export. Archive: [`phase-60.md`](plan-archive/phase-60.md).
 
 ## Phase 61: Saved Attacks
 
-Status: pending. Dependencies: phase 60. Steps: [`phase-61.md`](plan/phase-61.md).
+Status: complete. Dependencies: phase 60. Outcome: Added named saved attacks, linked tags, detach, the Attack panel and columns, and linked export. Archive: [`phase-61.md`](plan-archive/phase-61.md).
 
 ## Phase 62: Repeats
 
-Status: pending. Dependencies: phases 58, 61. Steps: [`phase-62.md`](plan/phase-62.md).
+Status: complete. Dependencies: phases 58, 61. Outcome: Added repeat rows with volley expansion, End repeat here, a typed end, the rotation clock and the Summary rule. Archive: [`phase-62.md`](plan-archive/phase-62.md).
 
 ## Phase 63: Tuning In The Preview
 
-Status: pending. Dependencies: phase 62. Steps: [`phase-63.md`](plan/phase-63.md).
+Status: complete. Dependencies: phase 62. Outcome: Added the pure tuning mapping and the preview's tuning controls, and the AGENTS.md clarification. Archive: [`phase-63.md`](plan-archive/phase-63.md).
 
 ## Phase 64: Guide And Acceptance
 
-Status: pending. Dependencies: phase 63. Steps: [`phase-64.md`](plan/phase-64.md).
+Status: complete. Dependencies: phase 63. Outcome: Rewrote the tagger guide, added the one Playwright case and ran the review gates. Archive: [`phase-64.md`](plan-archive/phase-64.md).
