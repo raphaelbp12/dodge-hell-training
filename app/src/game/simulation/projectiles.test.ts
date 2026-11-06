@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { createShard, advanceShard, type ShardCollisionContext } from "./projectiles";
-import { ENCOUNTER_CONFIG, type ProjectileSpec } from "../config/encounter";
+import { ENCOUNTER_CONFIG, type BulletSpec } from "../config/encounter";
 
 const stepSeconds = 1 / 60;
 
@@ -11,7 +11,8 @@ const BOOMERANG_VERTICES = [
   { x: 0, y: -0.5 },
 ];
 
-const BOOMERANG_PROJECTILE: ProjectileSpec = {
+const BOOMERANG_PROJECTILE: BulletSpec = {
+  type: "bullet",
   id: "test-boomerang",
   damageHp: 160,
   speedTilesPerSecond: 8,
@@ -26,7 +27,7 @@ const BOOMERANG_PROJECTILE: ProjectileSpec = {
 };
 
 // Source row 1: red-stinger-small at speed 8.5, range 9.5 tiles.
-const LINEAR_PROJECTILE: ProjectileSpec = {
+const LINEAR_PROJECTILE: BulletSpec = {
   ...BOOMERANG_PROJECTILE,
   id: "test-linear",
   speedTilesPerSecond: 8.5,
@@ -95,7 +96,7 @@ test("createShard reproduces a boomerang shard's authored lifetime and reversal 
 // would give) accumulates enough fixed-step floating-point drift at 7500+
 // ticks to itself exceed that tolerance, which is a test-authoring pitfall
 // rather than anything step 19.4 needs to handle for a trainer-scale range.
-const TURNING_PROJECTILE: ProjectileSpec = {
+const TURNING_PROJECTILE: BulletSpec = {
   ...BOOMERANG_PROJECTILE,
   id: "test-turning",
   speedTilesPerSecond: 8,
@@ -103,7 +104,7 @@ const TURNING_PROJECTILE: ProjectileSpec = {
 };
 
 // Source's values: amplitude 0.8 tiles, frequency 1 Hz; range picked the same way.
-const WAVY_PROJECTILE: ProjectileSpec = {
+const WAVY_PROJECTILE: BulletSpec = {
   ...BOOMERANG_PROJECTILE,
   id: "test-wavy",
   speedTilesPerSecond: 8,
@@ -206,84 +207,4 @@ test("turning and wavy shards agree at shared step boundaries across 30/60/120 H
       expect(position.y).toBeCloseTo(positions[0].y, 9);
     }
   }
-});
-
-// A six-tile detonation radius and a 10-tile/s max reach (speed 5, travel 2s).
-const LOB_PROJECTILE: ProjectileSpec = {
-  ...BOOMERANG_PROJECTILE,
-  id: "test-lob",
-  speedTilesPerSecond: 5,
-  motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
-};
-
-const lobContext: ShardCollisionContext = {
-  config: {
-    ...ENCOUNTER_CONFIG,
-    projectiles: {
-      ...ENCOUNTER_CONFIG.projectiles,
-      [LOB_PROJECTILE.id]: LOB_PROJECTILE,
-    },
-  },
-  collisionBoundingRadiusTiles: 0.001,
-};
-
-test("a lob shard fired toward a fixed direction arrives exactly at the maximum reach at travelSeconds", () => {
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: 0 }, 0);
-  expect(shard.detonationTargetTiles).toEqual({ x: 10, y: 0 });
-  advanceShard(lobContext, shard, 2, far, far);
-  expect(shard.positionTiles).toEqual({ x: 10, y: 0 });
-  expect(shard.ageSeconds).toBe(2);
-});
-
-test("a lob shard aimed at a near player lands exactly on the player, not the maximum reach", () => {
-  const nearPlayer = { x: 3, y: 4 }; // distance 5, well under the 10-tile reach
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: 0 }, 0, nearPlayer);
-  expect(shard.detonationTargetTiles).toEqual(nearPlayer);
-});
-
-test("a lob shard aimed at a far player is clamped to the maximum reach along the aim direction", () => {
-  const farPlayer = { x: 100, y: 0 };
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: 0 }, 0, farPlayer);
-  expect(shard.detonationTargetTiles).toEqual({ x: 10, y: 0 });
-});
-
-test("a lob shard passing directly through the player in flight registers no hit", () => {
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: -5 }, Math.PI / 2);
-  // The straight path crosses the origin at age 1 (halfway), where a normal
-  // swept-body shard would register a hit; a lob shard must not.
-  const result = advanceShard(
-    lobContext,
-    shard,
-    1,
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-  );
-  expect(result.hitPlayer).toBe(false);
-  expect(shard.positionTiles.x).toBeCloseTo(0, 12);
-  expect(shard.positionTiles.y).toBeCloseTo(0, 12);
-});
-
-test("a detonation whose circle reaches the player registers exactly one hit and expires", () => {
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: 0 }, 0);
-  // Detonates at (10, 0) with a 1.5-tile radius; the player stands at (11, 0).
-  const playerPosition = { x: 11, y: 0 };
-  const result = advanceShard(lobContext, shard, 2, playerPosition, playerPosition);
-  expect(result.hitPlayer).toBe(true);
-  expect(result.alive).toBe(false);
-});
-
-test("a detonation whose circle misses the player applies nothing", () => {
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: 0 }, 0);
-  const playerPosition = { x: 20, y: 0 };
-  const result = advanceShard(lobContext, shard, 2, playerPosition, playerPosition);
-  expect(result.hitPlayer).toBe(false);
-  expect(result.alive).toBe(false);
-});
-
-test("a lob shard does not detonate before travelSeconds even near the player", () => {
-  const shard = createShard(LOB_PROJECTILE, 1, { x: 0, y: 0 }, 0);
-  const playerPosition = { x: 5, y: 0 }; // directly on the flight path, mid-flight
-  const result = advanceShard(lobContext, shard, 1, playerPosition, playerPosition);
-  expect(result.hitPlayer).toBe(false);
-  expect(result.alive).toBe(true);
 });

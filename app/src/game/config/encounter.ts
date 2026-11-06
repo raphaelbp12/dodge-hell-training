@@ -9,6 +9,7 @@ import {
   AUTHORED_PROJECTILES,
   loadOutline,
   TELEGRAPH_COLOR_NAMES,
+  type ArmPattern,
   type AuthoredAppearance,
   type AuthoredAppearanceTemplate,
   type AuthoredArchetype,
@@ -70,11 +71,6 @@ export type ProjectileMotion =
       rangeTiles: number;
       amplitudeTiles: number;
       frequencyHz: number;
-    }>
-  | Readonly<{
-      kind: "lob";
-      travelSeconds: number;
-      detonationRadiusTiles: number;
     }>;
 
 export type ProjectileBombSpec = Readonly<{
@@ -99,10 +95,9 @@ export type ProjectileAppearanceSpec = Readonly<{
   bomb?: ProjectileBombSpec;
 }>;
 
-export type ProjectileSpec = Readonly<{
+type ProjectileCommonSpec = Readonly<{
   id: string;
   damageHp: number;
-  speedTilesPerSecond: number;
   armorPiercing: boolean;
   conditions: readonly ConditionApplication[];
   verticesTiles: readonly Vector2[];
@@ -110,8 +105,28 @@ export type ProjectileSpec = Readonly<{
   appearance: ProjectileAppearanceSpec | null;
   expiration: string;
   hitPolicy: string;
-  motion: ProjectileMotion;
 }>;
+
+export type BulletSpec = ProjectileCommonSpec &
+  Readonly<{
+    type: "bullet";
+    speedTilesPerSecond: number;
+    motion: ProjectileMotion;
+  }>;
+
+/**
+ * A bomb (N21): defined by where and when it explodes. Range is measured from
+ * the spawn point (N24); its speed is derived, never stored (N25).
+ */
+export type BombSpec = ProjectileCommonSpec &
+  Readonly<{
+    type: "bomb";
+    rangeTiles: number;
+    travelSeconds: number;
+    detonationRadiusTiles: number;
+  }>;
+
+export type ProjectileSpec = BulletSpec | BombSpec;
 
 /**
  * One rotating ring of arms. The optional fields deliberately subsume the
@@ -140,6 +155,8 @@ export type RingPattern = Readonly<{
   gapSectorsDegrees?: readonly (readonly [number, number])[];
   armSpreadDegreesPerSecond?: number;
   maxArmSpreadDegrees?: number;
+  /** What each arm fires; absent means a single shot (N03, N05). Inner angles stay in degrees. */
+  armPattern?: ArmPattern;
 }>;
 
 export type SpreadPattern =
@@ -156,6 +173,15 @@ export type SpreadPattern =
       arcDegrees: number;
       aim: "fixed";
       fixedBearingDegrees: number;
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "spread";
+      shots: number;
+      arcDegrees: number;
+      aim: "front";
+      /** N16: 0 is ahead of the enemy's movement heading, 180 behind. */
+      offsetDegrees: number;
       emitterRadiusTiles: number;
     }>;
 
@@ -174,7 +200,17 @@ export type ScatterPattern =
       aim: "fixed";
       fixedBearingDegrees: number;
       emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "scatter";
+      shots: number;
+      coneDegrees: number;
+      aim: "front";
+      offsetDegrees: number;
+      emitterRadiusTiles: number;
     }>;
+
+export type { ArmPattern };
 
 export type AttackPattern = RingPattern | SpreadPattern | ScatterPattern;
 
@@ -231,6 +267,11 @@ export type AttackSpec = Readonly<{
   tuningSource: string;
   pattern: AttackPattern;
   cadence: AttackCadence;
+  /**
+   * N28-N30: a bomb thrown at the player's position at fire time. Only a
+   * single-shot, player-aimed spread firing a bomb may carry it.
+   */
+  target?: "player";
 }>;
 
 export type { TelegraphColorName };
@@ -299,6 +340,8 @@ export type EnemyArchetype = Readonly<{
   contactArmorPiercing: boolean;
   contactCooldownSeconds: number;
   blocksPlayer: boolean;
+  /** N17: the starting movement heading in degrees; absent means 0. */
+  initialHeadingDegrees?: number;
 }>;
 
 export type SpawnRule = Readonly<{
@@ -371,7 +414,7 @@ const AUTHORED_PROJECTILE_ID = authoredPrimaryAttack.projectile;
 const authoredProjectile = AUTHORED_PROJECTILES[AUTHORED_PROJECTILE_ID];
 // The debug panel only ever tunes the shipped, boomerang-kind shard (G: 19.3
 // adds `linear` to the catalog type, but not to any debug-tunable projectile).
-if (authoredProjectile.motion.kind !== "boomerang")
+if (authoredProjectile.type !== "bullet" || authoredProjectile.motion.kind !== "boomerang")
   throw new RangeError("The debug-tunable projectile must use boomerang motion");
 const authoredBoomerangMotion = authoredProjectile.motion;
 // The debug panel's spawn-rate slider edits a real cadence; the debug-tunable
@@ -628,6 +671,7 @@ export function buildEncounterConfig(
     values.projectileHeight,
   );
   const projectile: ProjectileSpec = Object.freeze({
+    type: "bullet",
     id: AUTHORED_PROJECTILE_ID,
     damageHp: values.projectileDamageHp,
     speedTilesPerSecond: values.projectileSpeedTilesPerSecond,
@@ -707,6 +751,7 @@ function attackSpecFromAuthored(attack: AuthoredAttack): AttackSpec {
     tuningSource: attack.tuningSource,
     pattern: patternFromAuthored(attack.pattern),
     cadence: attack.cadence,
+    ...(attack.target === undefined ? {} : { target: attack.target }),
   });
 }
 
@@ -776,6 +821,9 @@ function archetypeFromAuthored(authored: AuthoredArchetype): EnemyArchetype {
     contactArmorPiercing: authored.contactArmorPiercing,
     contactCooldownSeconds: authored.contactCooldownSeconds,
     blocksPlayer: authored.blocksPlayer,
+    ...(authored.initialHeadingDegrees === undefined
+      ? {}
+      : { initialHeadingDegrees: authored.initialHeadingDegrees }),
     phases: Object.freeze(authored.phases.map(phaseSpecFromAuthored)),
   });
 }
@@ -977,10 +1025,9 @@ function projectileFromAuthored(authored: AuthoredProjectile): ProjectileSpec {
     collisionPartsTiles = Object.freeze([verticesTiles]);
   }
 
-  return Object.freeze({
+  const common = {
     id: authored.id,
     damageHp: authored.damageHp,
-    speedTilesPerSecond: authored.speedTilesPerSecond,
     armorPiercing: authored.armorPiercing,
     conditions: authored.conditions,
     verticesTiles,
@@ -988,6 +1035,19 @@ function projectileFromAuthored(authored: AuthoredProjectile): ProjectileSpec {
     appearance,
     expiration: authored.expiration,
     hitPolicy: authored.hitPolicy,
+  };
+  if (authored.type === "bomb")
+    return Object.freeze({
+      ...common,
+      type: "bomb",
+      rangeTiles: authored.rangeTiles,
+      travelSeconds: authored.travelSeconds,
+      detonationRadiusTiles: authored.detonationRadiusTiles,
+    });
+  return Object.freeze({
+    ...common,
+    type: "bullet",
+    speedTilesPerSecond: authored.speedTilesPerSecond,
     motion: authored.motion,
   });
 }
@@ -1089,9 +1149,9 @@ export function encounterConfigOf(id: string): EncounterConfig {
  */
 /** A projectile's lifetime, however its motion kind derives it. */
 function lifetimeSecondsOf(projectile: ProjectileSpec): number {
+  if (projectile.type === "bomb") return projectile.travelSeconds;
   const { motion } = projectile;
   if (motion.kind === "boomerang") return motion.lifetimeSeconds;
-  if (motion.kind === "lob") return motion.travelSeconds;
   return motion.rangeTiles / projectile.speedTilesPerSecond;
 }
 
@@ -1102,9 +1162,19 @@ function lifetimeSecondsOf(projectile: ProjectileSpec): number {
  * keeps exactly one attack per archetype; this sum already generalises
  * correctly once step 20.2 allows more).
  */
+/** Final shots one arm pattern fires, nested without limit (N10). */
+function armShotCount(armPattern: ArmPattern | undefined): number {
+  if (!armPattern || armPattern.kind === "single") return 1;
+  if (armPattern.kind === "ring")
+    return armPattern.arms * armShotCount(armPattern.armPattern);
+  return armPattern.shots;
+}
+
 /** Shots one volley of this pattern fires at once. */
 function shotsPerVolley(pattern: AttackPattern): number {
-  return pattern.kind === "ring" ? pattern.arms : pattern.shots;
+  return pattern.kind === "ring"
+    ? pattern.arms * armShotCount(pattern.armPattern)
+    : pattern.shots;
 }
 
 /** Worst-case concurrently-live shards one authored attack can sustain. */
@@ -1211,6 +1281,22 @@ export function projectileOf(
 ): ProjectileSpec {
   const projectile = config.projectiles[id];
   if (!projectile) throw new RangeError(`Unknown projectile: ${id}`);
+  return projectile;
+}
+
+/** Resolves a catalog projectile that must be a bullet (a shard's motion and speed live there). */
+export function bulletOf(config: EncounterConfig, id: string): BulletSpec {
+  const projectile = projectileOf(config, id);
+  if (projectile.type !== "bullet")
+    throw new RangeError(`Projectile ${id} is not a bullet`);
+  return projectile;
+}
+
+/** Resolves a catalog projectile that must be a bomb. */
+export function bombOf(config: EncounterConfig, id: string): BombSpec {
+  const projectile = projectileOf(config, id);
+  if (projectile.type !== "bomb")
+    throw new RangeError(`Projectile ${id} is not a bomb`);
   return projectile;
 }
 
@@ -1328,23 +1414,15 @@ export function validateEncounterConfig(config: EncounterConfig): void {
 }
 
 function validateProjectileSpec(projectile: ProjectileSpec): void {
-  const { motion } = projectile;
   assertNonnegative(projectile.damageHp, "shardDamageHp");
-  assertNonnegative(projectile.speedTilesPerSecond, "shardSpeedTilesPerSecond");
   transformBodyVertices(projectile.verticesTiles, { x: 0, y: 0 });
   validateConvexParts(projectile.collisionPartsTiles);
-  if (motion.kind === "boomerang") {
-    assertPositive(motion.reversalAgeSeconds, "reversalAgeSeconds");
-    assertPositive(motion.lifetimeSeconds, "lifetimeSeconds");
-    if (motion.reversalAgeSeconds >= motion.lifetimeSeconds)
-      throw new RangeError(
-        "Shard reversal must be strictly within its lifetime",
-      );
-  } else if (motion.kind === "lob") {
-    assertPositive(motion.travelSeconds, "travelSeconds");
-    assertPositive(motion.detonationRadiusTiles, "detonationRadiusTiles");
+  if (projectile.type === "bomb") {
+    assertPositive(projectile.rangeTiles, "rangeTiles");
+    assertPositive(projectile.travelSeconds, "travelSeconds");
+    assertPositive(projectile.detonationRadiusTiles, "detonationRadiusTiles");
   } else {
-    assertPositive(motion.rangeTiles, "rangeTiles");
+    validateBulletMotion(projectile);
   }
   if (projectile.expiration !== "lifetime-only")
     throw new RangeError("Shards must expire by lifetime only");
@@ -1352,8 +1430,57 @@ function validateProjectileSpec(projectile: ProjectileSpec): void {
     throw new RangeError("Shards must hit the player at most once");
 }
 
+function validateBulletMotion(projectile: BulletSpec): void {
+  const { motion } = projectile;
+  assertNonnegative(projectile.speedTilesPerSecond, "shardSpeedTilesPerSecond");
+  if (motion.kind === "boomerang") {
+    assertPositive(motion.reversalAgeSeconds, "reversalAgeSeconds");
+    assertPositive(motion.lifetimeSeconds, "lifetimeSeconds");
+    if (motion.reversalAgeSeconds >= motion.lifetimeSeconds)
+      throw new RangeError(
+        "Shard reversal must be strictly within its lifetime",
+      );
+  } else {
+    assertPositive(motion.rangeTiles, "rangeTiles");
+  }
+}
+
+/** Runtime check of a (possibly hand-built) arm pattern, recursively. */
+function validateArmPatternSpec(armPattern: ArmPattern): void {
+  switch (armPattern.kind) {
+    case "single":
+      return;
+    case "spread":
+      assertPositive(armPattern.shots, "armPattern shots");
+      assertNonnegative(armPattern.arcDegrees, "armPattern arcDegrees");
+      if (armPattern.arcDegrees >= 360)
+        throw new RangeError("An arm spread's arcDegrees must be below 360 degrees");
+      return;
+    case "scatter":
+      assertPositive(armPattern.shots, "armPattern shots");
+      assertPositive(armPattern.coneDegrees, "armPattern coneDegrees");
+      if (armPattern.coneDegrees > 360)
+        throw new RangeError("An arm scatter's coneDegrees must be at most 360 degrees");
+      return;
+    case "ring":
+      assertPositive(armPattern.arms, "armPattern arms");
+      if (
+        armPattern.phaseOffsetDegrees !== undefined &&
+        !Number.isFinite(armPattern.phaseOffsetDegrees)
+      )
+        throw new RangeError("phaseOffsetDegrees must be finite");
+      if (armPattern.armPattern) validateArmPatternSpec(armPattern.armPattern);
+      return;
+    default:
+      throw new RangeError(
+        `Unknown arm pattern kind: ${(armPattern as { kind: string }).kind}`,
+      );
+  }
+}
+
 /** Validates the optional ring extensions on a runtime config. */
 function validateRingPatternOptions(pattern: RingPattern): void {
+  if (pattern.armPattern) validateArmPatternSpec(pattern.armPattern);
   if (
     pattern.perBurstAdvanceDegrees !== undefined &&
     !Number.isFinite(pattern.perBurstAdvanceDegrees)
@@ -1405,12 +1532,27 @@ function validateRingPatternOptions(pattern: RingPattern): void {
     );
 }
 
-function validateAttackSpec(
+export function validateAttackSpec(
   config: EncounterConfig,
   attack: AttackSpec,
 ): void {
-  validateProjectileSpec(projectileOf(config, attack.projectileId));
+  const attackProjectile = projectileOf(config, attack.projectileId);
+  validateProjectileSpec(attackProjectile);
   const { pattern, cadence } = attack;
+  if (attack.target !== undefined) {
+    if (attack.target !== "player")
+      throw new RangeError('An attack target must be "player"');
+    if (attackProjectile.type !== "bomb")
+      throw new RangeError("Only a bomb can have a target");
+    if (
+      pattern.kind !== "spread" ||
+      pattern.shots !== 1 ||
+      pattern.aim !== "player"
+    )
+      throw new RangeError(
+        'A targeted bomb must be a single-shot spread with aim "player"',
+      );
+  }
   // Strictly positive: a zero here would make the attack degenerate (an
   // infinite fire rate or no shots).
   const positiveValues = {
@@ -1442,6 +1584,8 @@ function validateAttackSpec(
       throw new RangeError("A spread's arcDegrees must be below 360 degrees");
     if (pattern.aim === "fixed" && !Number.isFinite(pattern.fixedBearingDegrees))
       throw new RangeError("fixedBearingDegrees must be finite");
+    if (pattern.aim === "front" && !Number.isFinite(pattern.offsetDegrees))
+      throw new RangeError("offsetDegrees must be finite");
   } else {
     assertNonnegative(pattern.emitterRadiusTiles, "emitterRadiusTiles");
     assertPositive(pattern.coneDegrees, "coneDegrees");
@@ -1449,6 +1593,8 @@ function validateAttackSpec(
       throw new RangeError("A scatter's coneDegrees must be at most 360 degrees");
     if (pattern.aim === "fixed" && !Number.isFinite(pattern.fixedBearingDegrees))
       throw new RangeError("fixedBearingDegrees must be finite");
+    if (pattern.aim === "front" && !Number.isFinite(pattern.offsetDegrees))
+      throw new RangeError("offsetDegrees must be finite");
   }
 }
 
@@ -1645,6 +1791,28 @@ function validateArchetype(
   archetype: EnemyArchetype,
 ): void {
   validatePhases(config, archetype.phases);
+  if (
+    archetype.initialHeadingDegrees !== undefined &&
+    !Number.isFinite(archetype.initialHeadingDegrees)
+  )
+    throw new RangeError("initialHeadingDegrees must be finite");
+  // N17: a front-aimed attack reads the enemy's heading, so the archetype must
+  // state where it starts facing rather than silently defaulting to 0.
+  if (
+    archetype.initialHeadingDegrees === undefined &&
+    archetype.phases.some((phase) =>
+      [phase, ...(phase.subPhases ?? [])].some((scope) =>
+        scope.attacks.some(
+          (attack) =>
+            (attack.pattern.kind === "spread" || attack.pattern.kind === "scatter") &&
+            attack.pattern.aim === "front",
+        ),
+      ),
+    )
+  )
+    throw new RangeError(
+      "An archetype with a front-aimed attack must author initialHeadingDegrees",
+    );
   if (archetype.health !== undefined) validateHealthSpec(archetype.health);
   // Approved rules, asserted here rather than pinned in the structural type so
   // the type does not forbid the variation it appears to model (G: F10).

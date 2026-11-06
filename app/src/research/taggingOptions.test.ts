@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { encounterConfigOf, primaryArchetype } from "../game/config/encounter";
 import { phaseLabel } from "../game/config/drill";
-import type { Tag } from "./tagging";
+import { validateTag, type Tag } from "./tagging";
 import {
   appearanceOptions,
   assembleExport,
@@ -11,8 +11,12 @@ import {
   assignBurst,
   editTag,
   formatSummaryRow,
+  armPatternAllowed,
+  DEFAULT_SHOTS_PER_ARM,
   OFFERABLE_PATTERNS,
   readoutInterval,
+  rotationAllowed,
+  TAG_AIMS,
   sortNewestFirst,
   type StickySelection,
 } from "./taggingOptions";
@@ -361,5 +365,166 @@ describe("formatSummaryRow", () => {
     expect(row.intervals).toBe("—");
     expect(row.mean).toBe("—");
     expect(row.phase).toBe("99");
+  });
+});
+
+describe("composite and typed-geometry options (plan V15 phase 53)", () => {
+  const composite = (overrides: Partial<Tag> = {}) =>
+    tag({ pattern: "fixed-ring", armPattern: "spread", shotsPerArm: 3, armArcDegrees: 20, ...overrides });
+  const ok = (result: ReturnType<typeof editTag>) => {
+    if (!result.ok) throw new Error(result.error);
+    return result.tag;
+  };
+
+  test("front is a selectable aim on spread and scatter only", () => {
+    expect(TAG_AIMS).toContain("front");
+    expect(ok(editTag(tag({ pattern: "spread", aim: "player" }), { field: "aim", value: "front" }, 100)).aim).toBe("front");
+    expect(editTag(tag(), { field: "aim", value: "front" }, 100).ok).toBe(false);
+  });
+
+  test("armPatternAllowed and rotationAllowed", () => {
+    expect(armPatternAllowed("rotating-arm")).toBe(true);
+    expect(armPatternAllowed("fixed-ring")).toBe(true);
+    expect(armPatternAllowed("spread")).toBe(false);
+    expect(armPatternAllowed("volley")).toBe(false);
+    expect(rotationAllowed("rotating-arm")).toBe(true);
+    expect(rotationAllowed("fixed-ring")).toBe(false);
+  });
+
+  test("choosing an arm pattern needs a cone for spread and scatter, but not ring", () => {
+    expect(editTag(tag(), { field: "armPattern", value: "spread" }, 100)).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/cone/i),
+    });
+    const spread = ok(editTag(tag(), { field: "armPattern", value: "spread", armArcDegrees: 25 }, 100));
+    expect(spread).toMatchObject({ armPattern: "spread", armArcDegrees: 25, shotsPerArm: DEFAULT_SHOTS_PER_ARM });
+    const ring = ok(editTag(tag(), { field: "armPattern", value: "ring" }, 100));
+    expect(ring).toMatchObject({ armPattern: "ring", shotsPerArm: DEFAULT_SHOTS_PER_ARM });
+    expect(ring).not.toHaveProperty("armArcDegrees");
+  });
+
+  test("an arm pattern is refused on a pattern that cannot host arms", () => {
+    expect(
+      editTag(tag({ pattern: "spread", aim: "player" }), { field: "armPattern", value: "ring" }, 100).ok,
+    ).toBe(false);
+  });
+
+  test("armPattern null removes it and its dependants", () => {
+    const plain = ok(editTag(composite(), { field: "armPattern", value: null }, 100));
+    expect(plain).not.toHaveProperty("armPattern");
+    expect(plain).not.toHaveProperty("shotsPerArm");
+    expect(plain).not.toHaveProperty("armArcDegrees");
+  });
+
+  test("switching the arm pattern to ring drops the cone; to scatter keeps it", () => {
+    const ring = ok(editTag(composite(), { field: "armPattern", value: "ring" }, 100));
+    expect(ring).not.toHaveProperty("armArcDegrees");
+    expect(ring.shotsPerArm).toBe(3);
+    const scatter = ok(editTag(composite(), { field: "armPattern", value: "scatter" }, 100));
+    expect(scatter.armArcDegrees).toBe(20);
+    const backToSpread = editTag(ring, { field: "armPattern", value: "spread" }, 100);
+    expect(backToSpread.ok).toBe(false);
+  });
+
+  test("shotsPerArm and armArcDegrees edit with validation and keep the old tag on error", () => {
+    expect(ok(editTag(composite(), { field: "shotsPerArm", value: 5 }, 100)).shotsPerArm).toBe(5);
+    expect(ok(editTag(composite(), { field: "armArcDegrees", value: 45 }, 100)).armArcDegrees).toBe(45);
+    for (const bad of [0, 1.5, Number.NaN])
+      expect(editTag(composite(), { field: "shotsPerArm", value: bad }, 100).ok).toBe(false);
+    expect(editTag(composite(), { field: "shotsPerArm", value: null }, 100).ok).toBe(false);
+    expect(editTag(composite(), { field: "armArcDegrees", value: -1 }, 100).ok).toBe(false);
+    expect(editTag(composite(), { field: "armArcDegrees", value: 360 }, 100).ok).toBe(false);
+    expect(
+      editTag(composite({ armPattern: "scatter" }), { field: "armArcDegrees", value: 0 }, 100).ok,
+    ).toBe(false);
+    expect(editTag(composite(), { field: "armArcDegrees", value: null }, 100).ok).toBe(false);
+    expect(editTag(tag(), { field: "shotsPerArm", value: 2 }, 100).ok).toBe(false);
+    expect(
+      editTag(composite({ armPattern: "ring", armArcDegrees: undefined }), { field: "armArcDegrees", value: 10 }, 100).ok,
+    ).toBe(false);
+  });
+
+  test("rotation fields edit on a rotating arm, accept negatives, and null removes each", () => {
+    const withRate = ok(editTag(tag(), { field: "clockwiseDegreesPerSecond", value: -45 }, 100));
+    expect(withRate.clockwiseDegreesPerSecond).toBe(-45);
+    const withBoth = ok(editTag(withRate, { field: "initialPhaseDegrees", value: 12 }, 100));
+    expect(withBoth.initialPhaseDegrees).toBe(12);
+    const cleared = ok(editTag(withBoth, { field: "clockwiseDegreesPerSecond", value: null }, 100));
+    expect(cleared).not.toHaveProperty("clockwiseDegreesPerSecond");
+    expect(cleared.initialPhaseDegrees).toBe(12);
+    expect(editTag(tag({ pattern: "fixed-ring" }), { field: "initialPhaseDegrees", value: 3 }, 100).ok).toBe(false);
+    expect(editTag(tag(), { field: "clockwiseDegreesPerSecond", value: Number.NaN }, 100).ok).toBe(false);
+  });
+
+  test("changing the pattern drops fields the new pattern disallows", () => {
+    const rich = composite({ pattern: "rotating-arm", clockwiseDegreesPerSecond: 30, initialPhaseDegrees: 5 });
+    const fixed = ok(editTag(rich, { field: "pattern", value: "fixed-ring" }, 100));
+    expect(fixed).toMatchObject({ armPattern: "spread", shotsPerArm: 3, armArcDegrees: 20 });
+    expect(fixed).not.toHaveProperty("clockwiseDegreesPerSecond");
+    expect(fixed).not.toHaveProperty("initialPhaseDegrees");
+    const spread = ok(editTag(rich, { field: "pattern", value: "spread" }, 100));
+    for (const field of ["armPattern", "shotsPerArm", "armArcDegrees", "clockwiseDegreesPerSecond", "initialPhaseDegrees"])
+      expect(spread).not.toHaveProperty(field);
+  });
+
+  test("createTag copies sticky geometry only where the pattern allows it", () => {
+    const sticky: StickySelection = {
+      ...STICKY,
+      armPattern: "spread",
+      shotsPerArm: 3,
+      armArcDegrees: 20,
+      clockwiseDegreesPerSecond: 40,
+      initialPhaseDegrees: 10,
+    };
+    expect(createTag(1, sticky)).toMatchObject({
+      armPattern: "spread",
+      shotsPerArm: 3,
+      armArcDegrees: 20,
+      clockwiseDegreesPerSecond: 40,
+      initialPhaseDegrees: 10,
+    });
+    const fixedRing = createTag(1, { ...sticky, pattern: "fixed-ring" });
+    expect(fixedRing).toMatchObject({ armPattern: "spread", armArcDegrees: 20 });
+    expect(fixedRing).not.toHaveProperty("clockwiseDegreesPerSecond");
+    expect(fixedRing).not.toHaveProperty("initialPhaseDegrees");
+    const spreadTag = createTag(1, { ...sticky, pattern: "spread" });
+    for (const field of ["armPattern", "shotsPerArm", "armArcDegrees", "clockwiseDegreesPerSecond", "initialPhaseDegrees"])
+      expect(spreadTag).not.toHaveProperty(field);
+  });
+
+  test("createTag never produces a tag validateTag rejects", () => {
+    const incomplete: StickySelection = { ...STICKY, armPattern: "spread", shotsPerArm: 3 };
+    const result = createTag(1, incomplete);
+    expect(result).not.toHaveProperty("armPattern");
+    expect(() => validateTag(result, "tag")).not.toThrow();
+    const full: StickySelection = { ...STICKY, armPattern: "ring", shotsPerArm: 2, armArcDegrees: 9 };
+    const ringTag = createTag(1, full);
+    expect(ringTag).not.toHaveProperty("armArcDegrees");
+    expect(() => validateTag(ringTag, "tag")).not.toThrow();
+  });
+
+  test("the live-readout group separates a composite from a plain ring", () => {
+    const tags = [
+      tag({ timeSeconds: 1 }),
+      tag({ timeSeconds: 2 }),
+      composite({ pattern: "rotating-arm", timeSeconds: 9 }),
+    ];
+    expect(readoutInterval(tags, STICKY)).toBe(1);
+    expect(readoutInterval(tags, { ...STICKY, armPattern: "spread", shotsPerArm: 3, armArcDegrees: 20 })).toBeNull();
+  });
+
+  test("a summary row names its arm pattern", () => {
+    const base = {
+      phaseIndex: 0,
+      spriteId: "red-glaive",
+      pattern: "fixed-ring" as const,
+      scope: "all" as const,
+      sampleCount: 0,
+      meanSeconds: 0,
+      stdevSeconds: 0,
+      intervalsSeconds: [],
+    };
+    expect(formatSummaryRow(base, phaseOptions(QUEEN)).armPattern).toBe("—");
+    expect(formatSummaryRow({ ...base, armPattern: "ring" }, phaseOptions(QUEEN)).armPattern).toBe("ring");
   });
 });

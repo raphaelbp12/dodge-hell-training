@@ -4,7 +4,8 @@ import {
   encounterConfigOf,
   liveShardBoundPerEnemy,
   primaryArchetype,
-  projectileOf,
+  bombOf,
+  bulletOf,
   validateEncounterConfig,
 } from "../config/encounter";
 import { PALADIN_DERIVED_STATS, PALADIN_STATS } from "../config/stats";
@@ -17,7 +18,8 @@ import {
   setDebugSettings,
   spawnEnemy,
 } from "./simulation.ts";
-import { createShard, restampLiveShards } from "./projectiles.ts";
+import { createBomb } from "./bombs.ts";
+import { restampLiveShards } from "./projectiles.ts";
 import {
   DEBUG_RULES_VERSION,
   DEFAULT_DEBUG_SETTINGS,
@@ -48,7 +50,7 @@ const spawnRingRadiusTiles = ENCOUNTER_CONFIG.spawns.placement.ringRadiusTiles;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
 const PRIMARY_PHASE = PRIMARY.phases[0];
 const PRIMARY_ATTACK = PRIMARY_PHASE.attacks[0];
-const PRIMARY_PROJECTILE = projectileOf(
+const PRIMARY_PROJECTILE = bulletOf(
   ENCOUNTER_CONFIG,
   PRIMARY_ATTACK.projectileId,
 );
@@ -111,7 +113,6 @@ test("matched player size controls shard collision instead of the old larger pre
     hasHitPlayer: false,
     spawnPositionTiles: { x: 1.45, y: 0 },
     spawnOrientationRadians: 0,
-    detonationTargetTiles: null,
   });
   expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toEqual([]);
   expect(state.hitsTaken).toBe(0);
@@ -163,7 +164,6 @@ test("live debug settings suppress accepted hits, stop pursuit and target the ar
     hasHitPlayer: false,
     spawnPositionTiles: { x: 0, y: 0 },
     spawnOrientationRadians: 0,
-    detonationTargetTiles: null,
   });
   expect(advanceSimulation(state, stepSeconds, idle).acceptedHits).toEqual([]);
   expect(state.player.healthHp).toBe(PALADIN_STATS.healthHp);
@@ -684,7 +684,6 @@ test.each([0, 1, 2, 3, 4, 5])(
       hasHitPlayer: false,
       spawnPositionTiles: shard.spawnPositionTiles,
       spawnOrientationRadians: angle,
-      detonationTargetTiles: null,
     });
   },
 );
@@ -755,7 +754,6 @@ function makeShard(overrides: Partial<ShardState> = {}): ShardState {
     hasHitPlayer: false,
     spawnPositionTiles: { x: 0, y: 0 },
     spawnOrientationRadians: 0,
-    detonationTargetTiles: null,
     ...overrides,
   };
 }
@@ -1756,7 +1754,7 @@ test("an archetype edit applies to every live enemy", () => {
   }
 });
 
-test("a lob shard's detonation goes through the shared registerShardHit path, producing one AcceptedHit and no in-flight hit", () => {
+test("a bomb's detonation goes through the shared registerShardHit path, producing one AcceptedHit and no in-flight hit", () => {
   const LOB_PROJECTILE_ID = "test-lob-bomb";
   const state = freshSimulation();
   state.config = {
@@ -1764,9 +1762,9 @@ test("a lob shard's detonation goes through the shared registerShardHit path, pr
     projectiles: {
       ...state.config.projectiles,
       [LOB_PROJECTILE_ID]: {
+        type: "bomb",
         id: LOB_PROJECTILE_ID,
         damageHp: 200,
-        speedTilesPerSecond: 5,
         armorPiercing: false,
         conditions: [],
         verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
@@ -1774,22 +1772,25 @@ test("a lob shard's detonation goes through the shared registerShardHit path, pr
         appearance: null,
         expiration: "lifetime-only",
         hitPolicy: "once-per-shard",
-        motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
+        rangeTiles: 10,
+        travelSeconds: 2,
+        detonationRadiusTiles: 1.5,
       },
     },
   };
   state.enemies = [];
   state.shards = [];
+  state.bombs = [];
   state.player.positionTiles = { x: 10.5, y: 0 };
-  const lobProjectile = state.config.projectiles[LOB_PROJECTILE_ID];
-  state.shards.push(createShard(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
+  const lobProjectile = bombOf(state.config, LOB_PROJECTILE_ID);
+  state.bombs.push(createBomb(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
 
   // Mid-flight: the lob passes near the player's path but must not collide.
   for (let tick = 0; tick < 60; tick++) {
     const result = advanceSimulation(state, stepSeconds, idle);
     expect(result.acceptedHits).toEqual([]);
   }
-  expect(state.shards).toHaveLength(1);
+  expect(state.bombs).toHaveLength(1);
 
   // The remaining second brings the shard to its detonation at (10, 0),
   // 0.5 tiles from the player at (10.5, 0) - within the 1.5-tile radius.
@@ -1801,10 +1802,10 @@ test("a lob shard's detonation goes through the shared registerShardHit path, pr
   }
   expect(detonationHits).toHaveLength(1);
   expect(state.player.healthHp).toBeLessThan(healthBefore);
-  expect(state.shards).toEqual([]);
+  expect(state.bombs).toEqual([]);
 });
 
-test("a lob shard whose detonation misses the player applies nothing", () => {
+test("a bomb whose detonation misses the player applies nothing", () => {
   const LOB_PROJECTILE_ID = "test-lob-bomb-miss";
   const state = freshSimulation();
   state.config = {
@@ -1812,9 +1813,9 @@ test("a lob shard whose detonation misses the player applies nothing", () => {
     projectiles: {
       ...state.config.projectiles,
       [LOB_PROJECTILE_ID]: {
+        type: "bomb",
         id: LOB_PROJECTILE_ID,
         damageHp: 200,
-        speedTilesPerSecond: 5,
         armorPiercing: false,
         conditions: [],
         verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
@@ -1822,15 +1823,18 @@ test("a lob shard whose detonation misses the player applies nothing", () => {
         appearance: null,
         expiration: "lifetime-only",
         hitPolicy: "once-per-shard",
-        motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
+        rangeTiles: 10,
+        travelSeconds: 2,
+        detonationRadiusTiles: 1.5,
       },
     },
   };
   state.enemies = [];
   state.shards = [];
+  state.bombs = [];
   state.player.positionTiles = { x: 20, y: 0 };
-  const lobProjectile = state.config.projectiles[LOB_PROJECTILE_ID];
-  state.shards.push(createShard(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
+  const lobProjectile = bombOf(state.config, LOB_PROJECTILE_ID);
+  state.bombs.push(createBomb(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
 
   const healthBefore = state.player.healthHp;
   for (let tick = 0; tick < 120; tick++) {
@@ -1838,7 +1842,7 @@ test("a lob shard whose detonation misses the player applies nothing", () => {
     expect(result.acceptedHits).toEqual([]);
   }
   expect(state.player.healthHp).toBe(healthBefore);
-  expect(state.shards).toEqual([]);
+  expect(state.bombs).toEqual([]);
 });
 
 test("Crystal Worm debug reset restores the base config and rules", () => {
@@ -1866,7 +1870,7 @@ test("Queen god mode keeps the Queen config and taints the attempt until retry",
   expect(state.debugSettings.godMode).toBe(false);
 });
 
-test("a lob shard reports exactly one detonation event at its target, even when it misses", () => {
+test("a bomb reports exactly one detonation event at its target, even when it misses", () => {
   const LOB_PROJECTILE_ID = "test-lob-detonation";
   const state = freshSimulation();
   state.config = {
@@ -1874,9 +1878,9 @@ test("a lob shard reports exactly one detonation event at its target, even when 
     projectiles: {
       ...state.config.projectiles,
       [LOB_PROJECTILE_ID]: {
+        type: "bomb",
         id: LOB_PROJECTILE_ID,
         damageHp: 200,
-        speedTilesPerSecond: 5,
         armorPiercing: false,
         conditions: [],
         verticesTiles: PRIMARY_PROJECTILE.verticesTiles,
@@ -1884,15 +1888,18 @@ test("a lob shard reports exactly one detonation event at its target, even when 
         appearance: null,
         expiration: "lifetime-only",
         hitPolicy: "once-per-shard",
-        motion: { kind: "lob", travelSeconds: 2, detonationRadiusTiles: 1.5 },
+        rangeTiles: 10,
+        travelSeconds: 2,
+        detonationRadiusTiles: 1.5,
       },
     },
   };
   state.enemies = [];
   state.shards = [];
+  state.bombs = [];
   state.player.positionTiles = { x: 20, y: 0 };
-  const lobProjectile = state.config.projectiles[LOB_PROJECTILE_ID];
-  state.shards.push(createShard(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
+  const lobProjectile = bombOf(state.config, LOB_PROJECTILE_ID);
+  state.bombs.push(createBomb(lobProjectile, state.nextShardId++, { x: 0, y: 0 }, 0));
 
   const detonations = [];
   for (let tick = 0; tick < 120; tick++) {

@@ -29,7 +29,7 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 
 - Pure frontend in `app/`: React, TypeScript, Vite, Phaser, CSS Modules, npm, Vitest and Playwright. Install packages through npm and preserve the lockfile.
 - Models, configuration and simulation stay independent of React, Phaser, DOM and localStorage. Phaser owns runtime integration and drawing; React owns screens and HUD; a storage adapter owns persistence. Never update React per projectile per frame or add a second simulation clock.
-- A projectile's motion kind is authored per projectile: `linear`, `boomerang`, `turning`, `wavy` or `lob`. Reversing velocity once and expiring only by lifetime describes `boomerang` only. The per-projectile once-only hit rule applies to every kind. No stored firing origin, collision despawn or global invulnerability unless explicitly approved.
+- A bullet's motion kind is authored per projectile: `linear`, `boomerang`, `turning` or `wavy`. Reversing velocity once and expiring only by lifetime describes `boomerang` only. A bomb is a separate shot type (`"type": "bomb"`) with its own runtime list: it expires by its travel time and hits only by detonating. The per-projectile once-only hit rule applies to every kind and type. No stored firing origin, collision despawn or global invulnerability unless explicitly approved.
 
 ## Verification
 

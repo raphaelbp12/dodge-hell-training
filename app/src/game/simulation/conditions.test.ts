@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ENCOUNTER_CONFIG } from "../config/encounter";
+import { ENCOUNTER_CONFIG, bulletOf } from "../config/encounter";
 import { PALADIN_STATS } from "../config/stats";
 import { createSimulation, advanceSimulation } from "./simulation";
 import { createShard } from "./projectiles";
@@ -194,7 +194,7 @@ test("arena containment holds for every movement-condition combination", () => {
 
 test("an accepted hit applies full duration without same-step decay, then ticks once next step", () => {
   const projectileId = "crystal-worm-child-shard";
-  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const projectile = bulletOf(ENCOUNTER_CONFIG, projectileId);
   const config = {
     ...ENCOUNTER_CONFIG,
     projectiles: {
@@ -207,7 +207,7 @@ test("an accepted hit applies full duration without same-step decay, then ticks 
   } as const;
   const state = createSimulation(config, 123);
   state.shards.push(
-    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+    createShard(bulletOf(config, projectileId), 999, { x: 0, y: 0 }, 0),
   );
 
   const hit = advanceSimulation(state, stepSeconds, idle);
@@ -224,7 +224,7 @@ test("an accepted hit applies full duration without same-step decay, then ticks 
 
 test("an armor-piercing projectile ignores defense end-to-end", () => {
   const projectileId = "crystal-worm-child-shard";
-  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const projectile = bulletOf(ENCOUNTER_CONFIG, projectileId);
   const config = {
     ...ENCOUNTER_CONFIG,
     projectiles: {
@@ -234,7 +234,7 @@ test("an armor-piercing projectile ignores defense end-to-end", () => {
   } as const;
   const state = createSimulation(config, 123);
   state.shards.push(
-    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+    createShard(bulletOf(config, projectileId), 999, { x: 0, y: 0 }, 0),
   );
 
   const hit = advanceSimulation(state, stepSeconds, idle);
@@ -243,7 +243,7 @@ test("an armor-piercing projectile ignores defense end-to-end", () => {
 
 test("an active Curse multiplies a subsequent hit's damage end-to-end", () => {
   const projectileId = "crystal-worm-child-shard";
-  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const projectile = bulletOf(ENCOUNTER_CONFIG, projectileId);
   const config = {
     ...ENCOUNTER_CONFIG,
     projectiles: {
@@ -254,7 +254,7 @@ test("an active Curse multiplies a subsequent hit's damage end-to-end", () => {
   const state = createSimulation(config, 123);
   state.player.conditionSeconds.cursed = 10;
   state.shards.push(
-    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+    createShard(bulletOf(config, projectileId), 999, { x: 0, y: 0 }, 0),
   );
 
   const hit = advanceSimulation(state, stepSeconds, idle);
@@ -263,7 +263,7 @@ test("an active Curse multiplies a subsequent hit's damage end-to-end", () => {
 
 test("a 0-damage condition-only projectile still registers a hit and applies its condition", () => {
   const projectileId = "crystal-worm-child-shard";
-  const projectile = ENCOUNTER_CONFIG.projectiles[projectileId];
+  const projectile = bulletOf(ENCOUNTER_CONFIG, projectileId);
   const config = {
     ...ENCOUNTER_CONFIG,
     projectiles: {
@@ -277,7 +277,7 @@ test("a 0-damage condition-only projectile still registers a hit and applies its
   } as const;
   const state = createSimulation(config, 123);
   state.shards.push(
-    createShard(config.projectiles[projectileId], 999, { x: 0, y: 0 }, 0),
+    createShard(bulletOf(config, projectileId), 999, { x: 0, y: 0 }, 0),
   );
 
   const hit = advanceSimulation(state, stepSeconds, idle);

@@ -330,3 +330,14 @@
   color: #a7b0c0;
   font-size: 0.85rem;
 }
+
+.exportBox {
+  margin-block: 1rem;
+  padding: 0.75rem;
+  border: 1px solid currentColor;
+}
+
+.exportBox textarea {
+  width: 100%;
+  font-family: monospace;
+}

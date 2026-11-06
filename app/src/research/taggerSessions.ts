@@ -91,9 +91,29 @@ export function validateSessionDraft(value: unknown): SessionDraft {
   if (!OFFERABLE_PATTERNS.includes(sticky.pattern as never))
     reject("sticky.pattern", "must be an offerable pattern");
   if (!TAG_AIMS.includes(sticky.aim as never))
-    reject("sticky.aim", "must be player or fixed");
+    reject("sticky.aim", "must be player, fixed or front");
   const shots = positiveFinite(sticky.shots, "sticky.shots");
   if (!Number.isInteger(shots)) reject("sticky.shots", "must be an integer");
+  // Plan V15 N35: typed-geometry choices are optional and absent in older drafts.
+  if (
+    sticky.armPattern !== undefined &&
+    !["spread", "scatter", "ring"].includes(sticky.armPattern as string)
+  )
+    reject("sticky.armPattern", "must be spread, scatter or ring");
+  if (sticky.shotsPerArm !== undefined) {
+    const perArm = positiveFinite(sticky.shotsPerArm, "sticky.shotsPerArm");
+    if (!Number.isInteger(perArm)) reject("sticky.shotsPerArm", "must be an integer");
+  }
+  if (sticky.armArcDegrees !== undefined) {
+    const arc = sticky.armArcDegrees;
+    if (typeof arc !== "number" || !Number.isFinite(arc) || arc < 0)
+      reject("sticky.armArcDegrees", "must be a nonnegative finite number");
+  }
+  for (const field of ["clockwiseDegreesPerSecond", "initialPhaseDegrees"] as const) {
+    const typed = sticky[field];
+    if (typed !== undefined && (typeof typed !== "number" || !Number.isFinite(typed)))
+      reject(`sticky.${field}`, "must be a finite number");
+  }
   return value as SessionDraft;
 }
 

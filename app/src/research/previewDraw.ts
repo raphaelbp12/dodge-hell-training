@@ -16,11 +16,15 @@ export const PREVIEW_COLORS = {
   player: "#6ee7a8",
   highlight: "#ffffff",
   detonation: "#ff7a59",
+  heading: "#7cc4ff",
 } as const;
 
 const EMITTER_RADIUS_CSS_PIXELS = 4;
 const PLAYER_RADIUS_CSS_PIXELS = 5;
 const HIGHLIGHT_PADDING_CSS_PIXELS = 4;
+/** A presentation length for the heading arrow, not a gameplay value. */
+const HEADING_ARROW_LENGTH_TILES = 1.2;
+const HEADING_ARROWHEAD_CSS_PIXELS = 6;
 
 const spriteCache = new WeakMap<ProjectileAppearanceSpec, HTMLCanvasElement>();
 
@@ -109,6 +113,34 @@ function drawArena(
   context.stroke();
 }
 
+/** N20: a short arrow from the emitter along the enemy heading the slider sets. */
+function drawHeadingArrow(
+  context: CanvasRenderingContext2D,
+  emitter: { x: number; y: number },
+  headingRadians: number,
+  scale: number,
+): void {
+  const length = HEADING_ARROW_LENGTH_TILES * scale;
+  const tip = {
+    x: emitter.x + Math.cos(headingRadians) * length,
+    y: emitter.y + Math.sin(headingRadians) * length,
+  };
+  context.strokeStyle = PREVIEW_COLORS.heading;
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(emitter.x, emitter.y);
+  context.lineTo(tip.x, tip.y);
+  for (const side of [-1, 1]) {
+    const wing = headingRadians + Math.PI + side * (Math.PI / 6);
+    context.moveTo(tip.x, tip.y);
+    context.lineTo(
+      tip.x + Math.cos(wing) * HEADING_ARROWHEAD_CSS_PIXELS,
+      tip.y + Math.sin(wing) * HEADING_ARROWHEAD_CSS_PIXELS,
+    );
+  }
+  context.stroke();
+}
+
 /** Draws one preview frame through a view onto a square canvas (M10-M13, M28, M32). */
 export function drawPreviewFrame(
   context: CanvasRenderingContext2D,
@@ -124,6 +156,7 @@ export function drawPreviewFrame(
     tileToCanvas(tile, view, frame.arena, canvasPixels);
   const emitter = toCanvas(frame.emitterTiles);
   dot(context, emitter.x, emitter.y, EMITTER_RADIUS_CSS_PIXELS, PREVIEW_COLORS.emitter);
+  drawHeadingArrow(context, emitter, frame.headingRadians, scale);
   const player = toCanvas(frame.playerTiles);
   dot(context, player.x, player.y, PLAYER_RADIUS_CSS_PIXELS, PREVIEW_COLORS.player);
   context.imageSmoothingEnabled = false;

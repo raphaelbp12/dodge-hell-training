@@ -521,11 +521,6 @@ export type AuthoredProjectileMotion =
       rangeTiles: number;
       amplitudeTiles: number;
       frequencyHz: number;
-    }>
-  | Readonly<{
-      kind: "lob";
-      travelSeconds: number;
-      detonationRadiusTiles: number;
     }>;
 
 /**
@@ -588,19 +583,39 @@ export function validateConditions(
   );
 }
 
-export type AuthoredProjectile = Readonly<{
+type AuthoredProjectileCommon = Readonly<{
   id: string;
   source: string;
   damageHp: number;
-  speedTilesPerSecond: number;
   armorPiercing: boolean;
   conditions: readonly ConditionApplication[];
   body?: AuthoredBody;
   appearance?: string;
   expiration: string;
   hitPolicy: string;
-  motion: AuthoredProjectileMotion;
 }>;
+
+/** An entry without `type` in `projectiles.json`; validation names it `bullet`. */
+export type AuthoredBullet = AuthoredProjectileCommon &
+  Readonly<{
+    type: "bullet";
+    speedTilesPerSecond: number;
+    motion: AuthoredProjectileMotion;
+  }>;
+
+/**
+ * N21: a bomb is defined by where and when it explodes. It has no speed (N25)
+ * and no motion kind; its velocity is derived from range and travel time.
+ */
+export type AuthoredBomb = AuthoredProjectileCommon &
+  Readonly<{
+    type: "bomb";
+    rangeTiles: number;
+    travelSeconds: number;
+    detonationRadiusTiles: number;
+  }>;
+
+export type AuthoredProjectile = AuthoredBullet | AuthoredBomb;
 
 const rangeDerivedKinds = ["linear", "turning", "wavy"] as const;
 
@@ -657,24 +672,9 @@ function validateProjectileMotion(
     const frequencyHz = positiveNumber(motion.frequencyHz, `${path}.frequencyHz`);
     return Object.freeze({ kind: "wavy", rangeTiles, amplitudeTiles, frequencyHz });
   }
-  if (motion.kind === "lob") {
-    rejectIfAuthored(motion, path, "reversalAgeSeconds", "lob");
-    rejectIfAuthored(motion, path, "lifetimeSeconds", "lob");
-    if ("rangeTiles" in motion)
-      reject(`${path}.rangeTiles`, "must not be authored on a lob projectile");
-    const travelSeconds = positiveNumber(
-      motion.travelSeconds,
-      `${path}.travelSeconds`,
-    );
-    const detonationRadiusTiles = positiveNumber(
-      motion.detonationRadiusTiles,
-      `${path}.detonationRadiusTiles`,
-    );
-    return Object.freeze({ kind: "lob", travelSeconds, detonationRadiusTiles });
-  }
   reject(
     `${path}.kind`,
-    'must be "boomerang", "linear", "turning", "wavy" or "lob"',
+    'must be "boomerang", "linear", "turning" or "wavy"',
   );
 }
 
@@ -696,6 +696,47 @@ export function validateProjectile(
     : undefined;
   if (appearance !== undefined && !appearanceIds.has(appearance))
     reject(`${path}.appearance`, "must name a defined appearance");
+  const common = {
+    id,
+    source: text(projectile.source, `${path}.source`),
+    damageHp: nonnegativeNumber(projectile.damageHp, `${path}.damageHp`),
+    armorPiercing: boolean(
+      projectile.armorPiercing,
+      `${path}.armorPiercing`,
+    ),
+    conditions: validateConditions(projectile.conditions, `${path}.conditions`),
+    ...(hasBody ? { body: validateBody(projectile.body, `${path}.body`) } : {}),
+    ...(appearance !== undefined ? { appearance } : {}),
+    expiration: text(projectile.expiration, `${path}.expiration`),
+    hitPolicy: text(projectile.hitPolicy, `${path}.hitPolicy`),
+  };
+  if (projectile.type === "bomb") {
+    for (const field of ["speedTilesPerSecond", "motion"] as const)
+      if (field in projectile)
+        reject(`${path}.${field}`, "must not be authored on a bomb");
+    return Object.freeze({
+      ...common,
+      type: "bomb",
+      rangeTiles: positiveNumber(projectile.rangeTiles, `${path}.rangeTiles`),
+      travelSeconds: positiveNumber(
+        projectile.travelSeconds,
+        `${path}.travelSeconds`,
+      ),
+      detonationRadiusTiles: positiveNumber(
+        projectile.detonationRadiusTiles,
+        `${path}.detonationRadiusTiles`,
+      ),
+    });
+  }
+  if (projectile.type !== undefined)
+    reject(`${path}.type`, 'must be "bomb" or absent');
+  for (const field of [
+    "rangeTiles",
+    "travelSeconds",
+    "detonationRadiusTiles",
+  ] as const)
+    if (field in projectile)
+      reject(`${path}.${field}`, "must only be authored on a bomb");
   const motion = validateProjectileMotion(projectile.motion, `${path}.motion`);
   const speedTilesPerSecond = positiveNumber(
     projectile.speedTilesPerSecond,
@@ -725,22 +766,7 @@ export function validateProjectile(
         `would deviate ${deviationTiles} tiles from its chord per step, over the ${MAXIMUM_PATH_DEVIATION_TILES}-tile bound`,
       );
   }
-  return Object.freeze({
-    id,
-    source: text(projectile.source, `${path}.source`),
-    damageHp: nonnegativeNumber(projectile.damageHp, `${path}.damageHp`),
-    speedTilesPerSecond,
-    armorPiercing: boolean(
-      projectile.armorPiercing,
-      `${path}.armorPiercing`,
-    ),
-    conditions: validateConditions(projectile.conditions, `${path}.conditions`),
-    ...(hasBody ? { body: validateBody(projectile.body, `${path}.body`) } : {}),
-    ...(appearance !== undefined ? { appearance } : {}),
-    expiration: text(projectile.expiration, `${path}.expiration`),
-    hitPolicy: text(projectile.hitPolicy, `${path}.hitPolicy`),
-    motion,
-  });
+  return Object.freeze({ ...common, type: "bullet", speedTilesPerSecond, motion });
 }
 
 export function validateProjectiles(
@@ -763,6 +789,22 @@ export function validateProjectiles(
   );
 }
 
+/**
+ * N03/N04/N06/N11: what one arm of a ring fires. Absent on a ring means
+ * `single`. An inner pattern has no aim and no emitter radius: it centres on
+ * its arm's bearing and spawns from the outermost ring's radius (N06, N07).
+ */
+export type ArmPattern =
+  | Readonly<{ kind: "single" }>
+  | Readonly<{ kind: "spread"; shots: number; arcDegrees: number }>
+  | Readonly<{ kind: "scatter"; shots: number; coneDegrees: number }>
+  | Readonly<{
+      kind: "ring";
+      arms: number;
+      phaseOffsetDegrees?: number;
+      armPattern?: ArmPattern;
+    }>;
+
 export type AuthoredRingPattern = Readonly<{
   kind: "ring";
   arms: number;
@@ -773,6 +815,7 @@ export type AuthoredRingPattern = Readonly<{
   gapSectorsDegrees?: readonly (readonly [number, number])[];
   armSpreadDegreesPerSecond?: number;
   maxArmSpreadDegrees?: number;
+  armPattern?: ArmPattern;
 }>;
 
 export type AuthoredSpreadPattern =
@@ -781,6 +824,14 @@ export type AuthoredSpreadPattern =
       shots: number;
       arcDegrees: number;
       aim: "player";
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "spread";
+      shots: number;
+      arcDegrees: number;
+      aim: "front";
+      offsetDegrees: number;
       emitterRadiusTiles: number;
     }>
   | Readonly<{
@@ -798,6 +849,14 @@ export type AuthoredScatterPattern =
       shots: number;
       coneDegrees: number;
       aim: "player";
+      emitterRadiusTiles: number;
+    }>
+  | Readonly<{
+      kind: "scatter";
+      shots: number;
+      coneDegrees: number;
+      aim: "front";
+      offsetDegrees: number;
       emitterRadiusTiles: number;
     }>
   | Readonly<{
@@ -834,15 +893,28 @@ export type AuthoredAttack = Readonly<{
   tuningSource: (typeof validTuningSources)[number];
   pattern: AuthoredAttackPattern;
   cadence: AuthoredAttackCadence;
+  /** N28/N29: a bomb thrown at the player's fire-time position. */
+  target?: "player";
 }>;
 
-/** Validates the shared `aim`/`fixedBearingDegrees` pair for `spread`/`scatter`. */
+/**
+ * Validates the shared aim fields for `spread`/`scatter`. `front` (N16) aims
+ * relative to the enemy's movement heading: 0 is ahead, 180 behind.
+ */
 function validateAim(
   pattern: Record<string, unknown>,
   path: string,
 ):
   | Readonly<{ aim: "player" }>
-  | Readonly<{ aim: "fixed"; fixedBearingDegrees: number }> {
+  | Readonly<{ aim: "fixed"; fixedBearingDegrees: number }>
+  | Readonly<{ aim: "front"; offsetDegrees: number }> {
+  if (pattern.aim !== "fixed" && "fixedBearingDegrees" in pattern)
+    reject(
+      `${path}.fixedBearingDegrees`,
+      "must only be authored when aim is fixed",
+    );
+  if (pattern.aim !== "front" && "offsetDegrees" in pattern)
+    reject(`${path}.offsetDegrees`, "must only be authored when aim is front");
   if (pattern.aim === "fixed") {
     return {
       aim: "fixed",
@@ -852,15 +924,14 @@ function validateAim(
       ),
     };
   }
-  if (pattern.aim === "player") {
-    if ("fixedBearingDegrees" in pattern)
-      reject(
-        `${path}.fixedBearingDegrees`,
-        "must not be authored when aim is player",
-      );
-    return { aim: "player" };
+  if (pattern.aim === "front") {
+    return {
+      aim: "front",
+      offsetDegrees: finiteNumber(pattern.offsetDegrees, `${path}.offsetDegrees`),
+    };
   }
-  reject(`${path}.aim`, 'must be "player" or "fixed"');
+  if (pattern.aim === "player") return { aim: "player" };
+  reject(`${path}.aim`, 'must be "player", "fixed" or "front"');
 }
 
 /** Validates and copies the optional ring extensions, omitting absent ones. */
@@ -946,12 +1017,119 @@ function validateRingOptions(
   return options;
 }
 
+function validateSpreadArc(
+  pattern: Record<string, unknown>,
+  path: string,
+): { shots: number; arcDegrees: number } {
+  const shots = safeCount(pattern.shots, `${path}.shots`);
+  const arcDegrees = nonnegativeNumber(pattern.arcDegrees, `${path}.arcDegrees`);
+  if (arcDegrees >= 360)
+    reject(
+      `${path}.arcDegrees`,
+      "must be below 360 degrees; a full circle is a ring, not a spread",
+    );
+  return { shots, arcDegrees };
+}
+
+function validateScatterCone(
+  pattern: Record<string, unknown>,
+  path: string,
+): { shots: number; coneDegrees: number } {
+  const shots = safeCount(pattern.shots, `${path}.shots`);
+  const coneDegrees = positiveNumber(pattern.coneDegrees, `${path}.coneDegrees`);
+  if (coneDegrees > 360)
+    reject(`${path}.coneDegrees`, "must be at most 360 degrees");
+  return { shots, coneDegrees };
+}
+
+function rejectAuthoredFields(
+  pattern: Record<string, unknown>,
+  path: string,
+  fields: readonly string[],
+  reason: string,
+): void {
+  for (const field of fields)
+    if (field in pattern) reject(`${path}.${field}`, reason);
+}
+
+/**
+ * Validates what one arm of a ring fires, recursively (N03). Plan V15 N10
+ * records that no nesting depth or volley size is enforced here: the existing
+ * `safeCount` rule on each count is the only limit, and a typo can therefore
+ * author a huge volley. That risk was accepted by the user and is not an
+ * oversight.
+ */
+function validateArmPattern(value: unknown, path: string): ArmPattern {
+  const arm = record(value, path);
+  if (arm.kind === "single") {
+    for (const key of Object.keys(arm))
+      if (key !== "kind") reject(`${path}.${key}`, "must not be authored on a single");
+    return Object.freeze({ kind: "single" });
+  }
+  if (arm.kind === "spread") {
+    rejectAuthoredFields(
+      arm,
+      path,
+      ["aim", "fixedBearingDegrees", "emitterRadiusTiles", "armPattern"],
+      "must not be authored on an inner spread",
+    );
+    return Object.freeze({ kind: "spread", ...validateSpreadArc(arm, path) });
+  }
+  if (arm.kind === "scatter") {
+    rejectAuthoredFields(
+      arm,
+      path,
+      ["aim", "fixedBearingDegrees", "emitterRadiusTiles", "armPattern"],
+      "must not be authored on an inner scatter",
+    );
+    return Object.freeze({ kind: "scatter", ...validateScatterCone(arm, path) });
+  }
+  if (arm.kind === "ring") {
+    rejectAuthoredFields(
+      arm,
+      path,
+      [
+        "emitterRadiusTiles",
+        "clockwiseDegreesPerSecond",
+        "initialPhaseDegrees",
+        "perBurstAdvanceDegrees",
+        "gapSectorsDegrees",
+        "armSpreadDegreesPerSecond",
+        "maxArmSpreadDegrees",
+      ],
+      "must not be authored on an inner ring (only the outermost ring rotates)",
+    );
+    return Object.freeze({
+      kind: "ring",
+      arms: safeCount(arm.arms, `${path}.arms`),
+      ...("phaseOffsetDegrees" in arm
+        ? {
+            phaseOffsetDegrees: finiteNumber(
+              arm.phaseOffsetDegrees,
+              `${path}.phaseOffsetDegrees`,
+            ),
+          }
+        : {}),
+      ...("armPattern" in arm
+        ? { armPattern: validateArmPattern(arm.armPattern, `${path}.armPattern`) }
+        : {}),
+    });
+  }
+  reject(`${path}.kind`, 'must be "single", "spread", "scatter" or "ring"');
+}
+
 function validateAttackPattern(
   value: unknown,
   path: string,
 ): AuthoredAttackPattern {
   const pattern = record(value, path);
   if (pattern.kind === "ring") {
+    rejectAuthoredFields(
+      pattern,
+      path,
+      ["aim", "offsetDegrees", "fixedBearingDegrees"],
+      "is not valid on a ring: rings keep an absolute phase (N14)",
+    );
     const arms = safeCount(pattern.arms, `${path}.arms`);
     return Object.freeze({
       kind: "ring",
@@ -969,47 +1147,48 @@ function validateAttackPattern(
         `${path}.clockwiseDegreesPerSecond`,
       ),
       ...validateRingOptions(pattern, arms, path),
+      ...("armPattern" in pattern
+        ? {
+            armPattern: validateArmPattern(
+              pattern.armPattern,
+              `${path}.armPattern`,
+            ),
+          }
+        : {}),
     });
   }
   if (pattern.kind === "spread") {
-    const shots = safeCount(pattern.shots, `${path}.shots`);
-    const arcDegrees = nonnegativeNumber(
-      pattern.arcDegrees,
-      `${path}.arcDegrees`,
+    rejectAuthoredFields(
+      pattern,
+      path,
+      ["armPattern"],
+      "is only valid on a ring (N04)",
     );
-    if (arcDegrees >= 360)
-      reject(
-        `${path}.arcDegrees`,
-        "must be below 360 degrees; a full circle is a ring, not a spread",
-      );
     const emitterRadiusTiles = nonnegativeNumber(
       pattern.emitterRadiusTiles,
       `${path}.emitterRadiusTiles`,
     );
     return Object.freeze({
       kind: "spread",
-      shots,
-      arcDegrees,
+      ...validateSpreadArc(pattern, path),
       emitterRadiusTiles,
       ...validateAim(pattern, path),
     });
   }
   if (pattern.kind === "scatter") {
-    const shots = safeCount(pattern.shots, `${path}.shots`);
-    const coneDegrees = positiveNumber(
-      pattern.coneDegrees,
-      `${path}.coneDegrees`,
+    rejectAuthoredFields(
+      pattern,
+      path,
+      ["armPattern"],
+      "is only valid on a ring (N04)",
     );
-    if (coneDegrees > 360)
-      reject(`${path}.coneDegrees`, "must be at most 360 degrees");
     const emitterRadiusTiles = nonnegativeNumber(
       pattern.emitterRadiusTiles,
       `${path}.emitterRadiusTiles`,
     );
     return Object.freeze({
       kind: "scatter",
-      shots,
-      coneDegrees,
+      ...validateScatterCone(pattern, path),
       emitterRadiusTiles,
       ...validateAim(pattern, path),
     });
@@ -1066,7 +1245,15 @@ export function validateAttack(
     tuningSource: attack.tuningSource as (typeof validTuningSources)[number],
     pattern: validateAttackPattern(attack.pattern, `${path}.pattern`),
     cadence: validateAttackCadence(attack.cadence, `${path}.cadence`),
+    ...(attack.target === undefined
+      ? {}
+      : { target: validateAttackTarget(attack.target, `${path}.target`) }),
   });
+}
+
+function validateAttackTarget(value: unknown, path: string): "player" {
+  if (value !== "player") reject(path, 'must be "player"');
+  return "player";
 }
 
 export type AuthoredMovement =
@@ -1510,6 +1697,11 @@ export type AuthoredArchetype = Readonly<{
   /** Trainer-authored (K17): the source gives no contact rate. Unused while contactDamageHp is 0. */
   contactCooldownSeconds: number;
   blocksPlayer: boolean;
+  /**
+   * N17: the enemy's starting movement heading. Required only if one of its
+   * attacks, in any phase or sub-phase, aims `front` (phase 52).
+   */
+  initialHeadingDegrees?: number;
   phases: readonly AuthoredPhase[];
 }>;
 
@@ -1545,6 +1737,14 @@ function validateArchetype(
       `${path}.contactCooldownSeconds`,
     ),
     blocksPlayer: boolean(archetype.blocksPlayer, `${path}.blocksPlayer`),
+    ...(archetype.initialHeadingDegrees === undefined
+      ? {}
+      : {
+          initialHeadingDegrees: finiteNumber(
+            archetype.initialHeadingDegrees,
+            `${path}.initialHeadingDegrees`,
+          ),
+        }),
     phases: validatePhases(
       archetype.phases,
       `${path}.phases`,

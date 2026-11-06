@@ -1,0 +1,44 @@
+[
+ {
+  "second": 1,
+  "digest": "5bd8e513",
+  "hits": 1,
+  "detonations": 0,
+  "live": 0
+ },
+ {
+  "second": 2,
+  "digest": "8b771d13",
+  "hits": 2,
+  "detonations": 0,
+  "live": 8
+ },
+ {
+  "second": 3,
+  "digest": "1ad0a667",
+  "hits": 3,
+  "detonations": 9,
+  "live": 9
+ },
+ {
+  "second": 4,
+  "digest": "d336e476",
+  "hits": 7,
+  "detonations": 9,
+  "live": 0
+ },
+ {
+  "second": 5,
+  "digest": "b02a4e82",
+  "hits": 8,
+  "detonations": 10,
+  "live": 17
+ },
+ {
+  "second": 6,
+  "digest": "ed850b3",
+  "hits": 10,
+  "detonations": 18,
+  "live": 9
+ }
+]

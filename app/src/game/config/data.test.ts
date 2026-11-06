@@ -399,27 +399,46 @@ test.each([
   ).toThrow(RangeError);
 });
 
-const VALID_LOB_PROJECTILE = {
-  ...VALID_PROJECTILE,
-  motion: { kind: "lob", travelSeconds: 1.2, detonationRadiusTiles: 2 },
+const { speedTilesPerSecond: _speed, motion: _motion, ...VALID_BOMB_BASE } =
+  VALID_PROJECTILE;
+const VALID_BOMB = {
+  ...VALID_BOMB_BASE,
+  type: "bomb",
+  rangeTiles: 1.8,
+  travelSeconds: 0.6,
+  detonationRadiusTiles: 2,
 };
 
-test("validateProjectile accepts a valid lob entry", () => {
-  expect(() =>
-    validateProjectile(VALID_LOB_PROJECTILE, "lob-shard", TEST_STEP_SECONDS),
-  ).not.toThrow();
+test("validateProjectile accepts a valid bomb entry", () => {
+  expect(
+    validateProjectile(VALID_BOMB, "bomb", TEST_STEP_SECONDS),
+  ).toMatchObject({
+    type: "bomb",
+    rangeTiles: 1.8,
+    travelSeconds: 0.6,
+    detonationRadiusTiles: 2,
+  });
+});
+
+test("an entry without type validates as a bullet", () => {
+  expect(
+    validateProjectile(VALID_PROJECTILE, "shard", TEST_STEP_SECONDS),
+  ).toMatchObject({ type: "bullet" });
 });
 
 test.each([
-  ["nonpositive travelSeconds", { ...VALID_LOB_PROJECTILE, motion: { ...VALID_LOB_PROJECTILE.motion, travelSeconds: 0 } }],
-  ["missing travelSeconds", { ...VALID_LOB_PROJECTILE, motion: { kind: "lob", detonationRadiusTiles: 2 } }],
-  ["nonpositive detonationRadiusTiles", { ...VALID_LOB_PROJECTILE, motion: { ...VALID_LOB_PROJECTILE.motion, detonationRadiusTiles: 0 } }],
-  ["authored lifetimeSeconds on lob", { ...VALID_LOB_PROJECTILE, motion: { ...VALID_LOB_PROJECTILE.motion, lifetimeSeconds: 3 } }],
-  ["authored reversalAgeSeconds on lob", { ...VALID_LOB_PROJECTILE, motion: { ...VALID_LOB_PROJECTILE.motion, reversalAgeSeconds: 1.5 } }],
-  ["authored rangeTiles on lob", { ...VALID_LOB_PROJECTILE, motion: { ...VALID_LOB_PROJECTILE.motion, rangeTiles: 9.5 } }],
+  ["a speedTilesPerSecond", { ...VALID_BOMB, speedTilesPerSecond: 3 }],
+  ["a motion", { ...VALID_BOMB, motion: VALID_PROJECTILE.motion }],
+  ["an unknown type", { ...VALID_BOMB, type: "mine" }],
+  ["a nonpositive rangeTiles", { ...VALID_BOMB, rangeTiles: 0 }],
+  ["a nonpositive travelSeconds", { ...VALID_BOMB, travelSeconds: 0 }],
+  ["a nonpositive detonationRadiusTiles", { ...VALID_BOMB, detonationRadiusTiles: 0 }],
+  ["a missing rangeTiles", { ...VALID_BOMB, rangeTiles: undefined }],
+  ["a lob motion on a bullet", { ...VALID_PROJECTILE, motion: { kind: "lob", travelSeconds: 1.2, detonationRadiusTiles: 2 } }],
+  ["a bomb field on a bullet", { ...VALID_PROJECTILE, detonationRadiusTiles: 2 }],
 ] as const)("validateProjectile rejects %s", (_name, bad) => {
   expect(() =>
-    validateProjectile(bad, "lob-shard", TEST_STEP_SECONDS),
+    validateProjectile(bad, "bomb", TEST_STEP_SECONDS),
   ).toThrow(RangeError);
 });
 

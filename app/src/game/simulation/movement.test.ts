@@ -317,3 +317,97 @@ test("the chaseArenaCenter debug toggle still swaps to move-to-point at the arch
     6,
   );
 });
+
+// --- Plan V15 N17: an enemy's heading is its movement heading. ---
+
+const withInitialHeading = (movement: MovementSpec, initialHeadingDegrees?: number) => {
+  const archetype: EnemyArchetype = {
+    ...PRIMARY,
+    ...(initialHeadingDegrees === undefined ? {} : { initialHeadingDegrees }),
+    phases: [{ ...PRIMARY_PHASE, movement }],
+  };
+  return { ...ENCOUNTER_CONFIG, archetypes: { [PRIMARY.id]: archetype } };
+};
+
+test("heading starts at initialHeadingDegrees, or 0 when absent", () => {
+  const stationary: MovementSpec = { kind: "stationary" };
+  expect(
+    createSimulation(withInitialHeading(stationary), TEST_SEED).enemies[0].headingRadians,
+  ).toBe(0);
+  expect(
+    createSimulation(withInitialHeading(stationary, 90), TEST_SEED).enemies[0]
+      .headingRadians,
+  ).toBeCloseTo(Math.PI / 2, 12);
+});
+
+test("a stationary enemy holds its heading", () => {
+  const state = createSimulation(withInitialHeading({ kind: "stationary" }, 40), TEST_SEED);
+  const initial = state.enemies[0].headingRadians;
+  runTicks(state, 30);
+  expect(state.enemies[0].headingRadians).toBe(initial);
+});
+
+test.each([
+  ["chase", { kind: "chase", speedTilesPerSecond: 1.5 }],
+  ["move-to-point", { kind: "move-to-point", target: "arena-center", speedTilesPerSecond: 2 }],
+  ["wander", { kind: "wander", speedTilesPerSecond: 5, retargetSeconds: 0.5, radiusTiles: 5 }],
+] as const)("%s points the heading along its travel", (_name, movement) => {
+  const state = createSimulation(withInitialHeading(movement), TEST_SEED);
+  let moved = 0;
+  for (let tick = 0; tick < 120; tick++) {
+    const before = { ...state.enemies[0].positionTiles };
+    advanceSimulation(state, stepSeconds, idle);
+    const after = state.enemies[0].positionTiles;
+    const dx = after.x - before.x;
+    const dy = after.y - before.y;
+    if (Math.hypot(dx, dy) > 1e-9) {
+      moved++;
+      expect(state.enemies[0].headingRadians).toBeCloseTo(Math.atan2(dy, dx), 12);
+    }
+  }
+  expect(moved).toBeGreaterThan(0);
+});
+
+test("an orbit points the heading along its tangent", () => {
+  const state = createSimulation(
+    withInitialHeading({
+      kind: "orbit",
+      radiusTiles: 10,
+      degreesPerSecond: 30,
+      direction: "cw",
+      approachSpeedTilesPerSecond: 20,
+    }),
+    TEST_SEED,
+  );
+  runTicks(state, 90);
+  const centre = ARENA_SHAPE.centerTiles;
+  const { positionTiles, headingRadians } = state.enemies[0];
+  const radial = Math.atan2(positionTiles.y - centre.y, positionTiles.x - centre.x);
+  // Clockwise on screen (y down) is the +angle direction; the tangent is radial + 90 degrees.
+  expect(Math.cos(headingRadians - radial - Math.PI / 2)).toBeGreaterThan(0.999);
+});
+
+test("an enemy that stops holds its last heading", () => {
+  const state = createSimulation(
+    withInitialHeading({ kind: "move-to-point", target: "arena-center", speedTilesPerSecond: 40 }),
+    TEST_SEED,
+  );
+  runTicks(state, 120);
+  const centre = ARENA_SHAPE.centerTiles;
+  expect(state.enemies[0].positionTiles).toEqual(centre);
+  const held = state.enemies[0].headingRadians;
+  runTicks(state, 30);
+  expect(state.enemies[0].headingRadians).toBe(held);
+});
+
+test("the heading is identical at 30, 60 and 120 Hz", () => {
+  const config = withInitialHeading({ kind: "chase", speedTilesPerSecond: 1.5 }, 10);
+  const headings = [30, 60, 120].map((hz) => {
+    const state = createSimulation(config, TEST_SEED);
+    for (let update = 0; update < hz; update++)
+      advanceSimulation(state, 1 / hz, idle);
+    return state.enemies[0].headingRadians;
+  });
+  expect(headings[1]).toBeCloseTo(headings[0], 12);
+  expect(headings[2]).toBeCloseTo(headings[0], 12);
+});

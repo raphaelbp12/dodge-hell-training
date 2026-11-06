@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import {
   archetypeOf,
   ENCOUNTER_CONFIG,
+  bombOf,
   projectileOf,
   type EncounterConfig,
   type ProjectileAppearanceSpec,
@@ -817,7 +818,7 @@ class EncounterScene extends Phaser.Scene {
   }
 
   private drawEntities(): void {
-    const { player, enemies, shards } = this.state;
+    const { player, enemies, shards, bombs } = this.state;
     this.bodies.clear();
     const draw = (
       graphics: Phaser.GameObjects.Graphics,
@@ -859,7 +860,6 @@ class EncounterScene extends Phaser.Scene {
     this.projectiles.clear();
     this.shardImageUse.clear();
     this.fallbackShardDraws = 0;
-    const telegraphSeconds = this.state.config.presentation.lobTelegraphSeconds;
     for (const shard of shards) {
       const projectile = projectileOf(this.state.config, shard.projectileId);
       const appearance = projectile.appearance;
@@ -884,20 +884,34 @@ class EncounterScene extends Phaser.Scene {
           shard.orientationRadians,
         );
       }
-      if (
-        projectile.motion.kind === "lob" &&
-        shard.detonationTargetTiles &&
-        shard.ageSeconds >= shard.lifetimeSeconds - telegraphSeconds
-      ) {
+    }
+    // Bombs draw in their own pass (N22): the body in flight, then the red
+    // telegraph circle at the destination once the lead-in window opens.
+    const telegraphSeconds = this.state.config.presentation.lobTelegraphSeconds;
+    for (const bomb of bombs) {
+      const projectile = bombOf(this.state.config, bomb.projectileId);
+      const appearance = projectile.appearance;
+      draw(
+        this.projectiles,
+        projectile.verticesTiles,
+        bomb.positionTiles,
+        appearance?.bomb
+          ? hexColourToNumber(appearance.bomb.bodyColor)
+          : bomb.hasHitPlayer
+            ? presentation.spentShard
+            : presentation.shard,
+        bomb.orientationRadians,
+      );
+      if (bomb.ageSeconds >= bomb.lifetimeSeconds - telegraphSeconds) {
         this.projectiles
           .lineStyle(
             presentation.lobTelegraph.lineWidthCssPixels,
             presentation.lobTelegraph.color,
           )
           .strokeCircle(
-            shard.detonationTargetTiles.x * pixelsPerTile,
-            shard.detonationTargetTiles.y * pixelsPerTile,
-            projectile.motion.detonationRadiusTiles * pixelsPerTile,
+            bomb.detonationTargetTiles.x * pixelsPerTile,
+            bomb.detonationTargetTiles.y * pixelsPerTile,
+            projectile.detonationRadiusTiles * pixelsPerTile,
           );
       }
     }

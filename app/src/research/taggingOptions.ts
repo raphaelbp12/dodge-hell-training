@@ -11,12 +11,14 @@ import {
   type ProjectileAppearanceSpec,
 } from "../game/config/encounter";
 import {
+  armArcProblem,
   groupKey,
   validateObservationExport,
   type IntervalSummary,
   type ObservationExport,
   type Tag,
   type TagAim,
+  type TagArmPattern,
   type TagPattern,
   type VideoProvenance,
 } from "./tagging";
@@ -93,13 +95,40 @@ export const OFFERABLE_PATTERNS: readonly TagPattern[] = [
   "scatter",
 ];
 
-export const TAG_AIMS: readonly TagAim[] = ["player", "fixed"];
+const TAG_ARM_PATTERNS: readonly TagArmPattern[] = ["spread", "scatter", "ring"];
+
+export const TAG_AIMS: readonly TagAim[] = ["player", "fixed", "front"];
 
 export const DEFAULT_AIM: TagAim = "player";
 
 /** Z05: only spread and scatter record where they aim. */
 export function patternTakesAim(pattern: TagPattern): boolean {
   return pattern === "spread" || pattern === "scatter";
+}
+
+/** N31: only the two ring patterns host arms. */
+export function armPatternAllowed(pattern: TagPattern): boolean {
+  return pattern === "rotating-arm" || pattern === "fixed-ring";
+}
+
+/** N35: a typed rotation rate and phase only describe a rotating arm. */
+export function rotationAllowed(pattern: TagPattern): boolean {
+  return pattern === "rotating-arm";
+}
+
+/**
+ * Starting values the controls offer when a person first chooses an arm
+ * pattern. They are input conveniences for a typed estimate, not measurements
+ * and not gameplay values.
+ */
+export const DEFAULT_SHOTS_PER_ARM = 2;
+export const DEFAULT_ARM_ARC_DEGREES = 30;
+
+/** An arm pattern's cone/arc is typed for spread and scatter only (N34). */
+export function armPatternTakesArc(
+  armPattern: TagArmPattern,
+): armPattern is "spread" | "scatter" {
+  return armPattern !== "ring";
 }
 
 /** Rings count arms, every other pattern counts shots. */
@@ -116,7 +145,47 @@ export type StickySelection = Readonly<{
   /** Kept even when the pattern ignores it, so the choice survives a switch. */
   aim: TagAim;
   shots: number;
+  /**
+   * N35: typed-geometry choices, each optional and kept even when the pattern
+   * ignores it, so the choice survives a switch. Applied to a new tag only
+   * where the sticky pattern allows it.
+   */
+  armPattern?: TagArmPattern;
+  shotsPerArm?: number;
+  armArcDegrees?: number;
+  clockwiseDegreesPerSecond?: number;
+  initialPhaseDegrees?: number;
 }>;
+
+/**
+ * The composite and typed-geometry fields a new tag takes from the sticky
+ * selection. A composite needs its shots per arm, and a spread or scatter arm
+ * its cone; a selection missing one records a plain ring instead, so no tag is
+ * ever produced that `validateTag` rejects.
+ */
+function stickyGeometry(sticky: StickySelection): Partial<Tag> {
+  const geometry: {
+    -readonly [Field in keyof Tag]?: Tag[Field];
+  } = {};
+  const { armPattern, shotsPerArm, armArcDegrees } = sticky;
+  if (
+    armPatternAllowed(sticky.pattern) &&
+    armPattern !== undefined &&
+    shotsPerArm !== undefined &&
+    (!armPatternTakesArc(armPattern) || armArcDegrees !== undefined)
+  ) {
+    geometry.armPattern = armPattern;
+    geometry.shotsPerArm = shotsPerArm;
+    if (armPatternTakesArc(armPattern)) geometry.armArcDegrees = armArcDegrees;
+  }
+  if (rotationAllowed(sticky.pattern)) {
+    if (sticky.clockwiseDegreesPerSecond !== undefined)
+      geometry.clockwiseDegreesPerSecond = sticky.clockwiseDegreesPerSecond;
+    if (sticky.initialPhaseDegrees !== undefined)
+      geometry.initialPhaseDegrees = sticky.initialPhaseDegrees;
+  }
+  return geometry;
+}
 
 /** T22: one keypress records the sticky selection at the presented frame time. */
 export function createTag(
@@ -131,6 +200,7 @@ export function createTag(
     pattern: sticky.pattern,
     ...(patternTakesAim(sticky.pattern) ? { aim: sticky.aim } : {}),
     shots: sticky.shots,
+    ...stickyGeometry(sticky),
     ...(burstId === undefined ? {} : { burstId }),
   };
 }
@@ -141,6 +211,7 @@ function stickyKey(sticky: StickySelection): string {
     spriteId: sticky.spriteId,
     pattern: sticky.pattern,
     aim: patternTakesAim(sticky.pattern) ? sticky.aim : undefined,
+    armPattern: stickyGeometry(sticky).armPattern,
   });
 }
 
@@ -190,6 +261,20 @@ export type TagChange =
   | Readonly<{ field: "pattern"; value: TagPattern }>
   | Readonly<{ field: "aim"; value: TagAim }>
   | Readonly<{ field: "shots"; value: number }>
+  /**
+   * Null removes the arm pattern and its dependants. A spread or scatter arm
+   * needs a cone: supply `armArcDegrees` or have one already.
+   */
+  | Readonly<{
+      field: "armPattern";
+      value: TagArmPattern | null;
+      armArcDegrees?: number;
+    }>
+  | Readonly<{ field: "shotsPerArm"; value: number | null }>
+  | Readonly<{ field: "armArcDegrees"; value: number | null }>
+  /** Null removes the typed value. */
+  | Readonly<{ field: "clockwiseDegreesPerSecond"; value: number | null }>
+  | Readonly<{ field: "initialPhaseDegrees"; value: number | null }>
   /** Null removes the burst id (blank field). */
   | Readonly<{ field: "burstId"; value: number | null }>;
 
@@ -232,23 +317,109 @@ export function editTag(
     case "pattern": {
       if (!OFFERABLE_PATTERNS.includes(change.value))
         return fail("That pattern cannot be chosen.");
-      const { aim, ...rest } = tag;
+      const {
+        aim,
+        armPattern,
+        shotsPerArm,
+        armArcDegrees,
+        clockwiseDegreesPerSecond,
+        initialPhaseDegrees,
+        ...rest
+      } = tag;
+      // Fields the new pattern disallows are dropped, as the aim rule does.
       return {
         ok: true,
-        tag: patternTakesAim(change.value)
-          ? { ...rest, pattern: change.value, aim: aim ?? DEFAULT_AIM }
-          : { ...rest, pattern: change.value },
+        tag: {
+          ...rest,
+          pattern: change.value,
+          ...(patternTakesAim(change.value) ? { aim: aim ?? DEFAULT_AIM } : {}),
+          ...(armPatternAllowed(change.value) && armPattern !== undefined
+            ? {
+                armPattern,
+                ...(shotsPerArm === undefined ? {} : { shotsPerArm }),
+                ...(armArcDegrees === undefined ? {} : { armArcDegrees }),
+              }
+            : {}),
+          ...(rotationAllowed(change.value)
+            ? {
+                ...(clockwiseDegreesPerSecond === undefined
+                  ? {}
+                  : { clockwiseDegreesPerSecond }),
+                ...(initialPhaseDegrees === undefined ? {} : { initialPhaseDegrees }),
+              }
+            : {}),
+        },
       };
     }
     case "aim":
       if (!patternTakesAim(tag.pattern))
         return fail("Only spread and scatter have an aim.");
-      if (!TAG_AIMS.includes(change.value)) return fail("Aim must be player or fixed.");
+      if (!TAG_AIMS.includes(change.value))
+        return fail("Aim must be player, fixed or front.");
       return { ok: true, tag: { ...tag, aim: change.value } };
     case "shots":
       if (!Number.isInteger(change.value) || change.value < 1)
         return fail("Shots must be a positive whole number.");
       return { ok: true, tag: { ...tag, shots: change.value } };
+    case "armPattern": {
+      if (!armPatternAllowed(tag.pattern))
+        return fail("Only a ring can have an arm pattern.");
+      const { armPattern: _armPattern, shotsPerArm, armArcDegrees, ...rest } = tag;
+      if (change.value === null) return { ok: true, tag: rest };
+      if (!TAG_ARM_PATTERNS.includes(change.value))
+        return fail("Arm pattern must be spread, scatter or ring.");
+      if (!armPatternTakesArc(change.value))
+        return {
+          ok: true,
+          tag: {
+            ...rest,
+            armPattern: change.value,
+            shotsPerArm: shotsPerArm ?? DEFAULT_SHOTS_PER_ARM,
+          },
+        };
+      const arc = change.armArcDegrees ?? armArcDegrees;
+      if (arc === undefined)
+        return fail("Enter the cone width in degrees for a spread or scatter arm.");
+      const arcProblem = armArcProblem(change.value, arc);
+      if (arcProblem) return fail(`Cone width ${arcProblem}.`);
+      return {
+        ok: true,
+        tag: {
+          ...rest,
+          armPattern: change.value,
+          shotsPerArm: shotsPerArm ?? DEFAULT_SHOTS_PER_ARM,
+          armArcDegrees: arc,
+        },
+      };
+    }
+    case "shotsPerArm":
+      if (tag.armPattern === undefined) return fail("Choose an arm pattern first.");
+      if (
+        change.value === null ||
+        !Number.isInteger(change.value) ||
+        change.value < 1
+      )
+        return fail("Shots per arm must be a positive whole number.");
+      return { ok: true, tag: { ...tag, shotsPerArm: change.value } };
+    case "armArcDegrees":
+      if (tag.armPattern === undefined || !armPatternTakesArc(tag.armPattern))
+        return fail("Only a spread or scatter arm has a cone width.");
+      if (change.value === null) return fail("Cone width is required.");
+      {
+        const arcProblem = armArcProblem(tag.armPattern, change.value);
+        if (arcProblem) return fail(`Cone width ${arcProblem}.`);
+      }
+      return { ok: true, tag: { ...tag, armArcDegrees: change.value } };
+    case "clockwiseDegreesPerSecond":
+    case "initialPhaseDegrees": {
+      if (!rotationAllowed(tag.pattern))
+        return fail("Only a rotating arm has a typed rotation rate and phase.");
+      const { [change.field]: _removed, ...rest } = tag;
+      if (change.value === null) return { ok: true, tag: rest };
+      if (!Number.isFinite(change.value))
+        return fail("Rotation values must be finite numbers of degrees.");
+      return { ok: true, tag: { ...tag, [change.field]: change.value } };
+    }
     case "burstId": {
       if (change.value === null) {
         const { burstId: _removed, ...rest } = tag;
@@ -302,6 +473,7 @@ export type SummaryRow = Readonly<{
   sprite: string;
   pattern: string;
   aim: string;
+  armPattern: string;
   scope: string;
   sampleCount: number;
   mean: string;
@@ -324,6 +496,7 @@ export function formatSummaryRow(
     sprite: summary.spriteId,
     pattern: summary.pattern,
     aim: summary.aim ?? "—",
+    armPattern: summary.armPattern ?? "—",
     scope: summary.scope,
     sampleCount: summary.sampleCount,
     mean: summary.sampleCount === 0 ? "—" : seconds(summary.meanSeconds),

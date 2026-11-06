@@ -271,6 +271,116 @@ Rules for this register:
 
 **Fidelity gap this leaves.** None for gameplay. It is a capability gap: a study opened without its video (Z14) cannot be previewed until the video is chosen.
 
+### D27 - The Killer Bee Queen's Phase-1 Front Shot
+
+**What.** Author the shot the user observed the Queen firing relative to her front in her first phase (phase index 0), using plan V15's `aim: "front"`.
+
+**Why deferred.** Plan V15's N01 changes only `white-bomb-targeted`, and the observation names no shot, so there is no projectile, offset or cadence to author yet.
+
+**Blocked on.** Completion of plan V15's phases 52-54, tagging the shot from footage, and an explicit user decision to re-author, which needs a rules-version bump.
+
+**Fidelity gap this leaves.** The Queen's first phase has no front-relative shot, against the user's observation. The wiki does not describe one, so this rests on footage alone.
+
+### D28 - Bombs Targeting A Fixed Position
+
+**What.** Let a bomb's `target` name a position, not only the player, landing in its fixed travel time.
+
+**Why deferred.** Plan V15's N28 keeps `target: "player"` only. The Queen's source document shows bombs thrown at players, in radial bursts and along directions, and none thrown at a fixed position.
+
+**Blocked on.** An encounter or tagged footage that needs it, and a decision on whether a position is an arena tile or a named point such as the arena centre.
+
+**Fidelity gap this leaves.** None known for the shipped encounters. It is a capability gap against the user's stated bomb model.
+
+### D29 - Aimed Rings
+
+**What.** Let a ring, and so a ring of spreads, point at the player or the enemy's front, with arm 0 on that bearing at firing.
+
+**Why deferred.** Plan V15's N14 keeps rings on their absolute phase, because there is no evidence of an aimed ring yet. With N06, a ring of spreads can only be oriented by its ring's phase.
+
+**Blocked on.** Tagged footage of an aimed ring, and a decision on how aim combines with rotation, which plan V15 would have had to forbid.
+
+**Fidelity gap this leaves.** Any real attack that aims a ring is authored at a fixed phase instead, so it will not track the player or the enemy's front.
+
+### D30 - Re-Author The Queen's Phase-4 Glaive Rings As Composites
+
+**What.** Change `yellow-glaive-spread-ring`, `red-glaive-spread-ring` and `blue-glaive-spread-ring` from plain 4-arm rings to rings of spreads.
+
+**Why deferred.** Plan V15's N01 ships the capability without re-authoring them. The wiki says "4-directional spreads" but gives no shot count or cone width, so authoring them now would be placeholder values on a gameplay change.
+
+**Blocked on.** Completion of plan V15's phases 51-54, tagging them from footage, an explicit retune decision, and a rules-version bump.
+
+**Fidelity gap this leaves.** Phase index 3 fires one shot per arm where the wiki describes a spread per arm.
+
+### D31 - Speed-Based Targeted Bombs
+
+**What.** Let a targeted bomb fly at an authored speed, so its flight time varies with the target's distance.
+
+**Why deferred.** Plan V15's N27 authors time only, so a targeted bomb always lands in `travelSeconds` at any distance. A speed-based bomb needs a lifetime per bomb rather than per projectile, and the wiki lists no bomb speed.
+
+**Blocked on.** Tagged evidence that a real targeted bomb's flight time grows with distance.
+
+**Fidelity gap this leaves.** If real targeted bombs fly at a fixed speed, far targets land sooner here than in the game and near targets later.
+
+### D32 - Tagger Workflow Conveniences
+
+**What.** Three tagger conveniences from the 2026-11-05 audit: a compact layout that keeps the controls beside the video, with hotkeys for sprite and pattern; slow playback at 0.25x and 0.5x; and undo with a delete-last-tag key.
+
+**Why deferred.** The user chose other wins for plan V16. Frame stepping and the new timeline cover precision, and every tag row can be corrected by hand.
+
+**Blocked on.** A user decision that tagging friction, or an accidental deletion, now costs more than these are worth.
+
+**Fidelity gap this leaves.** None to gameplay. At 1440x900 the record button sits about 1,560 pixels down the page, and a deleted tag cannot be recovered.
+
+### D33 - A Player Position Per Tag In The Preview
+
+**What.** Record or type the player's position per tag, and place it by clicking the preview canvas, so each targeted bomb and player-aimed shot draws where the player actually stood.
+
+**Why deferred.** Plan V15 excluded recorded player positions, and M08's one global slider point stands in plan V16.
+
+**Blocked on.** A user decision that per-shot aim needs checking against footage, and a way to enter positions cheaply.
+
+**Fidelity gap this leaves.** None to gameplay. In the preview, every targeted bomb lands on one point, so targeted throws cannot be compared with where they landed in the video.
+
+### D34 - Choosing Which Attack A Tag Borrows From
+
+**What.** A control that picks which authored attack a tag borrows its projectile and motion from, in place of first-match.
+
+**Why deferred.** Plan V16's S03: first-match hides one of 60 shipped attacks, `blue-ball-spiral-ccw`, and a typed negative rate covers it.
+
+**Blocked on.** More shipped attacks sharing a phase, sprite and pattern family, or a tag that needs a hidden attack's different projectile.
+
+**Fidelity gap this leaves.** None to gameplay. A tag can never preview or export `blue-ball-spiral-ccw` by id.
+
+### D35 - Typed Per-Burst Advance In The Tagger
+
+**What.** A typed `perBurstAdvanceDegrees` on tags and saved attacks, drawn in the preview, for rotation that steps per burst rather than turning continuously.
+
+**Why deferred.** Plan V16's S44 keeps N38: the continuous rate times a repeat's interval already displaces each volley, which covers the user's case.
+
+**Blocked on.** A tagged attack whose displacement a continuous rate cannot reproduce.
+
+**Fidelity gap this leaves.** None to gameplay. `white-bomb-advance` still draws every burst at one angle in the preview unless a phase is typed per tag.
+
+### D36 - A Range Limit On Targeted Bombs
+
+**What.** Let a targeted bomb have a maximum throw distance, so a far target's bomb lands short, and let the tagger type that limit.
+
+**Why deferred.** Plan V15's N27 lands a targeted bomb on the player at any distance with no clamp, and plan V16's S12 keeps range disabled on targeted tags. A limit is a new gameplay rule needing a rules version.
+
+**Blocked on.** Tagged evidence that a real targeted bomb falls short of a distant player.
+
+**Fidelity gap this leaves.** If real targeted bombs have a limit, distant throws reach players here that they would not reach in the game.
+
+### D37 - A Saved-Attack Library Across Studies
+
+**What.** Keep saved attacks in a library that outlives one study, so a second video of the same fight can reuse them.
+
+**Why deferred.** Plan V16's S30 stores saved attacks in the study, which needs no new storage.
+
+**Blocked on.** Tagging a second video of a fight that uses attacks already saved.
+
+**Fidelity gap this leaves.** None to gameplay. Saved attacks must be recreated, or reached through a copy of an older study, for each new video.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

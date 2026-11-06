@@ -22,6 +22,8 @@ import {
   ENCOUNTER_CONFIG,
   movementSpeedTilesPerSecond,
   PRIMARY_ARCHETYPE_ID,
+  bombOf,
+  bulletOf,
   projectileOf,
   type AttackSpec,
   type EncounterConfig,
@@ -35,7 +37,8 @@ import {
   restampLiveShards,
   shardOverlapsPlayer,
 } from "./projectiles";
-import { resolveBearings } from "./patterns";
+import { advanceBomb, createBomb } from "./bombs";
+import { resolveBearings, scatterDrawCount } from "./patterns";
 import {
   DEFAULT_DEBUG_SETTINGS,
   DEBUG_RULES_VERSION,
@@ -59,6 +62,7 @@ import type {
   DrillSelection,
   EnemyState,
   PlayerState,
+  BombState,
   ShardState,
   SimulationInput,
   Vector2,
@@ -103,6 +107,8 @@ export type SimulationState = {
   /** Insertion-ordered so a fixed input sequence stays reproducible. */
   enemies: EnemyState[];
   shards: ShardState[];
+  /** Bombs live apart from shards (N22) but share their id sequence (N23). */
+  bombs: BombState[];
   ticksElapsed: number;
   elapsedSeconds: number;
   accumulatorSeconds: number;
@@ -174,6 +180,7 @@ export function createEnemy(
     id,
     archetypeId,
     positionTiles: { ...(positionTiles ?? archetype.spawnTiles) },
+    headingRadians: ((archetype.initialHeadingDegrees ?? 0) * Math.PI) / 180,
     spawnedAtSeconds,
     attackClocks: createAttackClocks(
       attacks,
@@ -263,6 +270,7 @@ export function createSimulation(
     },
     enemies: [],
     shards: [],
+    bombs: [],
     ticksElapsed: 0,
     elapsedSeconds: 0,
     accumulatorSeconds: 0,
@@ -453,7 +461,7 @@ export function setDebugSettings(
   state.collisionBoundingRadiusTiles = boundingRadiusTiles(config);
   state.shards = restampLiveShards(
     state.shards,
-    projectileOf(
+    bulletOf(
       config,
       archetypeOf(config, config.primaryArchetypeId).phases[0].attacks[0]
         .projectileId,
@@ -574,6 +582,12 @@ function advanceWanderMovement(
   );
 }
 
+/**
+ * The least displacement that turns an enemy's heading. A numerical tolerance
+ * (matching `orbitRingToleranceTiles`), not a gameplay value.
+ */
+const HEADING_MIN_DISPLACEMENT_TILES = 1e-9;
+
 /** Resolves one enemy's unconstrained next position under its active movement kind. */
 function advanceEnemyMovement(
   state: SimulationState,
@@ -663,11 +677,17 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
 
   for (const enemy of state.enemies) {
     const archetype = archetypeOf(config, enemy.archetypeId);
+    const startTiles = enemy.positionTiles;
     enemy.positionTiles = constrainToArena(
       advanceEnemyMovement(state, enemy, archetype, stepSeconds),
       archetype.verticesTiles,
       config.arena,
     );
+    // N17: the heading follows movement only, and holds when the enemy stops.
+    const displacementX = enemy.positionTiles.x - startTiles.x;
+    const displacementY = enemy.positionTiles.y - startTiles.y;
+    if (Math.hypot(displacementX, displacementY) > HEADING_MIN_DISPLACEMENT_TILES)
+      enemy.headingRadians = Math.atan2(displacementY, displacementX);
   }
 }
 
@@ -703,7 +723,7 @@ function applyAcceptedHit(
 
 function registerShardHit(
   state: SimulationState,
-  shard: ShardState,
+  shard: ShardState | BombState,
   acceptedHits: AcceptedHit[],
 ): void {
   const projectile = projectileOf(state.config, shard.projectileId);
@@ -718,6 +738,73 @@ function registerShardHit(
     )
   )
     shard.hasHitPlayer = true;
+}
+
+/**
+ * Advances every live shard and bomb, merged by ascending id (N23). Shards and
+ * bombs share one id sequence, so resolving them in id order keeps hit and
+ * detonation order identical to when both lived in one list. Everything is kept
+ * untouched once the run is no longer playing, as before the split.
+ */
+function advanceProjectiles(
+  state: SimulationState,
+  stepSeconds: number,
+  playerStart: Vector2,
+  acceptedHits: AcceptedHit[],
+  detonations: DetonationEvent[],
+): void {
+  const { shards, bombs } = state;
+  const survivingShards: ShardState[] = [];
+  const survivingBombs: BombState[] = [];
+  let shardIndex = 0;
+  let bombIndex = 0;
+  while (shardIndex < shards.length || bombIndex < bombs.length) {
+    const takeShard =
+      bombIndex >= bombs.length ||
+      (shardIndex < shards.length && shards[shardIndex].id < bombs[bombIndex].id);
+    if (takeShard) {
+      const shard = shards[shardIndex++];
+      if (currentPhase(state) !== "playing") {
+        survivingShards.push(shard);
+        continue;
+      }
+      const result = advanceShard(
+        state,
+        shard,
+        stepSeconds,
+        playerStart,
+        state.player.positionTiles,
+      );
+      if (result.hitPlayer) registerShardHit(state, shard, acceptedHits);
+      if (result.alive) survivingShards.push(shard);
+    } else {
+      const bomb = bombs[bombIndex++];
+      if (currentPhase(state) !== "playing") {
+        survivingBombs.push(bomb);
+        continue;
+      }
+      const result = advanceBomb(
+        state,
+        bomb,
+        stepSeconds,
+        playerStart,
+        state.player.positionTiles,
+      );
+      if (result.hitPlayer) registerShardHit(state, bomb, acceptedHits);
+      if (result.detonated)
+        detonations.push(
+          Object.freeze({
+            projectileId: bomb.projectileId,
+            positionTiles: { ...bomb.detonationTargetTiles },
+            radiusTiles: bombOf(state.config, bomb.projectileId)
+              .detonationRadiusTiles,
+          }),
+        );
+      if (result.alive) survivingBombs.push(bomb);
+    }
+  }
+  state.shards = survivingShards;
+  state.bombs = survivingBombs;
 }
 
 /**
@@ -818,18 +905,22 @@ function updateAttackClock(
     Math.max(state.elapsedSeconds, nextShotSeconds) * Number.EPSILON * 16;
   if (state.elapsedSeconds + shotToleranceSeconds < nextShotSeconds) return;
 
-  // A `scatter` volley draws one unit-random value per shot, in shot order,
+  // A volley draws one unit-random value per final scatter shot (a top-level
+  // scatter or a scatter inside a ring's arms), in depth-first arm order,
   // advancing the shared generator cursor - the only place this attack's
   // randomness enters, so draw order across attacks and enemies stays fixed
   // by the authored/enemy-insertion order the caller already iterates in
-  // (K11). `resolveBearings` itself never draws; it only consumes these.
+  // (K11). A pattern with no scatter draws nothing. `resolveBearings` itself
+  // never draws; it only consumes these.
+  const drawCount = scatterDrawCount(pattern);
   const drawnUnitRandoms =
-    pattern.kind === "scatter"
-      ? Array.from({ length: pattern.shots }, () => nextUnitRandom(state))
+    drawCount > 0
+      ? Array.from({ length: drawCount }, () => nextUnitRandom(state))
       : undefined;
   const bearings = resolveBearings(pattern, {
     enemyPositionTiles: enemy.positionTiles,
     playerPositionTiles: state.player.positionTiles,
+    enemyHeadingRadians: enemy.headingRadians,
     ringPhaseRadians: clock.ringPhaseRadians,
     volleyIndexInBurst: shotIndex,
     burstsFired: groupIndex,
@@ -839,21 +930,28 @@ function updateAttackClock(
     drawnUnitRandoms,
   });
   for (const bearing of bearings) {
-    state.shards.push(
-      createShard(
-        projectile,
-        state.nextShardId++,
-        {
-          x:
-            enemy.positionTiles.x +
-            Math.cos(bearing.bearingRadians) * bearing.emitterRadiusTiles,
-          y:
-            enemy.positionTiles.y +
-            Math.sin(bearing.bearingRadians) * bearing.emitterRadiusTiles,
-        },
-        bearing.bearingRadians,
-      ),
-    );
+    const spawnTiles = {
+      x:
+        enemy.positionTiles.x +
+        Math.cos(bearing.bearingRadians) * bearing.emitterRadiusTiles,
+      y:
+        enemy.positionTiles.y +
+        Math.sin(bearing.bearingRadians) * bearing.emitterRadiusTiles,
+    };
+    if (projectile.type === "bomb")
+      state.bombs.push(
+        createBomb(
+          projectile,
+          state.nextShardId++,
+          spawnTiles,
+          bearing.bearingRadians,
+          attack.target === "player" ? state.player.positionTiles : undefined,
+        ),
+      );
+    else
+      state.shards.push(
+        createShard(projectile, state.nextShardId++, spawnTiles, bearing.bearingRadians),
+      );
   }
   clock.volleysFired++;
 }
@@ -951,37 +1049,19 @@ export function advanceSimulation(
         state.player.positionTiles,
         acceptedHits,
       );
-    state.shards = state.shards.filter((shard) => {
-      if (currentPhase(state) !== "playing") return true;
-      const result = advanceShard(
-        state,
-        shard,
-        fixedStepSeconds,
-        playerStart,
-        state.player.positionTiles,
-      );
-      if (result.hitPlayer) registerShardHit(state, shard, acceptedHits);
-      if (result.detonated && shard.detonationTargetTiles) {
-        const projectile = projectileOf(state.config, shard.projectileId);
-        if (projectile.motion.kind === "lob")
-          detonations.push(
-            Object.freeze({
-              projectileId: shard.projectileId,
-              positionTiles: { ...shard.detonationTargetTiles },
-              radiusTiles: projectile.motion.detonationRadiusTiles,
-            }),
-          );
-      }
-      return result.alive;
-    });
+    advanceProjectiles(
+      state,
+      fixedStepSeconds,
+      playerStart,
+      acceptedHits,
+      detonations,
+    );
     if (state.player.healthHp > 0 && currentPhase(state) === "playing") {
       updateSpawns(state);
       const existingCount = state.shards.length;
       updateAttacks(state);
+      // Only shards are checked on arrival: a bomb hits only by detonating.
       for (const shard of state.shards.slice(existingCount)) {
-        // A lob only ever hits by detonating; its body is visual-only.
-        if (projectileOf(state.config, shard.projectileId).motion.kind === "lob")
-          continue;
         if (
           shardOverlapsPlayer(
             state,

@@ -1,0 +1,23 @@
+[
+ {
+  "second": 1,
+  "digest": "cf216a13",
+  "hits": 1,
+  "detonations": 0,
+  "live": 3
+ },
+ {
+  "second": 2,
+  "digest": "2642742",
+  "hits": 8,
+  "detonations": 0,
+  "live": 6
+ },
+ {
+  "second": 3,
+  "digest": "b23b9a59",
+  "hits": 10,
+  "detonations": 0,
+  "live": 7
+ }
+]

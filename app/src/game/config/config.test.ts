@@ -24,6 +24,7 @@ import {
   liveShardBoundForEncounter,
   liveShardBoundPerEnemy,
   primaryArchetype,
+  bulletOf,
   projectileOf,
   scaleBody,
   RULES_VERSION,
@@ -63,7 +64,7 @@ import {
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
 const PRIMARY_PHASE = PRIMARY.phases[0];
 const PRIMARY_ATTACK = PRIMARY_PHASE.attacks[0];
-const PRIMARY_PROJECTILE = projectileOf(
+const PRIMARY_PROJECTILE = bulletOf(
   ENCOUNTER_CONFIG,
   PRIMARY_ATTACK.projectileId,
 );
@@ -568,6 +569,7 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   });
   expect(ENCOUNTER_CONFIG.projectiles).toEqual({
     "crystal-worm-child-shard": {
+      type: "bullet",
       id: "crystal-worm-child-shard",
       damageHp: 160,
       speedTilesPerSecond: 8,
@@ -709,7 +711,6 @@ test("imports in Node and carries the comparison version in plain session snapsh
     hasHitPlayer: false,
     spawnPositionTiles: { x: 0, y: 0 },
     spawnOrientationRadians: 0,
-    detonationTargetTiles: null,
   };
   expect(shard).not.toHaveProperty("origin");
   expect(shard.hasHitPlayer).toBe(false);
@@ -918,7 +919,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v11");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v12");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -927,19 +928,25 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   expect(state.enemies).toHaveLength(1);
 });
 
-// G19-style/V11 follow-up: the Queen's rules version advanced to v11 because
-// the symmetric 5 x 7 player body changes collision enough to invalidate
-// comparison with earlier attempts. Older records must be retained in
-// storage but excluded from the new rules version's best.
-test("an older Killer Bee Queen attempt record is retained but excluded from the v11 best", () => {
+// Plan V15 N02: the Queen's rules version advanced to v12 because her targeted
+// white bomb now lands on the player. Older records (v10 and v11) must be
+// retained in storage but excluded from the new rules version's best.
+test("older Killer Bee Queen attempt records are retained but excluded from the v12 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v11");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v12");
   const records = [
     {
       id: "a",
       rulesVersion: "killer-bee-queen-nest-paladin-v10",
       elapsedSeconds: 500,
       hitsTaken: 2,
+      outcome: "death" as const,
+    },
+    {
+      id: "c",
+      rulesVersion: "killer-bee-queen-nest-paladin-v11",
+      elapsedSeconds: 300,
+      hitsTaken: 3,
       outcome: "death" as const,
     },
     {
@@ -951,6 +958,9 @@ test("an older Killer Bee Queen attempt record is retained but excluded from the
     },
   ];
   expect(retainedBestSeconds(records, queenConfig.rulesVersion)).toBe(120);
+  expect(
+    retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v11"),
+  ).toBe(300);
   expect(
     retainedBestSeconds(records, "killer-bee-queen-nest-paladin-v10"),
   ).toBe(500);
@@ -1072,7 +1082,7 @@ test("the Killer Bee Queen's phase 1 fires its five sourced projectiles", () => 
   const observedProjectileIds = new Set<string>();
   for (let tick = 0; tick < 600; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
-    for (const shard of state.shards) observedProjectileIds.add(shard.projectileId);
+    for (const shard of [...state.shards, ...state.bombs]) observedProjectileIds.add(shard.projectileId);
   }
   for (const attack of phase1Attacks)
     expect(observedProjectileIds.has(attack.projectileId)).toBe(true);
@@ -1133,7 +1143,7 @@ test("the Killer Bee Queen's phase 2 red sub-phase fires first with its own mini
   const observedProjectileIds = new Set<string>();
   for (let tick = 0; tick < 600; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
-    for (const shard of state.shards) observedProjectileIds.add(shard.projectileId);
+    for (const shard of [...state.shards, ...state.bombs]) observedProjectileIds.add(shard.projectileId);
   }
   for (const attack of redSubPhase.attacks)
     expect(observedProjectileIds.has(attack.projectileId)).toBe(true);
@@ -1185,8 +1195,8 @@ test("the Killer Bee Queen's phase 2 cycles its three colour sub-phases with the
 
   // The Killer Bees' own stinger rows differ from the Queen's same-named
   // stinger projectiles (step 23.4), not reused from her catalog entries.
-  const redBee = projectileOf(queenConfig, "red-killer-bee-stinger");
-  const queenRedStinger = projectileOf(queenConfig, "red-stinger-small");
+  const redBee = bulletOf(queenConfig, "red-killer-bee-stinger");
+  const queenRedStinger = bulletOf(queenConfig, "red-stinger-small");
   expect(redBee.damageHp).toBe(80);
   expect(redBee.speedTilesPerSecond).toBe(7);
   expect(queenRedStinger.damageHp).toBe(100);
@@ -1884,8 +1894,10 @@ test("the Killer Bee Queen's phase 7 new projectiles match their cited rows", ()
   ]);
   const whiteBombV2 = projectileOf(queenConfig, "white-bomb-v2");
   expect(whiteBombV2.damageHp).toBe(120);
-  expect(whiteBombV2.motion).toMatchObject({
-    kind: "lob",
+  expect(whiteBombV2).toMatchObject({
+    type: "bomb",
+    rangeTiles: 1.8,
+    travelSeconds: 0.6,
     detonationRadiusTiles: 3,
   });
   expect(projectileOf(queenConfig, "red-stinger-large-v3").damageHp).toBe(
@@ -2139,11 +2151,12 @@ test("the Killer Bee Queen's full fight never exceeds the derived live-shard bou
   let peakParts = 0;
   for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
-    peakShards = Math.max(peakShards, state.shards.length);
+    // Bombs count toward the live-projectile totals as before the split (N26).
+    peakShards = Math.max(peakShards, state.shards.length + state.bombs.length);
     peakEnemies = Math.max(peakEnemies, state.enemies.length);
     peakParts = Math.max(
       peakParts,
-      state.shards.reduce(
+      [...state.shards, ...state.bombs].reduce(
         (total, shard) =>
           total +
           projectileOf(queenConfig, shard.projectileId).collisionPartsTiles.length,

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { resolveBearings, type PatternContext } from "./patterns";
+import { resolveBearings, scatterDrawCount, type PatternContext } from "./patterns";
 import type {
   RingPattern,
   ScatterPattern,
@@ -463,4 +463,226 @@ test("scatter's aim: fixed and aim: player resolve the centre the same way sprea
   });
   // A single shot with drawnUnitRandoms 0.5 lands exactly at the centre.
   expect(bearings[0].bearingRadians).toBeCloseTo(0, 9);
+});
+
+// --- Plan V15 phase 51: a ring whose arms each fire a pattern. ---
+
+const ARM_RING = (armPattern: RingPattern["armPattern"], arms = 4): RingPattern => ({
+  ...RING,
+  arms,
+  clockwiseDegreesPerSecond: 0,
+  armPattern,
+});
+const ARM_CONTEXT: PatternContext = { ...baseContext, ringPhaseRadians: 0 };
+const bearingsOf = (pattern: RingPattern, context = ARM_CONTEXT): number[] =>
+  resolveBearings(pattern, context).map((bearing) => bearing.bearingRadians);
+
+test("a ring of 3-shot spreads gives one cluster per arm, centred on the arm", () => {
+  const bearings = bearingsOf(
+    ARM_RING({ kind: "spread", shots: 3, arcDegrees: 20 }),
+  );
+  expect(bearings).toHaveLength(12);
+  for (let arm = 0; arm < 4; arm++) {
+    const centre = arm * (Math.PI / 2);
+    expect(bearings[arm * 3]).toBeCloseTo(centre - degrees(10), 12);
+    expect(bearings[arm * 3 + 1]).toBeCloseTo(centre, 12);
+    expect(bearings[arm * 3 + 2]).toBeCloseTo(centre + degrees(10), 12);
+  }
+});
+
+test("an absent or single armPattern is exactly the plain ring", () => {
+  const plain = bearingsOf(ARM_RING(undefined));
+  expect(bearingsOf(ARM_RING({ kind: "single" }))).toEqual(plain);
+  expect(plain).toHaveLength(4);
+});
+
+test("a 1-shot arm spread equals its arm", () => {
+  expect(bearingsOf(ARM_RING({ kind: "spread", shots: 1, arcDegrees: 90 }))).toEqual(
+    bearingsOf(ARM_RING(undefined)),
+  );
+});
+
+test("a ring of rings fires every inner arm around its outer arm", () => {
+  const bearings = bearingsOf(ARM_RING({ kind: "ring", arms: 2 }, 2));
+  expect(bearings).toHaveLength(4);
+  expect(bearings[0]).toBeCloseTo(0, 12);
+  expect(bearings[1]).toBeCloseTo(Math.PI, 12);
+  expect(bearings[2]).toBeCloseTo(Math.PI, 12);
+  expect(bearings[3]).toBeCloseTo(2 * Math.PI, 12);
+});
+
+test("an inner ring's phaseOffsetDegrees offsets its arms from the outer arm", () => {
+  const bearings = bearingsOf(
+    ARM_RING({ kind: "ring", arms: 2, phaseOffsetDegrees: 30 }, 1),
+  );
+  expect(bearings[0]).toBeCloseTo(degrees(30), 12);
+  expect(bearings[1]).toBeCloseTo(degrees(30) + Math.PI, 12);
+});
+
+test("three levels of nesting expand depth first", () => {
+  const bearings = bearingsOf(
+    ARM_RING(
+      {
+        kind: "ring",
+        arms: 2,
+        armPattern: { kind: "spread", shots: 3, arcDegrees: 20 },
+      },
+      2,
+    ),
+  );
+  expect(bearings).toHaveLength(12);
+  // First outer arm (0), first inner arm (0): a cluster around 0.
+  expect(bearings[1]).toBeCloseTo(0, 12);
+  // First outer arm, second inner arm: a cluster around pi.
+  expect(bearings[4]).toBeCloseTo(Math.PI, 12);
+  // Second outer arm (pi), first inner arm: a cluster around pi again.
+  expect(bearings[7]).toBeCloseTo(Math.PI, 12);
+});
+
+test("a gap removes a whole arm's shots, not part of its cluster", () => {
+  const gapped: RingPattern = {
+    ...ARM_RING({ kind: "spread", shots: 3, arcDegrees: 20 }),
+    // Covers only arm 1 (90 degrees); the cluster's own shots span 80-100.
+    gapSectorsDegrees: [[85, 95]],
+  };
+  const bearings = bearingsOf(gapped);
+  expect(bearings).toHaveLength(9);
+  expect(bearings.every((bearing) => Math.abs(bearing - Math.PI / 2) > degrees(5))).toBe(true);
+});
+
+test("every shot offsets along its own bearing from the outermost emitter radius", () => {
+  const resolved = resolveBearings(
+    ARM_RING({ kind: "spread", shots: 3, arcDegrees: 20 }),
+    ARM_CONTEXT,
+  );
+  for (const bearing of resolved) expect(bearing.emitterRadiusTiles).toBe(0.35);
+});
+
+test("per-burst advance and ring phase move every cluster together", () => {
+  const spread = { kind: "spread", shots: 3, arcDegrees: 20 } as const;
+  const at = (phase: number) =>
+    bearingsOf(ARM_RING(spread), { ...ARM_CONTEXT, ringPhaseRadians: phase });
+  const base = at(0);
+  const turned = at(degrees(25));
+  base.forEach((bearing, index) =>
+    expect(turned[index]).toBeCloseTo(bearing + degrees(25), 12),
+  );
+  const advancing: RingPattern = { ...ARM_RING(spread), perBurstAdvanceDegrees: 10 };
+  bearingsOf(advancing, { ...ARM_CONTEXT, burstsFired: 2 }).forEach((bearing, index) =>
+    expect(bearing).toBeCloseTo(base[index] + degrees(20), 12),
+  );
+});
+
+test("a scatter arm reads one draw per final shot in depth-first arm order", () => {
+  const pattern = ARM_RING({ kind: "scatter", shots: 2, coneDegrees: 40 }, 2);
+  expect(scatterDrawCount(pattern)).toBe(4);
+  const draws = [0, 0.25, 0.75, 1];
+  const bearings = bearingsOf(pattern, { ...ARM_CONTEXT, drawnUnitRandoms: draws });
+  const cone = degrees(40);
+  const expected = [
+    0 + (0 - 0.5) * cone,
+    0 + (0.25 - 0.5) * cone,
+    Math.PI + (0.75 - 0.5) * cone,
+    Math.PI + (1 - 0.5) * cone,
+  ];
+  bearings.forEach((bearing, index) => expect(bearing).toBeCloseTo(expected[index], 12));
+});
+
+test("a gap-removed scatter arm still consumes its draws, so later arms are unchanged", () => {
+  const scatter = { kind: "scatter", shots: 2, coneDegrees: 40 } as const;
+  const draws = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+  const ungapped = bearingsOf(ARM_RING(scatter), { ...ARM_CONTEXT, drawnUnitRandoms: draws });
+  const gapped = bearingsOf(
+    { ...ARM_RING(scatter), gapSectorsDegrees: [[85, 95]] },
+    { ...ARM_CONTEXT, drawnUnitRandoms: draws },
+  );
+  expect(scatterDrawCount(ARM_RING(scatter))).toBe(8);
+  expect(gapped).toEqual([...ungapped.slice(0, 2), ...ungapped.slice(4)]);
+});
+
+test("scatterDrawCount is zero without a scatter and the shot count for a top-level scatter", () => {
+  expect(scatterDrawCount(RING)).toBe(0);
+  expect(scatterDrawCount(ARM_RING({ kind: "spread", shots: 5, arcDegrees: 10 }))).toBe(0);
+  expect(
+    scatterDrawCount({
+      kind: "scatter",
+      shots: 7,
+      coneDegrees: 10,
+      aim: "fixed",
+      fixedBearingDegrees: 0,
+      emitterRadiusTiles: 0,
+    }),
+  ).toBe(7);
+  expect(
+    scatterDrawCount(ARM_RING({ kind: "ring", arms: 3, armPattern: { kind: "scatter", shots: 2, coneDegrees: 5 } }, 2)),
+  ).toBe(12);
+});
+
+test("a composite ring requires enough drawn values for its scatter shots", () => {
+  expect(() =>
+    bearingsOf(ARM_RING({ kind: "scatter", shots: 2, coneDegrees: 40 }), {
+      ...ARM_CONTEXT,
+      drawnUnitRandoms: [0.5],
+    }),
+  ).toThrow(RangeError);
+});
+
+// --- Plan V15 phase 52: front-relative aim. ---
+
+const FRONT_SPREAD = (offsetDegrees: number, shots = 3): SpreadPattern => ({
+  kind: "spread",
+  shots,
+  arcDegrees: 20,
+  aim: "front",
+  offsetDegrees,
+  emitterRadiusTiles: 0.5,
+});
+const withHeading = (headingRadians: number): PatternContext => ({
+  ...baseContext,
+  enemyHeadingRadians: headingRadians,
+});
+
+test.each([
+  [0, 0],
+  [180, Math.PI],
+  [-90, -Math.PI / 2],
+  [37.5, degrees(37.5)],
+])("a front-aimed spread at offset %s centres on heading + offset", (offset, offsetRadians) => {
+  const heading = degrees(25);
+  const bearings = resolveBearings(FRONT_SPREAD(offset), withHeading(heading));
+  expect(bearings[1].bearingRadians).toBeCloseTo(heading + offsetRadians, 12);
+  expect(bearings[0].bearingRadians).toBeCloseTo(heading + offsetRadians - degrees(10), 12);
+});
+
+test("a front-aimed scatter centres its cone on heading + offset", () => {
+  const scatter: ScatterPattern = {
+    kind: "scatter",
+    shots: 2,
+    coneDegrees: 40,
+    aim: "front",
+    offsetDegrees: 180,
+    emitterRadiusTiles: 0,
+  };
+  const bearings = resolveBearings(scatter, {
+    ...withHeading(degrees(10)),
+    drawnUnitRandoms: [0.5, 1],
+  });
+  expect(bearings[0].bearingRadians).toBeCloseTo(degrees(10) + Math.PI, 12);
+  expect(bearings[1].bearingRadians).toBeCloseTo(degrees(10) + Math.PI + degrees(20), 12);
+});
+
+test("a front-aimed bearing follows the heading and ignores the player", () => {
+  const spread = FRONT_SPREAD(0, 1);
+  const at = (heading: number, player: { x: number; y: number }) =>
+    resolveBearings(spread, { ...withHeading(heading), playerPositionTiles: player })[0]
+      .bearingRadians;
+  expect(at(1, { x: 0, y: 0 })).toBe(at(1, { x: 50, y: -3 }));
+  expect(at(2, { x: 0, y: 0 })).toBeCloseTo(at(1, { x: 0, y: 0 }) + 1, 12);
+});
+
+test("a front-aimed pattern without a heading in the context uses 0", () => {
+  expect(resolveBearings(FRONT_SPREAD(90, 1), baseContext)[0].bearingRadians).toBeCloseTo(
+    Math.PI / 2,
+    12,
+  );
 });

@@ -119,6 +119,7 @@
               "id": "white-bomb-targeted",
               "projectile": "white-bomb-v1",
               "tuningSource": "trainer-authored",
+              "target": "player",
               "pattern": {
                 "kind": "spread",
                 "shots": 1,

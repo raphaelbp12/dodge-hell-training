@@ -50,7 +50,7 @@
       }
     },
     "killer-bee-queen": {
-      "rulesVersion": "killer-bee-queen-nest-paladin-v11",
+      "rulesVersion": "killer-bee-queen-nest-paladin-v12",
       "displayName": "Killer Bee Queen",
       "primaryArchetype": "killer-bee-queen",
       "arenaId": "nest-boss-room",

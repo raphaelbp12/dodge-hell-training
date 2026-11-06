@@ -2496,7 +2496,7 @@ test("the Home phase panel starts a two-phase one-shot drill at the first select
   await finishCountdown(page, false);
   const state = await inspect(page);
   expect(state.rulesVersion).toBe(
-    "killer-bee-queen-nest-paladin-v11-drill-p2-4-once",
+    "killer-bee-queen-nest-paladin-v12-drill-p2-4-once",
   );
   expect(state.enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
 });

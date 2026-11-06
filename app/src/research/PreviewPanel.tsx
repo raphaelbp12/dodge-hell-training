@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { EncounterConfig } from "../game/config/encounter";
 import type { Vector2 } from "../game/models";
 import { drawPreviewFrame, drawEmptyPreview } from "./previewDraw";
-import { countUnmatchedTags, previewAt } from "./previewModel";
+import {
+  countUnmatchedTags,
+  initialHeadingSliderDegrees,
+  previewAt,
+} from "./previewModel";
 import {
   PREVIEW_SIZE_PIXELS,
   type PreviewPreferenceValue,
@@ -20,6 +24,8 @@ import type { Tag } from "./tagging";
 import styles from "./PreviewPanel.module.css";
 
 const PLAYER_SLIDER_STEP_TILES = 0.1;
+/** Approved with plan V15 (N20): the heading slider moves in whole degrees. */
+const HEADING_SLIDER_STEP_DEGREES = 1;
 const SIZES: readonly PreviewSize[] = ["small", "medium", "large"];
 const NO_VIDEO_NOTE = "Open a video to see the preview";
 
@@ -54,6 +60,12 @@ export function PreviewPanel({
   const [playerTiles, setPlayerTiles] = useState<Vector2>(
     config.player.spawnTiles,
   );
+  // N20: one value for the whole study, starting at the primary archetype's
+  // initial heading. It is view state only: it never joins the persisted
+  // preference (M24) and resets on reload.
+  const [headingDegrees, setHeadingDegrees] = useState(() =>
+    initialHeadingSliderDegrees(config),
+  );
   const canvas = useRef<HTMLCanvasElement>(null);
   const drag = useRef<Vector2 | null>(null);
   const ranges = playerSliderRanges(shape);
@@ -78,7 +90,13 @@ export function PreviewPanel({
     }
     drawPreviewFrame(
       context,
-      previewAt({ tags, timeSeconds: mediaTime, config, playerTiles }),
+      previewAt({
+        tags,
+        timeSeconds: mediaTime,
+        config,
+        playerTiles,
+        headingRadians: (headingDegrees * Math.PI) / 180,
+      }),
       view,
       canvasPixels,
       highlightedTagIndices,
@@ -90,6 +108,7 @@ export function PreviewPanel({
     mediaTime,
     config,
     playerTiles,
+    headingDegrees,
     view,
     canvasPixels,
     highlightedTagIndices,
@@ -200,6 +219,18 @@ export function PreviewPanel({
               <output>{playerTiles[axis].toFixed(1)}</output>
             </label>
           ))}
+          <label className={styles.slider}>
+            <span>Enemy heading (degrees)</span>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={HEADING_SLIDER_STEP_DEGREES}
+              value={headingDegrees}
+              onChange={(event) => setHeadingDegrees(Number(event.target.value))}
+            />
+            <output>{headingDegrees.toFixed(0)}</output>
+          </label>
         </>
       )}
     </aside>

@@ -86,7 +86,7 @@ test("bombs keep a visual-only octagon body and a five-frame explosion", () => {
   expect(bomb.appearance!.bomb!.borderPixels).toBe(1);
   expect(bomb.appearance!.bomb!.bodyColor).toBe("#FF0000");
   expect(bomb.collisionPartsTiles).toHaveLength(1);
-  expect(bomb.motion.kind).toBe("lob");
+  expect(bomb.type).toBe("bomb");
 });
 
 test("the body-part cap equals the largest authored compound body", () => {

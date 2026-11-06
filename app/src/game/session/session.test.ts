@@ -37,7 +37,6 @@ test("session delivers accepted hits once before lethal result, never while paus
     hasHitPlayer: false,
     spawnPositionTiles: { x: 0, y: 0 },
     spawnOrientationRadians: 0,
-    detonationTargetTiles: null,
   });
   const delivered: number[] = [];
   const receive = (hit: { damageHp: number }) => {
@@ -81,7 +80,6 @@ function kill(session: SessionController) {
     hasHitPlayer: false,
     spawnPositionTiles: { ...session.simulation.player.positionTiles },
     spawnOrientationRadians: 0,
-    detonationTargetTiles: null,
   });
   return session.advance(tick, idle);
 }

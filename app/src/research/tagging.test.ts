@@ -463,3 +463,87 @@ test("the committed phase-3 observation export passes structural validation", ()
   const value: unknown = JSON.parse(readFileSync(exportUrl, "utf8"));
   expect(() => validateObservationExport(value)).not.toThrow();
 });
+
+describe("composite and typed-geometry tag fields (plan V15 phase 53)", () => {
+  const validations: ReadonlyArray<readonly [string, Tag]> = [
+    ["front aim on a spread", tag2({ pattern: "spread", aim: "front" })],
+    ["front aim on a scatter", tag2({ pattern: "scatter", aim: "front" })],
+    [
+      "a ring of spreads",
+      tag2({ pattern: "fixed-ring", armPattern: "spread", shotsPerArm: 3, armArcDegrees: 20 }),
+    ],
+    [
+      "a rotating ring of scatters",
+      tag2({ armPattern: "scatter", shotsPerArm: 2, armArcDegrees: 30 }),
+    ],
+    ["a ring of rings", tag2({ armPattern: "ring", shotsPerArm: 2 })],
+    ["a negative rotation rate", tag2({ clockwiseDegreesPerSecond: -45 })],
+    ["a rotation phase alone", tag2({ initialPhaseDegrees: 12.5 })],
+    ["a rate alone", tag2({ clockwiseDegreesPerSecond: 30 })],
+  ];
+
+  test.each(validations)("accepts %s", (_label, entry) => {
+    const value = observation2([entry]);
+    expect(validateObservationExport(value)).toBe(value);
+  });
+
+  const rejections: ReadonlyArray<readonly [string, unknown, RegExp]> = [
+    ["an unknown armPattern", { ...tag2(), armPattern: "single", shotsPerArm: 1 }, /armPattern/],
+    [
+      "armPattern on a spread",
+      tag2({ pattern: "spread", aim: "player", armPattern: "ring", shotsPerArm: 2 }),
+      /armPattern/,
+    ],
+    ["armPattern on a volley", tag2({ pattern: "volley", armPattern: "ring", shotsPerArm: 2 }), /armPattern/],
+    ["armPattern without shotsPerArm", tag2({ armPattern: "ring" }), /shotsPerArm/],
+    ["shotsPerArm without armPattern", tag2({ shotsPerArm: 2 }), /shotsPerArm/],
+    ["a zero shotsPerArm", tag2({ armPattern: "ring", shotsPerArm: 0 }), /shotsPerArm/],
+    ["a fractional shotsPerArm", tag2({ armPattern: "ring", shotsPerArm: 1.5 }), /shotsPerArm/],
+    ["a spread arm without a cone", tag2({ armPattern: "spread", shotsPerArm: 3 }), /armArcDegrees/],
+    ["a scatter arm without a cone", tag2({ armPattern: "scatter", shotsPerArm: 3 }), /armArcDegrees/],
+    ["a negative cone", tag2({ armPattern: "spread", shotsPerArm: 3, armArcDegrees: -1 }), /armArcDegrees/],
+    ["a full-turn spread arc", tag2({ armPattern: "spread", shotsPerArm: 3, armArcDegrees: 360 }), /armArcDegrees/],
+    ["a zero scatter cone", tag2({ armPattern: "scatter", shotsPerArm: 3, armArcDegrees: 0 }), /armArcDegrees/],
+    ["a scatter cone over 360", tag2({ armPattern: "scatter", shotsPerArm: 3, armArcDegrees: 361 }), /armArcDegrees/],
+    ["a cone on a ring of rings", tag2({ armPattern: "ring", shotsPerArm: 2, armArcDegrees: 10 }), /armArcDegrees/],
+    ["a cone without armPattern", tag2({ armArcDegrees: 10 }), /armArcDegrees/],
+    ["a rate on a fixed ring", tag2({ pattern: "fixed-ring", clockwiseDegreesPerSecond: 10 }), /clockwiseDegreesPerSecond/],
+    ["a phase on a spread", tag2({ pattern: "spread", aim: "fixed", initialPhaseDegrees: 10 }), /initialPhaseDegrees/],
+    ["a nonfinite rate", { ...tag2(), clockwiseDegreesPerSecond: Number.NaN }, /clockwiseDegreesPerSecond/],
+    ["a string phase", { ...tag2(), initialPhaseDegrees: "10" }, /initialPhaseDegrees/],
+  ];
+
+  test.each(rejections)("rejects %s", (_label, entry, path) => {
+    expect(() => validateObservationExport(observation2([entry]))).toThrow(path);
+  });
+
+  test("a v2 file without the new fields is unchanged and the studies keep them out", () => {
+    const value = observation2([tag2(), tag2({ pattern: "spread", aim: "player" })]);
+    expect(validateObservationExport(value)).toBe(value);
+    const study = studyFromExport(validateObservationExport(value));
+    for (const entry of study.tags) {
+      expect(entry).not.toHaveProperty("armPattern");
+      expect(entry).not.toHaveProperty("clockwiseDegreesPerSecond");
+    }
+  });
+
+  test("a composite and a plain ring of one sprite summarize separately (N31)", () => {
+    const summaries = summarizeTags([
+      tag2({ pattern: "fixed-ring", timeSeconds: 1 }),
+      tag2({ pattern: "fixed-ring", timeSeconds: 2 }),
+      tag2({ pattern: "fixed-ring", armPattern: "ring", shotsPerArm: 2, timeSeconds: 3 }),
+      tag2({ pattern: "fixed-ring", armPattern: "ring", shotsPerArm: 2, timeSeconds: 5 }),
+    ]);
+    expect(summaries).toHaveLength(2);
+    expect(summaries.map((summary) => summary.armPattern)).toEqual([undefined, "ring"]);
+  });
+
+  test("rotation and arc values do not join the grouping key", () => {
+    const summaries = summarizeTags([
+      tag2({ timeSeconds: 1, clockwiseDegreesPerSecond: 10, initialPhaseDegrees: 0 }),
+      tag2({ timeSeconds: 2, clockwiseDegreesPerSecond: 99, initialPhaseDegrees: 40 }),
+    ]);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].sampleCount).toBe(1);
+  });
+});

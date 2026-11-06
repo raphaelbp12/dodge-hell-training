@@ -65,34 +65,30 @@
       "motion": { "kind": "linear", "rangeTiles": 9 }
     },
     "white-bomb-v1": {
+      "type": "bomb",
       "source": "killer-bee-queen-source.md row 27",
       "damageHp": 100,
-      "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
       "appearance": "white-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
-      "motion": {
-        "kind": "lob",
-        "travelSeconds": 0.6,
-        "detonationRadiusTiles": 2
-      }
+      "rangeTiles": 1.8,
+      "travelSeconds": 0.6,
+      "detonationRadiusTiles": 2
     },
     "blue-bomb": {
+      "type": "bomb",
       "source": "killer-bee-queen-source.md row 30",
       "damageHp": 80,
-      "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "quiet", "seconds": 1 }],
       "appearance": "blue-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
-      "motion": {
-        "kind": "lob",
-        "travelSeconds": 0.6,
-        "detonationRadiusTiles": 2
-      }
+      "rangeTiles": 1.8,
+      "travelSeconds": 0.6,
+      "detonationRadiusTiles": 2
     },
     "red-stinger-small": {
       "source": "killer-bee-queen-source.md row 1",
@@ -106,19 +102,17 @@
       "motion": { "kind": "linear", "rangeTiles": 9.5 }
     },
     "red-bomb-v1": {
+      "type": "bomb",
       "source": "killer-bee-queen-source.md row 25",
       "damageHp": 80,
-      "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "confused", "seconds": 3 }],
       "appearance": "red-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
-      "motion": {
-        "kind": "lob",
-        "travelSeconds": 0.6,
-        "detonationRadiusTiles": 2
-      }
+      "rangeTiles": 1.8,
+      "travelSeconds": 0.6,
+      "detonationRadiusTiles": 2
     },
     "blue-stinger-small-v1": {
       "source": "killer-bee-queen-source.md row 5",
@@ -416,15 +410,17 @@
       "motion": { "kind": "linear", "rangeTiles": 10 }
     },
     "white-bomb-v2": {
+      "type": "bomb",
       "source": "killer-bee-queen-source.md row 28",
       "damageHp": 120,
-      "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "dazed", "seconds": 2 }],
       "appearance": "white-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
-      "motion": { "kind": "lob", "travelSeconds": 0.6, "detonationRadiusTiles": 3 }
+      "rangeTiles": 1.8,
+      "travelSeconds": 0.6,
+      "detonationRadiusTiles": 3
     },
     "red-stinger-large-v3": {
       "source": "killer-bee-queen-source.md row 23",
@@ -438,15 +434,17 @@
       "motion": { "kind": "linear", "rangeTiles": 11 }
     },
     "red-bomb-v2": {
+      "type": "bomb",
       "source": "killer-bee-queen-source.md row 26",
       "damageHp": 80,
-      "speedTilesPerSecond": 3,
       "armorPiercing": false,
       "conditions": [{ "key": "armorBroken", "seconds": 3 }],
       "appearance": "red-bomb",
       "expiration": "lifetime-only",
       "hitPolicy": "once-per-shard",
-      "motion": { "kind": "lob", "travelSeconds": 0.6, "detonationRadiusTiles": 2 }
+      "rangeTiles": 1.8,
+      "travelSeconds": 0.6,
+      "detonationRadiusTiles": 2
     },
     "blue-ball-v1": {
       "source": "killer-bee-queen-source.md row 8",

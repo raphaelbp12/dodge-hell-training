@@ -104,6 +104,11 @@ export type EnemyState = {
   id: number;
   archetypeId: string;
   positionTiles: Vector2;
+  /**
+   * The direction of the enemy's last movement, in radians clockwise on screen
+   * from +x (N17). Held while it does not move; only movement updates it.
+   */
+  headingRadians: number;
   spawnedAtSeconds: number;
   /** One per authored attack of the archetype, in authored order. */
   attackClocks: AttackClockState[];
@@ -156,8 +161,26 @@ export type ShardState = {
   /** Only meaningful for the turning and wavy kinds. */
   spawnPositionTiles: Vector2;
   spawnOrientationRadians: number;
-  /** Only meaningful for the lob kind. */
-  detonationTargetTiles: Vector2 | null;
+};
+
+/**
+ * A bomb in flight (N22). Separate from `ShardState` so a bomb's lifecycle -
+ * a destination, a detonation and no in-flight collision - never branches the
+ * bullet path. It shares the shard id sequence (N23).
+ */
+export type BombState = {
+  id: number;
+  projectileId: string;
+  orientationRadians: number;
+  positionTiles: Vector2;
+  velocityTilesPerSecond: Vector2;
+  ageSeconds: number;
+  /** The projectile's `travelSeconds`, captured at fire time. */
+  lifetimeSeconds: number;
+  /** Captured at fire time (G09). */
+  damageHp: number;
+  hasHitPlayer: boolean;
+  detonationTargetTiles: Vector2;
 };
 
 export type SessionPhase =

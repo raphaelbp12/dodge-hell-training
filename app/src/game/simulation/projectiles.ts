@@ -1,10 +1,9 @@
 import {
-  convexBodyOverlapsCircle,
   sweptConvexPartsOverlap,
   transformBodyParts,
   transformBodyVertices,
 } from "./geometry";
-import { projectileOf, type EncounterConfig, type ProjectileSpec } from "../config/encounter";
+import { bulletOf, projectileOf, type BulletSpec, type EncounterConfig } from "../config/encounter";
 import type { ShardState, Vector2 } from "../models";
 
 /** The two fields shard motion and collision need from SimulationState. */
@@ -23,7 +22,7 @@ export type ShardCollisionContext = Readonly<{
  * branch to maintain.
  */
 export function resolveShardLifetime(
-  projectile: ProjectileSpec,
+  projectile: BulletSpec,
 ): { lifetimeSeconds: number; reversalAgeSeconds: number } {
   const { motion } = projectile;
   if (motion.kind === "boomerang") {
@@ -31,9 +30,6 @@ export function resolveShardLifetime(
       lifetimeSeconds: motion.lifetimeSeconds,
       reversalAgeSeconds: motion.reversalAgeSeconds,
     };
-  }
-  if (motion.kind === "lob") {
-    return { lifetimeSeconds: motion.travelSeconds, reversalAgeSeconds: Infinity };
   }
   return {
     lifetimeSeconds: motion.rangeTiles / projectile.speedTilesPerSecond,
@@ -50,7 +46,7 @@ export function resolveShardLifetime(
  * end ages, which is why this is the only place either path is evaluated.
  */
 export type CurvedProjectileMotion = Extract<
-  ProjectileSpec["motion"],
+  BulletSpec["motion"],
   { kind: "turning" | "wavy" }
 >;
 
@@ -117,77 +113,24 @@ export function curvedShardOrientationAtAge(
 }
 
 function isCurvedMotion(
-  motion: ProjectileSpec["motion"],
-): motion is Extract<ProjectileSpec["motion"], { kind: "turning" | "wavy" }> {
+  motion: BulletSpec["motion"],
+): motion is Extract<BulletSpec["motion"], { kind: "turning" | "wavy" }> {
   return motion.kind === "turning" || motion.kind === "wavy";
 }
 
-/**
- * Resolves where a `lob` shard will land. Aimed at the player, the
- * destination is the player's position at fire time, clamped to the maximum
- * distance the shard can cover in its travel time; otherwise it is the
- * emitter point plus the firing direction times that same maximum distance.
- */
-export function resolveLobDestination(
-  projectile: ProjectileSpec,
-  travelSeconds: number,
-  positionTiles: Vector2,
-  orientationRadians: number,
-  aimPlayerPositionTiles: Vector2 | undefined,
-): Vector2 {
-  const maximumDistanceTiles = projectile.speedTilesPerSecond * travelSeconds;
-  if (!aimPlayerPositionTiles) {
-    return {
-      x: positionTiles.x + Math.cos(orientationRadians) * maximumDistanceTiles,
-      y: positionTiles.y + Math.sin(orientationRadians) * maximumDistanceTiles,
-    };
-  }
-  const deltaX = aimPlayerPositionTiles.x - positionTiles.x;
-  const deltaY = aimPlayerPositionTiles.y - positionTiles.y;
-  const distanceTiles = Math.hypot(deltaX, deltaY);
-  const clampFraction =
-    distanceTiles > maximumDistanceTiles && distanceTiles > 0
-      ? maximumDistanceTiles / distanceTiles
-      : 1;
-  return {
-    x: positionTiles.x + deltaX * clampFraction,
-    y: positionTiles.y + deltaY * clampFraction,
-  };
-}
-
-/**
- * Builds one shard fired from `positionTiles` along `orientationRadians`.
- * `aimPlayerPositionTiles`, when given, is only read for the `lob` kind's
- * player-aimed destination case; every other kind ignores it.
- */
+/** Builds one shard fired from `positionTiles` along `orientationRadians`. */
 export function createShard(
-  projectile: ProjectileSpec,
+  projectile: BulletSpec,
   id: number,
   positionTiles: Vector2,
   orientationRadians: number,
-  aimPlayerPositionTiles?: Vector2,
 ): ShardState {
   const { lifetimeSeconds, reversalAgeSeconds } =
     resolveShardLifetime(projectile);
-  let velocityTilesPerSecond = {
+  const velocityTilesPerSecond = {
     x: Math.cos(orientationRadians) * projectile.speedTilesPerSecond,
     y: Math.sin(orientationRadians) * projectile.speedTilesPerSecond,
   };
-  let detonationTargetTiles: Vector2 | null = null;
-  if (projectile.motion.kind === "lob") {
-    const target = resolveLobDestination(
-      projectile,
-      lifetimeSeconds,
-      positionTiles,
-      orientationRadians,
-      aimPlayerPositionTiles,
-    );
-    detonationTargetTiles = target;
-    velocityTilesPerSecond = {
-      x: (target.x - positionTiles.x) / lifetimeSeconds,
-      y: (target.y - positionTiles.y) / lifetimeSeconds,
-    };
-  }
   return {
     id,
     projectileId: projectile.id,
@@ -202,7 +145,6 @@ export function createShard(
     hasHitPlayer: false,
     spawnPositionTiles: { ...positionTiles },
     spawnOrientationRadians: orientationRadians,
-    detonationTargetTiles,
   };
 }
 
@@ -217,7 +159,7 @@ export function createShard(
  */
 export function restampLiveShards(
   shards: readonly ShardState[],
-  projectile: ProjectileSpec,
+  projectile: BulletSpec,
 ): ShardState[] {
   const { lifetimeSeconds, reversalAgeSeconds } =
     resolveShardLifetime(projectile);
@@ -283,7 +225,7 @@ export function shardOverlapsPlayer(
   );
 }
 
-function interpolatePosition(
+export function interpolatePosition(
   start: Vector2,
   end: Vector2,
   fraction: number,
@@ -301,7 +243,7 @@ function moveShard(
   playerStart: Vector2,
   playerEnd: Vector2,
 ): boolean {
-  const projectile = projectileOf(context.config, shard.projectileId);
+  const projectile = bulletOf(context.config, shard.projectileId);
   const shardStart = shard.positionTiles;
   if (isCurvedMotion(projectile.motion)) {
     const ageAtSegmentEndSeconds = shard.ageSeconds + elapsedSeconds;
@@ -324,22 +266,6 @@ function moveShard(
       y: shard.positionTiles.y + shard.velocityTilesPerSecond.y * elapsedSeconds,
     };
   }
-  if (projectile.motion.kind === "lob") {
-    // A lob shard never collides in flight; it only ever hits by detonating,
-    // which happens exactly once, in the same fixed step its age reaches
-    // `lifetimeSeconds` (travelSeconds) - the boundary snapping in
-    // `advanceShard` guarantees this comparison is exact, not approximate.
-    const isDetonating = shard.ageSeconds + elapsedSeconds >= shard.lifetimeSeconds;
-    if (!isDetonating || !shard.detonationTargetTiles) return false;
-    return (
-      !shard.hasHitPlayer &&
-      convexBodyOverlapsCircle(
-        transformBodyVertices(context.config.player.verticesTiles, playerEnd),
-        shard.detonationTargetTiles,
-        projectile.motion.detonationRadiusTiles,
-      )
-    );
-  }
   return (
     !shard.hasHitPlayer &&
     shardOverlapsPlayer(
@@ -359,7 +285,7 @@ export function advanceShard(
   elapsedSeconds: number,
   playerStart: Vector2,
   playerEnd: Vector2,
-): { alive: boolean; hitPlayer: boolean; detonated: boolean } {
+): { alive: boolean; hitPlayer: boolean } {
   const initialAgeSeconds = shard.ageSeconds;
   let hitPlayer = false;
   let segmentPlayerStart = playerStart;
@@ -406,13 +332,8 @@ export function advanceShard(
   }
   moveSegment(targetAgeSeconds - shard.ageSeconds);
   shard.ageSeconds = targetAgeSeconds;
-  const projectile = projectileOf(context.config, shard.projectileId);
   return {
     alive: shard.ageSeconds < shard.lifetimeSeconds,
     hitPlayer,
-    detonated:
-      projectile.motion.kind === "lob" &&
-      shard.ageSeconds >= shard.lifetimeSeconds &&
-      shard.detonationTargetTiles !== null,
   };
 }

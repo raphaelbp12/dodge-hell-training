@@ -126,6 +126,45 @@ describe("TaggerSessions", () => {
   });
 });
 
+describe("saved sessions carry typed geometry (plan V15 phase 53)", () => {
+  test("a draft with composite tags and sticky geometry validates and round-trips", () => {
+    const rich = JSON.parse(JSON.stringify(draft()));
+    rich.study.tags[0] = {
+      ...rich.study.tags[0],
+      pattern: "rotating-arm",
+      armPattern: "spread",
+      shotsPerArm: 3,
+      armArcDegrees: 20,
+      clockwiseDegreesPerSecond: -30,
+      initialPhaseDegrees: 5,
+    };
+    rich.sticky = {
+      ...rich.sticky,
+      aim: "front",
+      armPattern: "scatter",
+      shotsPerArm: 2,
+      armArcDegrees: 40,
+      clockwiseDegreesPerSecond: 12,
+      initialPhaseDegrees: 0,
+    };
+    expect(validateSessionDraft(rich)).toBe(rich);
+    expect(JSON.parse(JSON.stringify(rich))).toEqual(rich);
+  });
+
+  test.each([
+    ["a tag with armPattern but no shotsPerArm", (d: any) => { d.study.tags[0].armPattern = "ring"; }, /shotsPerArm/],
+    ["a tag rate on a fixed ring", (d: any) => { d.study.tags[0].pattern = "fixed-ring"; d.study.tags[0].clockwiseDegreesPerSecond = 3; }, /clockwiseDegreesPerSecond/],
+    ["a bad sticky armPattern", (d: any) => { d.sticky.armPattern = "star"; }, /sticky\.armPattern/],
+    ["a fractional sticky shotsPerArm", (d: any) => { d.sticky.shotsPerArm = 1.5; }, /sticky\.shotsPerArm/],
+    ["a negative sticky cone", (d: any) => { d.sticky.armArcDegrees = -1; }, /sticky\.armArcDegrees/],
+    ["a nonfinite sticky rate", (d: any) => { d.sticky.clockwiseDegreesPerSecond = Number.NaN; }, /sticky\.clockwiseDegreesPerSecond/],
+  ])("rejects %s", (_label, mutate, pattern) => {
+    const bad = JSON.parse(JSON.stringify(draft()));
+    mutate(bad);
+    expect(() => validateSessionDraft(bad)).toThrow(pattern);
+  });
+});
+
 describe("shouldWriteDraft", () => {
   test.each([
     [false, 3, false],

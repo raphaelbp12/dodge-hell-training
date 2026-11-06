@@ -30,7 +30,11 @@ export type TagPattern =
   | "scatter"
   | "volley";
 
-export type TagAim = "player" | "fixed";
+/** N19: `front` records only the aim, never a number. */
+export type TagAim = "player" | "fixed" | "front";
+
+/** N31: what each arm of a ring fires; one level only (N33). */
+export type TagArmPattern = "spread" | "scatter" | "ring";
 
 export type Tag = Readonly<{
   /** Seconds from video start, from requestVideoFrameCallback's mediaTime (T19). */
@@ -44,6 +48,16 @@ export type Tag = Readonly<{
   aim?: TagAim;
   /** Projectiles in the volley, or arms for a ring. */
   shots: number;
+  /** N31: rings only. What each arm fires; absent means a single shot. */
+  armPattern?: TagArmPattern;
+  /** N31: required with `armPattern`, absent without it. */
+  shotsPerArm?: number;
+  /** N34: required when `armPattern` is spread or scatter. A typed estimate. */
+  armArcDegrees?: number;
+  /** N35: `rotating-arm` only. A typed estimate, not a measurement. */
+  clockwiseDegreesPerSecond?: number;
+  /** N35: `rotating-arm` only. A typed estimate, not a measurement. */
+  initialPhaseDegrees?: number;
   /** Shared by every volley of one burst; a positive integer (Z08). */
   burstId?: number;
   /** Present only when a person typed this time (Z21). */
@@ -96,6 +110,7 @@ export type IntervalSummary = Readonly<{
   spriteId: string;
   pattern: TagPattern;
   aim?: TagAim;
+  armPattern?: TagArmPattern;
   scope: IntervalScope;
   /** Intervals observed in this scope. */
   sampleCount: number;
@@ -112,7 +127,8 @@ const TAG_PATTERNS: readonly TagPattern[] = [
   "scatter",
   "volley",
 ];
-const TAG_AIMS: readonly TagAim[] = ["player", "fixed"];
+const TAG_AIMS: readonly TagAim[] = ["player", "fixed", "front"];
+const TAG_ARM_PATTERNS: readonly TagArmPattern[] = ["spread", "scatter", "ring"];
 
 function reject(path: string, reason: string): never {
   throw new RangeError(`Observation export ${path} ${reason}`);
@@ -185,6 +201,62 @@ function tagPattern(value: unknown, path: string): TagPattern {
   return value as TagPattern;
 }
 
+function finite(value: unknown, path: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value))
+    reject(path, "must be a finite number");
+  return value;
+}
+
+/**
+ * Why `degrees` cannot be the typed width of a spread or scatter arm, or null
+ * when it can. The ranges match the game's own: a spread arc is below a full
+ * turn and a scatter cone is positive and at most one.
+ */
+export function armArcProblem(
+  armPattern: "spread" | "scatter",
+  degrees: number,
+): string | null {
+  if (!Number.isFinite(degrees)) return "must be a finite number of degrees";
+  if (armPattern === "spread")
+    return degrees >= 0 && degrees < 360 ? null : "must be from 0 up to, not including, 360 degrees";
+  return degrees > 0 && degrees <= 360 ? null : "must be above 0 and at most 360 degrees";
+}
+
+/** Shape check for the composite and typed-geometry fields of one tag (N31, N34, N35). */
+function validateGeometryFields(
+  source: Record<string, unknown>,
+  pattern: TagPattern,
+  path: string,
+): void {
+  const isRing = pattern === "rotating-arm" || pattern === "fixed-ring";
+  if (source.armPattern !== undefined) {
+    if (!isRing)
+      reject(`${path}.armPattern`, "must be absent unless the pattern is a ring");
+    if (!TAG_ARM_PATTERNS.includes(source.armPattern as TagArmPattern))
+      reject(`${path}.armPattern`, `must be one of ${TAG_ARM_PATTERNS.join(", ")}`);
+    positiveInteger(source.shotsPerArm, `${path}.shotsPerArm`);
+    if (source.armPattern === "ring") {
+      if (source.armArcDegrees !== undefined)
+        reject(`${path}.armArcDegrees`, "must be absent when armPattern is ring");
+    } else {
+      const arc = nonNegativeFinite(source.armArcDegrees, `${path}.armArcDegrees`);
+      const problem = armArcProblem(source.armPattern as "spread" | "scatter", arc);
+      if (problem) reject(`${path}.armArcDegrees`, problem);
+    }
+  } else {
+    if (source.shotsPerArm !== undefined)
+      reject(`${path}.shotsPerArm`, "must be absent without armPattern");
+    if (source.armArcDegrees !== undefined)
+      reject(`${path}.armArcDegrees`, "must be absent without armPattern");
+  }
+  for (const field of ["clockwiseDegreesPerSecond", "initialPhaseDegrees"] as const) {
+    if (source[field] === undefined) continue;
+    if (pattern !== "rotating-arm")
+      reject(`${path}.${field}`, "must be absent unless the pattern is rotating-arm");
+    finite(source[field], `${path}.${field}`);
+  }
+}
+
 function provenance(value: unknown): VideoProvenance {
   const source = record(value, "provenance");
   const sourceUrl = source.sourceUrl;
@@ -227,6 +299,7 @@ export function validateTag(value: unknown, path: string): Tag {
   } else if (source.aim !== undefined) {
     reject(`${path}.aim`, "must be absent unless the pattern is spread or scatter");
   }
+  validateGeometryFields(source, pattern, path);
   if (source.burstId !== undefined)
     positiveInteger(source.burstId, `${path}.burstId`);
   if (source.timeSource !== undefined && source.timeSource !== "typed")
@@ -305,6 +378,7 @@ type MutableGroup = {
   spriteId: string;
   pattern: TagPattern;
   aim?: TagAim;
+  armPattern?: TagArmPattern;
   tags: Tag[];
 };
 
@@ -329,6 +403,7 @@ function compareSummaries(
     compareText(first.spriteId, second.spriteId) ||
     compareText(first.pattern, second.pattern) ||
     compareText(first.aim ?? "", second.aim ?? "") ||
+    compareText(first.armPattern ?? "", second.armPattern ?? "") ||
     SCOPE_ORDER[first.scope] - SCOPE_ORDER[second.scope]
   );
 }
@@ -355,6 +430,7 @@ function summaryOf(
     spriteId: group.spriteId,
     pattern: group.pattern,
     ...(group.aim === undefined ? {} : { aim: group.aim }),
+    ...(group.armPattern === undefined ? {} : { armPattern: group.armPattern }),
     scope,
     intervalsSeconds: intervals,
   };
@@ -402,7 +478,7 @@ function summariesOf(group: MutableGroup): IntervalSummary[] {
 }
 
 /**
- * Groups by `(phaseIndex, spriteId, pattern, aim)` (Z06), then derives the
+ * Groups by `(phaseIndex, spriteId, pattern, aim, armPattern)` (Z06, N31), then derives the
  * interval sample count, mean and population standard deviation (T32).
  *
  * A group with no burst ids yields one `all` result. A group with any burst id
@@ -427,6 +503,7 @@ export function summarizeTags(tags: readonly Tag[]): readonly IntervalSummary[] 
         spriteId: entry.spriteId,
         pattern: entry.pattern,
         aim: entry.aim,
+        armPattern: entry.armPattern,
         tags: [entry],
       });
   }
@@ -435,9 +512,13 @@ export function summarizeTags(tags: readonly Tag[]): readonly IntervalSummary[] 
 
 /** The Z06 grouping key, shared with the tagger's live readout. */
 export function groupKey(
-  entry: Pick<Tag, "phaseIndex" | "spriteId" | "pattern" | "aim">,
+  entry: Pick<Tag, "phaseIndex" | "spriteId" | "pattern" | "aim" | "armPattern">,
 ): string {
-  return [entry.phaseIndex, entry.spriteId, entry.pattern, entry.aim ?? ""].join(
-    "\u0000",
-  );
+  return [
+    entry.phaseIndex,
+    entry.spriteId,
+    entry.pattern,
+    entry.aim ?? "",
+    entry.armPattern ?? "",
+  ].join("\u0000");
 }

@@ -11,7 +11,13 @@ import {
   encounterConfigOf,
   type ProjectileAppearanceSpec,
 } from "../game/config/encounter";
-import { summarizeTags, type Tag, type TagPattern } from "./tagging";
+import {
+  summarizeTags,
+  type Tag,
+  type TagAim,
+  type TagArmPattern,
+  type TagPattern,
+} from "./tagging";
 import {
   actionForKey,
   clampSeekTarget,
@@ -27,8 +33,12 @@ import {
 import {
   appearanceOptions,
   assembleExport,
+  armPatternAllowed,
+  armPatternTakesArc,
   assignBurst,
   createTag,
+  DEFAULT_ARM_ARC_DEGREES,
+  DEFAULT_SHOTS_PER_ARM,
   editTag,
   formatSummaryRow,
   OFFERABLE_PATTERNS,
@@ -36,6 +46,7 @@ import {
   phaseOptions,
   pixelGridCells,
   readoutInterval,
+  rotationAllowed,
   shotsLabel,
   sortNewestFirst,
   TAG_AIMS,
@@ -61,6 +72,11 @@ import {
 } from "./taggerSessions";
 import type { StudyState } from "./tagging";
 import { PreviewPanel } from "./PreviewPanel";
+import {
+  attackJson,
+  authoredAttackFromTag,
+  FRONT_EXPORT_NOTE,
+} from "./exportAttack";
 import {
   PreviewPreference,
   VIDEO_SIZE_PIXELS,
@@ -210,6 +226,62 @@ function CommitInput({
   );
 }
 
+function ExportBox({
+  tagNumber,
+  result,
+  note,
+  onCopy,
+  onClose,
+}: {
+  tagNumber: number;
+  result: ReturnType<typeof authoredAttackFromTag>;
+  note: string | null;
+  onCopy: (text: string) => void;
+  onClose: () => void;
+}) {
+  if (!result)
+    return (
+      <div className={styles.exportBox} role="status">
+        <p>
+          Tag {tagNumber} cannot export: no authored attack in its phase fires
+          this sprite in this pattern, so the cadence and projectile have
+          nothing to come from.
+        </p>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    );
+  const text = attackJson(result.attack);
+  return (
+    <div className={styles.exportBox}>
+      <label className={styles.field}>
+        <span>Attack JSON for tag {tagNumber}</span>
+        <textarea
+          readOnly
+          rows={14}
+          value={text}
+          aria-label={`Attack JSON for tag ${tagNumber}`}
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      </label>
+      <p className={styles.note}>
+        Paste this into the archetype&apos;s attacks in enemies.json by hand;
+        nothing is written for you. Rotation phase is measured at the first
+        tag of its group, and cadence is copied from the matched attack.
+      </p>
+      {result.aimsFront && <p className={styles.note}>{FRONT_EXPORT_NOTE}</p>}
+      <button type="button" onClick={() => onCopy(text)}>
+        Copy JSON
+      </button>{" "}
+      <button type="button" onClick={onClose}>
+        Close
+      </button>
+      {note && <span role="status"> {note}</span>}
+    </div>
+  );
+}
+
 export function TaggerRoute() {
   const appearances = appearanceOptions();
   const initialEncounter = ENCOUNTER_LIST.some(
@@ -248,6 +320,9 @@ export function TaggerRoute() {
     setLayout(next);
   };
   const [selectedTagIndex, setSelectedTagIndex] = useState<number | null>(null);
+  // N41: the row whose attack JSON is shown in the export box; nothing is written to disk.
+  const [exportIndex, setExportIndex] = useState<number | null>(null);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // The loaded or restored study's file name and duration (Z14, Z16).
@@ -540,6 +615,40 @@ export function TaggerRoute() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
+
+  /** Chooses the sticky arm pattern with the starting values a typed estimate needs. */
+  const setStickyArmPattern = (armPattern: TagArmPattern | null) =>
+    setSticky((current) => {
+      const { armPattern: _removed, ...rest } = current;
+      if (armPattern === null) return rest;
+      return {
+        ...rest,
+        armPattern,
+        shotsPerArm: current.shotsPerArm ?? DEFAULT_SHOTS_PER_ARM,
+        ...(armPatternTakesArc(armPattern)
+          ? { armArcDegrees: current.armArcDegrees ?? DEFAULT_ARM_ARC_DEGREES }
+          : {}),
+      };
+    });
+
+  /** A blank field removes a sticky typed value; anything else must be a finite number. */
+  const setStickyNumber = (
+    field:
+      | "shotsPerArm"
+      | "armArcDegrees"
+      | "clockwiseDegreesPerSecond"
+      | "initialPhaseDegrees",
+    text: string,
+  ) =>
+    setSticky((current) => {
+      const { [field]: _removed, ...rest } = current;
+      if (text.trim() === "") return rest;
+      const value = Number(text);
+      if (!Number.isFinite(value)) return current;
+      if (field === "shotsPerArm") return { ...rest, shotsPerArm: Math.max(1, Math.round(value)) };
+      if (field === "armArcDegrees") return { ...rest, armArcDegrees: Math.max(0, value) };
+      return { ...rest, [field]: value };
+    });
 
   const resetSeek = () => {
     clearSeekTimeout();
@@ -1028,6 +1137,13 @@ export function TaggerRoute() {
             </>
           )}{" "}
           · <strong>{sticky.shots}</strong> {shotsLabel(sticky.pattern)}
+          {armPatternAllowed(sticky.pattern) && sticky.armPattern && (
+            <>
+              {" "}
+              · each arm <strong>{sticky.armPattern}</strong>
+              {sticky.shotsPerArm !== undefined && <> ×{sticky.shotsPerArm}</>}
+            </>
+          )}
         </p>
         <div className={styles.controls}>
           <label className={styles.field}>
@@ -1099,6 +1215,91 @@ export function TaggerRoute() {
               Type any count; number keys 1-9 set it directly.
             </small>
           </label>
+          {armPatternAllowed(sticky.pattern) && (
+            <fieldset className={styles.field}>
+              <legend>Each arm fires</legend>
+              {[null, "spread", "scatter", "ring"].map((choice) => (
+                <label key={choice ?? "none"}>
+                  <input
+                    type="radio"
+                    name="arm-pattern"
+                    checked={(sticky.armPattern ?? null) === choice}
+                    onChange={() =>
+                      setStickyArmPattern(choice as TagArmPattern | null)
+                    }
+                  />
+                  {choice ?? "single shot"}
+                </label>
+              ))}
+              {sticky.armPattern && (
+                <label>
+                  <span>Shots per arm</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    aria-label="Shots per arm"
+                    value={sticky.shotsPerArm ?? ""}
+                    onChange={(event) =>
+                      setStickyNumber("shotsPerArm", event.target.value)
+                    }
+                  />
+                </label>
+              )}
+              {sticky.armPattern && armPatternTakesArc(sticky.armPattern) && (
+                <label>
+                  <span>Cone width, degrees (typed estimate)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    aria-label="Cone width in degrees"
+                    value={sticky.armArcDegrees ?? ""}
+                    onChange={(event) =>
+                      setStickyNumber("armArcDegrees", event.target.value)
+                    }
+                  />
+                </label>
+              )}
+              <small className={styles.note}>
+                One level of nesting only. The cone is typed by a person, not
+                measured from the video.
+              </small>
+            </fieldset>
+          )}
+          {rotationAllowed(sticky.pattern) && (
+            <fieldset className={styles.field}>
+              <legend>Rotation (typed estimates)</legend>
+              <label>
+                <span>Clockwise degrees per second</span>
+                <input
+                  type="number"
+                  step="any"
+                  aria-label="Clockwise degrees per second"
+                  value={sticky.clockwiseDegreesPerSecond ?? ""}
+                  onChange={(event) =>
+                    setStickyNumber("clockwiseDegreesPerSecond", event.target.value)
+                  }
+                />
+              </label>
+              <label>
+                <span>Initial phase, degrees</span>
+                <input
+                  type="number"
+                  step="any"
+                  aria-label="Initial phase in degrees"
+                  value={sticky.initialPhaseDegrees ?? ""}
+                  onChange={(event) =>
+                    setStickyNumber("initialPhaseDegrees", event.target.value)
+                  }
+                />
+              </label>
+              <small className={styles.note}>
+                Blank keeps the matched attack&apos;s authored value. Negative
+                rates turn counter-clockwise.
+              </small>
+            </fieldset>
+          )}
         </div>
         <div className={styles.recordRow}>
           <button
@@ -1181,6 +1382,7 @@ export function TaggerRoute() {
                   <th scope="col">Sprite</th>
                   <th scope="col">Pattern</th>
                   <th scope="col">Aim</th>
+                  <th scope="col">Arm pattern</th>
                   <th scope="col">Scope</th>
                   <th scope="col">Samples</th>
                   <th scope="col">Mean</th>
@@ -1190,11 +1392,12 @@ export function TaggerRoute() {
               </thead>
               <tbody>
                 {summaryRows.map((row) => (
-                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.scope}`}>
+                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.armPattern}|${row.scope}`}>
                     <td>{row.phase}</td>
                     <td>{row.sprite}</td>
                     <td>{row.pattern}</td>
                     <td>{row.aim}</td>
+                    <td>{row.armPattern}</td>
                     <td>{row.scope}</td>
                     <td>{row.sampleCount}</td>
                     <td>{row.mean}</td>
@@ -1223,6 +1426,7 @@ export function TaggerRoute() {
                   <th scope="col">Pattern</th>
                   <th scope="col">Aim</th>
                   <th scope="col">Shots / arms</th>
+                  <th scope="col">Geometry (typed)</th>
                   <th scope="col">Burst</th>
                   <th scope="col">
                     <span className={styles.visuallyHidden}>Actions</span>
@@ -1319,7 +1523,7 @@ export function TaggerRoute() {
                           onChange={(event) =>
                             applyEdit(index, {
                               field: "aim",
-                              value: event.target.value as "player" | "fixed",
+                              value: event.target.value as TagAim,
                             })
                           }
                         >
@@ -1342,6 +1546,106 @@ export function TaggerRoute() {
                       />
                     </td>
                     <td>
+                      {!armPatternAllowed(tag.pattern) &&
+                      !rotationAllowed(tag.pattern) ? (
+                        "—"
+                      ) : (
+                        <>
+                          {armPatternAllowed(tag.pattern) && (
+                            <>
+                              <select
+                                className={styles.cellSelect}
+                                aria-label={`Arm pattern of tag ${index + 1}`}
+                                value={tag.armPattern ?? ""}
+                                onChange={(event) =>
+                                  applyEdit(index, {
+                                    field: "armPattern",
+                                    value:
+                                      event.target.value === ""
+                                        ? null
+                                        : (event.target.value as TagArmPattern),
+                                    ...(event.target.value !== "" &&
+                                    event.target.value !== "ring" &&
+                                    tag.armArcDegrees === undefined
+                                      ? { armArcDegrees: DEFAULT_ARM_ARC_DEGREES }
+                                      : {}),
+                                  })
+                                }
+                              >
+                                <option value="">single</option>
+                                <option value="spread">spread</option>
+                                <option value="scatter">scatter</option>
+                                <option value="ring">ring</option>
+                              </select>
+                              {tag.armPattern && (
+                                <CommitInput
+                                  label={`Shots per arm of tag ${index + 1}`}
+                                  value={String(tag.shotsPerArm ?? "")}
+                                  onCommit={(text) =>
+                                    text.trim() !== "" &&
+                                    applyEdit(index, {
+                                      field: "shotsPerArm",
+                                      value: Number(text),
+                                    })
+                                  }
+                                />
+                              )}
+                              {tag.armPattern && armPatternTakesArc(tag.armPattern) && (
+                                <CommitInput
+                                  label={`Cone width of tag ${index + 1}`}
+                                  value={String(tag.armArcDegrees ?? "")}
+                                  step="any"
+                                  onCommit={(text) =>
+                                    text.trim() !== "" &&
+                                    applyEdit(index, {
+                                      field: "armArcDegrees",
+                                      value: Number(text),
+                                    })
+                                  }
+                                />
+                              )}
+                            </>
+                          )}
+                          {rotationAllowed(tag.pattern) && (
+                            <>
+                              <CommitInput
+                                label={`Rotation rate of tag ${index + 1}`}
+                                value={
+                                  tag.clockwiseDegreesPerSecond === undefined
+                                    ? ""
+                                    : String(tag.clockwiseDegreesPerSecond)
+                                }
+                                step="any"
+                                blankAllowed
+                                onCommit={(text) =>
+                                  applyEdit(index, {
+                                    field: "clockwiseDegreesPerSecond",
+                                    value: text.trim() === "" ? null : Number(text),
+                                  })
+                                }
+                              />
+                              <CommitInput
+                                label={`Initial phase of tag ${index + 1}`}
+                                value={
+                                  tag.initialPhaseDegrees === undefined
+                                    ? ""
+                                    : String(tag.initialPhaseDegrees)
+                                }
+                                step="any"
+                                blankAllowed
+                                onCommit={(text) =>
+                                  applyEdit(index, {
+                                    field: "initialPhaseDegrees",
+                                    value: text.trim() === "" ? null : Number(text),
+                                  })
+                                }
+                              />
+                            </>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td>
                       <CommitInput
                         label={`Burst of tag ${index + 1}`}
                         value={tag.burstId === undefined ? "" : String(tag.burstId)}
@@ -1357,6 +1661,18 @@ export function TaggerRoute() {
                     <td>
                       <button
                         type="button"
+                        onClick={() => {
+                          setCopyNote(null);
+                          setExportIndex((current) =>
+                            current === index ? null : index,
+                          );
+                        }}
+                        aria-label={`Export tag at ${tag.timeSeconds.toFixed(3)} seconds as an attack`}
+                      >
+                        Export as attack
+                      </button>{" "}
+                      <button
+                        type="button"
                         onClick={() => seekTo(tag.timeSeconds)}
                         disabled={!videoUrl}
                         aria-label={`Go to tag at ${tag.timeSeconds.toFixed(3)} seconds`}
@@ -1368,6 +1684,9 @@ export function TaggerRoute() {
                         onClick={() => {
                           setDirty(true);
                           setSelectedTagIndex((current) =>
+                            selectionAfterDelete(current, index),
+                          );
+                          setExportIndex((current) =>
                             selectionAfterDelete(current, index),
                           );
                           setTags((current) =>
@@ -1384,6 +1703,26 @@ export function TaggerRoute() {
               </tbody>
             </table>
           </div>
+        )}
+        {exportIndex !== null && tags[exportIndex] && (
+          <ExportBox
+            tagNumber={exportIndex + 1}
+            result={authoredAttackFromTag(tags[exportIndex], config)}
+            note={copyNote}
+            onCopy={(text) => {
+              // N41: a failing clipboard only leaves the box for manual copying.
+              const clipboard = navigator.clipboard;
+              if (!clipboard) {
+                setCopyNote("Copy the text above by hand.");
+                return;
+              }
+              clipboard.writeText(text).then(
+                () => setCopyNote("Copied."),
+                () => setCopyNote("Copy the text above by hand."),
+              );
+            }}
+            onClose={() => setExportIndex(null)}
+          />
         )}
         <p className={styles.note}>
           Tags list newest footage first. Edit a row in place or delete it;
