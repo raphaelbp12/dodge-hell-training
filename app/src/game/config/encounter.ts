@@ -744,7 +744,7 @@ function patternFromAuthored(pattern: AuthoredAttack["pattern"]): AttackPattern 
   });
 }
 
-function attackSpecFromAuthored(attack: AuthoredAttack): AttackSpec {
+export function attackSpecFromAuthored(attack: AuthoredAttack): AttackSpec {
   return Object.freeze({
     id: attack.id,
     projectileId: attack.projectile,

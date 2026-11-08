@@ -164,11 +164,11 @@ export function authoredAttackFromTag(
   };
 }
 
-/** N41: the pretty-printed JSON a person pastes into `enemies.json`. */
+/** N41: the pretty-printed JSON a person pastes into the monster's file under `game/data/enemies/`. */
 export function attackJson(attack: AuthoredAttack): string {
   return JSON.stringify(attack, null, 2);
 }
 
 /** N43: shown beside a front-aimed export. */
 export const FRONT_EXPORT_NOTE =
-  "This attack aims at the enemy's front, so its archetype in enemies.json needs initialHeadingDegrees.";
+  "This attack aims at the enemy's front, so its monster file under game/data/enemies/ needs initialHeadingDegrees.";

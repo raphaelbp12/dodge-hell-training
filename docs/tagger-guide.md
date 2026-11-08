@@ -13,8 +13,11 @@ Run `npm run dev` from `app/` and open the dev URL with `?tagger=1`, for example
 - **Pattern:** where the shots go. Choose `rotating-arm`, `fixed-ring`, `spread` or `scatter`. A loaded legacy tag may show `volley`, which cannot be chosen for new tags.
 - **Aim:** `player`, `fixed` or `front`. It exists only on `spread` and `scatter`. `front` means the shot is aimed relative to the enemy's front (its movement heading). By default the tag records only that, but you can type a **front offset**, and for `fixed` a **bearing** (see Typed estimates).
 - **Shots / arms:** the number of projectiles in the volley, or the number of arms for a ring or rotating arm.
-- **Arm pattern:** what each arm of a ring fires: a single shot (the default), a `spread`, a `scatter`, or another `ring`. Only `rotating-arm` and `fixed-ring` tags have one, and a tag describes one level only; deeper nesting is authored in `enemies.json`.
+- **Arm pattern:** what each arm of a ring fires: a single shot (the default), a `spread`, a `scatter`, or another `ring`. Only `rotating-arm` and `fixed-ring` tags have one, and a tag describes one level only; deeper nesting is authored in the monster's file.
 - **Shots per arm:** how many shots each arm fires (for an inner ring, how many inner arms).
+- **Monster draft:** a working copy of one monster's attacks, loaded from the game and edited in the tagger. It is never read by the game.
+- **Block:** a phase with no sub-phases, or one sub-phase. Each block has its own **Starts here** anchor.
+- **Anchor:** the video time at which a block is entered. It aligns a study with a video and is never exported.
 - **Typed estimates:** the cone width of a spread or scatter arm, a rotating arm's clockwise degrees per second and initial phase, a spread or scatter's own **cone**, a `fixed` aim's **bearing**, a `front` aim's **offset**, a ring's **emitter radius**, a bomb's **range** and **flight time**, and a bullet's **speed** and **range** are numbers *you type*. They are estimates, not measurements from the video, and the preview and export treat them as such. A blank field means "use the matched attack's authored value". A field appears only where it applies: a cone on a spread or scatter, a bearing with aim `fixed`, an offset with aim `front`, a radius on a ring, bomb fields for a bomb sprite, and bullet speed and range only when the matched projectile is a `linear` bullet. A `fixed` tag with no typed bearing uses the matched attack's bearing when that attack is fixed; otherwise it is not drawn and cannot export, and the status says it needs a bearing.
 
 ## First session
@@ -60,7 +63,7 @@ The Tags list shows the newest footage first. Every field in a row can be edited
 - Clearing the Burst field removes the burst id.
 - A ring row has a **Geometry (typed)** cell: choose its arm pattern (a spread or scatter arm asks for a cone width), shots per arm, and for a rotating arm its rate and phase. Clearing a rotation field removes the typed value. Changing a tag's pattern drops the fields the new pattern cannot have.
 - **Go to** seeks the video to that tag's time.
-- **Export as attack** shows the tag as an attack you can paste into `enemies.json` (see below).
+- **Export as attack** shows the tag as an attack you can paste into the monster's file under `app/src/game/data/enemies/` (see below).
 - **Delete** removes a row. There is no undo.
 
 ## Saving and resuming
@@ -97,7 +100,7 @@ Without an open video the canvas is black with a note asking you to open one.
 
 ## Exporting a tag as an attack
 
-Click **Export as attack** on a row to show that tag as the JSON of an authored attack, in a read-only box with a **Copy JSON** button. If the browser blocks copying, select the text by hand. Nothing is ever written to a file: paste the JSON into the right archetype's `attacks` in `enemies.json` yourself.
+Click **Export as attack** on a row to show that tag as the JSON of an authored attack, in a read-only box with a **Copy JSON** button. If the browser blocks copying, select the text by hand. Nothing is ever written to a file: paste the JSON into the right archetype's `attacks` in its file under `app/src/game/data/enemies/` yourself.
 
 The exported attack is exactly what the preview draws for the tag: the arms, arm pattern, typed cone, aim and rotation, with the pattern's phase written back as `initialPhaseDegrees`. Because the phase is measured at the *first tag of the group* rather than the game's clock start, adjust it if the attack's clock starts elsewhere. The id is the matched attack's id plus `-tagged`; the projectile and cadence are copied from the matched attack (the tool never derives cadence from your tagged intervals); and `tuningSource` is `video-observation`. A tag with no matching attack cannot export. A `front`-aimed export carries a note: its archetype also needs `initialHeadingDegrees`.
 
@@ -147,7 +150,30 @@ When you typed a bomb range or time, or a `linear` bullet's speed or range, the 
 3. Seek to the first volley and press Enter: a linked row appears.
 4. Seek to the last volley of the sweep and press **End repeat here**; the row now has a repeat end and the timeline shows a marker per 0.4 s.
 5. Select the row. In Tuning, drag the rotation rate while the preview is paused mid-pattern until the arms line up with the video; type an emitter radius if each volley fires from a different point.
-6. Open **Export as attack**: the attack id is `slow-spiral-tagged`, with your typed cooldown and rate. Paste it by hand into `enemies.json`.
+6. Open **Export as attack**: the attack id is `slow-spiral-tagged`, with your typed cooldown and rate. Paste it by hand into the monster's file under `app/src/game/data/enemies/`.
+
+## Correcting a monster from video
+
+The **Monster draft** panel lets you correct a monster's attacks against a recording and copy the result back as that monster's data file. Nothing is written to disk.
+
+1. Choose the **Encounter**, then the **Monster**. Every monster the encounter can reach is listed, including a spawn's own spawns. Each monster has its own study, even on one video. Switching monster keeps the video and its time, saves the current study, and opens the other monster's saved study for this video, or an empty one. Tags and saved attacks exist only in the primary monster's study; a minion study shows the video, timeline and draft only.
+2. Press **Load from game**. It copies the monster's current attacks into the draft. Loading again asks first, replaces only the attacks, keeps your anchors, and names any anchor whose block no longer exists.
+3. Find the first frame of a block in the video and press **Starts here** on that block. It records the presented frame's time, and pressing it again moves it. **Clear** removes it. A block with no anchor draws nothing. A press is refused while a seek is pending.
+4. A **block** is a phase with no sub-phases, or one sub-phase. Sub-phases are separate blocks with their own anchors: nothing cycles them for you. A block runs the phase's attacks plus its own sub-phase's attacks. The anchor means the moment the block is entered, and the preview adds the block's telegraph, as the game does.
+5. The preview stops a block at the earliest of its authored duration, the monster's next anchor, and the end of the video. Shots already fired finish their flight. Anchors at the same time resolve in authored order, and the later block wins.
+6. Select an attack to edit its projectile, pattern kind and fields, aim, target, and the four cadence values including **Initial delay**. An edit the game's validators refuse changes nothing and shows their message. Changing the pattern kind removes fields that no longer apply and names them. **Add attack** starts from a single player-aimed shot, which is a starting point and not a game value. **Delete** asks first. Editing or adding an attack sets its source to `video-observation`.
+7. The export box shows the monster's whole file, built from its current file with only the attack lists replaced, so hand edits to phase values survive. Press **Copy file** and paste it over the path shown.
+
+Limits, plainly: the preview uses one fixed emitter and draws only the selected monster, so a chasing monster stays still and a nest fires from the emitter. Scatter uses even spacing. The Worm's shard has no sprite, so its attacks can be edited and exported but not seen. Per-burst advance, gap sectors and arm spread are shown read-only and survive export, but have no controls. Phase and monster values and the projectile catalog are changed by hand. Anchors never reach the game. Pasting a file changes gameplay, so its `rulesVersion` bump and test updates are a separate approved change.
+
+On a primary study, the **Draft** and **Tags** switch above the preview chooses which one is drawn; it is view state and is not saved.
+
+### Worked example: moving one attack's first shot
+
+1. Open the Queen study, press **Load from game**, and press **Starts here** on the block when its telegraph ends in the video.
+2. Select an attack in that block and note when its first shot appears in the video compared with the preview.
+3. Change **Initial delay (s)** by the difference, then step the video to confirm the first volley now lines up.
+4. Copy the file from the export box and paste it over `app/src/game/data/enemies/killer-bee-queen.json`. Applying it is a separate approved change.
 
 ## Good practice
 

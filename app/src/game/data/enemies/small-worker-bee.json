@@ -1,0 +1,44 @@
+{
+  "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Small Worker Bee. 125 HP/25 DEF has no drain. Its slow is contact damage per K17/step 21.5, not a projectile: the source's only attack is an [Invisible] speed-0/range-0 touch. Spawned by an alive Killer Bee Nest's phase.",
+  "spawnTiles": {
+    "x": 0,
+    "y": -17
+  },
+  "body": {
+    "shape": "beveled-octagon",
+    "widthTiles": 0.5,
+    "heightTiles": 0.5
+  },
+  "health": {
+    "maxHealthHp": 125,
+    "progression": {
+      "kind": "none"
+    }
+  },
+  "contactDamageHp": 40,
+  "contactConditions": [
+    {
+      "key": "slowed",
+      "seconds": 1.6
+    }
+  ],
+  "contactArmorPiercing": true,
+  "contactCooldownSeconds": 1,
+  "blocksPlayer": false,
+  "phases": [
+    {
+      "id": "sole",
+      "enterAtHpFraction": 1,
+      "exitAfterSeconds": null,
+      "telegraphSeconds": 0.3,
+      "invulnerableOnEnterSeconds": 0,
+      "telegraphColor": "amber",
+      "movement": {
+        "kind": "chase",
+        "speedTilesPerSecond": 4
+      },
+      "progression": null,
+      "attacks": []
+    }
+  ]
+}

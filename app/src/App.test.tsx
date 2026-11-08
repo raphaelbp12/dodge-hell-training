@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { commitSha } from "virtual:build-info";
 import type { EncounterView } from "./game/phaser/encounter";
-import { RULES_VERSION } from "./game/config/encounter";
+import { RULES_VERSION, encounterConfigOf } from "./game/config/encounter";
 import {
   DEBUG_PARAMETERS,
   DEBUG_RULES_VERSION,
@@ -289,6 +289,12 @@ const runningView: EncounterView = {
   phaseLabel: "Phase 1",
   phaseCount: 1,
   drill: null,
+  bossHealthFraction: null,
+  phaseProgress: 0,
+  phaseEndsAtFraction: null,
+  phaseTimedSeconds: null,
+  subPhaseId: null,
+  conditions: [],
 };
 
 test("restores zoom before runtime creation and persists only explicit camera changes", async () => {
@@ -331,7 +337,6 @@ test("?encounter= selects a known encounter and ignores an unknown one", () => {
 test("Home Start passes the selected phase drill to the encounter", async () => {
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   await user.click(
     screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
   );
@@ -347,7 +352,6 @@ test("a ?phase= deep link seeds the Home selection and Start launches it", async
   window.history.pushState({}, "", "?phase=1,3&loop=1");
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   expect(
     screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
   ).toBeChecked();
@@ -360,50 +364,42 @@ test("a ?phase= deep link seeds the Home selection and Start launches it", async
   window.history.pushState({}, "", "/");
 });
 
-test("changing the encounter resets the selection to Full fight and closes the panel", async () => {
+test("changing the encounter resets the selection to Full fight", async () => {
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   await user.click(
     screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
   );
   await user.click(
     screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
   );
-  expect(screen.queryByLabelText("Phase selection")).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   expect(screen.getByRole("radio", { name: "Full fight" })).toBeChecked();
   await user.click(screen.getByRole("button", { name: "Start" }));
   expect(adapter.drill).toBeNull();
 });
 
-test("the phase panel and the debug panel are mutually exclusive asides", async () => {
+test("on Home the phase selector stays visible beside the debug aside", async () => {
   const user = userEvent.setup();
   render(<App />);
   await user.click(
     screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
   );
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   expect(screen.getByLabelText("Phase selection")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Debug" }));
-  expect(screen.queryByLabelText("Phase selection")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Enemy debug tools")).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Phases" }));
-  expect(screen.queryByLabelText("Enemy debug tools")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Phase selection")).toBeVisible();
 });
 
-test("returning Home clears the selection and closes the phase panel", async () => {
+test("returning Home clears the selection", async () => {
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   await user.click(
     screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
   );
   await user.click(screen.getByRole("button", { name: "Start" }));
   expect(adapter.drill).toEqual({ phaseIndices: [1], loop: true });
   await user.click(screen.getByRole("button", { name: "Home" }));
-  expect(screen.queryByLabelText("Phase selection")).not.toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "Full fight" })).toBeChecked();
   await user.click(screen.getByRole("button", { name: "Start" }));
   expect(adapter.drill).toBeNull();
 });
@@ -540,10 +536,6 @@ test("Home resets the live selection and closes the phase panel", async () => {
 
   await user.click(screen.getByRole("button", { name: "Home" }));
 
-  expect(
-    screen.queryByRole("complementary", { name: "Phase selection" }),
-  ).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Phases" }));
   expect(screen.getByRole("radio", { name: "Full fight" })).toBeChecked();
   await user.click(screen.getByRole("button", { name: "Start" }));
   expect(adapter.drill).toBeNull();
@@ -645,11 +637,16 @@ test("visible mute is visit-local, survives Home and updates audio without recre
   await user.click(mute);
   await user.click(screen.getByRole("button", { name: "Start" }));
   expect(adapter.initialMuted).toBe(true);
-  await user.click(mute);
+  // The session rail owns its own Mute checkbox, with the same state.
+  const sessionMute = screen.getByRole("checkbox", { name: "Mute hit audio" });
+  expect(sessionMute).toBeChecked();
+  await user.click(sessionMute);
   expect(adapter.setMuted).toHaveBeenLastCalledWith(false);
   expect(adapter.created).toBe(1);
   await user.click(screen.getByRole("button", { name: "Home" }));
-  expect(mute).not.toBeChecked();
+  expect(
+    screen.getByRole("checkbox", { name: "Mute hit audio" }),
+  ).not.toBeChecked();
   expect(localStorage.getItem("dodge-hell-training.mute")).toBeNull();
 });
 
@@ -791,6 +788,7 @@ test("lethal feedback remains individually observable in immediate results", asy
 });
 
 test("completed attempts save once despite duplicate callbacks, survive remount, and exclude aborted retries", async () => {
+  window.history.pushState({}, "", "?encounter=crystal-worm");
   const user = userEvent.setup();
   const mounted = render(
     <StrictMode>
@@ -847,6 +845,7 @@ test("completed attempts save once despite duplicate callbacks, survive remount,
 });
 
 test("personal best excludes incompatible rules while recent attempts identify them", () => {
+  window.history.pushState({}, "", "?encounter=crystal-worm");
   localStorage.setItem(
     HISTORY_STORAGE_KEY,
     JSON.stringify({
@@ -889,6 +888,7 @@ test.each(["corrupt", "blocked", "quota"])(
       vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
         throw new Error("quota");
       });
+    window.history.pushState({}, "", "?encounter=crystal-worm");
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole("button", { name: "Start" }));
@@ -941,4 +941,129 @@ test("the footer identifies the deployed build by commit", () => {
     // An unidentified build says so rather than inventing an identity.
     expect(screen.getByText("Local build")).toBeVisible();
   }
+});
+
+const queenRulesVersion = encounterConfigOf("killer-bee-queen").rulesVersion;
+
+function seedRecords(
+  records: { id: string; rulesVersion: string; seconds: number }[],
+) {
+  localStorage.setItem(
+    HISTORY_STORAGE_KEY,
+    JSON.stringify({
+      schemaVersion: HISTORY_SCHEMA_VERSION,
+      records: records.map((record) => ({
+        id: record.id,
+        rulesVersion: record.rulesVersion,
+        elapsedSeconds: record.seconds,
+        hitsTaken: 1,
+        outcome: "death",
+      })),
+    }),
+  );
+}
+
+test("the Queen's personal best shows on the default Home", () => {
+  seedRecords([{ id: "queen", rulesVersion: queenRulesVersion, seconds: 33.5 }]);
+  render(<App />);
+  expect(screen.getByLabelText("Retained personal best")).toHaveTextContent(
+    "33.50 s",
+  );
+  expect(screen.getByText("This selection")).toBeVisible();
+});
+
+test("the HUD shows a boss meter only when the boss has health, and lists conditions", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  act(() => adapter.publish!(runningView));
+  expect(
+    screen.queryByRole("meter", { name: "Boss progress" }),
+  ).not.toBeInTheDocument();
+  act(() =>
+    adapter.publish!({
+      ...runningView,
+      bossHealthFraction: 0.724,
+      conditions: [{ key: "slowed", remainingSeconds: 1.25, inert: false }],
+    }),
+  );
+  expect(screen.getByRole("meter", { name: "Boss progress" })).toHaveAttribute(
+    "value",
+    "0.724",
+  );
+  expect(screen.getByText("73%")).toBeVisible();
+  const list = screen.getByRole("list", { name: "Active conditions" });
+  expect(within(list).getByText("Slowed")).toBeVisible();
+  expect(within(list).getByText("1.3 s")).toBeVisible();
+});
+
+async function finishAttempt(
+  _user: ReturnType<typeof userEvent.setup>,
+  elapsedSeconds: number,
+  view: Partial<EncounterView> = {},
+  rulesVersion = queenRulesVersion,
+) {
+  const result: AttemptResult = {
+    attemptId: Math.round(elapsedSeconds * 100),
+    rulesVersion,
+    elapsedSeconds,
+    hitsTaken: 3,
+    outcome: "death",
+  };
+  act(() => {
+    adapter.publish!({
+      ...runningView,
+      status: "ended",
+      healthHp: 0,
+      result,
+      ...view,
+    });
+    adapter.onResult!(result);
+  });
+  return screen.getByRole("region", { name: "Attempt complete" });
+}
+
+test("results compare a better attempt with New best and a worse one with the gap", async () => {
+  seedRecords([{ id: "old", rulesVersion: queenRulesVersion, seconds: 10 }]);
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  let results = await finishAttempt(user, 20);
+  expect(within(results).getByText("New best")).toBeVisible();
+  await user.click(within(results).getByRole("button", { name: "Retry" }));
+  act(() => adapter.publish!(runningView));
+  results = await finishAttempt(user, 19.25);
+  expect(within(results).getByText("0.75 s short of your best")).toBeVisible();
+});
+
+test("a first attempt on a selection says so, and a debug result shows no comparison", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  let results = await finishAttempt(user, 8);
+  expect(
+    within(results).getByText("First attempt on this selection"),
+  ).toBeVisible();
+  await user.click(within(results).getByRole("button", { name: "Retry" }));
+  act(() => adapter.publish!(runningView));
+  results = await finishAttempt(user, 9, {}, DEBUG_RULES_VERSION);
+  expect(within(results).queryByText(/short of your best|New best|First attempt/))
+    .not.toBeInTheDocument();
+});
+
+test("results name the phase reached only when the boss has health", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Start" }));
+  let results = await finishAttempt(user, 8);
+  expect(within(results).queryByText("Reached")).not.toBeInTheDocument();
+  await user.click(within(results).getByRole("button", { name: "Retry" }));
+  act(() => adapter.publish!(runningView));
+  results = await finishAttempt(user, 9, {
+    bossHealthFraction: 0.5,
+    phaseLabel: "Phase 3 - Pond Barrage",
+  });
+  expect(within(results).getByText("Reached")).toBeVisible();
+  expect(within(results).getByText("Phase 3 - Pond Barrage")).toBeVisible();
+  expect(within(results).getByText("50% left")).toBeVisible();
 });

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
+import { hexToNumber, palette } from "../src/game/config/palette.ts";
 import appearanceData from "../src/game/data/projectile-appearances.json" with { type: "json" };
 import projectileData from "../src/game/data/projectiles.json" with { type: "json" };
 import type {
@@ -9,6 +10,8 @@ import type {
   ShardState,
   Vector2,
 } from "../src/game/models.ts";
+
+const groundColourValue = hexToNumber(palette.arena.ground);
 
 const shardColourValues = (() => {
   const colours = new Set<string>();
@@ -191,7 +194,7 @@ async function savedAttempts(page: Page) {
 }
 
 async function renderedPixels(page: Page) {
-  return page.locator("canvas").evaluate((canvas, shardColours) => {
+  return page.locator("canvas").evaluate((canvas, { shardColours, groundColour }) => {
     if (!(canvas instanceof HTMLCanvasElement))
       throw new Error("Expected encounter canvas");
     const copy = document.createElement("canvas");
@@ -227,7 +230,7 @@ async function renderedPixels(page: Page) {
         counts.shards++;
         shardColoursSeen.add((red << 16) | (green << 8) | blue);
       }
-      if (red === 28 && green === 48 && blue === 42) counts.ground++;
+      if (((red << 16) | (green << 8) | blue) === groundColour) counts.ground++;
       if (red === 85 && green === 214 && blue === 160) counts.healthBar++;
       if (red === 89 && green === 46 && blue === 57) counts.missingHealth++;
       if (red > 130 && green > 50 && green < 160 && blue > green && blue < red)
@@ -243,7 +246,7 @@ async function renderedPixels(page: Page) {
       enemyY: counts.enemy ? enemyY / counts.enemy : null,
       shardColoursSeen: [...shardColoursSeen],
     };
-  }, shardColourValues);
+  }, { shardColours: shardColourValues, groundColour: groundColourValue });
 }
 
 async function retrySnapshot(
@@ -829,15 +832,23 @@ for (const width of [1440, 390]) {
     expect(pixels.player).toBeGreaterThan(10);
     expect(pixels.healthBar).toBeGreaterThan(150);
     expect(pixels.ground).toBeGreaterThan(1000);
-    const layout = await page.evaluate(() => ({
-      headerBottom: document.querySelector("header")!.getBoundingClientRect()
-        .bottom,
-      arenaTop: document
+    const layout = await page.evaluate(() => {
+      const hud = document
+        .querySelector('[aria-label="Session HUD"]')!
+        .getBoundingClientRect();
+      const arena = document
         .querySelector('[aria-label="Encounter"]')!
-        .getBoundingClientRect().top,
-      overflow: document.documentElement.scrollWidth > innerWidth,
-    }));
-    expect(layout.headerBottom).toBeLessThanOrEqual(layout.arenaTop);
+        .getBoundingClientRect();
+      return {
+        overlaps:
+          hud.left < arena.right &&
+          arena.left < hud.right &&
+          hud.top < arena.bottom &&
+          arena.top < hud.bottom,
+        overflow: document.documentElement.scrollWidth > innerWidth,
+      };
+    });
+    expect(layout.overlaps).toBe(false);
     expect(layout.overflow).toBe(false);
     await page.screenshot({
       path: testInfo.outputPath(`release-encounter-${width}.png`),
@@ -1651,7 +1662,6 @@ for (const [phaseIndex, label, phaseLabel, phaseId] of [
     await page.getByRole("checkbox", { name: "God mode", exact: true }).check();
     await page.getByRole("button", { name: "Close debug" }).click();
     await page.getByRole("radio", { name: "Killer Bee Queen" }).check();
-    await page.getByRole("button", { name: "Phases", exact: true }).click();
     const panel = page.getByRole("complementary", { name: "Phase selection" });
     await panel.getByRole("checkbox", { name: phaseLabel }).check();
     // Loop stays checked: the drill must remain in this phase for the sample.
@@ -2323,7 +2333,10 @@ for (const viewport of [
       .poll(async () => (await inspect(page)).shards.length, { timeout: 6000 })
       .toBeGreaterThan(0);
     const state = await inspect(page);
-    expect(state.viewport.width).toBe(viewport.width);
+    const arenaBox = await page
+      .getByRole("region", { name: "Encounter", exact: true })
+      .boundingBox();
+    expect(state.viewport.width).toBe(arenaBox!.width);
     let pixels = await renderedPixels(page);
     if (viewport.width > 600)
       await expect
@@ -2349,17 +2362,22 @@ for (const viewport of [
     expect(pixels.ground).toBeGreaterThan(1000);
     if (viewport.width > 600) expect(pixels.enemy).toBeGreaterThan(10);
     const boxes = await page.evaluate(() => {
-      const header = document.querySelector("header")!.getBoundingClientRect();
+      const hud = document
+        .querySelector('[aria-label="Session HUD"]')!
+        .getBoundingClientRect();
       const arena = document
         .querySelector('[aria-label="Encounter"]')!
         .getBoundingClientRect();
       return {
-        headerBottom: header.bottom,
-        arenaTop: arena.top,
+        overlaps:
+          hud.left < arena.right &&
+          arena.left < hud.right &&
+          hud.top < arena.bottom &&
+          arena.top < hud.bottom,
         overflow: document.documentElement.scrollWidth > innerWidth,
       };
     });
-    expect(boxes.headerBottom).toBeLessThanOrEqual(boxes.arenaTop);
+    expect(boxes.overlaps).toBe(false);
     expect(boxes.overflow).toBe(false);
     await page.screenshot({
       path: testInfo.outputPath(`encounter-${viewport.width}.png`),
@@ -2474,13 +2492,6 @@ test("the Home phase panel starts a two-phase one-shot drill at the first select
   page,
 }) => {
   await page.goto(`./?seed=${NORTH_SEED}&encounter=killer-bee-queen`);
-  const phasesButton = page.getByRole("button", {
-    name: "Phases",
-    exact: true,
-  });
-  await expect(phasesButton).toHaveAttribute("aria-expanded", "false");
-  await phasesButton.click();
-  await expect(phasesButton).toHaveAttribute("aria-expanded", "true");
   const panel = page.getByRole("complementary", { name: "Phase selection" });
   await expect(panel).toBeVisible();
   await panel
@@ -2558,8 +2569,8 @@ test("the live phase panel pauses, applies, resumes, and handles result/retry/ho
   const viewportWidth = page.viewportSize()!.width;
   expect(layout.arenaWidth).toBe(beforeLayout.arenaWidth);
   expect(layout.canvasWidth).toBe(beforeLayout.canvasWidth);
-  expect(layout.arenaWidth).toBe(viewportWidth);
-  expect(layout.canvasWidth).toBe(viewportWidth);
+  expect(layout.canvasWidth).toBe(layout.arenaWidth);
+  expect(layout.arenaRight).toBe(viewportWidth);
   expect(layout.panelWidth).toBe(320);
   expect(layout.panelRight).toBeCloseTo(layout.arenaRight, 0);
   expect(layout.panelLeft).toBeCloseTo(layout.arenaRight - 320, 0);
@@ -2615,7 +2626,6 @@ test("the live phase panel pauses, applies, resumes, and handles result/retry/ho
   await expect(panel).not.toBeVisible();
 
   await page.getByRole("button", { name: "Home", exact: true }).click();
-  await page.getByRole("button", { name: "Phases", exact: true }).click();
   const homePanel = page.getByRole("complementary", {
     name: "Phase selection",
   });
@@ -2885,4 +2895,41 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   expect(exported).toContain('"id": "slow-spiral-tagged"');
   expect(exported).toContain('"cooldownAfterLastShotSeconds": 0.4');
   expect(exported).toContain('"clockwiseDegreesPerSecond": 45');
+});
+
+test.describe("live phase preview", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  test("draws on Home, follows the phase, and is gone after Start", async ({
+    page,
+  }) => {
+    await page.goto(`./?seed=${NORTH_SEED}&encounter=killer-bee-queen`);
+    const preview = page.locator("[data-phase-preview] canvas");
+    await expect(preview).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: "Start", exact: true }),
+    ).toBeFocused();
+    await page.getByRole("checkbox", { name: "Phase 3 - Pond Barrage" }).check();
+    await expect
+      .poll(async () =>
+        preview.evaluate((canvas) => {
+          const copy = document.createElement("canvas");
+          copy.width = (canvas as HTMLCanvasElement).width;
+          copy.height = (canvas as HTMLCanvasElement).height;
+          const context = copy.getContext("2d")!;
+          context.drawImage(canvas as HTMLCanvasElement, 0, 0);
+          const { data } = context.getImageData(0, 0, copy.width, copy.height);
+          const colours = new Set<number>();
+          for (let offset = 0; offset < data.length; offset += 40)
+            colours.add(
+              (data[offset]! << 16) | (data[offset + 1]! << 8) | data[offset + 2]!,
+            );
+          return colours.size;
+        }),
+      )
+      .toBeGreaterThan(3);
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(page.locator("canvas")).toHaveCount(1);
+    await expect(page.locator("[data-phase-preview]")).toHaveCount(0);
+  });
 });

@@ -9,6 +9,10 @@ import {
   parseStudyFile,
   resolveProvenance,
   videoChoiceDecision,
+  monsterSwitchPlan,
+  observationFileName,
+  studySections,
+  studyMonsterProblem,
 } from "./studyLoad";
 
 const KNOWN = ["killer-bee-queen"];
@@ -140,5 +144,53 @@ describe("encounterChangeDecision", () => {
     expect(encounterChangeDecision({ tagCount: 0, savedAttackCount: 0 })).toBe("change");
     expect(encounterChangeDecision({ tagCount: 2, savedAttackCount: 0 })).toBe("confirm");
     expect(encounterChangeDecision({ tagCount: 0, savedAttackCount: 1 })).toBe("confirm");
+  });
+});
+
+describe("studyMonsterProblem", () => {
+  const study = {
+    encounterId: "e",
+    archetypeId: null,
+    monsterDraft: null,
+    provenance: { sourceUrl: null, fileName: "a", frameRate: 30, durationSeconds: 1 },
+    savedAttacks: [],
+    tags: [],
+  } as const;
+  const tag = { timeSeconds: 1, phaseIndex: 0, spriteId: "x", pattern: "rotating-arm", shots: 1 } as const;
+
+  test("catches an unknown monster and tags on a minion", () => {
+    expect(studyMonsterProblem(study, "q", ["q", "m"])).toBeNull();
+    expect(studyMonsterProblem({ ...study, archetypeId: "zz" }, "q", ["q", "m"])).toMatch(/Unknown/);
+    expect(studyMonsterProblem({ ...study, archetypeId: "m", tags: [tag] }, "q", ["q", "m"])).toMatch(/primary/);
+  });
+});
+
+describe("V18 decisions", () => {
+  test("a draft counts as content to confirm", () => {
+    expect(loadDecision(0, true)).toBe("confirm");
+    expect(videoChoiceDecision({ tagCount: 0, keepTagsOnNextVideo: false, hasDraft: true })).toBe("confirm-reset");
+    expect(encounterChangeDecision({ tagCount: 0, savedAttackCount: 0, hasDraft: true })).toBe("confirm");
+  });
+
+  test("monsterSwitchPlan", () => {
+    const base = { hasVideo: true, unsaved: true, autosaveFailing: false, slotExists: true };
+    expect(monsterSwitchPlan(base)).toEqual({ writeCurrent: true, open: "slot", confirmFirst: false });
+    expect(monsterSwitchPlan({ ...base, slotExists: false }).open).toBe("empty");
+    expect(monsterSwitchPlan({ ...base, hasVideo: false })).toMatchObject({ writeCurrent: false, open: "empty" });
+    expect(monsterSwitchPlan({ ...base, autosaveFailing: true }).confirmFirst).toBe(true);
+    expect(monsterSwitchPlan({ ...base, unsaved: false, autosaveFailing: true }).confirmFirst).toBe(false);
+  });
+});
+
+describe("V18 names and visibility", () => {
+  test("download names", () => {
+    expect(observationFileName("q", "queen", "queen")).toBe("q-observations.json");
+    expect(observationFileName("q", "bee", "queen")).toBe("q-bee-observations.json");
+  });
+
+  test("a minion study hides tagging; the switch lives in primary studies", () => {
+    expect(studySections(true, "draft")).toEqual({ tagging: false, previewTuning: false, sourceSwitch: false });
+    expect(studySections(false, "tags")).toEqual({ tagging: true, previewTuning: true, sourceSwitch: true });
+    expect(studySections(false, "draft").previewTuning).toBe(false);
   });
 });

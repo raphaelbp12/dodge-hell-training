@@ -399,7 +399,7 @@ type PoseAtAge = Readonly<{
   orientationRadians: number;
 }> | null;
 
-function poseAtAge(
+export function poseAtAge(
   projectile: ProjectileSpec,
   spawnTiles: Vector2,
   bearingRadians: number,
@@ -476,7 +476,7 @@ function armEvenDraws(armPattern: ArmPattern | undefined): number[] {
  * Even stand-ins for every scatter draw a volley of `pattern` takes, one run
  * per scatter instance in depth-first arm order, matching `scatterDrawCount`.
  */
-function evenDrawsFor(pattern: AttackPattern): number[] | undefined {
+export function evenDrawsFor(pattern: AttackPattern): number[] | undefined {
   const draws =
     pattern.kind === "scatter"
       ? evenDraws(pattern.shots)
@@ -523,7 +523,7 @@ function firstTimeByRotationClock(tags: readonly Tag[]): Map<string, number> {
 }
 
 /** How long after firing a projectile can still be drawn: in flight, or exploding. */
-function drawnLifetimeSeconds(projectile: ProjectileSpec, explosionSeconds: number): number {
+export function drawnLifetimeSeconds(projectile: ProjectileSpec, explosionSeconds: number): number {
   return projectile.type === "bomb"
     ? projectile.travelSeconds + explosionSeconds
     : resolveShardLifetime(projectile).lifetimeSeconds;

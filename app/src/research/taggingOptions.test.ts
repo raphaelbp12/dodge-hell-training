@@ -193,12 +193,13 @@ describe("assembleExport", () => {
     const tags = [tag({ timeSeconds: 12 }), tag({ timeSeconds: 10 })];
     const exported = assembleExport({
       encounterId: "killer-bee-queen",
+      archetypeId: "killer-bee-queen",
       provenance,
       tags,
       recordedAt: "2026-11-03T12:00:00.000Z",
     });
     expect(exported.tags.map((entry) => entry.timeSeconds)).toEqual([10, 12]);
-    expect(exported.schemaVersion).toBe(3);
+    expect(exported.schemaVersion).toBe(4);
     expect(exported.savedAttacks).toEqual([]);
     expect(exported.encounterId).toBe("killer-bee-queen");
     expect(exported.provenance).toBe(provenance);
@@ -211,6 +212,7 @@ describe("assembleExport", () => {
     expect(() =>
       assembleExport({
         encounterId: "killer-bee-queen",
+        archetypeId: "killer-bee-queen",
         provenance,
         tags: [tag({ shots: 0 })],
         recordedAt: "2026-11-03T12:00:00.000Z",

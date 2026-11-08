@@ -12,7 +12,23 @@ import {
 import { PALADIN_DERIVED_STATS } from "./stats";
 import arenaData from "../data/arena.json";
 import shapesData from "../data/shapes.json";
-import enemiesData from "../data/enemies.json";
+import crystalWormChildHeadData from "../data/enemies/crystal-worm-child-head.json";
+import killerBeeQueenData from "../data/enemies/killer-bee-queen.json";
+import redKillerBeeData from "../data/enemies/red-killer-bee.json";
+import blueKillerBeeData from "../data/enemies/blue-killer-bee.json";
+import yellowKillerBeeData from "../data/enemies/yellow-killer-bee.json";
+import smallWorkerBeeData from "../data/enemies/small-worker-bee.json";
+import killerBeeNestRedData from "../data/enemies/killer-bee-nest-red.json";
+import killerBeeNestBlueData from "../data/enemies/killer-bee-nest-blue.json";
+import killerBeeNestYellowData from "../data/enemies/killer-bee-nest-yellow.json";
+import adolescentRedBeehemothData from "../data/enemies/adolescent-red-beehemoth.json";
+import adolescentBlueBeehemothData from "../data/enemies/adolescent-blue-beehemoth.json";
+import adolescentYellowBeehemothData from "../data/enemies/adolescent-yellow-beehemoth.json";
+// One file per monster, in the order of the original single enemy file. Provenance of the
+// set: "Enemy archetypes. Body dimensions are in tiles and scale a named outline
+// from shapes.json. Weapon values are the approved v3 tuning; provenance
+// docs/mechanics.md." Explicit imports, not a glob, keep the order exact and
+// stop a stray file joining the game.
 import encounterData from "../data/encounter.json";
 import projectilesData from "../data/projectiles.json";
 import appearancesData from "../data/projectile-appearances.json";
@@ -1779,7 +1795,7 @@ export function validateArchetypes(
         if (!spawned)
           reject(
             `enemies.archetypes.${id}.phases[${phaseIndex}].spawns`,
-            "archetype must name an archetype defined in enemies.json",
+            "archetype must name an archetype defined in game/data/enemies/",
           );
         if (spawn.startPhaseIndex >= spawned.phases.length)
           reject(
@@ -2034,8 +2050,23 @@ export const AUTHORED_PROJECTILES = validateProjectiles(
   AUTHORED_ENCOUNTER_DATA.simulation.fixedStepSeconds,
   new Set(Object.keys(AUTHORED_APPEARANCES.appearances)),
 );
+export const AUTHORED_MONSTER_FILES: Readonly<Record<string, unknown>> = Object.freeze({
+  "crystal-worm-child-head": crystalWormChildHeadData,
+  "killer-bee-queen": killerBeeQueenData,
+  "red-killer-bee": redKillerBeeData,
+  "blue-killer-bee": blueKillerBeeData,
+  "yellow-killer-bee": yellowKillerBeeData,
+  "small-worker-bee": smallWorkerBeeData,
+  "killer-bee-nest-red": killerBeeNestRedData,
+  "killer-bee-nest-blue": killerBeeNestBlueData,
+  "killer-bee-nest-yellow": killerBeeNestYellowData,
+  "adolescent-red-beehemoth": adolescentRedBeehemothData,
+  "adolescent-blue-beehemoth": adolescentBlueBeehemothData,
+  "adolescent-yellow-beehemoth": adolescentYellowBeehemothData,
+});
+
 export const AUTHORED_ARCHETYPES = validateArchetypes(
-  enemiesData,
+  { archetypes: AUTHORED_MONSTER_FILES },
   new Set(Object.keys(AUTHORED_PROJECTILES)),
   AUTHORED_ENCOUNTER_DATA.maxConcurrentMinions,
 );
@@ -2044,11 +2075,11 @@ for (const [id, entry] of Object.entries(AUTHORED_ENCOUNTER_DATA.encounters)) {
   if (!AUTHORED_ARCHETYPES[entry.primaryArchetype])
     reject(
       `encounter.encounters.${id}.primaryArchetype`,
-      "must name an archetype defined in enemies.json",
+      "must name an archetype defined in game/data/enemies/",
     );
   if (!AUTHORED_ARCHETYPES[entry.spawns.archetype])
     reject(
       `encounter.encounters.${id}.spawns.archetype`,
-      "must name an archetype defined in enemies.json",
+      "must name an archetype defined in game/data/enemies/",
     );
 }

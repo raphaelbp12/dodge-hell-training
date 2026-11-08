@@ -6,6 +6,7 @@
  * particular must stay free of React, the DOM, the video APIs, Phaser and the
  * simulation/session layers so the derivation is testable as plain arithmetic.
  */
+import type { MonsterDraft } from "./monsterDraft";
 
 export type TagKindV1 = "volley" | "rotating-arm";
 
@@ -159,11 +160,30 @@ export type ObservationExportV3 = Readonly<{
   tags: readonly StoredTag[];
 }>;
 
-export type ObservationExport = ObservationExportV3;
+export type ObservationExportV4 = Readonly<{
+  schemaVersion: 4;
+  encounterId: string;
+  archetypeId: string;
+  provenance: VideoProvenance;
+  recordedAt: string;
+  savedAttacks: readonly SavedAttack[];
+  tags: readonly StoredTag[];
+  monsterDraft: MonsterDraft | null;
+}>;
+
+export type ObservationExport = ObservationExportV4;
+
+type AnyObservationExport =
+  | ObservationExportV1
+  | ObservationExportV2
+  | ObservationExportV3
+  | ObservationExportV4;
 
 /** A loaded or restored study, before it can be exported. */
 export type StudyState = Readonly<{
   encounterId: string;
+  /** Null on a study older than v4, which means the primary monster. */
+  archetypeId: string | null;
   provenance: Readonly<{
     sourceUrl: string | null;
     fileName: string;
@@ -173,6 +193,7 @@ export type StudyState = Readonly<{
   }>;
   savedAttacks: readonly SavedAttack[];
   tags: readonly StoredTag[];
+  monsterDraft: MonsterDraft | null;
 }>;
 
 export type IntervalScope = "all" | "between-bursts" | "within-bursts";
@@ -546,6 +567,35 @@ export function validateSavedAttackLinks(
   });
 }
 
+/** V18 L28: structural check of a stored draft; attack contents stay unchecked (T31). */
+export function validateMonsterDraft(value: unknown, path: string): MonsterDraft {
+  const draft = record(value, path);
+  const attackList = (list: unknown, at: string) => {
+    if (!Array.isArray(list)) reject(at, "must be an array");
+    list.forEach((attack, index) => record(attack, `${at}[${index}]`));
+  };
+  if (!Array.isArray(draft.phases)) reject(`${path}.phases`, "must be an array");
+  draft.phases.forEach((entry, index) => {
+    const phasePath = `${path}.phases[${index}]`;
+    const phase = record(entry, phasePath);
+    nonEmptyString(phase.phaseId, `${phasePath}.phaseId`);
+    attackList(phase.attacks, `${phasePath}.attacks`);
+    if (!Array.isArray(phase.subPhases))
+      reject(`${phasePath}.subPhases`, "must be an array");
+    phase.subPhases.forEach((subEntry, subIndex) => {
+      const subPath = `${phasePath}.subPhases[${subIndex}]`;
+      const sub = record(subEntry, subPath);
+      nonEmptyString(sub.subPhaseId, `${subPath}.subPhaseId`);
+      attackList(sub.attacks, `${subPath}.attacks`);
+    });
+  });
+  const anchors = record(draft.anchors, `${path}.anchors`);
+  for (const [id, seconds] of Object.entries(anchors))
+    if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0)
+      reject(`${path}.anchors.${id}`, "must be a nonnegative finite number");
+  return value as MonsterDraft;
+}
+
 /**
  * Structural validation only; throws on malformed input, never coerces (T31).
  *
@@ -558,16 +608,21 @@ export function validateSavedAttackLinks(
  */
 export function validateObservationExport(
   value: unknown,
-): ObservationExportV1 | ObservationExportV2 | ObservationExportV3 {
+): AnyObservationExport {
   const source = record(value, "");
   const version = source.schemaVersion;
-  if (version !== undefined && version !== 2 && version !== 3)
-    reject("schemaVersion", "must be 2 or 3 when present");
+  if (version !== undefined && version !== 2 && version !== 3 && version !== 4)
+    reject("schemaVersion", "must be 2, 3 or 4 when present");
   nonEmptyString(source.encounterId, "encounterId");
   provenance(source.provenance);
   isoDate(source.recordedAt, "recordedAt");
   if (!Array.isArray(source.tags)) reject("tags", "must be an array");
-  if (version === 3) {
+  if (version === 3 || version === 4) {
+    if (version === 4) {
+      nonEmptyString(source.archetypeId, "archetypeId");
+      if (source.monsterDraft !== null)
+        validateMonsterDraft(source.monsterDraft, "monsterDraft");
+    }
     const savedAttacks = validateSavedAttacks(source.savedAttacks, "savedAttacks");
     const tags = source.tags.map((entry, index) =>
       validateStoredTag(entry, `tags[${index}]`),
@@ -578,7 +633,7 @@ export function validateObservationExport(
   else source.tags.forEach((entry, index) => tagV1(entry, index));
   // Return the caller's own object unchanged: the export is evidence, and this
   // function is a guard rather than a normalizer.
-  return value as ObservationExportV1 | ObservationExportV2 | ObservationExportV3;
+  return value as AnyObservationExport;
 }
 
 /**
@@ -588,12 +643,13 @@ export function validateObservationExport(
  * carry no saved attacks (S04).
  */
 export function studyFromExport(
-  validated: ObservationExportV1 | ObservationExportV2 | ObservationExportV3,
+  validated: AnyObservationExport,
 ): StudyState {
   const { sourceUrl, fileName, durationSeconds } = validated.provenance;
   if ("schemaVersion" in validated)
     return {
       encounterId: validated.encounterId,
+      archetypeId: validated.schemaVersion === 4 ? validated.archetypeId : null,
       provenance: {
         sourceUrl,
         fileName,
@@ -601,14 +657,18 @@ export function studyFromExport(
         durationSeconds,
       },
       savedAttacks:
-        validated.schemaVersion === 3
+        validated.schemaVersion === 3 || validated.schemaVersion === 4
           ? validated.savedAttacks.map((attack) => ({ ...attack }))
           : [],
       tags: validated.tags.map((entry) => ({ ...entry })),
+      monsterDraft:
+        validated.schemaVersion === 4 ? validated.monsterDraft : null,
     };
   return {
     encounterId: validated.encounterId,
+    archetypeId: null,
     provenance: { sourceUrl, fileName, frameRate: null, durationSeconds },
+    monsterDraft: null,
     savedAttacks: [],
     tags: validated.tags.map((entry) => ({
       timeSeconds: entry.timeSeconds,

@@ -1,0 +1,117 @@
+{
+  "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Adolescent Yellow Beehemoth. 20,000 HP/40 DEF has no drain. Movement is a static approximation of 'circle along the edges of the room' (step's own instruction): orbit at a large radius, near the arena wall. Same spawn/re-spawn simplification as the red Beehemoth (K18).",
+  "spawnTiles": {
+    "x": 0,
+    "y": -16.2
+  },
+  "body": {
+    "shape": "beveled-octagon",
+    "widthTiles": 2,
+    "heightTiles": 2
+  },
+  "health": {
+    "maxHealthHp": 20000,
+    "progression": {
+      "kind": "none"
+    }
+  },
+  "contactDamageHp": 0,
+  "contactConditions": [],
+  "contactArmorPiercing": false,
+  "contactCooldownSeconds": 0,
+  "blocksPlayer": false,
+  "phases": [
+    {
+      "id": "aimed",
+      "enterAtHpFraction": 1,
+      "exitAfterSeconds": null,
+      "telegraphSeconds": 0.5,
+      "invulnerableOnEnterSeconds": 0,
+      "telegraphColor": "amber",
+      "movement": {
+        "comment": "W27: 8 tiles, retuned from the previous 16 which was calibrated against the old 19.2-tile circle.",
+        "kind": "orbit",
+        "radiusTiles": 8,
+        "degreesPerSecond": 5,
+        "direction": "ccw",
+        "approachSpeedTilesPerSecond": 3
+      },
+      "progression": null,
+      "attacks": [
+        {
+          "id": "aimed-stinger-pair",
+          "projectile": "beehemoth-yellow-stinger-large",
+          "tuningSource": "wiki-prose",
+          "pattern": {
+            "kind": "spread",
+            "shots": 2,
+            "arcDegrees": 10,
+            "aim": "player",
+            "emitterRadiusTiles": 0
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1.5,
+            "initialDelaySeconds": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "final-phase",
+      "enterAtHpFraction": 0.0001,
+      "exitAfterSeconds": null,
+      "telegraphSeconds": 0.5,
+      "invulnerableOnEnterSeconds": 0,
+      "telegraphColor": "amber",
+      "movement": {
+        "comment": "W27: 8 tiles, retuned from the previous 16 which was calibrated against the old 19.2-tile circle.",
+        "kind": "orbit",
+        "radiusTiles": 8,
+        "degreesPerSecond": 5,
+        "direction": "ccw",
+        "approachSpeedTilesPerSecond": 3
+      },
+      "progression": null,
+      "attacks": [
+        {
+          "id": "radial-stinger-burst",
+          "projectile": "beehemoth-yellow-stinger-large",
+          "tuningSource": "wiki-prose",
+          "pattern": {
+            "kind": "ring",
+            "arms": 6,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": 0
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 2,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "glaive-spread",
+          "projectile": "beehemoth-yellow-glaive",
+          "tuningSource": "wiki-prose",
+          "pattern": {
+            "kind": "spread",
+            "shots": 3,
+            "arcDegrees": 40,
+            "aim": "player",
+            "emitterRadiusTiles": 0
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 2,
+            "initialDelaySeconds": 1
+          }
+        }
+      ]
+    }
+  ]
+}

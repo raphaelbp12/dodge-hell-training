@@ -46,6 +46,8 @@ const STICKY: StickySelection = {
 function study(fileName = "a.mp4", frameRate: number | null = 30): StudyState {
   return {
     encounterId: "killer-bee-queen",
+    archetypeId: null,
+    monsterDraft: null,
     provenance: { sourceUrl: null, fileName, frameRate, durationSeconds: 100 },
     savedAttacks: [],
     tags: [
@@ -84,7 +86,7 @@ describe("TaggerSessions", () => {
     const result = sessions.list();
     if (!result.ok) throw new Error("expected ok");
     expect(result.value).toEqual([
-      { readable: true, key: TaggerSessions.keyFor("a.mp4"), fileName: "a.mp4", tagCount: 1, savedAt: "2026-11-05T12:00:00.000Z" },
+      { readable: true, key: TaggerSessions.keyFor("a.mp4"), fileName: "a.mp4", archetypeId: null, tagCount: 1, savedAt: "2026-11-05T12:00:00.000Z" },
       { readable: false, key: `${TAGGER_SESSION_KEY_PREFIX}corrupt` },
       { readable: false, key: `${TAGGER_SESSION_KEY_PREFIX}invalid` },
     ]);
@@ -180,7 +182,7 @@ test("buildDraft carries sticky selection and a null frame rate", () => {
   const built = draft("a.mp4", null);
   expect(built.sticky).toEqual(STICKY);
   expect(built.study.provenance.frameRate).toBeNull();
-  expect(built.draftVersion).toBe(2);
+  expect(built.draftVersion).toBe(3);
 });
 
 describe("restoreSticky", () => {
@@ -221,7 +223,7 @@ describe("draft version 2 (plan V16 S05)", () => {
       sticky: STICKY,
     };
     const upgraded = validateSessionDraft(v1);
-    expect(upgraded.draftVersion).toBe(2);
+    expect(upgraded.draftVersion).toBe(3);
     expect(upgraded.study.savedAttacks).toEqual([]);
     expect(upgraded.study.tags).toEqual(v1Study.tags);
   });
@@ -272,5 +274,41 @@ describe("draft version 2 (plan V16 S05)", () => {
     new TaggerSessions(() => storage).write(draft("new.mp4"));
     const listed = new TaggerSessions(() => storage).list();
     expect(listed.ok && listed.value.every((entry) => entry.readable)).toBe(true);
+  });
+});
+
+describe("V18 monster slots", () => {
+  const minion = (name: string) => ({
+    ...draft(name),
+    study: { ...study(name), archetypeId: "red-killer-bee", tags: [], savedAttacks: [] },
+  });
+
+  test("two monsters on one video use two slots", () => {
+    const store = new Map<string, string>();
+    const sessions = new TaggerSessions(() => ({
+      get length() { return store.size; },
+      key: (i) => [...store.keys()][i] ?? null,
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => void store.set(k, v),
+      removeItem: (k) => void store.delete(k),
+    }));
+    sessions.write(draft("a.mp4"), "killer-bee-queen");
+    sessions.write(minion("a.mp4"), "killer-bee-queen");
+    expect(store.size).toBe(2);
+    expect(TaggerSessions.keyFor("a.mp4")).toBe(TAGGER_SESSION_KEY_PREFIX + "a.mp4");
+    expect(store.has(TaggerSessions.keyFor("a.mp4", "red-killer-bee"))).toBe(true);
+  });
+
+  test("a version 2 slot restores as the primary monster with no draft", () => {
+    const old = { ...draft("a.mp4"), draftVersion: 2 };
+    const restored = validateSessionDraft(old);
+    expect(restored.draftVersion).toBe(3);
+    expect(restored.study.archetypeId).toBeNull();
+    expect(restored.study.monsterDraft).toBeNull();
+  });
+
+  test("a malformed draft is rejected", () => {
+    const bad = { ...draft("a.mp4"), study: { ...study(), monsterDraft: { phases: 1, anchors: {} } } };
+    expect(() => validateSessionDraft(bad)).toThrow(/monsterDraft/);
   });
 });

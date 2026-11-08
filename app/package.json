@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@flatten-js/core": "^1.6.14",
+    "@fontsource-variable/grenze-gotisch": "^5.3.0",
+    "@fontsource/barlow-semi-condensed": "^5.3.0",
     "phaser": "^4.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

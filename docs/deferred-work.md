@@ -97,6 +97,8 @@ Rules for this register:
 
 **F5 fixed.** Step 23.1 moved the per-encounter arena/step reads onto `state.config` when it introduced encounter selection, so `advanceSimulation` and `constrainToArena` no longer read the module-level `ENCOUNTER_CONFIG`. The remaining findings below are still open.
 
+**F8 and part of F4 promoted.** Plan V17 (H01, H02) resolves F8 through `game/config/palette.ts` and moves arena drawing out of `EncounterScene` into `game/phaser/arena-renderer.ts`. The remaining F4 split, F6 and F9 stay deferred.
+
 **Blocked on.** Nothing for F4, F6, F8 and F9; each remains deferred on the same basis as before.
 
 ### D11 - Bearing-Aware Dodge Verification For Phases 2, 7 And 8
@@ -380,6 +382,56 @@ Rules for this register:
 **Blocked on.** Tagging a second video of a fight that uses attacks already saved.
 
 **Fidelity gap this leaves.** None to gameplay. Saved attacks must be recreated, or reached through a copy of an older study, for each new video.
+
+### D38 - Tags And Saved Attacks On Minions
+
+**What.** Let a minion's study record time-stamped tags and saved attacks, with the phase list, matching, preview and export following the selected monster.
+
+**Why deferred.** Plan V18's L09 keeps tags in the primary monster's study. A tag's phase is a boss phase and its matching reads the primary monster, so extending it touches every tag path, while the draft and anchors already serve the stated goal.
+
+**Blocked on.** A need for recorded shot timings or interval statistics for a minion.
+
+**Fidelity gap this leaves.** None to gameplay. A minion's shot times are read from the video by hand, and no interval statistics exist for minions.
+
+### D39 - Editing Phase, Sub-Phase And Monster Values In The Tagger
+
+**What.** Let the draft editor change health gates, phase and sub-phase durations, telegraphs, movement, spawns, and monster-level values such as health, contact damage, body and blocking.
+
+**Why deferred.** Plan V18's L11 limits the editor to attacks, which is the problem the user described. Export already keeps hand edits to these values (L30).
+
+**Blocked on.** Hand edits to these values becoming the slow part of correcting a monster.
+
+**Fidelity gap this leaves.** None to gameplay. These values can be wrong and must be corrected by hand in the monster's file, and the preview reads the corrected values only after that.
+
+### D40 - Editing The Projectile Catalog In The Tagger
+
+**What.** Let the draft editor change a projectile's speed, range, lifetime or other values, and export a matching `projectiles.json` change.
+
+**Why deferred.** Plan V18's L12 picks from the existing catalog so there is one export target per monster. A catalog entry can be shared between attacks and monsters, so editing one is not limited to the selected monster.
+
+**Blocked on.** Footage showing that a catalog value, rather than a pattern or cadence, is what is wrong.
+
+**Fidelity gap this leaves.** None to gameplay. A wrong projectile speed or range must be fixed by hand in `projectiles.json`.
+
+### D41 - Draft Controls For Per-Burst Advance, Gap Sectors And Arm Spread
+
+**What.** Add editor controls for `perBurstAdvanceDegrees`, `gapSectorsDegrees`, `armSpreadDegreesPerSecond` and `maxArmSpreadDegrees`.
+
+**Why deferred.** Plan V18's L13 gives controls only to the fields tags already support. Those fields appear on few Queen attacks (4, 1 and 1), and they survive export unchanged.
+
+**Blocked on.** Footage showing one of those values is wrong, or a new attack that needs one.
+
+**Fidelity gap this leaves.** None to gameplay. The preview draws these values, but they can be changed only by hand in the monster's file.
+
+### D42 - A Preview Of Several Monsters With Real Positions
+
+**What.** Draw several monsters together in the draft preview, at their real spawn positions and following their movement.
+
+**Why deferred.** Plan V18's L16 draws only the selected monster from one fixed emitter. The game places most minions by a bearing that depends on spawn order, so their positions cannot be worked out without running the simulation.
+
+**Blocked on.** A decision that fight-wide timing or position checks are worth a preview driven by the simulation, which also has to respect the rule against a second simulation clock.
+
+**Fidelity gap this leaves.** None to gameplay. The preview cannot confirm where a minion fires from, how a pattern looks from a moving monster, or how several monsters' patterns combine.
 
 ## Out Of Scope - Not Planned
 

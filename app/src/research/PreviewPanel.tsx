@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EncounterConfig } from "../game/config/encounter";
 import type { Vector2 } from "../game/models";
+import { draftPreviewAt } from "./draftPreview";
+import type { DraftBlock, MonsterDraft } from "./monsterDraft";
 import { drawPreviewFrame, drawEmptyPreview } from "./previewDraw";
 import {
   countUnmatchedTags,
@@ -62,7 +64,23 @@ const BLANK_ALLOWED: readonly TuningField[] = [
   "emitterRadiusTiles",
 ];
 
+/** V18 L15: the draft the panel draws instead of the tags. */
+export type DraftSource = Readonly<{
+  draft: MonsterDraft;
+  blocks: readonly DraftBlock[];
+  videoEndSeconds: number;
+}>;
+
 type Props = Readonly<{
+  /** Null draws the tags (unchanged); a value draws the draft with the video's `mediaTime`. */
+  draftSource?: DraftSource | null;
+  /** Shown in a primary study only; a minion study always draws the draft. */
+  sourceSwitch?: Readonly<{
+    value: "draft" | "tags";
+    onChange: (next: "draft" | "tags") => void;
+  }>;
+  /** Hides the tuning section and unmatched-tag notice. */
+  showTuning?: boolean;
   tags: readonly Tag[];
   /** Needed to expand repeat rows into volleys. */
   savedAttacks: readonly SavedAttack[];
@@ -81,6 +99,9 @@ type Props = Readonly<{
  * canvas (M10). React holds only the inputs; no element exists per projectile.
  */
 export function PreviewPanel({
+  draftSource = null,
+  sourceSwitch,
+  showTuning = true,
   tags,
   savedAttacks,
   mediaTime,
@@ -112,6 +133,26 @@ export function PreviewPanel({
     [tags, config],
   );
 
+  const playerAndHeading = {
+    playerTiles,
+    headingRadians: (headingDegrees * Math.PI) / 180,
+  };
+  const draftResult = useMemo(
+    () =>
+      draftSource === null
+        ? null
+        : draftPreviewAt({
+            draft: draftSource.draft,
+            blocks: draftSource.blocks,
+            config,
+            timeSeconds: mediaTime,
+            videoEndSeconds: draftSource.videoEndSeconds,
+            ...playerAndHeading,
+          }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [draftSource, config, mediaTime, playerTiles, headingDegrees],
+  );
+
   const chooseSize = (next: PreviewSize) => {
     onLayoutChange({ ...layout, size: next });
     setView((current) =>
@@ -128,14 +169,16 @@ export function PreviewPanel({
     }
     drawPreviewFrame(
       context,
-      previewAt({
-        tags,
-        savedAttacks,
-        timeSeconds: mediaTime,
-        config,
-        playerTiles,
-        headingRadians: (headingDegrees * Math.PI) / 180,
-      }),
+      draftResult
+        ? draftResult.frame
+        : previewAt({
+            tags,
+            savedAttacks,
+            timeSeconds: mediaTime,
+            config,
+            playerTiles,
+            headingRadians: (headingDegrees * Math.PI) / 180,
+          }),
       view,
       canvasPixels,
       highlightedTagIndices,
@@ -143,6 +186,7 @@ export function PreviewPanel({
   }, [
     shown,
     hasVideo,
+    draftResult,
     tags,
     savedAttacks,
     mediaTime,
@@ -176,6 +220,20 @@ export function PreviewPanel({
 
   return (
     <aside className={styles.panel} aria-label="Tag preview">
+      {sourceSwitch && (
+        <div className={styles.controls} role="group" aria-label="Preview source">
+          {(["tags", "draft"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={sourceSwitch.value === option}
+              onClick={() => sourceSwitch.onChange(option)}
+            >
+              {option === "tags" ? "Tags" : "Draft"}
+            </button>
+          ))}
+        </div>
+      )}
       <div className={styles.controls}>
         <button
           type="button"
@@ -234,7 +292,19 @@ export function PreviewPanel({
               {NO_VIDEO_NOTE}
             </p>
           )}
-          {unmatchedCount > 0 && (
+          {draftResult && (
+            <p className={styles.note} role="status">
+              Drawing the draft: one fixed emitter, no movement, and only the
+              selected monster. A block with no anchor draws nothing.
+            </p>
+          )}
+          {draftResult && draftResult.undrawnAttackIds.length > 0 && (
+            <p className={styles.note} role="status">
+              No sprite for: {draftResult.undrawnAttackIds.join(", ")}. These
+              attacks can be edited and exported but not seen.
+            </p>
+          )}
+          {!draftResult && showTuning && unmatchedCount > 0 && (
             <p className={styles.note} role="status">
               {unmatchedCount} {unmatchedCount === 1 ? "tag" : "tags"} not
               previewed
@@ -271,7 +341,7 @@ export function PreviewPanel({
             />
             <output>{headingDegrees.toFixed(0)}</output>
           </label>
-          <TuningSection tuning={tuning} />
+          {!draftResult && showTuning && <TuningSection tuning={tuning} />}
         </>
       )}
     </aside>

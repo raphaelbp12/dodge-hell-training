@@ -17,7 +17,10 @@ export type PhaseSelectorProps = Readonly<{
   activePhaseLabel?: string;
   onChange: (drill: DrillSelection | null) => void;
   onApply?: () => void;
-  onClose: () => void;
+  /** Live only: the Close button and Escape. Home shows the selector inline. */
+  onClose?: () => void;
+  /** Home only: hover or focus of a phase row, null when the pointer leaves. */
+  onPreviewPhase?: (index: number | null) => void;
 }>;
 
 /**
@@ -36,6 +39,7 @@ export function PhaseSelector({
   onChange,
   onApply,
   onClose,
+  onPreviewPhase,
 }: PhaseSelectorProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -66,24 +70,29 @@ export function PhaseSelector({
     // The scene listens on window for Escape to pause/resume; closing the
     // panel here must not also resume the attempt behind it.
     event.stopPropagation();
-    onClose();
+    onClose?.();
   };
   return (
     <aside
       id="phase-selector"
       aria-label="Phase selection"
-      className={`${styles.panel} ${mode === "live" ? styles.live : ""}`}
+      className={`${styles.panel} ${mode === "live" ? styles.live : styles.inline}`}
       onKeyDown={onKeyDown}
     >
       <div className={styles.heading}>
         <h2 ref={heading} tabIndex={mode === "live" ? -1 : undefined}>
           Phases
         </h2>
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
+        {mode === "live" && (
+          <button type="button" onClick={onClose}>
+            Close
+          </button>
+        )}
       </div>
-      <fieldset className={styles.options}>
+      <fieldset
+        className={styles.options}
+        onMouseLeave={() => onPreviewPhase?.(null)}
+      >
         <legend>Phase selection</legend>
         <label className={styles.choice}>
           <input
@@ -96,7 +105,12 @@ export function PhaseSelector({
           Full fight
         </label>
         {phases.map((phase) => (
-          <label key={phase.id} className={styles.choice}>
+          <label
+            key={phase.id}
+            className={styles.choice}
+            onMouseEnter={() => onPreviewPhase?.(phase.index)}
+            onFocus={() => onPreviewPhase?.(phase.index)}
+          >
             <input
               type="checkbox"
               value={phase.index}

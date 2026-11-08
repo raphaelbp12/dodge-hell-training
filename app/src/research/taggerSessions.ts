@@ -5,6 +5,7 @@
  * React or DOM here; the route owns wiring.
  */
 import {
+  validateMonsterDraft,
   validateSavedAttackLinks,
   validateSavedAttacks,
   validateStoredTag,
@@ -23,8 +24,12 @@ import type { EncounterConfig } from "../game/config/encounter";
 export const TAGGER_SESSION_KEY_PREFIX = "dodge-hell-training.tagger-session.";
 
 export type SessionDraft = Readonly<{
-  /** V16 S05: version 1 drafts upgrade on restore with no saved attacks. */
-  draftVersion: 2;
+  /**
+   * V16 S05: version 1 drafts upgrade on restore with no saved attacks.
+   * V18: version 3 carries the study's monster and draft; older drafts are the
+   * primary monster with none.
+   */
+  draftVersion: 3;
   /** ISO-8601 time of this write. */
   savedAt: string;
   study: StudyState;
@@ -68,8 +73,9 @@ function positiveFinite(value: unknown, path: string): number {
 /** Structural validation of a saved draft; throws on malformed input. */
 export function validateSessionDraft(value: unknown): SessionDraft {
   const source = record(value, "");
-  if (source.draftVersion !== 1 && source.draftVersion !== 2)
-    reject("draftVersion", "must be 1 or 2");
+  const version = source.draftVersion;
+  if (version !== 1 && version !== 2 && version !== 3)
+    reject("draftVersion", "must be 1, 2 or 3");
   const savedAt = nonEmptyString(source.savedAt, "savedAt");
   if (Number.isNaN(Date.parse(savedAt))) reject("savedAt", "must be a date");
   const study = record(source.study, "study");
@@ -83,13 +89,19 @@ export function validateSessionDraft(value: unknown): SessionDraft {
   positiveFinite(provenance.durationSeconds, "study.provenance.durationSeconds");
   if (!Array.isArray(study.tags)) reject("study.tags", "must be an array");
   const savedAttacks =
-    source.draftVersion === 2
+    version !== 1
       ? validateSavedAttacks(study.savedAttacks, "study.savedAttacks")
       : [];
   const tags = study.tags.map((entry, index) =>
     validateStoredTag(entry, `study.tags[${index}]`),
   );
   validateSavedAttackLinks(tags, savedAttacks, "study.tags");
+  if (version === 3) {
+    if (study.archetypeId !== null)
+      nonEmptyString(study.archetypeId, "study.archetypeId");
+    if (study.monsterDraft !== null)
+      validateMonsterDraft(study.monsterDraft, "study.monsterDraft");
+  }
   const sticky = record(source.sticky, "sticky");
   if (
     typeof sticky.phaseIndex !== "number" ||
@@ -126,11 +138,16 @@ export function validateSessionDraft(value: unknown): SessionDraft {
   }
   if (sticky.savedAttackId !== undefined)
     nonEmptyString(sticky.savedAttackId, "sticky.savedAttackId");
-  if (source.draftVersion === 2) return value as SessionDraft;
+  if (version === 3) return value as SessionDraft;
   return {
     ...(value as Record<string, unknown>),
-    draftVersion: 2,
-    study: { ...study, savedAttacks: [] },
+    draftVersion: 3,
+    study: {
+      ...study,
+      savedAttacks,
+      archetypeId: null,
+      monsterDraft: null,
+    },
   } as unknown as SessionDraft;
 }
 
@@ -141,7 +158,7 @@ export function buildDraft(input: {
   savedAt: string;
 }): SessionDraft {
   return {
-    draftVersion: 2,
+    draftVersion: 3,
     savedAt: input.savedAt,
     study: input.study,
     sticky: input.sticky,
@@ -155,8 +172,10 @@ export function buildDraft(input: {
 export function shouldWriteDraft(input: {
   dirty: boolean;
   tagCount: number;
+  /** V18: a study holding a monster draft is worth saving without tags. */
+  hasDraft?: boolean;
 }): boolean {
-  return input.dirty && input.tagCount > 0;
+  return input.dirty && (input.tagCount > 0 || input.hasDraft === true);
 }
 
 export type SessionNotice =
@@ -203,6 +222,8 @@ export type SessionListEntry =
       readable: true;
       key: string;
       fileName: string;
+      /** Null is the primary monster (L33). */
+      archetypeId: string | null;
       tagCount: number;
       savedAt: string;
     }>
@@ -231,9 +252,13 @@ export class TaggerSessions {
     }
   }
 
-  /** One slot per video file name (Z28). */
-  static keyFor(fileName: string): string {
-    return `${TAGGER_SESSION_KEY_PREFIX}${fileName}`;
+  /**
+   * One slot per video file name and monster (Z28, amended by L33): the
+   * primary monster keeps today's key, a minion's adds its archetype id.
+   */
+  static keyFor(fileName: string, minionArchetypeId?: string | null): string {
+    const base = `${TAGGER_SESSION_KEY_PREFIX}${fileName}`;
+    return minionArchetypeId ? `${base}#${minionArchetypeId}` : base;
   }
 
   private guard<T>(action: (storage: SessionStorage) => T): SessionResult<T> {
@@ -263,6 +288,7 @@ export class TaggerSessions {
             readable: true,
             key,
             fileName: draft.study.provenance.fileName,
+            archetypeId: draft.study.archetypeId,
             tagCount: draft.study.tags.length,
             savedAt: draft.savedAt,
           };
@@ -281,9 +307,14 @@ export class TaggerSessions {
     });
   }
 
-  write(draft: SessionDraft): SessionResult<string> {
+  /** `primaryArchetypeId` lets the primary monster keep today's slot (L33). */
+  write(draft: SessionDraft, primaryArchetypeId?: string): SessionResult<string> {
     return this.guard((storage) => {
-      const key = TaggerSessions.keyFor(draft.study.provenance.fileName);
+      const { archetypeId } = draft.study;
+      const key = TaggerSessions.keyFor(
+        draft.study.provenance.fileName,
+        archetypeId === primaryArchetypeId ? null : archetypeId,
+      );
       storage.setItem(key, JSON.stringify(draft));
       return key;
     });

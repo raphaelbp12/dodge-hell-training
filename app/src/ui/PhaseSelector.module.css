@@ -1,12 +1,12 @@
 .panel {
   flex: 0 0 320px;
   width: 320px;
-  max-height: calc(100svh - 110px);
+  max-height: 100svh;
   overflow: auto;
   padding: 16px;
-  background: #f8fbf8;
-  border-left: 1px solid #c4d5cc;
-  font-size: 13px;
+  background: var(--comb);
+  border-left: 1px solid var(--seam);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 /* Live: overlay the right 320 px of the playfield instead of shrinking it. */
@@ -18,6 +18,16 @@
   z-index: 2;
   max-height: none;
 }
+/* Home: always visible inside the hero, so no frame of its own. */
+.inline {
+  flex: none;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border-left: 0;
+}
 .heading {
   display: flex;
   justify-content: space-between;
@@ -25,20 +35,27 @@
   gap: 8px;
   margin-bottom: 16px;
 }
+.inline .heading {
+  display: none;
+}
 .heading h2 {
   margin: 0;
   font-size: 18px;
 }
 .panel button {
-  font-size: 12px;
+  font-size: 13px;
   padding: 6px 10px;
 }
 .options {
   border: 0;
-  border-top: 1px solid #c4d5cc;
+  border-top: 1px solid var(--seam);
   padding: 12px 0 4px;
   margin: 0 0 16px;
   min-width: 0;
+}
+.inline .options {
+  margin: 0 0 8px;
+  padding: 8px 0 0;
 }
 .options legend {
   font-weight: 600;
@@ -50,8 +67,14 @@
   gap: 8px;
   margin-bottom: 10px;
 }
-.panel input {
-  accent-color: #26885d;
+.inline .choice {
+  margin-bottom: 0;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+.inline .choice:hover,
+.inline .choice:focus-within {
+  background: var(--comb-raised);
 }
 .nowPlaying {
   display: flex;
@@ -59,11 +82,11 @@
   gap: 2px;
   margin: 16px 0;
   padding-top: 12px;
-  border-top: 1px solid #c4d5cc;
+  border-top: 1px solid var(--seam);
 }
 .nowPlaying span {
-  color: #4a6b5c;
-  font-size: 12px;
+  color: var(--smoke);
+  font-size: 13px;
 }
 .actions {
   display: flex;
@@ -76,6 +99,11 @@
     width: 100%;
     max-height: 38svh;
     border-left: 0;
-    border-bottom: 1px solid #c4d5cc;
+    border-bottom: 1px solid var(--seam);
+  }
+  .inline {
+    order: 0;
+    max-height: none;
+    border-bottom: 0;
   }
 }

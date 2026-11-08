@@ -62,3 +62,32 @@ export function appearanceRgbaPixels(
   }
   return { width, height, data };
 }
+
+export type PixelRect = Readonly<{
+  x: number;
+  y: number;
+  width: number;
+  colour: string;
+}>;
+
+/** One rectangle per horizontal run of one colour, for inline SVG sprites. */
+export function appearanceRects(
+  appearance: ProjectileAppearanceSpec,
+): readonly PixelRect[] {
+  const rects: PixelRect[] = [];
+  appearance.pixels.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const colour = row[x];
+      if (colour === null) {
+        x++;
+        continue;
+      }
+      let end = x + 1;
+      while (end < row.length && row[end] === colour) end++;
+      rects.push({ x, y, width: end - x, colour });
+      x = end;
+    }
+  });
+  return rects;
+}

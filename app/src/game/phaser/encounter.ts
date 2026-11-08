@@ -2,10 +2,7 @@ import Phaser from "phaser";
 import {
   archetypeOf,
   ENCOUNTER_CONFIG,
-  bombOf,
-  projectileOf,
   type EncounterConfig,
-  type ProjectileAppearanceSpec,
 } from "../config/encounter";
 import {
   DEFAULT_DEBUG_SETTINGS,
@@ -13,28 +10,21 @@ import {
   type DebugSettings,
 } from "../config/debug";
 import { PALADIN_STATS } from "../config/stats";
-import { transformBodyVertices } from "../simulation/geometry";
-import { CONDITION_LABELS, visibleConditions } from "../simulation/conditions";
+import {
+  CONDITION_LABELS,
+  visibleConditions,
+  type VisibleCondition,
+} from "../simulation/conditions";
 import { currentPhaseOf, forceNextSubPhase } from "../simulation/phases";
 import type { CreateSimulationOptions } from "../simulation/simulation";
 import { arbitrarySeed } from "../simulation/random";
-import type { TelegraphColorName } from "../config/data";
-import type { AcceptedHit, DrillSelection, ShardState, Vector2 } from "../models";
+import type { AcceptedHit, DrillSelection } from "../models";
 import { SessionController, type AttemptResult } from "../session/session";
 import type { DetonationEvent } from "../simulation/simulation";
 import { HitAudio } from "./hit-audio";
-import {
-  BOMB_EXPLOSION_FRAME_SECONDS,
-  bombExplosionFrameIndex,
-} from "./appearance-pixels";
-import { phaseViewOf } from "./view";
-import { octagonStaircaseRows } from "./arena-staircase";
-import { hazardOutlinesOf } from "./terrain-art";
-import {
-  createAppearanceTextures,
-  destroyAppearanceTextures,
-  type AppearanceTextureKeys,
-} from "./projectile-textures";
+import { phaseViewOf, type PhaseView } from "./view";
+import { ArenaRenderer } from "./arena-renderer";
+import { pixelsPerTile, presentation } from "./presentation";
 
 export type EncounterView = {
   healthHp: number;
@@ -53,6 +43,14 @@ export type EncounterView = {
   phaseCount: number;
   /** The active drill selection; null is the full fight. */
   drill: DrillSelection | null;
+  /** Boss progress and sub-phase fields, shared with the Home preview (V17). */
+  bossHealthFraction: PhaseView["bossHealthFraction"];
+  phaseProgress: PhaseView["phaseProgress"];
+  phaseEndsAtFraction: PhaseView["phaseEndsAtFraction"];
+  phaseTimedSeconds: PhaseView["phaseTimedSeconds"];
+  subPhaseId: PhaseView["subPhaseId"];
+  /** The player's visible conditions, for the HUD list. */
+  conditions: readonly VisibleCondition[];
 };
 
 export type EncounterHandle = {
@@ -82,87 +80,6 @@ type EncounterOptions = {
   onResult?: (result: AttemptResult) => void;
 };
 
-const presentation = {
-  hudIntervalMilliseconds: 100,
-  millisecondsPerSecond: 1000,
-  background: 0x101b1b,
-  ground: 0x1c302a,
-  // Two shades of the ground colour for the procedural honeycomb floor
-  // motif (P39, step 39.4) - no asset, generated per tile at draw time.
-  groundHoneycombLight: 0x24392f,
-  groundHoneycombDark: 0x152722,
-  grid: 0x29423a,
-  boundary: 0x648575,
-  honey: 0xb5791a,
-  honeyRim: 0xffcf7a,
-  player: 0xf0f5ef,
-  enemy: 0xea7969,
-  telegraphColors: {
-    white: 0xffffff,
-    amber: 0xffb347,
-    red: 0xff5f5f,
-    violet: 0xb388ff,
-    cyan: 0x69e8ea,
-  } satisfies Record<TelegraphColorName, number>,
-  shard: 0xffdf69,
-  spentShard: 0xc9a948,
-  lobTelegraph: {
-    color: 0xff5f5f,
-    lineWidthCssPixels: 2,
-  },
-  bombExplosion: {
-    frameSeconds: BOMB_EXPLOSION_FRAME_SECONDS,
-  },
-  hitNumbers: {
-    lifetimeSeconds: 0.9,
-    riseCssPixels: 28,
-    gapCssPixels: 12,
-    laneWidthCssPixels: 54,
-    lanes: 7,
-    fontSizeCssPixels: 18,
-    maxVisible: 16,
-    color: "#ff8fa3",
-    stroke: "#101b1b",
-    strokeCssPixels: 3,
-  },
-  healthBar: {
-    widthCssPixels: 48,
-    heightCssPixels: 6,
-    gapCssPixels: 6,
-    borderCssPixels: 1,
-    fill: 0x55d6a0,
-    empty: 0x592e39,
-    border: 0x101b1b,
-  },
-  conditionChip: {
-    gapAboveHealthBarCssPixels: 4,
-    gapBetweenCssPixels: 3,
-    heightCssPixels: 14,
-    horizontalPaddingCssPixels: 5,
-    fontSizeCssPixels: 10,
-    activeFill: 0x55303a,
-    inertFill: 0x2a2a2a,
-    activeTextColor: "#ffdf69",
-    inertTextColor: "#7a7a7a",
-  },
-} as const;
-const pixelsPerTile = ENCOUNTER_CONFIG.camera.cssPixelsPerTile;
-
-function hexColourToNumber(hex: string): number {
-  return Phaser.Display.Color.HexStringToColor(hex).color;
-}
-
-function projectileAppearances(
-  config: EncounterConfig,
-): readonly ProjectileAppearanceSpec[] {
-  const appearances = new Map<string, ProjectileAppearanceSpec>();
-  for (const projectile of Object.values(config.projectiles)) {
-    if (projectile.appearance)
-      appearances.set(projectile.appearance.id, projectile.appearance);
-  }
-  return [...appearances.values()];
-}
-
 const encounters = new WeakMap<HTMLElement, EncounterScene>();
 
 class EncounterScene extends Phaser.Scene {
@@ -170,21 +87,7 @@ class EncounterScene extends Phaser.Scene {
   private get state() {
     return this.session.simulation;
   }
-  private ground!: Phaser.GameObjects.Graphics;
-  private bodies!: Phaser.GameObjects.Graphics;
-  private projectiles!: Phaser.GameObjects.Graphics;
-  private appearanceTextures: ReadonlyMap<string, AppearanceTextureKeys> = new Map();
-  private shardImagePools = new Map<string, Phaser.GameObjects.Image[]>();
-  private shardImageUse = new Map<string, number>();
-  private bombExplosions: {
-    position: Vector2;
-    radiusTiles: number;
-    ageSeconds: number;
-    appearance: ProjectileAppearanceSpec;
-  }[] = [];
-  private bombsDetonated = 0;
-  private bombExplosionFramesDrawn = 0;
-  private fallbackShardDraws = 0;
+  private arenaRenderer!: ArenaRenderer;
   private healthBar!: Phaser.GameObjects.Graphics;
   private conditionChips!: Phaser.GameObjects.Graphics;
   private conditionChipTexts: Phaser.GameObjects.Text[] = [];
@@ -241,15 +144,9 @@ class EncounterScene extends Phaser.Scene {
 
   create(): void {
     if (this.disposed) return;
-    this.ground = this.add.graphics().setDepth(0);
-    this.bodies = this.add.graphics().setDepth(1);
-    this.projectiles = this.add.graphics().setDepth(2);
+    this.arenaRenderer = new ArenaRenderer(this, () => this.state);
     this.healthBar = this.add.graphics().setDepth(3);
     this.conditionChips = this.add.graphics().setDepth(3);
-    this.appearanceTextures = createAppearanceTextures(
-      this,
-      projectileAppearances(this.state.config),
-    );
     const keyboard = this.input.keyboard!;
     this.keys = keyboard.addKeys(
       { north: "W", south: "S", east: "D", west: "A" },
@@ -265,7 +162,7 @@ class EncounterScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.centerCamera, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.dispose, this);
     this.session.start();
-    this.drawGround();
+    this.arenaRenderer.drawGround();
     this.drawEntities();
     this.centerCamera();
     this.host.focus({ preventScroll: true });
@@ -425,9 +322,8 @@ class EncounterScene extends Phaser.Scene {
 
   private resetAttemptCleanup(): void {
     this.clearHitNumbers();
-    this.bombExplosions = [];
-    this.bombsDetonated = 0;
-    this.bombExplosionFramesDrawn = 0;
+    this.arenaRenderer.clearExplosions();
+    this.arenaRenderer.resetCounters();
     this.hitAudio.reset();
     this.hitAudio.unlock();
     this.finalHitAmounts = [];
@@ -443,7 +339,7 @@ class EncounterScene extends Phaser.Scene {
   setDebugSettings(settings: DebugSettings): void {
     if (this.disposed) return;
     this.session.setDebugSettings(settings);
-    if (!this.bodies) return;
+    if (!this.arenaRenderer) return;
     this.drawEntities();
     this.publishView();
   }
@@ -455,7 +351,7 @@ class EncounterScene extends Phaser.Scene {
     );
     if (!enemy) return;
     forceNextSubPhase(this.state, enemy, archetypeOf(this.state.config, enemy.archetypeId));
-    if (this.bodies) this.drawEntities();
+    if (this.arenaRenderer) this.drawEntities();
     this.publishView();
   }
 
@@ -532,17 +428,10 @@ class EncounterScene extends Phaser.Scene {
       number.text.destroy();
       return false;
     });
-    this.bombExplosions = this.bombExplosions.filter((effect) => {
-      effect.ageSeconds += activeSeconds;
-      return (
-        effect.ageSeconds <
-        presentation.bombExplosion.frameSeconds *
-          effect.appearance.bomb!.frameOuterPixels.length
-      );
-    });
+    this.arenaRenderer.advanceExplosions(activeSeconds);
     if (this.session.phase === "playing")
-      for (const event of newDetonations) this.addBombExplosion(event);
-    else this.bombExplosions = [];
+      for (const event of newDetonations) this.arenaRenderer.addBombExplosion(event);
+    else this.arenaRenderer.clearExplosions();
     this.drawEntities();
     this.centerCamera();
     this.hudRemainingMilliseconds -= delta;
@@ -574,6 +463,7 @@ class EncounterScene extends Phaser.Scene {
       finalHitAmounts: this.finalHitAmounts,
       debug: this.state.rulesVersion === DEBUG_RULES_VERSION,
       ...phaseViewOf(this.state),
+      conditions: visibleConditions(this.state.player),
     });
   }
 
@@ -587,221 +477,14 @@ class EncounterScene extends Phaser.Scene {
       );
   }
 
-  /** Draws the ground, grid and boundary for a circular arena - unchanged
-   * behaviour from before shaped arenas existed (P38). */
-  private drawCircleGround(shape: Extract<
-    EncounterConfig["arena"]["shape"],
-    { kind: "circle" }
-  >): void {
-    const { radiusTiles, centerTiles } = shape;
-    const centerX = centerTiles.x * pixelsPerTile;
-    const centerY = centerTiles.y * pixelsPerTile;
-    const radius = radiusTiles * pixelsPerTile;
-    this.ground
-      .fillStyle(presentation.ground)
-      .fillCircle(centerX, centerY, radius);
-    this.drawHoneycomb(centerX, centerY, (tileX, tileY) => {
-      const dx = tileX + 0.5 - centerTiles.x;
-      const dy = tileY + 0.5 - centerTiles.y;
-      return Math.hypot(dx, dy) <= radiusTiles;
-    }, radiusTiles);
-    this.drawHazards(centerX, centerY, this.state.config.arena.hazards);
-    this.ground.lineStyle(1, presentation.grid);
-    for (let tile = -radiusTiles + 1; tile < radiusTiles; tile++) {
-      const extent =
-        Math.sqrt(radiusTiles * radiusTiles - tile * tile) * pixelsPerTile;
-      this.ground.lineBetween(
-        centerX + tile * pixelsPerTile,
-        centerY - extent,
-        centerX + tile * pixelsPerTile,
-        centerY + extent,
-      );
-      this.ground.lineBetween(
-        centerX - extent,
-        centerY + tile * pixelsPerTile,
-        centerX + extent,
-        centerY + tile * pixelsPerTile,
-      );
-    }
-    this.ground
-      .lineStyle(3, presentation.boundary)
-      .strokeCircle(centerX, centerY, radius);
-  }
-
-  /** Draws the ground, grid and stepped-tile boundary for an octagonal
-   * arena, deriving the staircase at draw time (P38, step 38.4): no
-   * rasterised outline is stored anywhere. */
-  private drawOctagonGround(
-    shape: Extract<EncounterConfig["arena"]["shape"], { kind: "octagon" }>,
-  ): void {
-    const centerX = shape.centerTiles.x * pixelsPerTile;
-    const centerY = shape.centerTiles.y * pixelsPerTile;
-    const rows = octagonStaircaseRows(shape);
-    this.ground.fillStyle(presentation.ground);
-    for (const row of rows) {
-      this.ground.fillRect(
-        centerX - row.halfWidthTiles * pixelsPerTile,
-        centerY + (row.rowCenterTiles - 0.5) * pixelsPerTile,
-        row.halfWidthTiles * 2 * pixelsPerTile,
-        pixelsPerTile,
-      );
-    }
-    this.drawHoneycomb(
-      centerX,
-      centerY,
-      (tileX, tileY) => {
-        const row = rows.find(
-          (candidate) => candidate.rowCenterTiles === tileY,
-        );
-        return !!row && Math.abs(tileX + 0.5) <= row.halfWidthTiles;
-      },
-      Math.max(
-        ...rows.map((row) => Math.max(row.halfWidthTiles, Math.abs(row.rowCenterTiles))),
-        0,
-      ),
-    );
-    this.drawHazards(centerX, centerY, this.state.config.arena.hazards);
-    this.ground.lineStyle(1, presentation.grid);
-    for (const row of rows) {
-      const left = centerX - row.halfWidthTiles * pixelsPerTile;
-      const right = centerX + row.halfWidthTiles * pixelsPerTile;
-      const top = centerY + (row.rowCenterTiles - 0.5) * pixelsPerTile;
-      const bottom = top + pixelsPerTile;
-      for (
-        let tileX = Math.ceil(left / pixelsPerTile) * pixelsPerTile;
-        tileX < right;
-        tileX += pixelsPerTile
-      )
-        this.ground.lineBetween(tileX, top, tileX, bottom);
-      this.ground.lineBetween(left, top, right, top);
-    }
-    this.ground.lineStyle(3, presentation.boundary);
-    for (const row of rows) {
-      const left = centerX - row.halfWidthTiles * pixelsPerTile;
-      const right = centerX + row.halfWidthTiles * pixelsPerTile;
-      const top = centerY + (row.rowCenterTiles - 0.5) * pixelsPerTile;
-      const bottom = top + pixelsPerTile;
-      const above = rows.find(
-        (candidate) => candidate.rowCenterTiles === row.rowCenterTiles - 1,
-      );
-      const aboveHalfWidthTiles = above?.halfWidthTiles ?? 0;
-      if (aboveHalfWidthTiles !== row.halfWidthTiles) {
-        this.ground.lineBetween(
-          left,
-          top,
-          centerX - aboveHalfWidthTiles * pixelsPerTile,
-          top,
-        );
-        this.ground.lineBetween(
-          right,
-          top,
-          centerX + aboveHalfWidthTiles * pixelsPerTile,
-          top,
-        );
-      }
-      this.ground.lineBetween(left, top, left, bottom);
-      this.ground.lineBetween(right, top, right, bottom);
-      const below = rows.find(
-        (candidate) => candidate.rowCenterTiles === row.rowCenterTiles + 1,
-      );
-      if (!below) this.ground.lineBetween(left, bottom, right, bottom);
-    }
-  }
-
-  private drawGround(): void {
-    const { shape } = this.state.config.arena;
-    if (shape.kind === "circle") this.drawCircleGround(shape);
-    else this.drawOctagonGround(shape);
-  }
-
-  /**
-   * Procedural two-tone honeycomb cell motif over the safe floor (P39, step
-   * 39.4): one small hexagon per tile cell whose centre `cellTest` accepts,
-   * shaded light or dark by tile-coordinate parity. No asset, no authored
-   * grid - generated at draw time from the tile bounds alone, and drawn once
-   * at create/resize, never per frame.
-   */
-  private drawHoneycomb(
-    centerX: number,
-    centerY: number,
-    cellInsideShape: (tileX: number, tileY: number) => boolean,
-    boundsRadiusTiles: number,
-  ): void {
-    const hexRadiusCssPixels = pixelsPerTile * 0.42;
-    const bound = Math.ceil(boundsRadiusTiles) + 1;
-    for (let tileY = -bound; tileY < bound; tileY++) {
-      for (let tileX = -bound; tileX < bound; tileX++) {
-        if (!cellInsideShape(tileX, tileY)) continue;
-        const cellCenterX = centerX + (tileX + 0.5) * pixelsPerTile;
-        const cellCenterY = centerY + (tileY + 0.5) * pixelsPerTile;
-        const shade =
-          (tileX + tileY) % 2 === 0
-            ? presentation.groundHoneycombLight
-            : presentation.groundHoneycombDark;
-        const points: Phaser.Math.Vector2[] = [];
-        for (let corner = 0; corner < 6; corner++) {
-          const angleRadians = (Math.PI / 3) * corner + Math.PI / 6;
-          points.push(
-            new Phaser.Math.Vector2(
-              cellCenterX + hexRadiusCssPixels * Math.cos(angleRadians),
-              cellCenterY + hexRadiusCssPixels * Math.sin(angleRadians),
-            ),
-          );
-        }
-        this.ground.fillStyle(shade).fillPoints(points, true);
-      }
-    }
-  }
-
-  /**
-   * Draws each hazard region as its exact shape (P39, step 39.4): a diamond
-   * pond as a diamond, an annulus pond as a true ring - never approximated
-   * as a circle or a square, since that would misinform the player about
-   * where honey actually is. `hazardOutlinesOf` (terrain-art.ts) is the pure,
-   * separately tested region-to-outline conversion this draws from.
-   */
-  private drawHazards(
-    centerX: number,
-    centerY: number,
-    hazards: EncounterConfig["arena"]["hazards"],
-  ): void {
-    for (const outline of hazardOutlinesOf(hazards)) {
-      if (outline.kind === "diamond") {
-        const points = outline.verticesTiles.map(
-          (vertex) =>
-            new Phaser.Math.Vector2(
-              centerX + vertex.x * pixelsPerTile,
-              centerY + vertex.y * pixelsPerTile,
-            ),
-        );
-        this.ground.fillStyle(presentation.honey).fillPoints(points, true);
-        this.ground
-          .lineStyle(2, presentation.honeyRim)
-          .strokePoints(points, true);
-      } else {
-        const innerRadius = outline.innerRadiusTiles * pixelsPerTile;
-        const outerRadius = outline.outerRadiusTiles * pixelsPerTile;
-        // Phaser has no built-in ring fill; approximate the annulus as a
-        // thick stroked circle at its midline, whose line width exactly
-        // spans inner to outer radius.
-        this.ground
-          .lineStyle(outerRadius - innerRadius, presentation.honey)
-          .strokeCircle(centerX, centerY, (innerRadius + outerRadius) / 2);
-        this.ground
-          .lineStyle(2, presentation.honeyRim)
-          .strokeCircle(centerX, centerY, innerRadius)
-          .strokeCircle(centerX, centerY, outerRadius);
-      }
-    }
-  }
-
   private addHitNumber(hit: AcceptedHit): void {
     const policy = presentation.hitNumbers;
     while (this.hitNumbers.length >= policy.maxVisible)
       this.hitNumbers.shift()!.text.destroy();
     const text = this.add
       .text(0, 0, `-${hit.damageHp}`, {
-        fontFamily: "Consolas, monospace",
+        fontFamily: '"Barlow Semi Condensed", sans-serif',
+        fontStyle: "600",
         fontSize: `${policy.fontSizeCssPixels}px`,
         color: policy.color,
         stroke: policy.stroke,
@@ -818,109 +501,8 @@ class EncounterScene extends Phaser.Scene {
   }
 
   private drawEntities(): void {
-    const { player, enemies, shards, bombs } = this.state;
-    this.bodies.clear();
-    const draw = (
-      graphics: Phaser.GameObjects.Graphics,
-      vertices: readonly Vector2[],
-      position: Vector2,
-      color: number,
-      orientation = 0,
-    ) => {
-      const points = transformBodyVertices(vertices, position, orientation).map(
-        (vertex) =>
-          new Phaser.Math.Vector2(
-            vertex.x * pixelsPerTile,
-            vertex.y * pixelsPerTile,
-          ),
-      );
-      graphics.fillStyle(color).fillPoints(points, true);
-    };
-    for (const enemy of enemies) {
-      const archetype = archetypeOf(this.state.config, enemy.archetypeId);
-      const phase = currentPhaseOf(archetype, enemy);
-      const isTelegraphing =
-        this.state.elapsedSeconds <
-        enemy.phaseEnteredAtSeconds + phase.telegraphSeconds;
-      draw(
-        this.bodies,
-        archetype.verticesTiles,
-        enemy.positionTiles,
-        isTelegraphing
-          ? presentation.telegraphColors[phase.telegraphColor]
-          : presentation.enemy,
-      );
-    }
-    draw(
-      this.bodies,
-      this.state.config.player.verticesTiles,
-      player.positionTiles,
-      presentation.player,
-    );
-    this.projectiles.clear();
-    this.shardImageUse.clear();
-    this.fallbackShardDraws = 0;
-    for (const shard of shards) {
-      const projectile = projectileOf(this.state.config, shard.projectileId);
-      const appearance = projectile.appearance;
-      const hasShardTexture = Boolean(
-        appearance &&
-          !appearance.bomb &&
-          this.appearanceTextures.has(appearance.id),
-      );
-      if (hasShardTexture) {
-        this.drawShardImage(appearance!, shard);
-      } else {
-        if (appearance && !appearance.bomb) this.fallbackShardDraws++;
-        draw(
-          this.projectiles,
-          projectile.verticesTiles,
-          shard.positionTiles,
-          appearance?.bomb
-            ? hexColourToNumber(appearance.bomb.bodyColor)
-            : shard.hasHitPlayer
-              ? presentation.spentShard
-              : presentation.shard,
-          shard.orientationRadians,
-        );
-      }
-    }
-    // Bombs draw in their own pass (N22): the body in flight, then the red
-    // telegraph circle at the destination once the lead-in window opens.
-    const telegraphSeconds = this.state.config.presentation.lobTelegraphSeconds;
-    for (const bomb of bombs) {
-      const projectile = bombOf(this.state.config, bomb.projectileId);
-      const appearance = projectile.appearance;
-      draw(
-        this.projectiles,
-        projectile.verticesTiles,
-        bomb.positionTiles,
-        appearance?.bomb
-          ? hexColourToNumber(appearance.bomb.bodyColor)
-          : bomb.hasHitPlayer
-            ? presentation.spentShard
-            : presentation.shard,
-        bomb.orientationRadians,
-      );
-      if (bomb.ageSeconds >= bomb.lifetimeSeconds - telegraphSeconds) {
-        this.projectiles
-          .lineStyle(
-            presentation.lobTelegraph.lineWidthCssPixels,
-            presentation.lobTelegraph.color,
-          )
-          .strokeCircle(
-            bomb.detonationTargetTiles.x * pixelsPerTile,
-            bomb.detonationTargetTiles.y * pixelsPerTile,
-            projectile.detonationRadiusTiles * pixelsPerTile,
-          );
-      }
-    }
-    for (const [key, pool] of this.shardImagePools) {
-      const used = this.shardImageUse.get(key) ?? 0;
-      for (let index = used; index < pool.length; index++)
-        pool[index]!.setVisible(false);
-    }
-    this.drawBombExplosions();
+    const { player } = this.state;
+    this.arenaRenderer.drawWorld(this.zoom);
     const bar = presentation.healthBar;
     const width = bar.widthCssPixels / this.zoom;
     const height = bar.heightCssPixels / this.zoom;
@@ -968,88 +550,6 @@ class EncounterScene extends Phaser.Scene {
     }
   }
 
-  private drawShardImage(
-    appearance: ProjectileAppearanceSpec,
-    shard: ShardState,
-  ): void {
-    const keys = this.appearanceTextures.get(appearance.id);
-    if (!keys) return;
-    const key = shard.hasHitPlayer ? keys.spent : keys.normal;
-    const index = this.shardImageUse.get(key) ?? 0;
-    let pool = this.shardImagePools.get(key);
-    if (!pool) {
-      pool = [];
-      this.shardImagePools.set(key, pool);
-    }
-    let image = pool[index];
-    if (!image) {
-      image = this.add.image(0, 0, key).setDepth(1.9).setOrigin(0.5, 0.5);
-      pool.push(image);
-    }
-    image
-      .setTexture(key)
-      .setPosition(
-        shard.positionTiles.x * pixelsPerTile,
-        shard.positionTiles.y * pixelsPerTile,
-      )
-      .setRotation(shard.orientationRadians)
-      .setScale(pixelsPerTile / appearance.pixelsPerTile)
-      .setVisible(true);
-    this.shardImageUse.set(key, index + 1);
-  }
-
-  private addBombExplosion(event: DetonationEvent): void {
-    const projectile = projectileOf(this.state.config, event.projectileId);
-    const appearance = projectile.appearance;
-    if (!appearance?.bomb) return;
-    this.bombsDetonated++;
-    this.bombExplosions.push({
-      position: { ...event.positionTiles },
-      radiusTiles: event.radiusTiles,
-      ageSeconds: 0,
-      appearance,
-    });
-  }
-
-  private drawBombExplosions(): void {
-    for (const effect of this.bombExplosions) {
-      const bomb = effect.appearance.bomb;
-      if (!bomb) continue;
-      this.bombExplosionFramesDrawn++;
-      const frameIndex = bombExplosionFrameIndex(
-        effect.ageSeconds,
-        presentation.bombExplosion.frameSeconds,
-        bomb.frameOuterPixels.length,
-      );
-      const outerPixels = bomb.frameOuterPixels[frameIndex]!;
-      const finalOuterPixels =
-        bomb.frameOuterPixels[bomb.frameOuterPixels.length - 1]!;
-      const tilesPerNativePixel =
-        (effect.radiusTiles * 2) /
-        (finalOuterPixels / effect.appearance.pixelsPerTile);
-      const sizeCssPixels =
-        (outerPixels / effect.appearance.pixelsPerTile) *
-        tilesPerNativePixel *
-        pixelsPerTile;
-      const borderCssPixels =
-        (bomb.borderPixels / effect.appearance.pixelsPerTile) *
-        tilesPerNativePixel *
-        pixelsPerTile;
-      const left = effect.position.x * pixelsPerTile - sizeCssPixels / 2;
-      const top = effect.position.y * pixelsPerTile - sizeCssPixels / 2;
-      this.projectiles
-        .fillStyle(hexColourToNumber(effect.appearance.palette.A!))
-        .fillRect(left, top, sizeCssPixels, sizeCssPixels)
-        .fillStyle(hexColourToNumber(effect.appearance.palette.B!))
-        .fillRect(
-          left + borderCssPixels,
-          top + borderCssPixels,
-          sizeCssPixels - borderCssPixels * 2,
-          sizeCssPixels - borderCssPixels * 2,
-        );
-    }
-  }
-
   /** Draws one labelled chip per active-or-visible condition, below the health bar. */
   private drawConditionChips(
     player: typeof this.state.player,
@@ -1068,7 +568,8 @@ class EncounterScene extends Phaser.Scene {
       }`;
       const text = this.add
         .text(0, 0, label, {
-          fontFamily: "Consolas, monospace",
+          fontFamily: '"Barlow Semi Condensed", sans-serif',
+          fontStyle: "600",
           fontSize: `${policy.fontSizeCssPixels}px`,
           color: condition.inert ? policy.inertTextColor : policy.activeTextColor,
         })
@@ -1131,10 +632,7 @@ class EncounterScene extends Phaser.Scene {
         widthCssPixels: number.text.displayWidth * this.zoom,
         heightCssPixels: number.text.displayHeight * this.zoom,
       })),
-      bombsDetonated: this.bombsDetonated,
-      bombExplosionsActive: this.bombExplosions.length,
-      bombExplosionFramesDrawn: this.bombExplosionFramesDrawn,
-      fallbackShards: this.fallbackShardDraws,
+      ...this.arenaRenderer.counters,
       audio: this.hitAudio.inspect(),
     };
   }
@@ -1143,11 +641,7 @@ class EncounterScene extends Phaser.Scene {
     if (this.disposed) return;
     this.disposed = true;
     this.clearHitNumbers();
-    this.bombExplosions = [];
-    for (const pool of this.shardImagePools.values())
-      for (const image of pool) image.destroy();
-    this.shardImagePools.clear();
-    destroyAppearanceTextures(this, this.appearanceTextures);
+    this.arenaRenderer?.destroy();
     this.hitAudio.dispose();
     this.session.home();
     this.input?.keyboard?.resetKeys();

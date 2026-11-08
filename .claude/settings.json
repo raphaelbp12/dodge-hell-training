@@ -1,8 +1,12 @@
 {
-  "enabledMcpjsonServers": ["codegraph"],
   "permissions": {
-    "allow": ["mcp__codegraph__*"]
+    "allow": [
+      "mcp__codegraph__*"
+    ]
   },
+  "enabledMcpjsonServers": [
+    "codegraph"
+  ],
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -14,5 +18,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
   }
 }

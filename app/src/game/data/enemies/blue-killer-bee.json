@@ -1,0 +1,58 @@
+{
+  "comment": "docs/killer-bee-queen-source.md Minion Source Extracts - Blue Killer Bee. Chases and fires a single directed shot; 400 HP/25 DEF, no drain. Spawned by phase 2's blue sub-phase, despawn-on-exit.",
+  "spawnTiles": {
+    "x": 0,
+    "y": -16.2
+  },
+  "body": {
+    "shape": "beveled-octagon",
+    "widthTiles": 1,
+    "heightTiles": 1
+  },
+  "health": {
+    "maxHealthHp": 400,
+    "progression": {
+      "kind": "none"
+    }
+  },
+  "contactDamageHp": 0,
+  "contactConditions": [],
+  "contactArmorPiercing": false,
+  "contactCooldownSeconds": 0,
+  "blocksPlayer": false,
+  "phases": [
+    {
+      "id": "sole",
+      "enterAtHpFraction": 1,
+      "exitAfterSeconds": null,
+      "telegraphSeconds": 0.5,
+      "invulnerableOnEnterSeconds": 0,
+      "telegraphColor": "cyan",
+      "movement": {
+        "kind": "chase",
+        "speedTilesPerSecond": 3
+      },
+      "progression": null,
+      "attacks": [
+        {
+          "id": "single-shot",
+          "projectile": "blue-killer-bee-stinger",
+          "tuningSource": "wiki-prose",
+          "pattern": {
+            "kind": "spread",
+            "shots": 1,
+            "arcDegrees": 0,
+            "aim": "player",
+            "emitterRadiusTiles": 0
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1.5,
+            "initialDelaySeconds": 0.5
+          }
+        }
+      ]
+    }
+  ]
+}

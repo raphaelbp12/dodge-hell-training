@@ -3,6 +3,7 @@
  * phase 34.3). Everything here reads `game/config/` one way (T13) and stays
  * independent of React, the DOM and the video APIs.
  */
+import type { MonsterDraft } from "./monsterDraft";
 import { phaseLabel } from "../game/config/drill";
 import {
   PROJECTILE_APPEARANCES,
@@ -625,8 +626,10 @@ export function sortNewestFirst(
  */
 export function assembleExport(input: {
   encounterId: string;
+  archetypeId: string;
   provenance: VideoProvenance;
   savedAttacks?: readonly SavedAttack[];
+  monsterDraft?: MonsterDraft | null;
   tags: readonly StoredTag[];
   recordedAt: string;
 }): ObservationExport {
@@ -634,12 +637,14 @@ export function assembleExport(input: {
     (first, second) => first.timeSeconds - second.timeSeconds,
   );
   return validateObservationExport({
-    schemaVersion: 3,
+    schemaVersion: 4,
     encounterId: input.encounterId,
+    archetypeId: input.archetypeId,
     provenance: input.provenance,
     recordedAt: input.recordedAt,
     savedAttacks: input.savedAttacks ?? [],
     tags,
+    monsterDraft: input.monsterDraft ?? null,
   }) as ObservationExport;
 }
 

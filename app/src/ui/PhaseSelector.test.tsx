@@ -18,6 +18,7 @@ function Harness({
   activePhaseLabel,
   onApply,
   onClose = vi.fn(),
+  onPreviewPhase,
 }: {
   mode?: "home" | "live";
   initial?: DrillSelection | null;
@@ -25,6 +26,7 @@ function Harness({
   activePhaseLabel?: string;
   onApply?: () => void;
   onClose?: () => void;
+  onPreviewPhase?: (index: number | null) => void;
 }) {
   const [drill, setDrill] = useState<DrillSelection | null>(initial);
   return (
@@ -38,6 +40,7 @@ function Harness({
         onChange={setDrill}
         onApply={onApply}
         onClose={onClose}
+        onPreviewPhase={onPreviewPhase}
       />
       <output aria-label="drill">{JSON.stringify(drill)}</output>
     </>
@@ -103,15 +106,24 @@ test("multi-select renders in authored order and stores a sorted unique set", as
   );
 });
 
-test("Home mode has no Apply and calls onClose", async () => {
-  const user = userEvent.setup();
-  const onClose = vi.fn();
-  render(<Harness onClose={onClose} />);
+test("Home mode is inline: no Apply and no Close", () => {
+  render(<Harness onClose={vi.fn()} />);
   expect(
     screen.queryByRole("button", { name: "Apply" }),
   ).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Close" }));
-  expect(onClose).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("button", { name: "Close" }),
+  ).not.toBeInTheDocument();
+});
+
+test("Home mode reports the hovered phase to the preview", async () => {
+  const user = userEvent.setup();
+  const onPreviewPhase = vi.fn();
+  render(<Harness onClose={vi.fn()} onPreviewPhase={onPreviewPhase} />);
+  await user.hover(screen.getByText("Phase 3 - Pond Barrage"));
+  expect(onPreviewPhase).toHaveBeenLastCalledWith(2);
+  await user.unhover(screen.getByText("Phase 3 - Pond Barrage"));
+  expect(onPreviewPhase).toHaveBeenLastCalledWith(null);
 });
 
 test("Live mode shows the active row and calls onApply and onClose", async () => {

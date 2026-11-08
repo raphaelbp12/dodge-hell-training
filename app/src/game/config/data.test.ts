@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   AUTHORED_APPEARANCES,
   AUTHORED_ARCHETYPES,
+  AUTHORED_MONSTER_FILES,
   AUTHORED_ARENAS,
   AUTHORED_PROJECTILES,
   AUTHORED_SHAPES,
@@ -1203,3 +1204,22 @@ test.each([
     ).toThrow(RangeError);
   },
 );
+
+const MONSTER_FILE_TEXT = import.meta.glob("../data/enemies/*.json", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+test("every authored monster has one file named for its id, in canonical text", () => {
+  const ids = Object.keys(AUTHORED_MONSTER_FILES);
+  expect(ids).toHaveLength(Object.keys(AUTHORED_ARCHETYPES).length);
+  expect(Object.keys(MONSTER_FILE_TEXT)).toHaveLength(ids.length);
+  for (const id of ids) {
+    const text = MONSTER_FILE_TEXT[`../data/enemies/${id}.json`];
+    expect(text).toBe(
+      `${JSON.stringify(AUTHORED_MONSTER_FILES[id], null, 2)}\n`,
+    );
+    expect(AUTHORED_ARCHETYPES[id]).toBeDefined();
+  }
+});

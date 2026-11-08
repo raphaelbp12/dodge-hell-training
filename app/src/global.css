@@ -1,0 +1,41 @@
+:root {
+  color-scheme: dark;
+  color: var(--wax);
+  background: var(--night);
+  font: 500 16px/1.45 "Barlow Semi Condensed", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  scrollbar-color: var(--seam) var(--night);
+  --display: "Grenze Gotisch Variable", Georgia, serif;
+  --rail-width: 264px;
+  --accent: var(--honey);
+  --accent-deep: var(--ember);
+}
+[data-encounter="crystal-worm"] {
+  --accent: var(--crystal);
+  --accent-deep: var(--coral);
+}
+*, *::before, *::after { box-sizing: border-box; letter-spacing: 0; }
+body { margin: 0; background: var(--night); }
+#root { width: 100%; max-width: none; min-height: 100svh; border: 0; text-align: left; }
+button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--wax);
+  background: var(--comb);
+  border: 1px solid var(--seam);
+  border-radius: 3px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--comb-raised); border-color: var(--smoke); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--accent); }
+a { color: var(--wax); text-underline-offset: 3px; }
+code { font: inherit; color: var(--wax); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

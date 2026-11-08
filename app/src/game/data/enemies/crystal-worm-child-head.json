@@ -1,0 +1,52 @@
+{
+  "comment": "spawnTiles is the approved north spawn, a 3-tile center-to-wall margin inside the 19.2-tile arena.",
+  "spawnTiles": {
+    "x": 0,
+    "y": -16.2
+  },
+  "body": {
+    "shape": "beveled-octagon",
+    "widthTiles": 1.25,
+    "heightTiles": 1.25
+  },
+  "contactDamageHp": 0,
+  "contactConditions": [],
+  "contactArmorPiercing": false,
+  "contactCooldownSeconds": 0,
+  "blocksPlayer": false,
+  "phases": [
+    {
+      "id": "sole",
+      "enterAtHpFraction": 1,
+      "exitAfterSeconds": null,
+      "telegraphSeconds": 0,
+      "invulnerableOnEnterSeconds": 0,
+      "telegraphColor": "amber",
+      "movement": {
+        "kind": "chase",
+        "speedTilesPerSecond": 1.5
+      },
+      "progression": null,
+      "attacks": [
+        {
+          "id": "spiral-shards",
+          "projectile": "crystal-worm-child-shard",
+          "tuningSource": "approved-v3",
+          "pattern": {
+            "kind": "ring",
+            "arms": 6,
+            "emitterRadiusTiles": 0.35,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": 45
+          },
+          "cadence": {
+            "shotsPerBurst": 11,
+            "shotIntervalSeconds": 0.19,
+            "cooldownAfterLastShotSeconds": 3,
+            "initialDelaySeconds": 2
+          }
+        }
+      ]
+    }
+  ]
+}

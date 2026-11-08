@@ -1,71 +1,38 @@
-import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
-import {
-  createEncounter,
-  type EncounterHandle,
-  type EncounterView,
-} from "./game/phaser/encounter";
-import { PALADIN_STATS } from "./game/config/stats";
+import { useEffect, useRef, useState } from "react";
+import type { EncounterHandle } from "./game/phaser/encounter";
+import { PALADIN_STATS, PALADIN_DERIVED_STATS } from "./game/config/stats";
 import {
   DEBUG_TUNABLE_ENCOUNTER_ID,
   DEFAULT_ENCOUNTER_ID,
-  ENCOUNTER_CONFIG,
   ENCOUNTER_LIST,
   encounterConfigOf,
   primaryArchetype,
-  RULES_VERSION,
-  type EncounterConfig,
 } from "./game/config/encounter";
-import {
-  AttemptHistory,
-  retainedBestSeconds,
-  type HistorySnapshot,
-} from "./storage/attempts";
+import { AttemptHistory } from "./storage/attempts";
 import styles from "./App.module.css";
 import { ZoomPreference } from "./storage/zoom";
-import { commitSha } from "virtual:build-info";
 import { parseDrillFromLocation, phaseLabel } from "./game/config/drill";
 import type { DrillSelection } from "./game/models";
 import { PhaseSelector } from "./ui/PhaseSelector";
-import {
-  DEBUG_GROUPS,
-  DEBUG_PARAMETERS,
-  DEBUG_RULES_VERSION,
-  DEBUG_TOGGLES,
-  DEFAULT_DEBUG_SETTINGS,
-  loadSelectedDebugValues,
-  updateDebugParameter,
-  type DebugSettings,
-} from "./game/config/debug";
-import {
-  CONDITION_DESCRIPTIONS,
-  CONDITION_KEYS,
-  CONDITION_LABELS,
-  INERT_CONDITIONS,
-} from "./game/simulation/conditions";
+import { DEFAULT_DEBUG_SETTINGS, type DebugSettings } from "./game/config/debug";
+import { DebugPanel } from "./ui/DebugPanel";
+import { ControlsDialog } from "./ui/ControlsDialog";
+import { History } from "./ui/History";
+import { selectedRulesVersion } from "./ui/historyModel";
+import { EncounterScreen } from "./ui/EncounterScreen";
+import { Changelog } from "./ui/Changelog";
+import { Footer } from "./ui/Footer";
+import { ArenaPlate } from "./ui/ArenaPlate";
+import { PhaseDossier } from "./ui/PhaseDossier";
+import { PhasePreview, motionAllowed } from "./ui/PhasePreview";
 
-const REPOSITORY_URL = "https://github.com/raphaelbp12/dodge-hell-training";
-const SHORT_SHA_LENGTH = 7;
-
-/** The deployed build's commit, or null when the build was not identified. */
-function deployedCommit(): { short: string; url: string } | null {
-  const sha = commitSha;
-  if (!/^[0-9a-f]{7,40}$/.test(sha)) return null;
-  return {
-    short: sha.slice(0, SHORT_SHA_LENGTH),
-    url: `${REPOSITORY_URL}/commit/${sha}`,
-  };
-}
-
-/**
- * Optional `?seed=<integer>` pins spawn placement, so a run can be reproduced
- * or shared. Omitted or invalid means a varied opening.
- */
-function readSeedFromLocation(): number | undefined {
-  const raw = new URLSearchParams(window.location.search).get("seed");
-  if (raw === null) return undefined;
-  const seed = Number(raw);
-  return Number.isFinite(seed) ? Math.trunc(seed) : undefined;
-}
+/** The Paladin's authored equipment, matching `PALADIN_EQUIPMENT_BONUSES`. */
+const PALADIN_EQUIPMENT = [
+  "Archon Sword",
+  "Vengeance Armor",
+  "Seal of the Divine",
+  "Ring of Paramount Health",
+] as const;
 
 /**
  * K14: `?encounter=<id>` links a specific encounter; an unknown id is ignored
@@ -76,516 +43,6 @@ function readEncounterIdFromLocation(): string | undefined {
   const raw = new URLSearchParams(window.location.search).get("encounter");
   if (raw === null) return undefined;
   return ENCOUNTER_LIST.some((entry) => entry.id === raw) ? raw : undefined;
-}
-
-function DebugPanel({
-  settings,
-  onChange,
-  onClose,
-  encounterHandle,
-}: {
-  settings: DebugSettings;
-  onChange: (settings: DebugSettings) => void;
-  onClose: () => void;
-  encounterHandle: RefObject<EncounterHandle | null>;
-}) {
-  return (
-    <aside
-      id="debug-tools"
-      aria-label="Enemy debug tools"
-      data-debug-tools
-      className={styles.debugPanel}
-    >
-      <div className={styles.debugHeading}>
-        <h2>Enemy debug</h2>
-        <button type="button" onClick={onClose}>
-          Close debug
-        </button>
-      </div>
-      <button
-        className={styles.debugLoad}
-        type="button"
-        onClick={() => onChange(loadSelectedDebugValues(settings))}
-      >
-        Load selected values
-      </button>
-      {DEBUG_TOGGLES.map((toggle) => (
-        <label key={toggle.key} className={styles.debugToggle}>
-          <input
-            type="checkbox"
-            checked={settings[toggle.key]}
-            onChange={(event) =>
-              onChange({ ...settings, [toggle.key]: event.target.checked })
-            }
-          />
-          {toggle.label}
-        </label>
-      ))}
-      <button
-        type="button"
-        className={styles.debugLoad}
-        onClick={() => encounterHandle.current?.advanceSubPhase()}
-      >
-        Next sub-phase
-      </button>
-      {DEBUG_GROUPS.map((group) => (
-        <fieldset key={group}>
-          <legend>{group}</legend>
-          {DEBUG_PARAMETERS.filter(
-            (parameter) => parameter.group === group,
-          ).map((parameter) => (
-            <label key={parameter.key} className={styles.debugParameter}>
-              <span>{parameter.label}</span>
-              <output>
-                {Number(settings[parameter.key].toFixed(3))} {parameter.unit}
-              </output>
-              <input
-                type="range"
-                aria-label={parameter.label}
-                data-debug-parameter={parameter.key}
-                min={parameter.min}
-                max={parameter.max}
-                step={parameter.step}
-                value={settings[parameter.key]}
-                onChange={(event) =>
-                  onChange(
-                    updateDebugParameter(
-                      settings,
-                      parameter.key,
-                      Number(event.target.value),
-                    ),
-                  )
-                }
-              />
-            </label>
-          ))}
-        </fieldset>
-      ))}
-      <button type="button" onClick={() => onChange(DEFAULT_DEBUG_SETTINGS)}>
-        Reset defaults
-      </button>
-    </aside>
-  );
-}
-
-function ControlsDialog({ onClose }: { onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const opener = document.activeElement;
-    const element = dialog.current!;
-    element.showModal();
-    return () => {
-      element.close();
-      if (opener instanceof HTMLElement && opener.isConnected)
-        opener.focus({ preventScroll: true });
-    };
-  }, []);
-  return (
-    <dialog
-      ref={dialog}
-      className={styles.controls}
-      aria-labelledby="controls-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Tab") {
-          event.preventDefault();
-          dialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
-        }
-      }}
-    >
-      <h2 id="controls-title">Controls</h2>
-      <dl>
-        {CONDITION_KEYS.map((key) => (
-          <Fragment key={key}>
-            <dt>
-              {CONDITION_LABELS[key]}
-              {(INERT_CONDITIONS as readonly string[]).includes(key) && " (inert)"}
-            </dt>
-            <dd>{CONDITION_DESCRIPTIONS[key]}</dd>
-          </Fragment>
-        ))}
-        <dt>WASD</dt>
-        <dd>Move</dd>
-        <dt>R</dt>
-        <dd>Immediate retry</dd>
-        <dt>O / P</dt>
-        <dd>Zoom out / in</dd>
-        <dt>Escape</dt>
-        <dd>Pause / resume, or close Controls</dd>
-        <dt>Mute</dt>
-        <dd>Hit audio checkbox</dd>
-        <dt>Resume</dt>
-        <dd>Continue a paused attempt</dd>
-        <dt>Start / Retry / Home</dt>
-        <dd>Screen actions</dd>
-        <dt>Tab / Shift+Tab</dt>
-        <dd>Move focus</dd>
-        <dt>Enter / Space</dt>
-        <dd>Activate a focused control</dd>
-      </dl>
-      <button type="button" autoFocus onClick={onClose}>
-        Close
-      </button>
-    </dialog>
-  );
-}
-
-function History({ snapshot }: { snapshot: HistorySnapshot }) {
-  const best = retainedBestSeconds(snapshot.records, RULES_VERSION);
-  return (
-    <section className={styles.history} aria-label="Attempt history">
-      <p>
-        Retained personal best{" "}
-        <strong aria-label="Retained personal best">
-          {best === null ? "None" : `${best.toFixed(2)} s`}
-        </strong>
-      </p>
-      <small>
-        Current rules / latest {ENCOUNTER_CONFIG.session.historyLimit} completed
-        attempts
-      </small>
-      <details open>
-        <summary>Recent attempts ({snapshot.records.length})</summary>
-        {snapshot.records.length ? (
-          <ol aria-label="Recent attempts">
-            {snapshot.records.map((record) => (
-              <li
-                key={record.id}
-                aria-label={`Completed attempt: ${record.elapsedSeconds.toFixed(2)} seconds, ${record.hitsTaken} hits`}
-              >
-                <span>{record.elapsedSeconds.toFixed(2)} s</span>
-                <span>{record.hitsTaken} hits</span>
-                <span title={record.rulesVersion}>
-                  {record.rulesVersion === RULES_VERSION
-                    ? "Current rules"
-                    : "Other rules"}
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p>No completed attempts</p>
-        )}
-      </details>
-      {snapshot.warning && <p role="status">{snapshot.warning}</p>}
-    </section>
-  );
-}
-
-function Encounter({
-  zoomPreference,
-  zoomStorage,
-  muted,
-  debugSettings,
-  onHome,
-  history,
-  historySnapshot,
-  onHistoryChange,
-  encounterHandle,
-  config,
-  displayName,
-  drill,
-  onDrillChange,
-  debugOpen,
-  onDebugOpenChange,
-}: {
-  zoomPreference: RefObject<number>;
-  zoomStorage: ZoomPreference;
-  muted: boolean;
-  debugSettings: DebugSettings;
-  onHome: () => void;
-  history: AttemptHistory;
-  historySnapshot: HistorySnapshot;
-  onHistoryChange: (snapshot: HistorySnapshot) => void;
-  encounterHandle: RefObject<EncounterHandle | null>;
-  config: EncounterConfig;
-  displayName: string;
-  drill: DrillSelection | null;
-  onDrillChange: (drill: DrillSelection | null) => void;
-  debugOpen: boolean;
-  onDebugOpenChange: (open: boolean) => void;
-}) {
-  const host = useRef<HTMLDivElement>(null);
-  const resultHeading = useRef<HTMLHeadingElement>(null);
-  const phaseButton = useRef<HTMLButtonElement>(null);
-  const runtime = encounterHandle;
-  const [controlsOpen, setControlsOpen] = useState(false);
-  const [phaseOpen, setPhaseOpen] = useState(false);
-  const initialMuted = useRef(muted);
-  const initialDebugSettings = useRef(debugSettings);
-  // The launch selection is fixed for this runtime; live Apply updates the
-  // session and the shared selector via the App-owned drill state.
-  const initialDrill = useRef(drill);
-  const phases = primaryArchetype(config).phases.map((phase, index) => ({
-    index,
-    id: phase.id,
-    label: phaseLabel(phase.id, index),
-  }));
-  const initialPhaseIndex = drill?.phaseIndices[0] ?? 0;
-  const [view, setView] = useState<EncounterView>({
-    healthHp: PALADIN_STATS.healthHp,
-    elapsedSeconds: 0,
-    hitsTaken: 0,
-    status: "countdown",
-    countdownRemainingSeconds: config.session.startCountdownSeconds,
-    zoom: zoomPreference.current,
-    result: null,
-    phaseIndex: initialPhaseIndex,
-    phaseLabel: phases[initialPhaseIndex]?.label ?? phases[0].label,
-    phaseCount: phases.length,
-    drill,
-  });
-  useEffect(() => {
-    if (view.result) resultHeading.current?.focus();
-  }, [view.result]);
-  useEffect(() => {
-    if (view.result) setPhaseOpen(false);
-  }, [view.result]);
-  useEffect(() => {
-    // A Debug aside opened from the header closes the live phase panel and
-    // resumes the attempt, so the two asides never stack.
-    if (!debugOpen || !phaseOpen) return;
-    setPhaseOpen(false);
-    runtime.current?.resume();
-  }, [debugOpen, phaseOpen, runtime]);
-  useEffect(() => {
-    let active = true;
-    const runtimeId = crypto.randomUUID();
-    const recordedAttempts = new Set<number>();
-    const handle = createEncounter(
-      host.current!,
-      (nextView) => {
-        if (!active) return;
-        zoomPreference.current = nextView.zoom;
-        setView(nextView);
-      },
-      {
-        config,
-        seed: readSeedFromLocation(),
-        drill: { drill: initialDrill.current },
-        initialZoom: zoomPreference.current,
-        initialMuted: initialMuted.current,
-        initialDebugSettings: initialDebugSettings.current,
-        onZoomChange: (zoom) => {
-          if (!active) return;
-          zoomPreference.current = zoom;
-          zoomStorage.set(zoom);
-        },
-        onResult: (result) => {
-          if (result.rulesVersion === DEBUG_RULES_VERSION) return;
-          if (!active || recordedAttempts.has(result.attemptId)) return;
-          recordedAttempts.add(result.attemptId);
-          const { attemptId, ...metrics } = result;
-          onHistoryChange(
-            history.save({ id: `${runtimeId}:${attemptId}`, ...metrics }),
-          );
-        },
-      },
-    );
-    runtime.current = handle;
-    return () => {
-      active = false;
-      runtime.current = null;
-      handle.destroy();
-    };
-  }, [zoomPreference, zoomStorage, history, onHistoryChange]);
-  useEffect(() => {
-    runtime.current?.setMuted(muted);
-  }, [muted]);
-  useEffect(() => {
-    runtime.current?.setDebugSettings(debugSettings);
-  }, [debugSettings]);
-  const openPhasePanel = () => {
-    runtime.current?.setControlsOpen(false);
-    setControlsOpen(false);
-    onDebugOpenChange(false);
-    runtime.current?.pause();
-    setPhaseOpen(true);
-  };
-  const closePhasePanel = () => {
-    setPhaseOpen(false);
-    runtime.current?.resume();
-  };
-  const retryAttempt = () => {
-    setPhaseOpen(false);
-    runtime.current?.retry();
-  };
-  return (
-    <>
-      <div className={styles.telemetry} aria-label="Session HUD">
-        <span className={styles.health}>
-          <meter
-            aria-label="Health"
-            min={0}
-            max={PALADIN_STATS.healthHp}
-            value={view.healthHp}
-          />
-          {Math.ceil(view.healthHp)} / {PALADIN_STATS.healthHp} HP
-        </span>
-        <output aria-label="Survival time" aria-live="off">
-          {view.elapsedSeconds.toFixed(1)} s
-        </output>
-        <span>{view.hitsTaken} hits</span>
-        {view.debug && (
-          <span className={styles.debugBadge}>Debug attempt / not saved</span>
-        )}
-        <span aria-label="Primary stats" className={styles.stats}>
-          <span>{PALADIN_STATS.vitality} VIT</span>
-          <span>{PALADIN_STATS.speed} SPD</span>
-          <span>{PALADIN_STATS.defense} DEF</span>
-        </span>
-        <span role="status" aria-label="Session status">
-          {view.status === "ended"
-            ? view.result?.outcome === "cleared"
-              ? "Boss defeated"
-              : "Defeated"
-            : view.status === "paused"
-              ? "Paused"
-              : view.status === "countdown"
-                ? "Starting"
-                : "Active"}
-        </span>
-        <div
-          className={`${styles.actions} ${view.result ? styles.hiddenActions : ""}`}
-          inert={!!view.result}
-          aria-hidden={!!view.result}
-        >
-          <button
-            ref={phaseButton}
-            type="button"
-            aria-expanded={phaseOpen}
-            aria-controls={phaseOpen ? "phase-selector" : undefined}
-            onClick={() => {
-              if (phaseOpen) closePhasePanel();
-              else openPhasePanel();
-            }}
-          >
-            Phases
-          </button>
-          <button
-            type="button"
-            disabled={view.status !== "paused"}
-            onClick={() => {
-              if (phaseOpen) closePhasePanel();
-              else runtime.current?.resume();
-            }}
-          >
-            Resume
-          </button>
-          <button type="button" onClick={retryAttempt}>
-            Retry
-          </button>
-          <button type="button" onClick={onHome}>
-            Home
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPhaseOpen(false);
-              runtime.current?.setControlsOpen(true);
-              setControlsOpen(true);
-            }}
-          >
-            Controls
-          </button>
-        </div>
-      </div>
-      <div className={styles.liveLayout}>
-        <div className={styles.playfield}>
-        <div
-          ref={host}
-          tabIndex={0}
-          role="region"
-          aria-label="Encounter"
-          className={styles.arena}
-        />
-        {view.status === "countdown" && (
-          <div className={styles.countdown} aria-hidden="true">
-            {Math.ceil(view.countdownRemainingSeconds)}
-          </div>
-        )}
-        {view.status === "paused" && (
-          <div
-            className={`${styles.countdown} ${styles.paused}`}
-            aria-label="Paused overlay"
-          >
-            Paused
-          </div>
-        )}
-        {view.result && (
-          <section className={styles.results} aria-labelledby="result-title">
-            <span className={styles.eyebrow}>{displayName}</span>
-            <h2 id="result-title" ref={resultHeading} tabIndex={-1}>
-              {view.result.outcome === "cleared"
-                ? "Boss defeated"
-                : "Attempt complete"}
-            </h2>
-            {view.result.rulesVersion === DEBUG_RULES_VERSION && (
-              <p className={styles.debugBadge}>Debug attempt / not saved</p>
-            )}
-            {!!view.finalHitAmounts?.length && (
-              <div
-                role="group"
-                aria-label="Final hit amounts"
-                className={styles.finalHits}
-              >
-                {view.finalHitAmounts.map((amount, index) => (
-                  <span key={index}>-{amount}</span>
-                ))}
-              </div>
-            )}
-            <dl>
-              <div>
-                <dt>Survival time</dt>
-                <dd>{view.result.elapsedSeconds.toFixed(2)} s</dd>
-              </div>
-              <div>
-                <dt>Hits taken</dt>
-                <dd>{view.result.hitsTaken}</dd>
-              </div>
-            </dl>
-            <div className={styles.actions}>
-              <button
-                className={styles.primary}
-                type="button"
-                onClick={() => runtime.current?.retry()}
-              >
-                Retry
-              </button>
-              <button type="button" onClick={onHome}>
-                Home
-              </button>
-            </div>
-            <History snapshot={historySnapshot} />
-          </section>
-        )}
-        </div>
-        {phaseOpen && (
-          <PhaseSelector
-            mode="live"
-            phases={phases}
-            drill={drill}
-            activePhaseIndex={view.phaseIndex}
-            activePhaseLabel={view.phaseLabel}
-            onChange={onDrillChange}
-            onApply={() => runtime.current?.applyDrill(drill)}
-            onClose={closePhasePanel}
-          />
-        )}
-      </div>
-      {controlsOpen && (
-        <ControlsDialog
-          onClose={() => {
-            runtime.current?.setControlsOpen(false);
-            setControlsOpen(false);
-          }}
-        />
-      )}
-    </>
-  );
 }
 
 export default function App() {
@@ -602,19 +59,18 @@ export default function App() {
   const selectedEncounter =
     ENCOUNTER_LIST.find((entry) => entry.id === selectedEncounterId) ??
     ENCOUNTER_LIST[0];
+  const selectedConfig = encounterConfigOf(selectedEncounterId);
   const isDebugTunable = selectedEncounterId === DEBUG_TUNABLE_ENCOUNTER_ID;
   const [drill, setDrill] = useState<DrillSelection | null>(() =>
     parseDrillFromLocation(encounterConfigOf(selectedEncounterId)),
   );
-  const [phaseOpen, setPhaseOpen] = useState(false);
-  const phaseButton = useRef<HTMLButtonElement>(null);
-  const phases = primaryArchetype(
-    encounterConfigOf(selectedEncounterId),
-  ).phases.map((phase, index) => ({
+  const [previewPhase, setPreviewPhase] = useState<number | null>(null);
+  const phases = primaryArchetype(selectedConfig).phases.map((phase, index) => ({
     index,
     id: phase.id,
     label: phaseLabel(phase.id, index),
   }));
+  const shownPhaseIndex = previewPhase ?? drill?.phaseIndices[0] ?? 0;
   const [homeControlsOpen, setHomeControlsOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
@@ -631,60 +87,55 @@ export default function App() {
   useEffect(() => {
     if (!launched) startButton.current?.focus();
   }, [launched]);
+  const rulesVersion = selectedRulesVersion(selectedConfig, drill);
+  // The Mute checkbox and Debug button live in the Home header and, once an
+  // attempt starts, in the session rail; one fragment keeps handlers identical.
+  const sessionTools = (
+    <>
+      <label className={styles.mute}>
+        <input
+          type="checkbox"
+          aria-label="Mute hit audio"
+          checked={muted}
+          onChange={(event) => setMuted(event.target.checked)}
+        />
+        Mute
+      </label>
+      {isDebugTunable && (
+        <button
+          ref={debugButton}
+          type="button"
+          data-debug-tools
+          aria-expanded={debugOpen}
+          aria-controls="debug-tools"
+          onClick={() => setDebugOpen((open) => !open)}
+        >
+          Debug
+        </button>
+      )}
+    </>
+  );
   return (
-    <main className={`${styles.shell} ${launched ? styles.session : ""}`}>
-      <header className={styles.header}>
-        <div>
-          <span className={styles.eyebrow}>Dodge Hell Training</span>
-          <h1>{selectedEncounter.displayName}</h1>
-        </div>
-        <div className={styles.headerTools}>
-          {!launched && (
-            <button
-              ref={phaseButton}
-              type="button"
-              aria-expanded={phaseOpen}
-              aria-controls={phaseOpen ? "phase-selector" : undefined}
-              onClick={() => {
-                setPhaseOpen((open) => !open);
-                setDebugOpen(false);
-              }}
-            >
-              Phases
+    <main
+      className={`${styles.shell} ${launched ? styles.session : ""}`}
+      data-encounter={selectedEncounterId}
+    >
+      {!launched && (
+        <header className={styles.header}>
+          <span className={styles.brand}>Dodge Hell Training</span>
+          <div className={styles.headerTools}>
+            <button type="button" onClick={() => setHomeControlsOpen(true)}>
+              Controls
             </button>
-          )}
-          {isDebugTunable && (
-            <button
-              ref={debugButton}
-              type="button"
-              data-debug-tools
-              aria-expanded={debugOpen}
-              aria-controls="debug-tools"
-              onClick={() => {
-                setDebugOpen((open) => !open);
-                setPhaseOpen(false);
-              }}
-            >
-              Debug
-            </button>
-          )}
-          <span className={styles.encounterLabel}>Survival</span>
-          <label className={styles.mute}>
-            <input
-              type="checkbox"
-              aria-label="Mute hit audio"
-              checked={muted}
-              onChange={(event) => setMuted(event.target.checked)}
-            />
-            Mute
-          </label>
-        </div>
-      </header>
+            {sessionTools}
+          </div>
+        </header>
+      )}
       <p className={styles.keyboardNotice}>Desktop keyboard required</p>
       <div className={styles.debugLayout}>
         <div className={styles.mainContent}>
           {launched ? (
-            <Encounter
+            <EncounterScreen
               zoomPreference={zoomPreference}
               zoomStorage={zoomStorage}
               muted={muted}
@@ -692,30 +143,26 @@ export default function App() {
               onHome={() => {
                 setLaunched(false);
                 setDrill(null);
-                setPhaseOpen(false);
               }}
               history={history}
               historySnapshot={historySnapshot}
               onHistoryChange={setHistorySnapshot}
               encounterHandle={encounterHandle}
-              config={encounterConfigOf(selectedEncounterId)}
+              config={selectedConfig}
               displayName={selectedEncounter.displayName}
               drill={drill}
               onDrillChange={setDrill}
               debugOpen={debugOpen}
               onDebugOpenChange={setDebugOpen}
+              sessionTools={sessionTools}
             />
           ) : (
             <div className={styles.home}>
               <section
-                className={styles.intro}
-                aria-labelledby="practice-title"
+                className={styles.hero}
+                aria-label="Encounter selection"
               >
-                <div className={styles.specimen} aria-hidden="true">
-                  <div className={styles.crystal} />
-                </div>
-                <div>
-                  <h2 id="practice-title">Choose an encounter</h2>
+                <div className={styles.heroControls}>
                   <fieldset
                     className={styles.encounterChoice}
                     aria-label="Encounter"
@@ -730,17 +177,27 @@ export default function App() {
                           onChange={() => {
                             setSelectedEncounterId(entry.id);
                             setDrill(null);
-                            setPhaseOpen(false);
+                            setPreviewPhase(null);
                           }}
                         />
                         {entry.displayName}
                       </label>
                     ))}
                   </fieldset>
+                  <h1 className={styles.bossName}>
+                    {selectedEncounter.displayName}
+                  </h1>
                   <p>
                     A fixed Paladin, one arena, and another attempt whenever
                     you are ready.
                   </p>
+                  <PhaseSelector
+                    mode="home"
+                    phases={phases}
+                    drill={drill}
+                    onChange={setDrill}
+                    onPreviewPhase={setPreviewPhase}
+                  />
                   <button
                     ref={startButton}
                     className={styles.primary}
@@ -748,19 +205,38 @@ export default function App() {
                     onClick={() => {
                       setLaunched(true);
                       setDebugOpen(false);
-                      setPhaseOpen(false);
+                      setPreviewPhase(null);
                     }}
                   >
                     Start
                   </button>
-                  <button
-                    type="button"
-                    className={styles.homeControls}
-                    onClick={() => setHomeControlsOpen(true)}
-                  >
-                    Controls
-                  </button>
                 </div>
+                <div className={styles.heroStage}>
+                  <div className={styles.stagePlate}>
+                    <ArenaPlate arena={selectedConfig.arena} />
+                    <PhasePreview
+                      config={selectedConfig}
+                      phaseIndex={shownPhaseIndex}
+                    />
+                  </div>
+                  {motionAllowed() && (
+                    <p className={styles.previewCaption}>
+                      Live preview. The Paladin stands still here.
+                    </p>
+                  )}
+                  <PhaseDossier
+                    config={selectedConfig}
+                    phaseIndex={shownPhaseIndex}
+                    label={phases[shownPhaseIndex].label}
+                  />
+                </div>
+              </section>
+              <section className={styles.record} aria-labelledby="record-title">
+                <h2 id="record-title">Practice record</h2>
+                <History
+                  snapshot={historySnapshot}
+                  rulesVersion={rulesVersion}
+                />
               </section>
               <section className={styles.preset} aria-labelledby="preset-title">
                 <h2 id="preset-title">Paladin</h2>
@@ -768,161 +244,21 @@ export default function App() {
                 <span>{PALADIN_STATS.vitality} VIT</span>
                 <span>{PALADIN_STATS.speed} SPD</span>
                 <span>{PALADIN_STATS.defense} DEF</span>
-              </section>
-              <History snapshot={historySnapshot} />
-              <section
-                className={styles.changelog}
-                aria-labelledby="changelog-title"
-              >
-                <h2 id="changelog-title">Changelog</h2>
-                <time dateTime="2026-11-05">5 Nov 2026</time>
-                <ul>
-                  <li>
-                    The player's body is now a symmetric 5 x 7 core: shorter
-                    than before and without the lateral arm bump, with its
-                    hitbox following the same shape.
-                  </li>
-                  <li>
-                    Both encounters have a new comparison identity, so earlier
-                    attempts show as other rules.
-                  </li>
-                </ul>
-                <time dateTime="2026-11-04">4 Nov 2026</time>
-                <ul>
-                  <li>
-                    Killer Bee Queen phase 3 is retuned from tagged reference
-                    footage.
-                  </li>
-                  <li>
-                    The Nest is now an octagonal boss room with Killer Honey:
-                    the centre pond and outer ring slow you and deal 60
-                    armor-piercing damage every second.
-                  </li>
-                  <li>
-                    Phase-3 drills start the Queen at the arena centre instead
-                    of walking her in.
-                  </li>
-                  <li>
-                    Sprites are re-scaled to the measured 9-pixel tile grid;
-                    both encounters have a new comparison identity, so earlier
-                    attempts remain as other rules.
-                  </li>
-                  <li>
-                    HUD controls now wrap on narrow screens instead of
-                    overflowing.
-                  </li>
-                </ul>
-                <time dateTime="2026-11-03">3 Nov 2026</time>
-                <ul>
-                  <li>
-                    New phase selector: train the full fight or any set of
-                    phases, loop them, and apply a change live from the HUD.
-                  </li>
-                  <li>The live panel shows which phase is playing.</li>
-                </ul>
-                <time dateTime="2026-10-30">30 Oct 2026</time>
-                <ul>
-                  <li>
-                    The Queen's projectiles are pixel art now, with hitboxes
-                    that follow each sprite's shape.
-                  </li>
-                  <li>Bombs play a five-frame detonation effect.</li>
-                  <li>
-                    New Queen comparison identity; earlier attempts no longer
-                    count toward the best.
-                  </li>
-                </ul>
-                <time dateTime="2026-10-29">29 Oct 2026</time>
-                <ul>
-                  <li>
-                    New boss: the Killer Bee Queen, with eight phases to
-                    practice.
-                  </li>
-                  <li>
-                    Status effects like Paralyzed, Slowed and Confused now
-                    change how you move.
-                  </li>
-                  <li>
-                    Add <code>?phase=</code> and <code>?loop=1</code> to
-                    practice a single phase.
-                  </li>
-                  <li>Choose which encounter to train on the home screen.</li>
-                </ul>
-                <time dateTime="2026-10-26">26 Oct 2026</time>
-                <ul>
-                  <li>
-                    Heads now arrive over time, up to four at once, each firing
-                    on its own clock.
-                  </li>
-                  <li>
-                    Arena and enemies are authored as data; add{" "}
-                    <code>?seed=</code> to replay an opening.
-                  </li>
-                  <li>
-                    New comparison identity; earlier records are kept as other
-                    rules.
-                  </li>
-                </ul>
-                <time dateTime="2026-10-25">25 Oct 2026</time>
-                <ul>
-                  <li>
-                    V2 polygon encounter with eleven-shot spirals and versioned
-                    comparisons.
-                  </li>
-                  <li>
-                    Reload-safe zoom, player health bar and individual hit
-                    amounts.
-                  </li>
-                  <li>
-                    Original hit audio, visit-local mute and Home/HUD Controls.
-                  </li>
-                </ul>
-                <time dateTime="2026-10-24">24 Oct 2026</time>
-                <ul>
-                  <li>
-                    Crystal Worm Child Head encounter with returning shard
-                    bursts.
-                  </li>
-                  <li>Pause, immediate retry, and attempt results.</li>
-                  <li>
-                    Local attempt history and retained personal best by rules
-                    version.
-                  </li>
+                <span>
+                  {PALADIN_DERIVED_STATS.speedTilesPerSecond.toFixed(1)} tiles/s
+                </span>
+                <span>
+                  {PALADIN_DERIVED_STATS.regenerationHpPerSecond.toFixed(1)}{" "}
+                  HP/s regeneration
+                </span>
+                <ul aria-label="Equipment">
+                  {PALADIN_EQUIPMENT.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
                 </ul>
               </section>
-              <footer className={styles.footer}>
-                <nav aria-label="References">
-                  <a href="https://www.realmeye.com/wiki/crystal-worm-child">
-                    Enemy reference
-                  </a>
-                  <a href="https://www.realmofthemadgod.com/">
-                    Realm of the Mad God
-                  </a>
-                  <a href={REPOSITORY_URL}>Source code</a>
-                  {import.meta.env.DEV && (
-                    <a href="?tagger=1">Video tagger (dev)</a>
-                  )}
-                </nav>
-                <p className={styles.build}>
-                  {(() => {
-                    const commit = deployedCommit();
-                    return commit ? (
-                      <>
-                        Deployed build{" "}
-                        <a href={commit.url}>
-                          <code>{commit.short}</code>
-                        </a>
-                      </>
-                    ) : (
-                      <>Local build</>
-                    );
-                  })()}
-                </p>
-                <p>
-                  Unofficial practice encounter. Pursuit and timing include
-                  trainer-specific approximations.
-                </p>
-              </footer>
+              <Changelog />
+              <Footer />
               {homeControlsOpen && (
                 <ControlsDialog onClose={() => setHomeControlsOpen(false)} />
               )}
@@ -938,18 +274,6 @@ export default function App() {
               debugButton.current?.focus();
             }}
             encounterHandle={encounterHandle}
-          />
-        )}
-        {!launched && phaseOpen && (
-          <PhaseSelector
-            mode="home"
-            phases={phases}
-            drill={drill}
-            onChange={setDrill}
-            onClose={() => {
-              setPhaseOpen(false);
-              phaseButton.current?.focus();
-            }}
           />
         )}
       </div>

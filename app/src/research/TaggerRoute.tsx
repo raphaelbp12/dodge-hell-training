@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
 } from "react";
 import {
+  archetypeOf,
   DEFAULT_ENCOUNTER_ID,
   ENCOUNTER_LIST,
   encounterConfigOf,
@@ -59,11 +60,22 @@ import {
   currentDuration,
   fileNameMismatch,
   loadDecision,
+  monsterSwitchPlan,
+  observationFileName,
   parseStudyFile,
   resolveProvenance,
+  studyMonsterProblem,
+  studySections,
   videoChoiceDecision,
   encounterChangeDecision,
 } from "./studyLoad";
+import { DraftPanel } from "./DraftPanel";
+import {
+  blocksOfMonster,
+  monstersOfEncounter,
+  setAnchor,
+  type MonsterDraft,
+} from "./monsterDraft";
 import {
   buildDraft,
   restoreSticky,
@@ -276,7 +288,7 @@ function ExportBox({
         />
       </label>
       <p className={styles.note}>
-        Paste this into the archetype&apos;s attacks in enemies.json by hand;
+        Paste this into the archetype&apos;s attacks in its file under game/data/enemies/ by hand;
         nothing is written for you. Rotation phase is taken at the first tag
         of its group.{" "}
         {linked
@@ -326,6 +338,17 @@ export function TaggerRoute() {
     : ENCOUNTER_LIST[0].id;
   const [encounterId, setEncounterId] = useState(initialEncounter);
   const config = encounterConfigOf(encounterId);
+  // V18 L06/L07: one study per monster; the primary monster is the default.
+  const [archetypeId, setArchetypeId] = useState(
+    () => encounterConfigOf(initialEncounter).primaryArchetypeId,
+  );
+  const [monsterDraft, setMonsterDraft] = useState<MonsterDraft | null>(null);
+  // View state only (L15): not saved, and moves to the draft when one loads.
+  const [previewSource, setPreviewSource] = useState<"draft" | "tags">("tags");
+  const isMinion = archetypeId !== config.primaryArchetypeId;
+  const sections = studySections(isMinion, previewSource);
+  const monsterIds = monstersOfEncounter(config);
+  const draftBlocks = blocksOfMonster(archetypeOf(config, archetypeId));
   const phases = phaseOptions(config);
   const [sticky, setSticky] = useState<StickySelection>({
     phaseIndex: 0,
@@ -445,7 +468,14 @@ export function TaggerRoute() {
   // keyed by the file name in use now, so an accepted mismatched video writes
   // to its own slot and leaves the old one (Z16).
   useEffect(() => {
-    if (!shouldWriteDraft({ dirty, tagCount: tags.length })) return;
+    if (
+      !shouldWriteDraft({
+        dirty,
+        tagCount: tags.length,
+        hasDraft: monsterDraft !== null,
+      })
+    )
+      return;
     const source = videoUrl
       ? { fileName, durationSeconds }
       : studyMeta;
@@ -454,6 +484,8 @@ export function TaggerRoute() {
     const trimmed = sourceUrlText.trim();
     const study: StudyState = {
       encounterId,
+      archetypeId,
+      monsterDraft,
       provenance: {
         sourceUrl: trimmed.length === 0 ? null : trimmed,
         fileName: source.fileName.trim(),
@@ -465,9 +497,13 @@ export function TaggerRoute() {
     };
     const result = sessions.write(
       buildDraft({ study, sticky, savedAt: new Date().toISOString() }),
+      config.primaryArchetypeId,
     );
     setAutosaveError(result.ok ? null : result.error);
   }, [
+    archetypeId,
+    monsterDraft,
+    config.primaryArchetypeId,
     dirty,
     tags.length,
     storedTags,
@@ -620,6 +656,7 @@ export function TaggerRoute() {
   };
 
   const recordTag = (mode: "standalone" | "new-burst" | "continue-burst") => {
+    if (isMinion) return;
     if (!videoUrl) {
       setError("Load a video before recording a tag.");
       return;
@@ -762,6 +799,7 @@ export function TaggerRoute() {
       setRateDetected(false);
       setTags([]);
       setSavedAttacks([]);
+      setMonsterDraft(null);
       setSelectedTagIndex(null);
       setStudyMeta(null);
       setDirty(false);
@@ -776,10 +814,11 @@ export function TaggerRoute() {
     const decision = videoChoiceDecision({
       tagCount: tags.length,
       keepTagsOnNextVideo,
+      hasDraft: monsterDraft !== null,
     });
     if (decision === "confirm-reset")
       setConfirmation({
-        message: `Choosing "${file.name}" clears the ${tags.length} tag(s) in this session. Saved sessions are not affected.`,
+        message: `Choosing "${file.name}" clears the ${tags.length} tag(s)${monsterDraft ? " and the monster draft" : ""} in this session. Saved sessions are not affected.`,
         onConfirm: () => applyVideo(file, false),
       });
     else applyVideo(file, decision === "keep");
@@ -791,10 +830,11 @@ export function TaggerRoute() {
       encounterChangeDecision({
         tagCount: tags.length,
         savedAttackCount: savedAttacks.length,
+        hasDraft: monsterDraft !== null,
       }) === "confirm"
     ) {
       setConfirmation({
-        message: `Changing encounter clears the ${tags.length} tag(s) and ${savedAttacks.length} saved attack(s) in this session. Saved sessions are not affected.`,
+        message: `Changing encounter clears the ${tags.length} tag(s)${monsterDraft ? ", the monster draft" : ""} and ${savedAttacks.length} saved attack(s) in this session. Saved sessions are not affected.`,
         onConfirm: () => applyEncounter(id),
       });
       return;
@@ -804,6 +844,9 @@ export function TaggerRoute() {
 
   const applyEncounter = (id: string) => {
     setEncounterId(id);
+    setArchetypeId(encounterConfigOf(id).primaryArchetypeId);
+    setMonsterDraft(null);
+    setPreviewSource("tags");
     // One video is one fight (T16): tags recorded under the previous encounter
     // cannot be relabelled by a later selector change.
     setTags([]);
@@ -824,6 +867,11 @@ export function TaggerRoute() {
     notices: readonly string[],
   ) => {
     setEncounterId(study.encounterId);
+    setArchetypeId(
+      study.archetypeId ?? encounterConfigOf(study.encounterId).primaryArchetypeId,
+    );
+    setMonsterDraft(study.monsterDraft);
+    setPreviewSource(study.monsterDraft ? "draft" : "tags");
     setSourceUrlText(study.provenance.sourceUrl ?? "");
     setFrameRateText(
       study.provenance.frameRate === null ? "" : String(study.provenance.frameRate),
@@ -845,7 +893,7 @@ export function TaggerRoute() {
   };
 
   const requestApply = (message: string, apply: () => void) => {
-    if (loadDecision(tags.length) === "confirm")
+    if (loadDecision(tags.length, monsterDraft !== null) === "confirm")
       setConfirmation({ message, onConfirm: apply });
     else apply();
   };
@@ -861,6 +909,15 @@ export function TaggerRoute() {
           study = parseStudyFile(text, KNOWN_ENCOUNTER_IDS);
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
+          return;
+        }
+        const problem = studyMonsterProblem(
+          study,
+          encounterConfigOf(study.encounterId).primaryArchetypeId,
+          monstersOfEncounter(encounterConfigOf(study.encounterId)),
+        );
+        if (problem) {
+          setError(problem);
           return;
         }
         requestApply(
@@ -881,6 +938,15 @@ export function TaggerRoute() {
     const draft = result.value;
     if (!KNOWN_ENCOUNTER_IDS.includes(draft.study.encounterId)) {
       setError(`Unknown encounter "${draft.study.encounterId}".`);
+      return;
+    }
+    const problem = studyMonsterProblem(
+      draft.study,
+      encounterConfigOf(draft.study.encounterId).primaryArchetypeId,
+      monstersOfEncounter(encounterConfigOf(draft.study.encounterId)),
+    );
+    if (problem) {
+      setError(problem);
       return;
     }
     const restored = restoreSticky(
@@ -1097,9 +1163,11 @@ export function TaggerRoute() {
       });
       const exported = assembleExport({
         encounterId,
+        archetypeId,
         provenance,
         savedAttacks,
         tags: storedTags,
+        monsterDraft,
         recordedAt: new Date().toISOString(),
       });
       const blob = new Blob([JSON.stringify(exported, null, 2)], {
@@ -1108,7 +1176,11 @@ export function TaggerRoute() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${encounterId}-observations.json`;
+      anchor.download = observationFileName(
+        encounterId,
+        archetypeId,
+        config.primaryArchetypeId,
+      );
       anchor.style.display = "none";
       document.body.append(anchor);
       anchor.click();
@@ -1119,6 +1191,139 @@ export function TaggerRoute() {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
+
+  /** The study as the autosave would write it, or null with no source yet. */
+  const currentStudy = (): StudyState | null => {
+    const source = videoUrl ? { fileName, durationSeconds } : studyMeta;
+    if (!source || source.fileName.trim().length === 0 || !(source.durationSeconds > 0))
+      return null;
+    const trimmed = sourceUrlText.trim();
+    return {
+      encounterId,
+      archetypeId,
+      monsterDraft,
+      provenance: {
+        sourceUrl: trimmed.length === 0 ? null : trimmed,
+        fileName: source.fileName.trim(),
+        frameRate,
+        durationSeconds: source.durationSeconds,
+      },
+      savedAttacks,
+      tags: storedTags,
+    };
+  };
+
+  /** L08: switching monsters keeps the video and its time and swaps the study. */
+  const applyMonsterSwitch = (
+    id: string,
+    plan: ReturnType<typeof monsterSwitchPlan>,
+  ) => {
+    const study = currentStudy();
+    if (plan.writeCurrent && study) {
+      const result = sessions.write(
+        buildDraft({ study, sticky, savedAt: new Date().toISOString() }),
+        config.primaryArchetypeId,
+      );
+      setAutosaveError(result.ok ? null : result.error);
+    }
+    const slot =
+      plan.open === "slot" && study
+        ? sessions.read(
+            TaggerSessions.keyFor(
+              study.provenance.fileName,
+              id === config.primaryArchetypeId ? null : id,
+            ),
+          )
+        : null;
+    setArchetypeId(id);
+    setSelectedTagIndex(null);
+    setExportIndex(null);
+    setDirty(false);
+    setError(null);
+    if (slot?.ok) {
+      const restored = restoreSticky(slot.value.sticky, config, slot.value.study.savedAttacks);
+      setTags(slot.value.study.tags);
+      setSavedAttacks(slot.value.study.savedAttacks);
+      setMonsterDraft(slot.value.study.monsterDraft);
+      setPreviewSource(slot.value.study.monsterDraft ? "draft" : "tags");
+      setSticky(restored.sticky);
+      setNotice(null);
+      return;
+    }
+    // An empty study keeps sourceUrl and frameRate, and never the video.
+    setTags([]);
+    setSavedAttacks([]);
+    setMonsterDraft(null);
+    setPreviewSource("tags");
+    setNotice(null);
+  };
+
+  const chooseMonster = (id: string) => {
+    if (id === archetypeId) return;
+    const source = videoUrl ? fileName.trim() : (studyMeta?.fileName.trim() ?? "");
+    const slotExists =
+      source.length > 0 &&
+      sessions.read(
+        TaggerSessions.keyFor(source, id === config.primaryArchetypeId ? null : id),
+      ).ok;
+    const plan = monsterSwitchPlan({
+      hasVideo: videoUrl !== null,
+      unsaved: dirty,
+      autosaveFailing: autosaveError !== null,
+      slotExists,
+    });
+    if (plan.confirmFirst) {
+      setConfirmation({
+        message: `Autosave is failing, so switching monster would lose the unsaved ${tags.length} tag(s)${monsterDraft ? " and monster draft" : ""} of this study. Export first, or confirm to switch anyway.`,
+        onConfirm: () => applyMonsterSwitch(id, { ...plan, writeCurrent: false }),
+      });
+      return;
+    }
+    applyMonsterSwitch(id, plan);
+  };
+
+  /** L17: records the presented frame's time for a block, guarded like a tag (T19). */
+  const startBlockHere = (blockId: string) => {
+    if (!videoUrl) {
+      setError("Load a video before anchoring a block.");
+      return;
+    }
+    if (seekPendingRef.current) {
+      setError("Wait for the seeked frame to appear before anchoring a block.");
+      return;
+    }
+    if (!monsterDraft) return;
+    setError(null);
+    setDirty(true);
+    setMonsterDraft(setAnchor(monsterDraft, blockId, mediaTime));
+  };
+
+  const changeDraft = (next: MonsterDraft) => {
+    setMonsterDraft(next);
+    setDirty(true);
+    if (monsterDraft === null) setPreviewSource("draft");
+  };
+
+  const messages = (
+    <>
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
+        {autosaveError && (
+          <p className={styles.error} role="alert">
+            Autosave failed: {autosaveError}. Tagging continues; export to keep
+            your work.
+          </p>
+        )}
+        {notice && (
+          <p className={styles.warning} role="status">
+            {notice}
+          </p>
+        )}
+    </>
+  );
 
   const rows = sortNewestFirst(tags);
   const showSessions =
@@ -1170,6 +1375,7 @@ export function TaggerRoute() {
               <thead>
                 <tr>
                   <th scope="col">File</th>
+                  <th scope="col">Monster</th>
                   <th scope="col">Tags</th>
                   <th scope="col">Last saved</th>
                   <th scope="col">
@@ -1182,6 +1388,7 @@ export function TaggerRoute() {
                   entry.readable ? (
                     <tr key={entry.key}>
                       <td>{entry.fileName}</td>
+                      <td>{entry.archetypeId ?? "primary"}</td>
                       <td>{entry.tagCount}</td>
                       <td>{new Date(entry.savedAt).toLocaleString()}</td>
                       <td>
@@ -1195,7 +1402,7 @@ export function TaggerRoute() {
                     </tr>
                   ) : (
                     <tr key={entry.key}>
-                      <td colSpan={3}>Unreadable: {entry.key}</td>
+                      <td colSpan={4}>Unreadable: {entry.key}</td>
                       <td>
                         <button type="button" onClick={() => discardSession(entry.key)}>
                           Discard
@@ -1237,6 +1444,20 @@ export function TaggerRoute() {
               {ENCOUNTER_LIST.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Monster</span>
+            <select
+              aria-label="Monster"
+              value={archetypeId}
+              onChange={(event) => chooseMonster(event.target.value)}
+            >
+              {monsterIds.map((id) => (
+                <option key={id} value={id}>
+                  {id}
                 </option>
               ))}
             </select>
@@ -1335,6 +1556,21 @@ export function TaggerRoute() {
           </div>
           <PreviewPanel
             key={encounterId}
+            draftSource={
+              monsterDraft && (isMinion || previewSource === "draft")
+                ? {
+                    draft: monsterDraft,
+                    blocks: draftBlocks,
+                    videoEndSeconds: duration > 0 ? duration : Infinity,
+                  }
+                : null
+            }
+            sourceSwitch={
+              sections.sourceSwitch
+                ? { value: previewSource, onChange: setPreviewSource }
+                : undefined
+            }
+            showTuning={sections.previewTuning}
             tags={tags}
             savedAttacks={savedAttacks}
             mediaTime={mediaTime}
@@ -1408,6 +1644,21 @@ export function TaggerRoute() {
         </p>
       </section>
 
+      <DraftPanel
+        key={archetypeId}
+        archetypeId={archetypeId}
+        config={config}
+        draft={monsterDraft}
+        blocks={draftBlocks}
+        hasVideo={videoUrl !== null}
+        onStartsHere={startBlockHere}
+        onChange={changeDraft}
+      />
+
+      {!sections.tagging && <section className={styles.panel}>{messages}</section>}
+
+      {sections.tagging && (
+        <>
       <section className={styles.panel} aria-labelledby="tag-title">
         <h2 id="tag-title">Tag</h2>
         <p className={styles.sticky} aria-live="polite">
@@ -1645,22 +1896,7 @@ export function TaggerRoute() {
             Export JSON
           </button>
         </div>
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-        {autosaveError && (
-          <p className={styles.error} role="alert">
-            Autosave failed: {autosaveError}. Tagging continues; export to keep
-            your work.
-          </p>
-        )}
-        {notice && (
-          <p className={styles.warning} role="status">
-            {notice}
-          </p>
-        )}
+        {messages}
       </section>
 
       <section className={styles.panel} aria-labelledby="sprite-title">
@@ -2151,6 +2387,8 @@ export function TaggerRoute() {
           name; load a study JSON above to continue earlier work.
         </p>
       </section>
+        </>
+      )}
     </main>
   );
 }

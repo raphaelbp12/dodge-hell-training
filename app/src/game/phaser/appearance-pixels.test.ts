@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type { ProjectileAppearanceSpec } from "../config/encounter";
 import {
+  appearanceRects,
   appearanceRgbaPixels,
   bombExplosionFrameIndex,
 } from "./appearance-pixels";
@@ -57,4 +58,16 @@ test("the bomb explosion frame index holds the last frame and rejects negatives"
   expect(bombExplosionFrameIndex(0.2, 0.04, 5)).toBe(4);
   expect(bombExplosionFrameIndex(-1, 0.04, 5)).toBe(0);
   expect(bombExplosionFrameIndex(0, 0.04, 0)).toBe(0);
+});
+
+test("merges horizontal runs of one colour into rectangles", () => {
+  const wide = {
+    ...appearance,
+    nativeWidthPixels: 4,
+    pixels: [["#FF0000", "#FF0000", null, "#00FF00"]],
+  } satisfies ProjectileAppearanceSpec;
+  expect(appearanceRects(wide)).toEqual([
+    { x: 0, y: 0, width: 2, colour: "#FF0000" },
+    { x: 3, y: 0, width: 1, colour: "#00FF00" },
+  ]);
 });

@@ -87,7 +87,7 @@ const exported = (entry: Tag, config = CONFIG) => {
   return result;
 };
 
-/** An exported snippet must always be valid for enemies.json. */
+/** An exported snippet must always be valid for a monster file under game/data/enemies/. */
 const valid = (entry: Tag, config = CONFIG) =>
   validateAttack(
     JSON.parse(JSON.stringify(exported(entry, config).attack)),

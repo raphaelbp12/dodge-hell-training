@@ -245,7 +245,7 @@ describe("validateObservationExport v2", () => {
 
   test("rejects an unknown schema version", () => {
     expect(() =>
-      validateObservationExport(observation2([tag2()], { schemaVersion: 4 })),
+      validateObservationExport(observation2([tag2()], { schemaVersion: 5 })),
     ).toThrow(/schemaVersion/);
     expect(() =>
       validateObservationExport(observation2([tag2()], { schemaVersion: 1 })),
@@ -780,5 +780,41 @@ describe("repeat rows in the summary (V16 S46)", () => {
       tag2({ timeSeconds: 10, savedAttackId: "a1", repeatEndSeconds: 40 }),
     ]);
     expect(summaries[0]!.sampleCount).toBe(0);
+  });
+});
+
+describe("V18 schema v4", () => {
+  const provenance = { sourceUrl: null, fileName: "a.mp4", frameRate: 30, durationSeconds: 10 };
+  const base = {
+    schemaVersion: 4,
+    encounterId: "killer-bee-queen",
+    archetypeId: "red-killer-bee",
+    provenance,
+    recordedAt: "2026-11-07T00:00:00.000Z",
+    savedAttacks: [],
+    tags: [],
+    monsterDraft: { phases: [{ phaseId: "p", attacks: [], subPhases: [] }], anchors: { p: 1.5 } },
+  };
+
+  test("round-trips a draft and anchors", () => {
+    const study = studyFromExport(validateObservationExport(base));
+    expect(study.archetypeId).toBe("red-killer-bee");
+    expect(study.monsterDraft).toEqual(base.monsterDraft);
+  });
+
+  test("rejects a bad draft, a negative anchor and an empty archetype", () => {
+    expect(() => validateObservationExport({ ...base, monsterDraft: { phases: {}, anchors: {} } })).toThrow(/phases/);
+    expect(() =>
+      validateObservationExport({ ...base, monsterDraft: { ...base.monsterDraft, anchors: { p: -1 } } }),
+    ).toThrow(/anchors/);
+    expect(() => validateObservationExport({ ...base, archetypeId: "" })).toThrow(/archetypeId/);
+  });
+
+  test("older versions load as the primary monster with no draft", () => {
+    const v3 = studyFromExport(
+      validateObservationExport({ ...base, schemaVersion: 3, archetypeId: undefined, monsterDraft: undefined }),
+    );
+    expect(v3.archetypeId).toBeNull();
+    expect(v3.monsterDraft).toBeNull();
   });
 });
