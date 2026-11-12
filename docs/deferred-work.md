@@ -433,6 +433,26 @@ Rules for this register:
 
 **Fidelity gap this leaves.** None to gameplay. When a block's entry frame is ambiguous in a video, its anchor is the person's estimate, and the preview's timing inherits that error.
 
+### D44 - Suggesting Boundaries From Attack Marks
+
+**What.** Let the tagger propose a segment boundary from the marks on attack tracks: when an attack authored only in one segment is marked at a time no boundary covers, suggest that the segment started at or before that mark.
+
+**Why deferred.** Plan V20's E04 keeps boundaries as the person's own marks on the structure track, so a boundary is always something seen in the video, never inferred from an attack. The warnings of E18 report a mark outside its segment's windows, which is the same evidence without the inference.
+
+**Blocked on.** Real studies showing that segment entries are routinely harder to see than the attacks that follow them, so the warning alone is not enough.
+
+**Fidelity gap this leaves.** None to gameplay. A missed boundary leaves marks outside every window, which the Reconcile step reports.
+
+### D45 - An Attack That Stops Before Its Segment Ends
+
+**What.** Let an authored attack stop firing before its phase or sub-phase ends, so that a video showing an attack that runs for part of a segment can be reproduced without inventing a sub-phase boundary.
+
+**Why deferred.** Plan V20's E07 records an end mark as a diagnostic only, because the engine runs every attack until its segment ends (`createAttackClocks` is reset only at phase and sub-phase entry in `phases.ts`). Supporting an attack duration is an engine change with its own rules version and is outside the tagger plan.
+
+**Blocked on.** A monster whose authored structure cannot express an observed attack window by adding a sub-phase, and a decision to add an attack-level duration to `AttackSpec` under a new rules version.
+
+**Fidelity gap this leaves.** An attack that visibly stops mid-segment in the real game either keeps firing in the trainer or forces a sub-phase split that the real game does not have. The Reconcile step's warning names the case so it is never mistaken for a tagging error.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.
