@@ -70,6 +70,8 @@ import {
   encounterChangeDecision,
 } from "./studyLoad";
 import { GlossaryPanel } from "./GlossaryPanel";
+import { StepGuidePanel } from "./StepGuidePanel";
+import { STEP_GUIDES } from "./stepGuide";
 import { HelpMark } from "./HelpMark";
 import * as help from "./helpText";
 import { DraftPanel } from "./DraftPanel";
@@ -127,6 +129,7 @@ import {
   type PreviewSize,
 } from "./previewPreference";
 import { TaggerTimeline } from "./TaggerTimeline";
+import { Segmented, StepNav, type StepItem, type TaggerStep } from "./TaggerControls";
 import {
   nextVolleyTime,
   previousVolleyTime,
@@ -408,6 +411,9 @@ export function TaggerRoute() {
   >(null);
   const [sessionListError, setSessionListError] = useState<string | null>(null);
   const [sessionsDismissed, setSessionsDismissed] = useState(false);
+  // View state only: which working step the page shows. Every panel stays
+  // mounted, so switching steps never loses a half-typed value.
+  const [step, setStep] = useState<TaggerStep>("setup");
   const video = useRef<HTMLVideoElement>(null);
   const highlighted = useMemo(
     () => highlightedTagIndices(tags, selectedTagIndex),
@@ -696,6 +702,8 @@ export function TaggerRoute() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // The setup step shows no video controls, so its keys stay ordinary keys.
+      if (step === "setup") return;
       const target = event.target as HTMLElement | null;
       if (isEditableTarget(target)) return;
       if (isActivationTarget(target, event.key)) return;
@@ -1338,46 +1346,116 @@ export function TaggerRoute() {
   const showSessions =
     !sessionsDismissed &&
     ((sessionList !== null && sessionList.length > 0) || sessionListError);
+  const encounterName =
+    ENCOUNTER_LIST.find((entry) => entry.id === encounterId)?.displayName ?? encounterId;
+  const stickyStatus = tagMatchStatus(createTag(0, sticky), config, archetypeId);
+  const phaseBlocks = draftBlocks.filter((block) => block.phaseId === selectedPhase?.id);
+  const anchoredCount = monsterDraft
+    ? phaseBlocks.filter((block) => monsterDraft.anchors[block.id] !== undefined).length
+    : 0;
+  const steps: readonly StepItem[] = [
+    {
+      id: "setup",
+      name: STEP_GUIDES.setup.name,
+      status: videoUrl
+        ? frameRate === null
+          ? "Frame rate missing"
+          : `${fileName}, ${frameRate} fps`
+        : studyMeta
+          ? "Study loaded, no video"
+          : "Choose a video",
+      done: videoUrl !== null && frameRate !== null,
+    },
+    {
+      id: "tag",
+      name: STEP_GUIDES.tag.name,
+      status: tags.length === 1 ? "1 tag" : `${tags.length} tags`,
+    },
+    {
+      id: "review",
+      name: STEP_GUIDES.review.name,
+      status: tags.length === 0 ? "Nothing yet" : "Check, edit, export",
+    },
+    {
+      id: "draft",
+      name: STEP_GUIDES.draft.name,
+      status: monsterDraft
+        ? `${anchoredCount} of ${phaseBlocks.length} blocks anchored`
+        : "Optional",
+    },
+  ];
+  const canRecord = videoUrl !== null && !seekPending;
 
   return (
-    <main className={styles.shell} data-tagger-route>
+    <main className={styles.shell} data-tagger-route data-step={step}>
       <header className={styles.header}>
-        <div>
-          <span className={styles.eyebrow}>Development only</span>
-          <h1>{ENCOUNTER_LIST.find((entry) => entry.id === encounterId)?.displayName} tagger</h1>
+        <div className={styles.titleBlock}>
+          <h1>{encounterName} tagger</h1>
+          <p className={styles.subtitle}>
+            Monster <strong>{archetypeId}</strong>. A development tool: the
+            video never leaves this computer.
+          </p>
         </div>
-        <p className={styles.note}>
-          Tag spawns at the presented frame. The video is never uploaded or
-          committed.
-        </p>
-        <GlossaryPanel />
+        <label className={styles.phaseControl}>
+          <span>Phase</span>
+          <HelpMark text={help.HELP_DRAFT_PHASE} />
+          <select
+            aria-label="Phase"
+            value={sticky.phaseIndex}
+            onChange={(event) =>
+              setSticky((current) => ({
+                ...current,
+                phaseIndex: Number(event.target.value),
+              }))
+            }
+          >
+            {phases.map((phase) => (
+              <option key={phase.id} value={phase.index}>
+                {phase.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className={styles.headerActions}>
+          <button type="button" onClick={exportTags}>
+            Export study JSON
+          </button>
+          <StepGuidePanel step={step} />
+          <GlossaryPanel />
+        </div>
       </header>
 
-      {confirmation && (
-        <div className={styles.confirm} role="alertdialog" aria-label="Confirm">
-          <span>{confirmation.message}</span>
-          <button
-            type="button"
-            onClick={() => {
-              const { onConfirm } = confirmation;
-              setConfirmation(null);
-              onConfirm();
-            }}
-          >
-            Confirm
-          </button>
-          <button type="button" onClick={() => setConfirmation(null)}>
-            Cancel
-          </button>
-        </div>
-      )}
+      <StepNav steps={steps} current={step} onChoose={setStep} />
 
+      <div className={styles.messages}>
+        {confirmation && (
+          <div className={styles.confirm} role="alertdialog" aria-label="Confirm">
+            <span>{confirmation.message}</span>
+            <button
+              type="button"
+              onClick={() => {
+                const { onConfirm } = confirmation;
+                setConfirmation(null);
+                onConfirm();
+              }}
+            >
+              Confirm
+            </button>
+            <button type="button" onClick={() => setConfirmation(null)}>
+              Cancel
+            </button>
+          </div>
+        )}
+        {messages}
+      </div>
+
+      <div className={styles.setup} hidden={step !== "setup"}>
       {showSessions && (
-        <section className={styles.panel} aria-labelledby="sessions-title">
+        <section className={styles.card} aria-labelledby="sessions-title">
           <div className={styles.headingRow}>
-<h2 id="sessions-title">Saved sessions</h2>
-<HelpMark text={help.HELP_SECTION_SESSIONS} />
-</div>
+            <h2 id="sessions-title">Continue a saved session</h2>
+            <HelpMark text={help.HELP_SECTION_SESSIONS} />
+          </div>
           {sessionListError && (
             <p className={styles.error} role="alert">
               Saved sessions are unavailable: {sessionListError}
@@ -1427,127 +1505,190 @@ export function TaggerRoute() {
               </tbody>
             </table>
           </div>
-          <p className={styles.note}>
-            Sessions are saved automatically per video file name and removed
-            only when discarded.
-          </p>
-          <button type="button" onClick={() => setSessionsDismissed(true)}>
-            Dismiss list
-          </button>
+          <div className={styles.cardFoot}>
+            <p className={styles.note}>
+              Sessions save automatically per video file name and stay until
+              you discard them.
+            </p>
+            <button type="button" onClick={() => setSessionsDismissed(true)}>
+              Dismiss list
+            </button>
+          </div>
         </section>
       )}
 
-      <section className={styles.panel} aria-labelledby="source-title">
+      <section className={styles.card} aria-labelledby="source-title">
         <div className={styles.headingRow}>
-<h2 id="source-title">Video</h2>
-<HelpMark text={help.HELP_SECTION_VIDEO} />
-</div>
-        <div className={styles.row}>
-          <label className={styles.field}>
-            <span>Local video file</span>
-            <input type="file" accept="video/*" onChange={chooseFile} />
-          </label>
-          <label className={styles.field}>
-            <span>Load study (JSON, optional)</span>
-            <input type="file" accept="application/json,.json" onChange={chooseStudy} />
-          </label>
-          <label className={styles.field}>
-            <span>Encounter</span>
-            <select
-              value={encounterId}
-              onChange={(event) => chooseEncounter(event.target.value)}
-            >
-              {ENCOUNTER_LIST.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span>Monster</span>
-            <select
-              aria-label="Monster"
-              value={archetypeId}
-              onChange={(event) => chooseMonster(event.target.value)}
-            >
-              {monsterIds.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </label>
+          <h2 id="source-title">Start a study</h2>
+          <HelpMark text={help.HELP_SECTION_VIDEO} />
         </div>
-        <div className={styles.row}>
-          <label className={styles.field}>
-            <span>Source URL (blank for a local recording)</span>
-            <input
-              type="url"
-              value={sourceUrlText}
-              onChange={(event) => {
-                setSourceUrlText(event.target.value);
-                if (tags.length > 0) setDirty(true);
-              }}
-              placeholder="https://..."
-            />
-          </label>
-          <label className={styles.field}>
-            <span>
-              Video's presented frame rate (fps, required)
-              {rateDetected && " - detected from playback"}
-            </span>
-            <input
-              type="number"
-              min="1"
-              step="any"
-              value={frameRateText}
-              onChange={(event) => {
-                setFrameRateText(event.target.value);
-                setRateDetected(false);
-                if (tags.length > 0) setDirty(true);
-              }}
-            />
-          </label>
-        </div>
-        <p className={styles.meta}>
-          {videoUrl
-            ? fileName
-            : studyMeta
-              ? `${studyMeta.fileName} (from study, no video open)`
-              : "No file chosen"}{" "}
-          · duration {duration > 0 ? `${duration.toFixed(3)} s` : "unknown"}
-        </p>
-        {mismatch && (
-          <p className={styles.warning} role="status">
-            The study names "{studyMeta?.fileName}" but the open video is "
-            {fileName}". Export will use the open video's file name and
-            duration.
-          </p>
-        )}
-        <div className={styles.stage}>
-          <div className={styles.stageMain}>
-            <div className={styles.sizeControls} role="group" aria-label="Video size">
-              <span>Video size</span>
-              {(["small", "medium", "large"] as const satisfies readonly PreviewSize[]).map(
-                (option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-label={`Video size ${option}`}
-                    aria-pressed={layout.videoSize === option}
-                    onClick={() => changeLayout({ ...layout, videoSize: option })}
-                  >
-                    {option[0]!.toUpperCase() + option.slice(1)}
-                  </button>
-                ),
+        <ol className={styles.setupList}>
+          <li>
+            <h3>Open the video</h3>
+            <div className={styles.setupBody}>
+              <div className={styles.fileRow}>
+                <label className={styles.fileButton}>
+                  <input
+                    className={styles.fileInput}
+                    type="file"
+                    accept="video/*"
+                    onChange={chooseFile}
+                  />
+                  <span>{videoUrl ? "Choose another video" : "Choose video file"}</span>
+                </label>
+                <p className={styles.meta}>
+                  {videoUrl
+                    ? fileName
+                    : studyMeta
+                      ? `${studyMeta.fileName} (from the study, no video open)`
+                      : "No video chosen"}
+                  {duration > 0 && `, ${duration.toFixed(3)} s long`}
+                </p>
+              </div>
+              {mismatch && (
+                <p className={styles.warning} role="status">
+                  The study names "{studyMeta?.fileName}" but the open video is "
+                  {fileName}". Export will use the open video's file name and
+                  duration.
+                </p>
               )}
+              <div className={styles.fieldGrid}>
+                <label className={styles.field}>
+                  <span>
+                    Presented frame rate, fps (required)
+                    {rateDetected && <em className={styles.detected}> detected from playback</em>}
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="any"
+                    value={frameRateText}
+                    onChange={(event) => {
+                      setFrameRateText(event.target.value);
+                      setRateDetected(false);
+                      if (tags.length > 0) setDirty(true);
+                    }}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Source URL (blank for a local recording)</span>
+                  <input
+                    type="url"
+                    value={sourceUrlText}
+                    onChange={(event) => {
+                      setSourceUrlText(event.target.value);
+                      if (tags.length > 0) setDirty(true);
+                    }}
+                    placeholder="https://..."
+                  />
+                </label>
+              </div>
+              <p className={styles.note}>
+                Frame steps and tag times need the rate. Leave it blank and
+                press Play: playback fills it in.
+              </p>
             </div>
+          </li>
+          <li>
+            <h3>Choose the monster</h3>
+            <div className={styles.setupBody}>
+              <div className={styles.fieldGrid}>
+                <label className={styles.field}>
+                  <span>Encounter</span>
+                  <select
+                    value={encounterId}
+                    onChange={(event) => chooseEncounter(event.target.value)}
+                  >
+                    {ENCOUNTER_LIST.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  <span>Monster</span>
+                  <select
+                    aria-label="Monster"
+                    value={archetypeId}
+                    onChange={(event) => chooseMonster(event.target.value)}
+                  >
+                    {monsterIds.map((id) => (
+                      <option key={id} value={id}>
+                        {id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className={styles.note}>
+                One study covers one monster. Pick the phase at the top of
+                the page.
+              </p>
+            </div>
+          </li>
+          <li>
+            <h3>Continue earlier work (optional)</h3>
+            <div className={styles.setupBody}>
+              <div className={styles.fileRow}>
+                <label className={styles.fileButton}>
+                  <input
+                    className={styles.fileInput}
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={chooseStudy}
+                  />
+                  <span>Load study JSON</span>
+                </label>
+                <p className={styles.meta}>
+                  A study exported earlier with Export study JSON.
+                </p>
+              </div>
+            </div>
+          </li>
+        </ol>
+        <div className={styles.cardFoot}>
+          <span />
+          <button
+            type="button"
+            className={styles.primary}
+            onClick={() => setStep("tag")}
+          >
+            Start tagging
+          </button>
+        </div>
+      </section>
+      </div>
+
+      <div className={styles.workspace} data-step={step} hidden={step === "setup"}>
+        <div className={styles.stage}>
+          <div className={styles.viewer}>
+            <div
+              className={styles.videoColumn}
+              style={{ maxWidth: VIDEO_SIZE_PIXELS[layout.videoSize] }}
+            >
+              <div className={styles.toolbar} role="group" aria-label="Video size">
+                <span className={styles.toolbarLabel}>Video</span>
+                <span className={styles.segmentedButtons}>
+                  {(["small", "medium", "large"] as const satisfies readonly PreviewSize[]).map(
+                    (option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-label={`Video size ${option}`}
+                        aria-pressed={layout.videoSize === option}
+                        onClick={() => changeLayout({ ...layout, videoSize: option })}
+                      >
+                        {option[0]!.toUpperCase()}
+                      </button>
+                    ),
+                  )}
+                </span>
+              </div>
         {videoUrl && (
           <video
             ref={video}
             className={styles.video}
-            style={{ width: VIDEO_SIZE_PIXELS[layout.videoSize] }}
             src={videoUrl}
             playsInline
             onLoadedMetadata={() => {
@@ -1564,12 +1705,139 @@ export function TaggerRoute() {
           />
         )}
         {!videoUrl && (
-          <p className={styles.empty}>
-            Choose a video file to record, step or jump. Without one you can
-            still load, edit and export a study. Nothing is uploaded.
-          </p>
-        )}
+          <div className={styles.videoEmpty}>
+            <p>No video open.</p>
+            <p className={styles.note}>
+              Open one to record, step or jump. Without one you can still
+              load, edit and export a study.
+            </p>
+            <button type="button" onClick={() => setStep("setup")}>
+              Open a video
+            </button>
           </div>
+        )}
+        <div className={styles.transport}>
+          <output className={styles.timecode} aria-label="Current frame time">
+            {mediaTime.toFixed(3)} s
+          </output>
+          <span className={styles.duration}>
+            of {duration > 0 ? `${duration.toFixed(3)} s` : "unknown"}
+          </span>
+          <div className={styles.transportButtons}>
+            <button
+              type="button"
+              className={styles.playButton}
+              onClick={togglePlayback}
+              disabled={!videoUrl}
+            >
+              {playing ? "Pause" : "Play"}
+            </button>
+            <span className={styles.buttonGroup}>
+              <button
+                type="button"
+                aria-label={`Jump back ${COARSE_JUMP_SECONDS} seconds`}
+                onClick={() => jumpBy(-COARSE_JUMP_SECONDS)}
+                disabled={!videoUrl}
+              >
+                −{COARSE_JUMP_SECONDS} s
+              </button>
+              <button
+                type="button"
+                aria-label={`Jump back ${FINE_JUMP_SECONDS} seconds`}
+                onClick={() => jumpBy(-FINE_JUMP_SECONDS)}
+                disabled={!videoUrl}
+              >
+                −{FINE_JUMP_SECONDS} s
+              </button>
+            </span>
+            <span className={styles.buttonGroup}>
+              <button type="button" onClick={() => stepFrame(-1)} disabled={!videoUrl}>
+                Previous frame
+              </button>
+              <button type="button" onClick={() => stepFrame(1)} disabled={!videoUrl}>
+                Next frame
+              </button>
+            </span>
+            <span className={styles.buttonGroup}>
+              <button
+                type="button"
+                aria-label={`Jump forward ${FINE_JUMP_SECONDS} seconds`}
+                onClick={() => jumpBy(FINE_JUMP_SECONDS)}
+                disabled={!videoUrl}
+              >
+                +{FINE_JUMP_SECONDS} s
+              </button>
+              <button
+                type="button"
+                aria-label={`Jump forward ${COARSE_JUMP_SECONDS} seconds`}
+                onClick={() => jumpBy(COARSE_JUMP_SECONDS)}
+                disabled={!videoUrl}
+              >
+                +{COARSE_JUMP_SECONDS} s
+              </button>
+            </span>
+          </div>
+        </div>
+        <TaggerTimeline
+          durationSeconds={duration}
+          mediaTime={mediaTime}
+          volleyTimes={volleyTimes}
+          enabled={videoUrl !== null}
+          onSeek={seekTo}
+        />
+        {step === "tag" && (
+          <div className={styles.recordBar}>
+            <button
+              type="button"
+              className={styles.record}
+              onClick={() => recordTag("standalone")}
+              disabled={!canRecord}
+            >
+              <span className={styles.recordDot} aria-hidden="true" />
+              Record tag
+              <kbd aria-hidden="true">Enter</kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => recordTag("new-burst")}
+              disabled={!canRecord}
+            >
+              Start burst (B)
+            </button>
+            <button
+              type="button"
+              onClick={() => recordTag("continue-burst")}
+              disabled={!canRecord}
+            >
+              Add to burst (Shift+Enter)
+            </button>
+            <button type="button" onClick={endRepeatHere} disabled={!canRecord}>
+              End repeat here
+            </button>
+            <output className={styles.readout} aria-label="Interval since previous tag">
+              {seekPending
+                ? "Waiting for the seeked frame"
+                : interval === null
+                  ? "No previous tag in this group"
+                  : `${interval.toFixed(3)} s since previous`}
+            </output>
+          </div>
+        )}
+        <details className={styles.shortcuts}>
+          <summary>Keyboard shortcuts</summary>
+          <dl>
+            <div><dt><kbd>Space</kbd></dt><dd>Play or pause</dd></div>
+            <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>One frame back or forward</dd></div>
+            <div><dt><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt><dd>Jump {FINE_JUMP_SECONDS} s</dd></div>
+            <div><dt><kbd>PageUp</kbd> <kbd>PageDown</kbd></dt><dd>Jump {COARSE_JUMP_SECONDS} s</dd></div>
+            <div><dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous or next volley</dd></div>
+            <div><dt><kbd>Enter</kbd></dt><dd>Record a standalone tag</dd></div>
+            <div><dt><kbd>B</kbd></dt><dd>Record a volley that starts a new burst</dd></div>
+            <div><dt><kbd>Shift</kbd> + <kbd>Enter</kbd></dt><dd>Add a volley to the latest matching burst</dd></div>
+            <div><dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd>Set the shot count</dd></div>
+          </dl>
+        </details>
+            </div>
           <PreviewPanel
             key={encounterId}
             draftSource={
@@ -1599,174 +1867,90 @@ export function TaggerRoute() {
             layout={layout}
             onLayoutChange={changeLayout}
           />
+          </div>
         </div>
-        <div className={styles.transport}>
-          <button type="button" onClick={togglePlayback} disabled={!videoUrl}>
-            {playing ? "Pause" : "Play"}
-          </button>
-          <button
-            type="button"
-            aria-label={`Jump back ${COARSE_JUMP_SECONDS} seconds`}
-            onClick={() => jumpBy(-COARSE_JUMP_SECONDS)}
-            disabled={!videoUrl}
-          >
-            −{COARSE_JUMP_SECONDS} s
-          </button>
-          <button
-            type="button"
-            aria-label={`Jump back ${FINE_JUMP_SECONDS} seconds`}
-            onClick={() => jumpBy(-FINE_JUMP_SECONDS)}
-            disabled={!videoUrl}
-          >
-            −{FINE_JUMP_SECONDS} s
-          </button>
-          <button type="button" onClick={() => stepFrame(-1)} disabled={!videoUrl}>
-            Previous frame
-          </button>
-          <button type="button" onClick={() => stepFrame(1)} disabled={!videoUrl}>
-            Next frame
-          </button>
-          <button
-            type="button"
-            aria-label={`Jump forward ${FINE_JUMP_SECONDS} seconds`}
-            onClick={() => jumpBy(FINE_JUMP_SECONDS)}
-            disabled={!videoUrl}
-          >
-            +{FINE_JUMP_SECONDS} s
-          </button>
-          <button
-            type="button"
-            aria-label={`Jump forward ${COARSE_JUMP_SECONDS} seconds`}
-            onClick={() => jumpBy(COARSE_JUMP_SECONDS)}
-            disabled={!videoUrl}
-          >
-            +{COARSE_JUMP_SECONDS} s
-          </button>
-          <output className={styles.time} aria-label="Current frame time">
-            {mediaTime.toFixed(3)} s
-          </output>
-        </div>
-        <TaggerTimeline
-          durationSeconds={duration}
-          mediaTime={mediaTime}
-          volleyTimes={volleyTimes}
-          enabled={videoUrl !== null}
-          onSeek={seekTo}
-        />
-        <p className={styles.note}>
-          Space plays or pauses, [ and ] seek to the previous and next volley, arrows step one frame, Shift+arrows jump{" "}
-          {FINE_JUMP_SECONDS} seconds, PageUp/PageDown jump {COARSE_JUMP_SECONDS}{" "}
-          seconds, Enter records a standalone tag, B records a volley that
-          starts a new burst, Shift+Enter adds a volley to the latest matching
-          burst, and number keys 1-9 set the shot count.
-        </p>
-      </section>
 
-      <DraftPanel
-        key={archetypeId}
-        archetypeId={archetypeId}
-        config={config}
-        draft={monsterDraft}
-        blocks={draftBlocks}
-        hasVideo={videoUrl !== null}
-        phases={phases}
-        phaseIndex={sticky.phaseIndex}
-        onPhaseChange={(phaseIndex) =>
-          setSticky((current) => ({ ...current, phaseIndex }))
-        }
-        onStartsHere={startBlockHere}
-        onChange={changeDraft}
-      />
-
-        <>
-      <section className={styles.panel} aria-labelledby="tag-title">
+        <div className={styles.inspector} hidden={step === "review"}>
+      <section
+        className={styles.inspectorPanel}
+        aria-labelledby="tag-title"
+        hidden={step !== "tag"}
+      >
         <div className={styles.headingRow}>
-<h2 id="tag-title">Tag</h2>
-<HelpMark text={help.HELP_SECTION_TAG} />
-</div>
-        <p className={styles.sticky} aria-live="polite">
-          Recording: {chosenAttack && <><strong>{chosenAttack.name}</strong> · </>}<strong>{sticky.spriteId}</strong> ·{" "}
-          {selectedPhase ? selectedPhase.label : "No phase"} ({selectedPhase?.id}
-          ) · <strong>{sticky.pattern}</strong>
-          {patternTakesAim(sticky.pattern) && (
-            <>
-              {" "}
-              · aim <strong>{sticky.aim}</strong>
-            </>
-          )}{" "}
-          · <strong>{sticky.shots}</strong> {shotsLabel(sticky.pattern)}
-          {armPatternAllowed(sticky.pattern) && sticky.armPattern && (
-            <>
-              {" "}
-              · each arm <strong>{sticky.armPattern}</strong>
-              {sticky.shotsPerArm !== undefined && <> ×{sticky.shotsPerArm}</>}
-            </>
-          )}
-        </p>
-        <p className={styles.note} role="status" aria-label="Match status">
-          {matchStatusText(tagMatchStatus(createTag(0, sticky), config, archetypeId), phaseName)}
-        </p>
-        <div className={styles.controls}>
-          <SavedAttackPanel
-            savedAttacks={savedAttacks}
-            chosen={chosenAttack}
-            modified={chosenAttack !== null && isStickyModified(sticky, chosenAttack)}
-            onChoose={chooseAttack}
-            onSave={saveAttack}
-            onUpdate={updateAttack}
-            onRename={renameAttack}
-            onDelete={deleteAttack}
-          />
-          <label className={styles.field}>
-            <span>Phase</span>
-            <select
-              value={sticky.phaseIndex}
-              onChange={(event) =>
-                setSticky((current) => ({
-                  ...current,
-                  phaseIndex: Number(event.target.value),
-                }))
-              }
-            >
-              {phases.map((phase) => (
-                <option key={phase.id} value={phase.index}>
-                  {phase.label} — {phase.id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className={styles.field}>
-            <legend>Pattern</legend>
-            {OFFERABLE_PATTERNS.map((pattern) => (
-              <label key={pattern}>
-                <input
-                  type="radio"
-                  name="pattern"
-                  checked={sticky.pattern === pattern}
-                  onChange={() => setSticky((current) => ({ ...current, pattern }))}
-                />
-                {pattern}
-              </label>
+          <h2 id="tag-title">Next tag</h2>
+          <HelpMark text={help.HELP_SECTION_TAG} />
+        </div>
+        <div className={styles.nextTag} aria-live="polite">
+          <p className={styles.nextTagChips}>
+            <span className={styles.visuallyHidden}>Recording: </span>
+            {chosenAttack && <span className={styles.chip}>{chosenAttack.name}</span>}
+            <span className={styles.chip}>{sticky.spriteId}</span>
+            <span className={styles.chip}>{sticky.pattern}</span>
+            {patternTakesAim(sticky.pattern) && (
+              <span className={styles.chip}>aim {sticky.aim}</span>
+            )}
+            <span className={styles.chip}>
+              {sticky.shots} {shotsLabel(sticky.pattern)}
+            </span>
+            {armPatternAllowed(sticky.pattern) && sticky.armPattern && (
+              <span className={styles.chip}>
+                each arm {sticky.armPattern}
+                {sticky.shotsPerArm !== undefined && <> ×{sticky.shotsPerArm}</>}
+              </span>
+            )}
+          </p>
+          <p
+            className={styles.matchStatus}
+            data-kind={stickyStatus.kind}
+            role="status"
+            aria-label="Match status"
+          >
+            {matchStatusText(stickyStatus, phaseName)}
+          </p>
+        </div>
+
+        <fieldset className={styles.formRow}>
+          <legend className={styles.formLabel}>
+            Sprite
+            <HelpMark text={help.HELP_SECTION_SPRITE} />
+          </legend>
+          <div className={styles.appearanceGrid}>
+            {appearances.map((option) => (
+              <AppearanceChoice
+                key={option.id}
+                option={option}
+                selected={sticky.spriteId === option.id}
+                onSelect={() =>
+                  setSticky((current) => ({ ...current, spriteId: option.id }))
+                }
+              />
             ))}
-          </fieldset>
-          {patternTakesAim(sticky.pattern) && (
-            <fieldset className={styles.field}>
-              <legend>Aim</legend>
-              {TAG_AIMS.map((aim) => (
-                <label key={aim}>
-                  <input
-                    type="radio"
-                    name="aim"
-                    checked={sticky.aim === aim}
-                    onChange={() => setSticky((current) => ({ ...current, aim }))}
-                  />
-                  {aim}
-                </label>
-              ))}
-            </fieldset>
-          )}
-          <label className={styles.field}>
-            <span>{sticky.pattern === "rotating-arm" || sticky.pattern === "fixed-ring" ? "Arms" : "Shots"}</span>
+          </div>
+        </fieldset>
+
+        <Segmented
+          legend="Pattern"
+          name="pattern"
+          options={OFFERABLE_PATTERNS}
+          value={sticky.pattern}
+          onChange={(pattern) => setSticky((current) => ({ ...current, pattern }))}
+        />
+        {patternTakesAim(sticky.pattern) && (
+          <Segmented
+            legend="Aim"
+            name="aim"
+            options={TAG_AIMS}
+            value={sticky.aim}
+            onChange={(aim) => setSticky((current) => ({ ...current, aim }))}
+          />
+        )}
+        <label className={styles.formRow}>
+          <span className={styles.formLabel}>
+            {sticky.pattern === "rotating-arm" || sticky.pattern === "fixed-ring"
+              ? "Arms"
+              : "Shots"}
+          </span>
+          <span className={styles.inlineInput}>
             <input
               type="number"
               min="1"
@@ -1783,27 +1967,25 @@ export function TaggerRoute() {
               }}
             />
             <small className={styles.note}>
-              Type any count; number keys 1-9 set it directly.
+              Or press <kbd>1</kbd>–<kbd>9</kbd>.
             </small>
-          </label>
-          {armPatternAllowed(sticky.pattern) && (
-            <fieldset className={styles.field}>
-              <legend>Each arm fires</legend>
-              {[null, "spread", "scatter", "ring"].map((choice) => (
-                <label key={choice ?? "none"}>
-                  <input
-                    type="radio"
-                    name="arm-pattern"
-                    checked={(sticky.armPattern ?? null) === choice}
-                    onChange={() =>
-                      setStickyArmPattern(choice as TagArmPattern | null)
-                    }
-                  />
-                  {choice ?? "single shot"}
-                </label>
-              ))}
-              {sticky.armPattern && (
-                <label>
+          </span>
+        </label>
+        {armPatternAllowed(sticky.pattern) && (
+          <div className={styles.formGroup}>
+            <Segmented
+              legend="Each arm fires"
+              name="arm-pattern"
+              options={["single", "spread", "scatter", "ring"] as const}
+              value={sticky.armPattern ?? "single"}
+              label={(choice) => (choice === "single" ? "single shot" : choice)}
+              onChange={(choice) =>
+                setStickyArmPattern(choice === "single" ? null : choice)
+              }
+            />
+            {sticky.armPattern && (
+              <div className={styles.fieldGrid}>
+                <label className={styles.field}>
                   <span>Shots per arm</span>
                   <input
                     type="number"
@@ -1816,32 +1998,34 @@ export function TaggerRoute() {
                     }
                   />
                 </label>
-              )}
-              {sticky.armPattern && armPatternTakesArc(sticky.armPattern) && (
-                <label>
-                  <span>Cone width, degrees (typed estimate)</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    aria-label="Cone width in degrees"
-                    value={sticky.armArcDegrees ?? ""}
-                    onChange={(event) =>
-                      setStickyNumber("armArcDegrees", event.target.value)
-                    }
-                  />
-                </label>
-              )}
-              <small className={styles.note}>
-                One level of nesting only. The cone is typed by a person, not
-                measured from the video.
-              </small>
-            </fieldset>
-          )}
-          {rotationAllowed(sticky.pattern) && (
-            <fieldset className={styles.field}>
-              <legend>Rotation (typed estimates)</legend>
-              <label>
+                {armPatternTakesArc(sticky.armPattern) && (
+                  <label className={styles.field}>
+                    <span>Cone width, degrees</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      aria-label="Cone width in degrees"
+                      value={sticky.armArcDegrees ?? ""}
+                      onChange={(event) =>
+                        setStickyNumber("armArcDegrees", event.target.value)
+                      }
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+            <small className={styles.note}>
+              One level of nesting only. The cone is a typed estimate, not
+              measured from the video.
+            </small>
+          </div>
+        )}
+        {rotationAllowed(sticky.pattern) && (
+          <fieldset className={styles.formGroup}>
+            <legend className={styles.formLabel}>Rotation (typed estimates)</legend>
+            <div className={styles.fieldGrid}>
+              <label className={styles.field}>
                 <span>Clockwise degrees per second</span>
                 <input
                   type="number"
@@ -1853,7 +2037,7 @@ export function TaggerRoute() {
                   }
                 />
               </label>
-              <label>
+              <label className={styles.field}>
                 <span>Initial phase, degrees</span>
                 <input
                   type="number"
@@ -1865,143 +2049,66 @@ export function TaggerRoute() {
                   }
                 />
               </label>
-              <small className={styles.note}>
-                Blank keeps the matched attack&apos;s authored value. Negative
-                rates turn counter-clockwise.
-              </small>
-            </fieldset>
-          )}
-          <StickyTypedFields
-            sticky={sticky}
-            showBullet={stickyShowsBullet}
-            onNumber={setStickyTyped}
-            onTarget={setStickyTarget}
-          />
-        </div>
-        <div className={styles.recordRow}>
-          <button
-            type="button"
-            className={styles.record}
-            onClick={() => recordTag("standalone")}
-            disabled={!videoUrl || seekPending}
-          >
-            Record tag
-          </button>
-          <button
-            type="button"
-            onClick={() => recordTag("new-burst")}
-            disabled={!videoUrl || seekPending}
-          >
-            Start burst (B)
-          </button>
-          <button
-            type="button"
-            onClick={() => recordTag("continue-burst")}
-            disabled={!videoUrl || seekPending}
-          >
-            Add to burst (Shift+Enter)
-          </button>
-          <button
-            type="button"
-            onClick={endRepeatHere}
-            disabled={!videoUrl || seekPending}
-          >
-            End repeat here
-          </button>
-          <output className={styles.readout} aria-label="Interval since previous tag">
-            {seekPending
-              ? "Waiting for the seeked frame"
-              : interval === null
-                ? "No previous tag in this group"
-                : `${interval.toFixed(3)} s since previous`}
-          </output>
-          <button type="button" onClick={exportTags}>
-            Export JSON
-          </button>
-        </div>
-        {messages}
-      </section>
-
-      <section className={styles.panel} aria-labelledby="sprite-title">
-        <div className={styles.headingRow}>
-<h2 id="sprite-title">Sprite</h2>
-<HelpMark text={help.HELP_SECTION_SPRITE} />
-</div>
-        <div className={styles.appearanceGrid}>
-          {appearances.map((option) => (
-            <AppearanceChoice
-              key={option.id}
-              option={option}
-              selected={sticky.spriteId === option.id}
-              onSelect={() =>
-                setSticky((current) => ({ ...current, spriteId: option.id }))
-              }
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.panel} aria-labelledby="summary-title">
-        <div className={styles.headingRow}>
-<h2 id="summary-title">Summary</h2>
-<HelpMark text={help.HELP_SECTION_SUMMARY} />
-</div>
-        <p className={styles.note}>
-          A repeat counts once, at its first volley. Intervals between rows come
-          from video times; a saved attack&apos;s cadence is typed and is never
-          measured here.
-        </p>
-        {summaryRows.length === 0 ? (
-          <p className={styles.empty}>No tags to summarise yet.</p>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col">Phase</th>
-                  <th scope="col">Sprite</th>
-                  <th scope="col">Pattern</th>
-                  <th scope="col">Aim</th>
-                  <th scope="col">Arm pattern</th>
-                  <th scope="col">Target</th>
-                  <th scope="col">Attack</th>
-                  <th scope="col">Scope</th>
-                  <th scope="col">Samples</th>
-                  <th scope="col">Mean</th>
-                  <th scope="col">Deviation</th>
-                  <th scope="col">Intervals</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summaryRows.map((row) => (
-                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.armPattern}|${row.target}|${row.attack}|${row.scope}`}>
-                    <td>{row.phase}</td>
-                    <td>{row.sprite}</td>
-                    <td>{row.pattern}</td>
-                    <td>{row.aim}</td>
-                    <td>{row.armPattern}</td>
-                    <td>{row.target}</td>
-                    <td>{row.attack}</td>
-                    <td>{row.scope}</td>
-                    <td>{row.sampleCount}</td>
-                    <td>{row.mean}</td>
-                    <td>{row.deviation}</td>
-                    <td className={styles.intervals}>{row.intervals}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            </div>
+            <small className={styles.note}>
+              Blank keeps the matched attack&apos;s authored value. Negative
+              rates turn counter-clockwise.
+            </small>
+          </fieldset>
         )}
+        <StickyTypedFields
+          sticky={sticky}
+          showBullet={stickyShowsBullet}
+          onNumber={setStickyTyped}
+          onTarget={setStickyTarget}
+        />
+        <SavedAttackPanel
+          savedAttacks={savedAttacks}
+          chosen={chosenAttack}
+          modified={chosenAttack !== null && isStickyModified(sticky, chosenAttack)}
+          onChoose={chooseAttack}
+          onSave={saveAttack}
+          onUpdate={updateAttack}
+          onRename={renameAttack}
+          onDelete={deleteAttack}
+        />
       </section>
 
-      <section className={styles.panel} aria-labelledby="tags-title">
-        <div className={styles.headingRow}>
-<h2 id="tags-title">Tags ({tags.length})</h2>
-<HelpMark text={help.HELP_SECTION_TAGS} />
-</div>
+      <div hidden={step !== "draft"}>
+        <DraftPanel
+          key={archetypeId}
+          archetypeId={archetypeId}
+          config={config}
+          draft={monsterDraft}
+          blocks={draftBlocks}
+          hasVideo={videoUrl !== null}
+          phases={phases}
+          phaseIndex={sticky.phaseIndex}
+          onStartsHere={startBlockHere}
+          onChange={changeDraft}
+        />
+      </div>
+        </div>
+
+      <div className={styles.review} hidden={step !== "review"}>
+      <section className={styles.card} aria-labelledby="tags-title">
+        <div className={styles.cardHead}>
+          <div className={styles.headingRow}>
+            <h2 id="tags-title">Tags ({tags.length})</h2>
+            <HelpMark text={help.HELP_SECTION_TAGS} />
+          </div>
+          <p className={styles.note}>
+            Newest footage first. Click a row to jump there and tune it in the
+            preview. Edits apply at once; there is no undo.
+          </p>
+        </div>
         {tags.length === 0 ? (
-          <p className={styles.empty}>No tags recorded yet.</p>
+          <div className={styles.emptyState}>
+            <p>No tags recorded yet.</p>
+            <button type="button" onClick={() => setStep("tag")}>
+              Tag volleys
+            </button>
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={`${styles.table} ${styles.compactTable}`}>
@@ -2313,9 +2420,14 @@ export function TaggerRoute() {
                       )}
                     </td>
                     <td>
-                      <small className={styles.note}>
-                        {matchStatusText(tagMatchStatus(tag, config, archetypeId), phaseName)}
-                      </small>
+                      {(() => {
+                        const status = tagMatchStatus(tag, config, archetypeId);
+                        return (
+                          <span className={styles.rowStatus} data-kind={status.kind}>
+                            {matchStatusText(status, phaseName)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className={styles.stickyActions}>
                       <button
@@ -2414,13 +2526,65 @@ export function TaggerRoute() {
             onClose={() => setExportIndex(null)}
           />
         )}
-        <p className={styles.note}>
-          Tags list newest footage first. Edit a row in place or delete it;
-          there is no undo. Sessions are saved automatically per video file
-          name; load a study JSON above to continue earlier work.
-        </p>
       </section>
-        </>
+
+      <section className={styles.card} aria-labelledby="summary-title">
+        <div className={styles.cardHead}>
+          <div className={styles.headingRow}>
+            <h2 id="summary-title">Summary</h2>
+            <HelpMark text={help.HELP_SECTION_SUMMARY} />
+          </div>
+          <p className={styles.note}>
+            A repeat counts once, at its first volley. Intervals between rows
+            come from video times; a saved attack&apos;s cadence is typed and
+            is never measured here.
+          </p>
+        </div>
+        {summaryRows.length === 0 ? (
+          <p className={styles.empty}>No tags to summarise yet.</p>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Phase</th>
+                  <th scope="col">Sprite</th>
+                  <th scope="col">Pattern</th>
+                  <th scope="col">Aim</th>
+                  <th scope="col">Arm pattern</th>
+                  <th scope="col">Target</th>
+                  <th scope="col">Attack</th>
+                  <th scope="col">Scope</th>
+                  <th scope="col">Samples</th>
+                  <th scope="col">Mean</th>
+                  <th scope="col">Deviation</th>
+                  <th scope="col">Intervals</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryRows.map((row) => (
+                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.armPattern}|${row.target}|${row.attack}|${row.scope}`}>
+                    <td>{row.phase}</td>
+                    <td>{row.sprite}</td>
+                    <td>{row.pattern}</td>
+                    <td>{row.aim}</td>
+                    <td>{row.armPattern}</td>
+                    <td>{row.target}</td>
+                    <td>{row.attack}</td>
+                    <td>{row.scope}</td>
+                    <td>{row.sampleCount}</td>
+                    <td>{row.mean}</td>
+                    <td>{row.deviation}</td>
+                    <td className={styles.intervals}>{row.intervals}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      </div>
+      </div>
     </main>
   );
 }

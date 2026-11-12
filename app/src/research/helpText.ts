@@ -10,7 +10,7 @@
 export const HELP_DRAFT_HEADING =
   "A working copy of the selected monster's attacks that you edit here and export as text. Nothing is written to the game files.";
 export const HELP_DRAFT_PHASE =
-  "The phase this study works on. The Tag panel's Phase select is the same value, and the draft panel, its preview, Load from game and the export all use only this phase.";
+  "The phase this study works on. New tags record it, and the monster draft, its preview, Load from game and the export all use only this phase.";
 export const HELP_DRAFT_LOAD =
   "Copies the game's current attacks into the draft. With no draft yet it copies the whole monster; with one it replaces only the selected phase's attacks and keeps your anchors.";
 export const HELP_DRAFT_BLOCK =

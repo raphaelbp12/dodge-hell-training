@@ -2771,6 +2771,8 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(study)),
   });
+  const tagStep = page.getByRole("button", { name: /^Tag volleys/ });
+  await tagStep.click();
   const canvas = page.getByLabel("Tag preview canvas");
   const side = async () => {
     const box = (await canvas.boundingBox())!;
@@ -2793,6 +2795,7 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
   await page.getByRole("button", { name: "Video size large" }).click();
   await page.getByRole("button", { name: "Hide preview" }).click();
   await page.reload();
+  await tagStep.click();
   await expect(
     page.getByRole("button", { name: "Video size large" }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -2810,6 +2813,9 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   if (await dismiss.isVisible()) await dismiss.click();
 
   await loadTestClip(page);
+  const tagStep = page.getByRole("button", { name: /^Tag volleys/ });
+  const reviewStep = page.getByRole("button", { name: /^Review tags/ });
+  await tagStep.click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
   const frameTime = async () =>
     Number.parseFloat(
@@ -2820,11 +2826,7 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
 
   // A rotating arm of red balls in phase 3, saved as a named attack with a typed cadence.
   await page.getByRole("button", { name: "red-ball", exact: true }).click();
-  await page
-    .getByRole("region", { name: "Tag", exact: true })
-    .locator("label", { has: page.locator("span", { hasText: /^Phase$/ }) })
-    .locator("select")
-    .selectOption("2");
+  await page.getByRole("combobox", { name: "Phase", exact: true }).selectOption("2");
   await page.getByLabel("Clockwise degrees per second").fill("30");
   await expect(page.getByRole("status", { name: "Match status" })).toContainText(
     "Plays as",
@@ -2838,7 +2840,9 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   const attackCell = page
     .getByRole("region", { name: /^Tags/ })
     .getByRole("cell", { name: "Slow spiral" });
+  await reviewStep.click();
   await expect(attackCell).toBeVisible();
+  await tagStep.click();
 
   // Move on, wait for the seeked frame, then end the repeat there.
   await page.getByLabel("Go to time").fill("1.5");
@@ -2847,6 +2851,7 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   await expect(page.getByRole("button", { name: "Record tag" })).toBeEnabled();
   await page.getByRole("button", { name: "Start burst (B)" }).focus();
   await page.getByRole("button", { name: "End repeat here" }).click();
+  await reviewStep.click();
   await expect(page.getByLabel("Repeat end of tag 1")).not.toHaveValue("");
   await expect(page.getByText(/not previewed/)).toHaveCount(0);
 
@@ -2870,10 +2875,11 @@ test("the draft panel shows one phase and Starts here anchors a block", async ({
   const dismiss = page.getByRole("button", { name: "Dismiss list" });
   if (await dismiss.isVisible()) await dismiss.click();
   await loadTestClip(page);
+  await page.getByRole("button", { name: /^Draft monster/ }).click();
 
   const draft = page.getByRole("region", { name: /Monster draft/ });
   await draft.getByRole("button", { name: "Load from game" }).click();
-  await draft.getByLabel("Phase of the monster draft").selectOption("2");
+  await page.getByRole("combobox", { name: "Phase", exact: true }).selectOption("2");
   // Only phase 3's block is listed; phase 2 and 4 have none shown.
   await expect(draft.getByRole("heading", { level: 3 })).toHaveCount(1);
   const startsHere = draft.getByRole("button", { name: /^Starts here: / });

@@ -29,10 +29,12 @@ type Props = Readonly<{
   draft: MonsterDraft | null;
   blocks: readonly DraftBlock[];
   hasVideo: boolean;
-  /** The selected monster's phases and the study's one selected phase (J02). */
+  /**
+   * The selected monster's phases and the study's one selected phase (J02).
+   * The phase is chosen once, in the route's header.
+   */
   phases: readonly PhaseOption[];
   phaseIndex: number;
-  onPhaseChange: (phaseIndex: number) => void;
   /** Records the presented frame's `mediaTime` for a block, guarded by the route (T19). */
   onStartsHere: (blockId: string) => void;
   /** Every accepted change; the route marks the study dirty so autosave runs. */
@@ -74,7 +76,6 @@ export function DraftPanel({
   hasVideo,
   phases,
   phaseIndex,
-  onPhaseChange,
   onStartsHere,
   onChange,
 }: Props) {
@@ -165,43 +166,68 @@ export function DraftPanel({
     at: DraftLocation,
     attacks: readonly AuthoredAttack[],
   ) => (
-    <div>
-      <HelpMark text={help.HELP_ATTACK_LIST} />
-      <ul>
-        {attacks.map((attack) => (
-          <li key={attack.id}>
-            <button
-              type="button"
-              aria-pressed={selected?.id === attack.id}
-              onClick={() => {
-                setSelected({ at, id: attack.id });
-                setConfirmDelete(false);
-              }}
-            >
-              {attack.id}
-            </button>{" "}
-            <small className={styles.note}>
-              {attack.pattern.kind}, {attack.projectile}
-            </small>
-          </li>
-        ))}
-      </ul>
-      <label className={styles.field}>
-        <span>New attack id</span>
-        <HelpMark text={help.HELP_NEW_ATTACK_ID} />
-        <input
-          value={newIds[locationKey(at)] ?? ""}
-          onChange={(event) =>
-            setNewIds((current) => ({ ...current, [locationKey(at)]: event.target.value }))
-          }
-        />
-      </label>
-      <button type="button" onClick={() => add(at)}>
-        Add attack
-      </button>
-      <HelpMark text={help.HELP_ADD_ATTACK} />
+    <div className={styles.attackGroup}>
+      {attacks.length === 0 ? (
+        <p className={styles.empty}>No attacks here yet.</p>
+      ) : (
+        <ul className={styles.attackList}>
+          {attacks.map((attack) => (
+            <li key={attack.id}>
+              <button
+                type="button"
+                className={styles.attackChoice}
+                aria-pressed={selected?.id === attack.id}
+                onClick={() => {
+                  setSelected(
+                    selected?.id === attack.id ? null : { at, id: attack.id },
+                  );
+                  setConfirmDelete(false);
+                }}
+              >
+                <span className={styles.attackId}>{attack.id}</span>
+                <small>
+                  {attack.pattern.kind}, {attack.projectile}
+                </small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className={styles.addAttack}>
+        <label className={styles.field}>
+          <span>
+            New attack id
+            <HelpMark text={help.HELP_NEW_ATTACK_ID} />
+          </span>
+          <input
+            value={newIds[locationKey(at)] ?? ""}
+            onChange={(event) =>
+              setNewIds((current) => ({ ...current, [locationKey(at)]: event.target.value }))
+            }
+          />
+        </label>
+        <button type="button" onClick={() => add(at)}>
+          Add attack
+        </button>
+        <HelpMark text={help.HELP_ADD_ATTACK} />
+      </div>
     </div>
   );
+
+  const editorFor = (at: DraftLocation) =>
+    selected &&
+    current &&
+    locationKey(selected.at) === locationKey(at) && (
+      <AttackEditor
+        key={`${locationKey(selected.at)}:${selected.id}`}
+        attack={current}
+        config={config}
+        apply={(change) => apply(selected.at, selected.id, change)}
+        onDelete={() => (confirmDelete ? remove() : setConfirmDelete(true))}
+        confirmingDelete={confirmDelete}
+        onCancelDelete={() => setConfirmDelete(false)}
+      />
+    );
 
   const exportText = draft
     ? monsterFileText(archetypeId, draft, AUTHORED_MONSTER_FILES[archetypeId], config, phaseId)
@@ -230,37 +256,34 @@ export function DraftPanel({
   })();
 
   return (
-    <section className={styles.panel} aria-labelledby="draft-title">
+    <section className={styles.inspectorPanel} aria-labelledby="draft-title">
       <div className={styles.headingRow}>
         <h2 id="draft-title">Monster draft: {archetypeId}</h2>
         <HelpMark text={help.HELP_DRAFT_HEADING} />
       </div>
       <p className={styles.note}>
-        A working copy of this monster&apos;s attacks. Phase and monster values
-        are read-only here; change them by hand in the file.
+        A working copy of this monster&apos;s attacks in{" "}
+        {selectedPhase?.label ?? "this phase"}. Phase and monster values are
+        read-only here; change them by hand in the file.
       </p>
-      <label className={styles.field}>
-        <span>Phase</span>
-        <HelpMark text={help.HELP_DRAFT_PHASE} />
-        <select
-          aria-label="Phase of the monster draft"
-          value={phaseIndex}
-          onChange={(event) => onPhaseChange(Number(event.target.value))}
-        >
-          {phases.map((phase) => (
-            <option key={phase.id} value={phase.index}>
-              {phase.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        onClick={() => (draft ? setConfirmLoad(true) : load())}
-      >
-        Load from game
-      </button>
-      <HelpMark text={help.HELP_DRAFT_LOAD} />
+      <div className={draft ? styles.toolbar : styles.emptyState}>
+        {!draft && (
+          <p>
+            Load the game&apos;s attacks to start a draft, then anchor each
+            block where it starts in the video.
+          </p>
+        )}
+        <span>
+          <button
+            type="button"
+            className={draft ? undefined : styles.primary}
+            onClick={() => (draft ? setConfirmLoad(true) : load())}
+          >
+            Load from game
+          </button>
+          <HelpMark text={help.HELP_DRAFT_LOAD} />
+        </span>
+      </div>
       {confirmLoad && (
         <div className={styles.confirm} role="alertdialog" aria-label="Confirm load">
           <span>
@@ -290,111 +313,135 @@ export function DraftPanel({
           {draft.phases.filter((phase) => phase.phaseId === phaseId).map((phase) => {
             const phaseBlocks = blocks.filter((block) => block.phaseId === phase.phaseId);
             return (
-              <div key={phase.phaseId}>
-                <h3>{phase.phaseId}</h3>
-                <ul>
+              <div key={phase.phaseId} className={styles.draftBody}>
+                <h3 className={styles.draftStepHead}>{phase.phaseId}</h3>
+                <p className={styles.draftStepLead}>
+                  Anchor each block: pause on the frame where it is entered,
+                  before its telegraph, and press Starts here.
+                </p>
+                <ul className={styles.blockList}>
                   {phaseBlocks.map((block) => {
                     const anchor = draft.anchors[block.id];
                     return (
-                      <li key={block.id}>
-                        <strong>{block.label}</strong>
-                        <HelpMark text={help.HELP_DRAFT_BLOCK} />{" "}
-                        <small className={styles.note}>
-                          telegraph {block.telegraphSeconds} s,{" "}
-                          {block.durationSeconds === null
-                            ? "no authored duration"
-                            : `duration ${block.durationSeconds} s`}
-                        </small>{" "}
-                        <button
-                          type="button"
-                          disabled={!hasVideo}
-                          aria-label={`Starts here: ${block.label}`}
-                          onClick={() => onStartsHere(block.id)}
-                        >
-                          Starts here
-                        </button>
-                        <HelpMark text={help.HELP_STARTS_HERE} />{" "}
-                        {anchor !== undefined && (
-                          <>
-                            <output aria-label={`Anchor of ${block.label}`}>
-                              {anchor.toFixed(3)} s
-                            </output>{" "}
-                            <button
-                              type="button"
-                              aria-label={`Clear anchor: ${block.label}`}
-                              onClick={() => onChange(clearAnchor(draft, block.id))}
-                            >
-                              Clear
-                            </button>
-                            <HelpMark text={help.HELP_CLEAR_ANCHOR} />
-                          </>
-                        )}
+                      <li key={block.id} className={styles.blockRow}>
+                        <div className={styles.blockText}>
+                          <strong>
+                            {block.label}
+                            <HelpMark text={help.HELP_DRAFT_BLOCK} />
+                          </strong>
+                          <small className={styles.note}>
+                            telegraph {block.telegraphSeconds} s,{" "}
+                            {block.durationSeconds === null
+                              ? "no authored duration"
+                              : `duration ${block.durationSeconds} s`}
+                          </small>
+                        </div>
+                        <div className={styles.blockActions}>
+                          {anchor !== undefined ? (
+                            <>
+                              <output
+                                className={styles.anchorTime}
+                                aria-label={`Anchor of ${block.label}`}
+                              >
+                                {anchor.toFixed(3)} s
+                              </output>
+                              <button
+                                type="button"
+                                aria-label={`Clear anchor: ${block.label}`}
+                                onClick={() => onChange(clearAnchor(draft, block.id))}
+                              >
+                                Clear
+                              </button>
+                              <HelpMark text={help.HELP_CLEAR_ANCHOR} />
+                            </>
+                          ) : (
+                            <span className={styles.unanchored}>No anchor</span>
+                          )}
+                          <button
+                            type="button"
+                            disabled={!hasVideo}
+                            aria-label={`Starts here: ${block.label}`}
+                            onClick={() => onStartsHere(block.id)}
+                          >
+                            Starts here
+                          </button>
+                          <HelpMark text={help.HELP_STARTS_HERE} />
+                        </div>
                       </li>
                     );
                   })}
                 </ul>
-                <h4>Attacks of {phase.phaseId}</h4>
-                {attackLists({ phaseId: phase.phaseId, subPhaseId: null }, phase.attacks)}
-                {phase.subPhases.map((sub) => (
-                  <div key={sub.subPhaseId}>
-                    <h4>
-                      Attacks of {phase.phaseId} / {sub.subPhaseId}
-                    </h4>
-                    {attackLists(
-                      { phaseId: phase.phaseId, subPhaseId: sub.subPhaseId },
-                      sub.attacks,
-                    )}
-                  </div>
-                ))}
+                <div className={styles.draftAttacks}>
+                  <p className={styles.draftStepLead}>
+                    Edit the attacks. Choose one to open its editor; the
+                    preview shows the draft from each anchor.
+                    <HelpMark text={help.HELP_ATTACK_LIST} />
+                  </p>
+                  <h4>Attacks of {phase.phaseId}</h4>
+                  {attackLists({ phaseId: phase.phaseId, subPhaseId: null }, phase.attacks)}
+                  {editorFor({ phaseId: phase.phaseId, subPhaseId: null })}
+                  {phase.subPhases.map((sub) => (
+                    <div key={sub.subPhaseId}>
+                      <h4>
+                        Attacks of {phase.phaseId} / {sub.subPhaseId}
+                      </h4>
+                      {attackLists(
+                        { phaseId: phase.phaseId, subPhaseId: sub.subPhaseId },
+                        sub.attacks,
+                      )}
+                      {editorFor({ phaseId: phase.phaseId, subPhaseId: sub.subPhaseId })}
+                    </div>
+                  ))}
+                  <p className={styles.note}>
+                    A new attack starts as a single player-aimed shot every{" "}
+                    {NEW_ATTACK_DEFAULTS.cadence.cooldownAfterLastShotSeconds} s:
+                    a starting point to edit, not a value from the game.
+                  </p>
+                </div>
               </div>
             );
           })}
-          <p className={styles.note}>
-            A new attack starts as a single player-aimed shot every{" "}
-            {NEW_ATTACK_DEFAULTS.cadence.cooldownAfterLastShotSeconds} s: a
-            starting point to edit, not a value from the game.
-          </p>
-          {selected && current && (
-            <AttackEditor
-              key={`${locationKey(selected.at)}:${selected.id}`}
-              attack={current}
-              config={config}
-              apply={(change) => apply(selected.at, selected.id, change)}
-              onDelete={() => (confirmDelete ? remove() : setConfirmDelete(true))}
-              confirmingDelete={confirmDelete}
-              onCancelDelete={() => setConfirmDelete(false)}
-            />
-          )}
           <div className={styles.exportBox}>
-            <label className={styles.field}>
-              <span>
-                File for {monsterFilePath(archetypeId)} (only {phaseId}&apos;s
-                attacks are replaced)
-              </span>
-              <textarea
-                readOnly
-                rows={14}
-                aria-label={`File text for ${archetypeId}`}
-                value={exportText?.ok ? exportText.value : (exportText?.error ?? "")}
-                onFocus={(event) => event.currentTarget.select()}
-              />
-              <HelpMark text={help.HELP_EXPORT_BOX} />
-            </label>
-            <p className={styles.note}>
-              Paste this over {monsterFilePath(archetypeId)} by hand; nothing is
-              written for you. Pasting it changes gameplay: the rulesVersion
-              bump and the test updates are a separate approved change. Anchors
-              are never included.
+            <p className={styles.draftStepLead}>
+              Copy the monster file and paste it over{" "}
+              <code>{monsterFilePath(archetypeId)}</code> by hand.
             </p>
-            <button
-              type="button"
-              disabled={!exportText?.ok}
-              onClick={() => exportText?.ok && copy(exportText.value)}
-            >
-              Copy file
-            </button>
-            <HelpMark text={help.HELP_COPY_FILE} />
-            {copyNote && <span role="status"> {copyNote}</span>}
+            <div className={styles.toolbar}>
+              <span>
+                <button
+                  type="button"
+                  className={styles.primary}
+                  disabled={!exportText?.ok}
+                  onClick={() => exportText?.ok && copy(exportText.value)}
+                >
+                  Copy file
+                </button>
+                <HelpMark text={help.HELP_COPY_FILE} />
+              </span>
+              {copyNote && <span role="status">{copyNote}</span>}
+            </div>
+            <p className={styles.note}>
+              Only {phaseId}&apos;s attacks are replaced. Nothing is written
+              for you, and anchors are never included. Pasting it changes
+              gameplay: the rulesVersion bump and the test updates are a
+              separate approved change.
+            </p>
+            <details className={styles.fileText}>
+              <summary>Show the file text</summary>
+              <label className={styles.field}>
+                <span>
+                  File for {monsterFilePath(archetypeId)}
+                  <HelpMark text={help.HELP_EXPORT_BOX} />
+                </span>
+                <textarea
+                  readOnly
+                  rows={14}
+                  aria-label={`File text for ${archetypeId}`}
+                  value={exportText?.ok ? exportText.value : (exportText?.error ?? "")}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              </label>
+            </details>
           </div>
         </>
       )}
@@ -458,7 +505,7 @@ function AttackEditor({
   );
   const readOnly = READ_ONLY_RING_FIELDS.filter((key) => pattern[key] !== undefined);
   return (
-    <fieldset className={styles.field} aria-label={`Editing ${attack.id}`}>
+    <fieldset className={styles.attackEditor} aria-label={`Editing ${attack.id}`}>
       <legend>Editing {attack.id}</legend>
       <label>
         <span>Projectile</span>
@@ -593,15 +640,21 @@ function AttackEditor({
           <HelpMark text={help.HELP_READ_ONLY_FIELDS} />
         </p>
       )}
-      <button type="button" onClick={onDelete}>
-        {confirmingDelete ? "Confirm delete" : "Delete"}
-      </button>
-      <HelpMark text={help.HELP_DELETE_ATTACK} />
-      {confirmingDelete && (
-        <button type="button" onClick={onCancelDelete}>
-          Cancel
+      <div className={styles.editorFoot}>
+        <button
+          type="button"
+          className={confirmingDelete ? styles.danger : undefined}
+          onClick={onDelete}
+        >
+          {confirmingDelete ? "Confirm delete" : "Delete"}
         </button>
-      )}
+        <HelpMark text={help.HELP_DELETE_ATTACK} />
+        {confirmingDelete && (
+          <button type="button" onClick={onCancelDelete}>
+            Cancel
+          </button>
+        )}
+      </div>
     </fieldset>
   );
 }

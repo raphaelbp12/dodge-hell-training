@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test, vi } from "vitest";
+import { expect, test } from "vitest";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import { archetypeOf, encounterConfigOf } from "../game/config/encounter";
 import { DraftPanel } from "./DraftPanel";
@@ -12,7 +12,7 @@ const id = "killer-bee-queen";
 const raw = AUTHORED_MONSTER_FILES[id] as { phases: { id: string; subPhases?: unknown[] | null }[] };
 const phases = phaseOptions(queen, id);
 
-function mount(phaseIndex: number, onPhaseChange = vi.fn()) {
+function mount(phaseIndex: number) {
   const draft = loadMonsterDraft(raw, null, raw.phases[phaseIndex].id).draft;
   render(
     <DraftPanel
@@ -23,12 +23,11 @@ function mount(phaseIndex: number, onPhaseChange = vi.fn()) {
       hasVideo
       phases={phases}
       phaseIndex={phaseIndex}
-      onPhaseChange={onPhaseChange}
       onStartsHere={() => undefined}
       onChange={() => undefined}
     />,
   );
-  return { draft, onPhaseChange };
+  return { draft };
 }
 
 test("only the selected phase's blocks and attack lists are shown (J01)", () => {
@@ -39,10 +38,10 @@ test("only the selected phase's blocks and attack lists are shown (J01)", () => 
     expect(screen.queryByRole("heading", { name: phase.id })).toBeNull();
 });
 
-test("the draft panel's Phase select reports a change", async () => {
-  const { onPhaseChange } = mount(2);
-  await userEvent.selectOptions(screen.getByLabelText("Phase of the monster draft"), "3");
-  expect(onPhaseChange).toHaveBeenCalledWith(3);
+test("the draft panel has no phase select of its own: the route's header owns it", () => {
+  mount(2);
+  const panel = screen.getByRole("region", { name: /Monster draft/ });
+  expect(within(panel).queryByRole("combobox", { name: /phase/i })).toBeNull();
 });
 
 test("every draft-panel control has a help mark (J11)", async () => {

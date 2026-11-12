@@ -165,10 +165,10 @@ export function StickyTypedFields({
   const fields = visibleFields(shape, showBullet);
   if (!bomb && fields.length === 0) return null;
   return (
-    <fieldset className={styles.field}>
-      <legend>Typed estimates (not measurements)</legend>
+    <fieldset className={styles.formGroup}>
+      <legend className={styles.formLabel}>Typed estimates (not measurements)</legend>
       {bomb && (
-        <label>
+        <label className={styles.check}>
           <input
             type="checkbox"
             checked={targeted}
@@ -181,8 +181,9 @@ export function StickyTypedFields({
       {bomb && !targetable && (
         <small className={styles.note}>{TARGET_DISABLED_REASON}</small>
       )}
+      <div className={styles.fieldGrid}>
       {fields.map((field) => (
-        <label key={field}>
+        <label key={field} className={styles.field}>
           <span>{FIELD_TEXT[field].sticky}</span>
           <input
             type="number"
@@ -194,6 +195,7 @@ export function StickyTypedFields({
           />
         </label>
       ))}
+      </div>
       {targeted && (
         <small className={styles.note}>
           A targeted bomb lands on the player at any distance, so range does not

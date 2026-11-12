@@ -51,10 +51,10 @@ export function SavedAttackPanel({
   };
 
   return (
-    <fieldset className={styles.field}>
-      <legend>Attack</legend>
-      <label>
-        <span>Saved attack</span>
+    <fieldset className={styles.formGroup}>
+      <legend className={styles.formLabel}>Saved attack</legend>
+      <label className={styles.field}>
+        <span>Link the next tag to</span>
         <select
           aria-label="Saved attack"
           value={chosen?.id ?? ""}
@@ -91,8 +91,8 @@ export function SavedAttackPanel({
         )}
       </div>
       {saving && (
-        <div className={styles.row}>
-          <label>
+        <div className={styles.fieldGrid}>
+          <label className={styles.field}>
             <span>Name</span>
             <input
               type="text"
@@ -101,7 +101,7 @@ export function SavedAttackPanel({
               onChange={(event) => setName(event.target.value)}
             />
           </label>
-          <label>
+          <label className={styles.field}>
             <span>Shots per burst</span>
             <input
               type="number"
@@ -113,8 +113,8 @@ export function SavedAttackPanel({
             />
           </label>
           {showInterval && (
-            <label>
-              <span>Shot interval, seconds (typed estimate)</span>
+            <label className={styles.field}>
+              <span>Shot interval, s (typed estimate)</span>
               <input
                 type="number"
                 step="any"
@@ -124,8 +124,8 @@ export function SavedAttackPanel({
               />
             </label>
           )}
-          <label>
-            <span>Cooldown after the last shot, seconds (typed estimate)</span>
+          <label className={styles.field}>
+            <span>Cooldown after the last shot, s (typed estimate)</span>
             <input
               type="number"
               step="any"
@@ -134,17 +134,19 @@ export function SavedAttackPanel({
               onChange={(event) => setCooldown(event.target.value)}
             />
           </label>
-          <button type="button" onClick={submit}>
-            Save
-          </button>
-          <button type="button" onClick={() => setSaving(false)}>
-            Cancel
-          </button>
+          <div className={styles.row}>
+            <button type="button" className={styles.primary} onClick={submit}>
+              Save
+            </button>
+            <button type="button" onClick={() => setSaving(false)}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       {chosen && (
-        <div className={styles.row}>
-          <label>
+        <div className={styles.inlineForm}>
+          <label className={styles.field}>
             <span>Rename</span>
             <input
               type="text"

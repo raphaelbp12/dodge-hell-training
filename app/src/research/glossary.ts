@@ -7,7 +7,7 @@ export type GlossaryEntry = Readonly<{ term: string; meaning: string }>;
 
 export const GLOSSARY: readonly GlossaryEntry[] = [
   { term: "Telegraph", meaning: "The warning time at the start of a phase or sub-phase, before its attacks begin firing. The draft preview starts a block's attack timing at its anchor plus its telegraph." },
-  { term: "Phase", meaning: "A stage of a monster's fight. A monster's attacks are authored per phase. The study has one selected phase, shared by the Tag panel and the Monster draft panel." },
+  { term: "Phase", meaning: "A stage of a monster's fight. A monster's attacks are authored per phase. The study has one selected phase, chosen at the top of the tagger and shared by tagging and the monster draft." },
   { term: "Sub-phase", meaning: "A part of a phase with its own telegraph and attacks. It runs the phase's attacks plus its own." },
   { term: "Block", meaning: "A phase with no sub-phases, or one sub-phase. Each block has its own anchor." },
   { term: "Anchor", meaning: "The video time at which a block is entered, set with Starts here. It marks the block's entry, before its telegraph, never an attack's first shot. It aligns a draft with a video and is never exported." },
