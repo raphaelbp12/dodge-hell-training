@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   attackFieldApplies,
   isBombSprite,
@@ -20,6 +21,7 @@ export function CommitInput({
   blankAllowed = false,
   step = "1",
   caption,
+  help,
 }: {
   value: string;
   label: string;
@@ -28,6 +30,8 @@ export function CommitInput({
   step?: string;
   /** A short visible name; the `label` stays the accessible name (V16 S20). */
   caption?: string;
+  /** A help mark shown beside the caption, never beside the input. */
+  help?: ReactNode;
 }) {
   const input = (
     <input
@@ -52,6 +56,7 @@ export function CommitInput({
   return (
     <label className={styles.cellCaption}>
       <small>{caption}</small>
+      {help}
       {input}
     </label>
   );

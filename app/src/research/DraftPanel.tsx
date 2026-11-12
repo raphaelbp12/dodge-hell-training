@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { AUTHORED_MONSTER_FILES, type AuthoredAttack } from "../game/config/data";
 import type { EncounterConfig } from "../game/config/encounter";
 import { ProjectileSprite } from "../ui/ProjectileSprite";
@@ -188,13 +188,13 @@ export function DraftPanel({
       </ul>
       <label className={styles.field}>
         <span>New attack id</span>
+        <HelpMark text={help.HELP_NEW_ATTACK_ID} />
         <input
           value={newIds[locationKey(at)] ?? ""}
           onChange={(event) =>
             setNewIds((current) => ({ ...current, [locationKey(at)]: event.target.value }))
           }
         />
-        <HelpMark text={help.HELP_NEW_ATTACK_ID} />
       </label>
       <button type="button" onClick={() => add(at)}>
         Add attack
@@ -241,6 +241,7 @@ export function DraftPanel({
       </p>
       <label className={styles.field}>
         <span>Phase</span>
+        <HelpMark text={help.HELP_DRAFT_PHASE} />
         <select
           aria-label="Phase of the monster draft"
           value={phaseIndex}
@@ -252,7 +253,6 @@ export function DraftPanel({
             </option>
           ))}
         </select>
-        <HelpMark text={help.HELP_DRAFT_PHASE} />
       </label>
       <button
         type="button"
@@ -420,10 +420,10 @@ function AttackEditor({
   const pattern = attack.pattern as unknown as Pattern;
   const kind = pattern.kind as (typeof KINDS)[number];
   const number = (key: string, label: string, helpText: string, optional = false) => (
-    <>
     <CommitInput
       label={`${label} of ${attack.id}`}
       caption={label}
+      help={<HelpMark text={helpText} />}
       value={pattern[key] === undefined ? "" : String(pattern[key])}
       step="any"
       blankAllowed={optional}
@@ -436,16 +436,14 @@ function AttackEditor({
         });
       }}
     />
-    <HelpMark text={helpText} />
-    </>
   );
   const armPattern = pattern.armPattern as Pattern | undefined;
   const armKind = (armPattern?.kind as string | undefined) ?? "single";
   const armKey = (key: string, label: string, helpText: string) => (
-    <>
     <CommitInput
       label={`${label} of ${attack.id}`}
       caption={label}
+      help={<HelpMark text={helpText} />}
       value={armPattern?.[key] === undefined ? "" : String(armPattern[key])}
       step="any"
       onCommit={(text) =>
@@ -457,8 +455,6 @@ function AttackEditor({
         })
       }
     />
-    <HelpMark text={helpText} />
-    </>
   );
   const readOnly = READ_ONLY_RING_FIELDS.filter((key) => pattern[key] !== undefined);
   return (
@@ -466,6 +462,7 @@ function AttackEditor({
       <legend>Editing {attack.id}</legend>
       <label>
         <span>Projectile</span>
+        <HelpMark text={help.HELP_ATTACK_PROJECTILE} />
         <select
           aria-label={`Projectile of ${attack.id}`}
           value={attack.projectile}
@@ -477,13 +474,13 @@ function AttackEditor({
             </option>
           ))}
         </select>
-        <HelpMark text={help.HELP_ATTACK_PROJECTILE} />
       </label>
       {config.projectiles[attack.projectile] && (
         <ProjectileSprite projectile={config.projectiles[attack.projectile]} sizePixels={32} />
       )}
       <label>
         <span>Pattern kind</span>
+        <HelpMark text={help.HELP_ATTACK_KIND} />
         <select
           aria-label={`Pattern kind of ${attack.id}`}
           value={kind}
@@ -497,7 +494,6 @@ function AttackEditor({
             </option>
           ))}
         </select>
-        <HelpMark text={help.HELP_ATTACK_KIND} />
       </label>
       {kind === "ring" && (
         <>
@@ -506,6 +502,7 @@ function AttackEditor({
           {number("clockwiseDegreesPerSecond", "Rate °/s", help.HELP_RING_RATE)}
           <label>
             <span>Each arm fires</span>
+        <HelpMark text={help.HELP_ARM_PATTERN} />
             <select
               aria-label={`Arm pattern of ${attack.id}`}
               value={armKind}
@@ -524,7 +521,6 @@ function AttackEditor({
                 </option>
               ))}
             </select>
-            <HelpMark text={help.HELP_ARM_PATTERN} />
           </label>
           {armKind === "ring" && armKey("arms", "Arm arms", help.HELP_ARM_ARMS)}
           {(armKind === "spread" || armKind === "scatter") && armKey("shots", "Shots per arm", help.HELP_ARM_SHOTS)}
@@ -538,6 +534,7 @@ function AttackEditor({
           {kind === "spread" ? number("arcDegrees", "Arc °", help.HELP_PATTERN_ARC) : number("coneDegrees", "Cone °", help.HELP_PATTERN_CONE)}
           <label>
             <span>Aim</span>
+        <HelpMark text={help.HELP_PATTERN_AIM} />
             <select
               aria-label={`Aim of ${attack.id}`}
               value={String(pattern.aim)}
@@ -551,7 +548,6 @@ function AttackEditor({
                 </option>
               ))}
             </select>
-            <HelpMark text={help.HELP_PATTERN_AIM} />
           </label>
           {pattern.aim === "front" && number("offsetDegrees", "Offset °", help.HELP_PATTERN_OFFSET)}
           {pattern.aim === "fixed" && number("fixedBearingDegrees", "Bearing °", help.HELP_PATTERN_BEARING)}
@@ -578,18 +574,17 @@ function AttackEditor({
           ["initialDelaySeconds", "Initial delay (s)"],
         ] as const
       ).map(([key, label]) => (
-        <Fragment key={key}>
-          <CommitInput
-            label={`${label} of ${attack.id}`}
-            caption={label}
-            value={String(attack.cadence[key])}
-            step="any"
-            onCommit={(text) =>
-              text.trim() !== "" && apply({ field: "cadence", key, value: Number(text) })
-            }
-          />
-          <HelpMark text={CADENCE_HELP[key]} />
-        </Fragment>
+        <CommitInput
+          key={key}
+          label={`${label} of ${attack.id}`}
+          caption={label}
+          help={<HelpMark text={CADENCE_HELP[key]} />}
+          value={String(attack.cadence[key])}
+          step="any"
+          onCommit={(text) =>
+            text.trim() !== "" && apply({ field: "cadence", key, value: Number(text) })
+          }
+        />
       ))}
       {readOnly.length > 0 && (
         <p className={styles.note}>
