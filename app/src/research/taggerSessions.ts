@@ -190,6 +190,7 @@ export type SessionNotice =
 export function restoreSticky(
   sticky: StickySelection,
   config: EncounterConfig,
+  archetypeId: string,
   savedAttacks: readonly SavedAttack[] = [],
 ): { sticky: StickySelection; notices: readonly SessionNotice[] } {
   const notices: SessionNotice[] = [];
@@ -198,7 +199,7 @@ export function restoreSticky(
     spriteId = appearanceOptions()[0].id;
     notices.push("sprite-missing");
   }
-  if (!phaseOptions(config).some((phase) => phase.index === phaseIndex)) {
+  if (!phaseOptions(config, archetypeId).some((phase) => phase.index === phaseIndex)) {
     phaseIndex = 0;
     notices.push("phase-missing");
   }

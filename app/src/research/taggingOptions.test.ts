@@ -86,7 +86,7 @@ describe("appearanceOptions", () => {
 
 describe("phaseOptions", () => {
   test("lists the encounter's top-level phases labelled by authored id", () => {
-    const options = phaseOptions(QUEEN);
+    const options = phaseOptions(QUEEN, QUEEN.primaryArchetypeId);
     const phases = primaryArchetype(QUEEN).phases;
     expect(options).toHaveLength(phases.length);
     expect(options.map((option) => option.index)).toEqual(
@@ -342,7 +342,7 @@ describe("sortNewestFirst", () => {
 });
 
 describe("formatSummaryRow", () => {
-  const phases = phaseOptions(QUEEN);
+  const phases = phaseOptions(QUEEN, QUEEN.primaryArchetypeId);
   const base = {
     phaseIndex: 0,
     spriteId: "red-glaive",
@@ -530,8 +530,8 @@ describe("composite and typed-geometry options (plan V15 phase 53)", () => {
       stdevSeconds: 0,
       intervalsSeconds: [],
     };
-    expect(formatSummaryRow(base, phaseOptions(QUEEN)).armPattern).toBe("—");
-    expect(formatSummaryRow({ ...base, armPattern: "ring" }, phaseOptions(QUEEN)).armPattern).toBe("ring");
+    expect(formatSummaryRow(base, phaseOptions(QUEEN, QUEEN.primaryArchetypeId)).armPattern).toBe("—");
+    expect(formatSummaryRow({ ...base, armPattern: "ring" }, phaseOptions(QUEEN, QUEEN.primaryArchetypeId)).armPattern).toBe("ring");
   });
 });
 
@@ -766,9 +766,16 @@ describe("formatSummaryRow attack column (V16 S46)", () => {
       shots: 2,
       cadence: { shotsPerBurst: 1, cooldownAfterLastShotSeconds: 1 },
     };
-    const phases = phaseOptions(QUEEN);
+    const phases = phaseOptions(QUEEN, QUEEN.primaryArchetypeId);
     expect(formatSummaryRow({ ...base, savedAttackId: "attack-1" }, phases, [attack]).attack).toBe("Spiral");
     expect(formatSummaryRow(base, phases, [attack]).attack).toBe("—");
     expect(formatSummaryRow({ ...base, target: "player" }, phases).target).toBe("player");
+  });
+});
+
+describe("phaseOptions for a minion (J18)", () => {
+  test("lists the minion's own phases", () => {
+    expect(phaseOptions(QUEEN, "killer-bee-nest-red")).toHaveLength(2);
+    expect(phaseOptions(QUEEN, "red-killer-bee")).toHaveLength(1);
   });
 });

@@ -7,7 +7,6 @@ import type { MonsterDraft } from "./monsterDraft";
 import { phaseLabel } from "../game/config/drill";
 import {
   PROJECTILE_APPEARANCES,
-  primaryArchetype,
   type EncounterConfig,
   type ProjectileAppearanceSpec,
 } from "../game/config/encounter";
@@ -59,8 +58,9 @@ export type PhaseOption = Readonly<{
  */
 export function phaseOptions(
   config: EncounterConfig,
+  archetypeId: string,
 ): readonly PhaseOption[] {
-  return primaryArchetype(config).phases.map((phase, index) => ({
+  return config.archetypes[archetypeId].phases.map((phase, index) => ({
     index,
     id: phase.id,
     label: phaseLabel(phase.id, index),

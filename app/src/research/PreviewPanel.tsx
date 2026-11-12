@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { EncounterConfig } from "../game/config/encounter";
 import type { Vector2 } from "../game/models";
 import { draftPreviewAt } from "./draftPreview";
+import { HelpMark } from "./HelpMark";
+import { HELP_SECTION_PREVIEW } from "./helpText";
 import type { DraftBlock, MonsterDraft } from "./monsterDraft";
 import { drawPreviewFrame, drawEmptyPreview } from "./previewDraw";
 import {
@@ -68,13 +70,15 @@ const BLANK_ALLOWED: readonly TuningField[] = [
 export type DraftSource = Readonly<{
   draft: MonsterDraft;
   blocks: readonly DraftBlock[];
+  /** J06: only this phase's blocks are drawn. */
+  phaseId: string;
   videoEndSeconds: number;
 }>;
 
 type Props = Readonly<{
   /** Null draws the tags (unchanged); a value draws the draft with the video's `mediaTime`. */
   draftSource?: DraftSource | null;
-  /** Shown in a primary study only; a minion study always draws the draft. */
+  /** Shown in every study (V19 J19). */
   sourceSwitch?: Readonly<{
     value: "draft" | "tags";
     onChange: (next: "draft" | "tags") => void;
@@ -87,6 +91,8 @@ type Props = Readonly<{
   mediaTime: number;
   hasVideo: boolean;
   config: EncounterConfig;
+  /** The monster the tags index (J18). */
+  archetypeId: string;
   highlightedTagIndices: readonly number[];
   tuning: TuningProps;
   /** The persisted layout, owned by the route (shown and size). */
@@ -107,6 +113,7 @@ export function PreviewPanel({
   mediaTime,
   hasVideo,
   config,
+  archetypeId,
   highlightedTagIndices,
   tuning,
   layout,
@@ -129,8 +136,8 @@ export function PreviewPanel({
   const drag = useRef<Vector2 | null>(null);
   const ranges = playerSliderRanges(shape);
   const unmatchedCount = useMemo(
-    () => countUnmatchedTags(tags, config),
-    [tags, config],
+    () => countUnmatchedTags(tags, config, archetypeId),
+    [tags, config, archetypeId],
   );
 
   const playerAndHeading = {
@@ -144,6 +151,7 @@ export function PreviewPanel({
         : draftPreviewAt({
             draft: draftSource.draft,
             blocks: draftSource.blocks,
+            phaseId: draftSource.phaseId,
             config,
             timeSeconds: mediaTime,
             videoEndSeconds: draftSource.videoEndSeconds,
@@ -176,6 +184,7 @@ export function PreviewPanel({
             savedAttacks,
             timeSeconds: mediaTime,
             config,
+            archetypeId,
             playerTiles,
             headingRadians: (headingDegrees * Math.PI) / 180,
           }),
@@ -191,6 +200,7 @@ export function PreviewPanel({
     savedAttacks,
     mediaTime,
     config,
+    archetypeId,
     playerTiles,
     headingDegrees,
     view,
@@ -242,6 +252,7 @@ export function PreviewPanel({
         >
           {shown ? "Hide preview" : "Show preview"}
         </button>
+        <HelpMark text={HELP_SECTION_PREVIEW} />
         {shown && (
           <>
             {SIZES.map((option) => (

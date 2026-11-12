@@ -69,6 +69,8 @@ import {
   videoChoiceDecision,
   encounterChangeDecision,
 } from "./studyLoad";
+import { HelpMark } from "./HelpMark";
+import * as help from "./helpText";
 import { DraftPanel } from "./DraftPanel";
 import {
   blocksOfMonster,
@@ -345,11 +347,10 @@ export function TaggerRoute() {
   const [monsterDraft, setMonsterDraft] = useState<MonsterDraft | null>(null);
   // View state only (L15): not saved, and moves to the draft when one loads.
   const [previewSource, setPreviewSource] = useState<"draft" | "tags">("tags");
-  const isMinion = archetypeId !== config.primaryArchetypeId;
-  const sections = studySections(isMinion, previewSource);
+  const sections = studySections(previewSource);
   const monsterIds = monstersOfEncounter(config);
   const draftBlocks = blocksOfMonster(archetypeOf(config, archetypeId));
-  const phases = phaseOptions(config);
+  const phases = phaseOptions(config, archetypeId);
   const [sticky, setSticky] = useState<StickySelection>({
     phaseIndex: 0,
     spriteId: appearances[0].id,
@@ -434,7 +435,7 @@ export function TaggerRoute() {
     savedAttacks.find((entry) => entry.id === sticky.savedAttackId) ?? null;
   const interval = readoutInterval(tags, sticky, linkedAttackId);
   const phaseName = (index: number) => phases[index]?.label ?? `phase ${index + 1}`;
-  const stickyShowsBullet = matchesLinearBullet(createTag(0, sticky), config);
+  const stickyShowsBullet = matchesLinearBullet(createTag(0, sticky), config, archetypeId);
   const duration = currentDuration(
     durationSeconds,
     studyMeta?.durationSeconds ?? null,
@@ -656,7 +657,6 @@ export function TaggerRoute() {
   };
 
   const recordTag = (mode: "standalone" | "new-burst" | "continue-burst") => {
-    if (isMinion) return;
     if (!videoUrl) {
       setError("Load a video before recording a tag.");
       return;
@@ -952,6 +952,8 @@ export function TaggerRoute() {
     const restored = restoreSticky(
       draft.sticky,
       encounterConfigOf(draft.study.encounterId),
+      draft.study.archetypeId ??
+        encounterConfigOf(draft.study.encounterId).primaryArchetypeId,
       draft.study.savedAttacks,
     );
     const notices = restored.notices.map((entry) =>
@@ -1241,7 +1243,12 @@ export function TaggerRoute() {
     setDirty(false);
     setError(null);
     if (slot?.ok) {
-      const restored = restoreSticky(slot.value.sticky, config, slot.value.study.savedAttacks);
+      const restored = restoreSticky(
+        slot.value.sticky,
+        config,
+        id,
+        slot.value.study.savedAttacks,
+      );
       setTags(slot.value.study.tags);
       setSavedAttacks(slot.value.study.savedAttacks);
       setMonsterDraft(slot.value.study.monsterDraft);
@@ -1255,6 +1262,7 @@ export function TaggerRoute() {
     setSavedAttacks([]);
     setMonsterDraft(null);
     setPreviewSource("tags");
+    setSticky((current) => ({ ...current, phaseIndex: 0 }));
     setNotice(null);
   };
 
@@ -1364,7 +1372,10 @@ export function TaggerRoute() {
 
       {showSessions && (
         <section className={styles.panel} aria-labelledby="sessions-title">
-          <h2 id="sessions-title">Saved sessions</h2>
+          <div className={styles.headingRow}>
+<h2 id="sessions-title">Saved sessions</h2>
+<HelpMark text={help.HELP_SECTION_SESSIONS} />
+</div>
           {sessionListError && (
             <p className={styles.error} role="alert">
               Saved sessions are unavailable: {sessionListError}
@@ -1425,7 +1436,10 @@ export function TaggerRoute() {
       )}
 
       <section className={styles.panel} aria-labelledby="source-title">
-        <h2 id="source-title">Video</h2>
+        <div className={styles.headingRow}>
+<h2 id="source-title">Video</h2>
+<HelpMark text={help.HELP_SECTION_VIDEO} />
+</div>
         <div className={styles.row}>
           <label className={styles.field}>
             <span>Local video file</span>
@@ -1557,10 +1571,11 @@ export function TaggerRoute() {
           <PreviewPanel
             key={encounterId}
             draftSource={
-              monsterDraft && (isMinion || previewSource === "draft")
+              monsterDraft && previewSource === "draft"
                 ? {
                     draft: monsterDraft,
                     blocks: draftBlocks,
+                    phaseId: selectedPhase?.id ?? "",
                     videoEndSeconds: duration > 0 ? duration : Infinity,
                   }
                 : null
@@ -1576,6 +1591,7 @@ export function TaggerRoute() {
             mediaTime={mediaTime}
             hasVideo={videoUrl !== null}
             config={config}
+            archetypeId={archetypeId}
             highlightedTagIndices={highlighted}
             tuning={tuning}
             layout={layout}
@@ -1651,16 +1667,21 @@ export function TaggerRoute() {
         draft={monsterDraft}
         blocks={draftBlocks}
         hasVideo={videoUrl !== null}
+        phases={phases}
+        phaseIndex={sticky.phaseIndex}
+        onPhaseChange={(phaseIndex) =>
+          setSticky((current) => ({ ...current, phaseIndex }))
+        }
         onStartsHere={startBlockHere}
         onChange={changeDraft}
       />
 
-      {!sections.tagging && <section className={styles.panel}>{messages}</section>}
-
-      {sections.tagging && (
         <>
       <section className={styles.panel} aria-labelledby="tag-title">
-        <h2 id="tag-title">Tag</h2>
+        <div className={styles.headingRow}>
+<h2 id="tag-title">Tag</h2>
+<HelpMark text={help.HELP_SECTION_TAG} />
+</div>
         <p className={styles.sticky} aria-live="polite">
           Recording: {chosenAttack && <><strong>{chosenAttack.name}</strong> · </>}<strong>{sticky.spriteId}</strong> ·{" "}
           {selectedPhase ? selectedPhase.label : "No phase"} ({selectedPhase?.id}
@@ -1681,7 +1702,7 @@ export function TaggerRoute() {
           )}
         </p>
         <p className={styles.note} role="status" aria-label="Match status">
-          {matchStatusText(tagMatchStatus(createTag(0, sticky), config), phaseName)}
+          {matchStatusText(tagMatchStatus(createTag(0, sticky), config, archetypeId), phaseName)}
         </p>
         <div className={styles.controls}>
           <SavedAttackPanel
@@ -1900,7 +1921,10 @@ export function TaggerRoute() {
       </section>
 
       <section className={styles.panel} aria-labelledby="sprite-title">
-        <h2 id="sprite-title">Sprite</h2>
+        <div className={styles.headingRow}>
+<h2 id="sprite-title">Sprite</h2>
+<HelpMark text={help.HELP_SECTION_SPRITE} />
+</div>
         <div className={styles.appearanceGrid}>
           {appearances.map((option) => (
             <AppearanceChoice
@@ -1916,7 +1940,10 @@ export function TaggerRoute() {
       </section>
 
       <section className={styles.panel} aria-labelledby="summary-title">
-        <h2 id="summary-title">Summary</h2>
+        <div className={styles.headingRow}>
+<h2 id="summary-title">Summary</h2>
+<HelpMark text={help.HELP_SECTION_SUMMARY} />
+</div>
         <p className={styles.note}>
           A repeat counts once, at its first volley. Intervals between rows come
           from video times; a saved attack&apos;s cadence is typed and is never
@@ -1967,7 +1994,10 @@ export function TaggerRoute() {
       </section>
 
       <section className={styles.panel} aria-labelledby="tags-title">
-        <h2 id="tags-title">Tags ({tags.length})</h2>
+        <div className={styles.headingRow}>
+<h2 id="tags-title">Tags ({tags.length})</h2>
+<HelpMark text={help.HELP_SECTION_TAGS} />
+</div>
         {tags.length === 0 ? (
           <p className={styles.empty}>No tags recorded yet.</p>
         ) : (
@@ -2124,14 +2154,14 @@ export function TaggerRoute() {
 <fieldset disabled={linked} className={styles.cellFieldset}>
                       {!armPatternAllowed(tag.pattern) &&
                       !rotationAllowed(tag.pattern) &&
-                      !rowHasTypedFields(tag, matchesLinearBullet(tag, config)) ? (
+                      !rowHasTypedFields(tag, matchesLinearBullet(tag, config, archetypeId)) ? (
                         "—"
                       ) : (
                         <>
                           <RowTypedFields
                             tag={tag}
                             index={index}
-                            showBullet={matchesLinearBullet(tag, config)}
+                            showBullet={matchesLinearBullet(tag, config, archetypeId)}
                             onEdit={(change) => applyEdit(index, change)}
                           />
                           {armPatternAllowed(tag.pattern) && (
@@ -2282,7 +2312,7 @@ export function TaggerRoute() {
                     </td>
                     <td>
                       <small className={styles.note}>
-                        {matchStatusText(tagMatchStatus(tag, config), phaseName)}
+                        {matchStatusText(tagMatchStatus(tag, config, archetypeId), phaseName)}
                       </small>
                     </td>
                     <td className={styles.stickyActions}>
@@ -2361,10 +2391,11 @@ export function TaggerRoute() {
             result={authoredAttackFromTag(
               tags[exportIndex],
               config,
+              archetypeId,
               savedAttacks.find((entry) => entry.id === tags[exportIndex].savedAttackId),
             )}
             linked={tags[exportIndex].savedAttackId !== undefined}
-            statusText={matchStatusText(tagMatchStatus(tags[exportIndex], config), phaseName)}
+            statusText={matchStatusText(tagMatchStatus(tags[exportIndex], config, archetypeId), phaseName)}
             note={copyNote}
             onCopy={(text) => {
               // N41: a failing clipboard only leaves the box for manual copying.
@@ -2388,7 +2419,6 @@ export function TaggerRoute() {
         </p>
       </section>
         </>
-      )}
     </main>
   );
 }

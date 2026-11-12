@@ -82,7 +82,7 @@ const tag = (overrides: Partial<Tag> = {}): Tag => ({
 });
 
 const exported = (entry: Tag, config = CONFIG) => {
-  const result = authoredAttackFromTag(entry, config);
+  const result = authoredAttackFromTag(entry, config, config.primaryArchetypeId);
   if (!result) throw new Error("expected an export");
   return result;
 };
@@ -98,9 +98,9 @@ const valid = (entry: Tag, config = CONFIG) =>
 
 describe("authoredAttackFromTag", () => {
   test("an unmatched tag cannot export", () => {
-    expect(authoredAttackFromTag(tag({ spriteId: "nope" }), CONFIG)).toBeNull();
-    expect(authoredAttackFromTag(tag({ pattern: "volley" }), CONFIG)).toBeNull();
-    expect(authoredAttackFromTag(tag({ phaseIndex: 9 }), CONFIG)).toBeNull();
+    expect(authoredAttackFromTag(tag({ spriteId: "nope" }), CONFIG, CONFIG.primaryArchetypeId)).toBeNull();
+    expect(authoredAttackFromTag(tag({ pattern: "volley" }), CONFIG, CONFIG.primaryArchetypeId)).toBeNull();
+    expect(authoredAttackFromTag(tag({ phaseIndex: 9 }), CONFIG, CONFIG.primaryArchetypeId)).toBeNull();
   });
 
   test("a plain rotating tag takes its id, projectile and cadence from the match", () => {
@@ -196,7 +196,7 @@ describe("authoredAttackFromTag", () => {
     expect(exported(bomb({}), config).attack.target).toBeUndefined();
     expect(exported(bomb({ shots: 3, target: "player" }), config).attack.target).toBeUndefined();
     // A fixed tag never exports as player-aimed or targeted; it needs a bearing.
-    expect(authoredAttackFromTag(bomb({ aim: "fixed" }), config)).toBeNull();
+    expect(authoredAttackFromTag(bomb({ aim: "fixed" }), config, config.primaryArchetypeId)).toBeNull();
     const fixed = exported(bomb({ aim: "fixed", fixedBearingDegrees: 90 }), config);
     expect(fixed.attack.target).toBeUndefined();
     expect(fixed.attack.pattern).toMatchObject({ aim: "fixed", fixedBearingDegrees: 90 });
@@ -304,18 +304,18 @@ describe("linked tag export (V16 step 61.4)", () => {
   });
 
   test("two saved attacks from one match give different ids", () => {
-    const first = authoredAttackFromTag(linkedTag, CONFIG, saved())!;
-    const second = authoredAttackFromTag(linkedTag, CONFIG, saved({ id: "attack-2", name: "Other" }))!;
+    const first = authoredAttackFromTag(linkedTag, CONFIG, CONFIG.primaryArchetypeId, saved())!;
+    const second = authoredAttackFromTag(linkedTag, CONFIG, CONFIG.primaryArchetypeId, saved({ id: "attack-2", name: "Other" }))!;
     expect(first.attack.id).toBe("slow-spiral-tagged");
     expect(second.attack.id).toBe("other-tagged");
   });
 
   test("cadence comes from the saved attack at one and at three shots per burst", () => {
-    const one = authoredAttackFromTag(linkedTag, CONFIG, saved())!.attack.cadence;
+    const one = authoredAttackFromTag(linkedTag, CONFIG, CONFIG.primaryArchetypeId, saved())!.attack.cadence;
     expect(one).toMatchObject({ shotsPerBurst: 1, cooldownAfterLastShotSeconds: 0.4 });
     const three = authoredAttackFromTag(
       linkedTag,
-      CONFIG,
+      CONFIG, CONFIG.primaryArchetypeId,
       saved({
         cadence: { shotsPerBurst: 3, shotIntervalSeconds: 0.15, cooldownAfterLastShotSeconds: 1.2 },
       }),
@@ -329,7 +329,7 @@ describe("linked tag export (V16 step 61.4)", () => {
   });
 
   test("a symbols-only name falls back to the stable id and the result is valid", () => {
-    const result = authoredAttackFromTag(linkedTag, CONFIG, saved({ name: "???" }))!;
+    const result = authoredAttackFromTag(linkedTag, CONFIG, CONFIG.primaryArchetypeId, saved({ name: "???" }))!;
     expect(result.attack.id).toBe("attack-1-tagged");
     expect(() =>
       validateAttack(JSON.parse(JSON.stringify(result.attack)), "export", new Set([PROJECTILE]), new Set()),
@@ -341,10 +341,10 @@ describe("linked tag export (V16 step 61.4)", () => {
     const sprite = QUEEN.projectiles[bomb]!.appearance!.id;
     const config = configOf([attack("bomb", bomb, { ...SPREAD, shots: 1, arcDegrees: 0, emitterRadiusTiles: 0 })]);
     const typed = tag({ spriteId: sprite, pattern: "spread", aim: "player", shots: 1, bombRangeTiles: 4 });
-    const linked = authoredAttackFromTag(typed, config, saved())!;
+    const linked = authoredAttackFromTag(typed, config, config.primaryArchetypeId, saved())!;
     expect(linked.projectileVariant!.id).toBe("slow-spiral-tagged");
     expect(linked.attack.projectile).toBe("slow-spiral-tagged");
-    const loose = authoredAttackFromTag(typed, config)!;
+    const loose = authoredAttackFromTag(typed, config, config.primaryArchetypeId)!;
     expect(loose.attack.id).toBe("bomb-tagged");
     expect(loose.projectileVariant!.id).toBe("white-bomb-v1-tagged");
   });

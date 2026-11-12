@@ -125,17 +125,17 @@ const PLAYER = { x: EMITTER.x + 5, y: EMITTER.y };
 describe("matchTagAttack", () => {
   test("matches a ring from rotating-arm and fixed-ring", () => {
     for (const pattern of ["rotating-arm", "fixed-ring"] as const) {
-      const match = matchTagAttack(tag({ pattern }), CONFIG);
+      const match = matchTagAttack(tag({ pattern }), CONFIG, CONFIG.primaryArchetypeId);
       expect(match?.attack.id).toBe("ring");
     }
   });
 
   test("matches spread and scatter", () => {
     expect(
-      matchTagAttack(tag({ pattern: "spread", aim: "player" }), CONFIG)?.attack.id,
+      matchTagAttack(tag({ pattern: "spread", aim: "player" }), CONFIG, CONFIG.primaryArchetypeId)?.attack.id,
     ).toBe("spread");
     expect(
-      matchTagAttack(tag({ pattern: "scatter", aim: "fixed" }), CONFIG)?.attack.id,
+      matchTagAttack(tag({ pattern: "scatter", aim: "fixed" }), CONFIG, CONFIG.primaryArchetypeId)?.attack.id,
     ).toBe("scatter");
   });
 
@@ -144,12 +144,12 @@ describe("matchTagAttack", () => {
       [attackOf("first", "linear-a", RING), attackOf("second", "linear-a", RING)],
       [LINEAR],
     );
-    expect(matchTagAttack(tag(), config)?.attack.id).toBe("first");
+    expect(matchTagAttack(tag(), config, config.primaryArchetypeId)?.attack.id).toBe("first");
   });
 
   test("a matching sprite with the wrong family does not match", () => {
     const config = configOf([attackOf("spread", "linear-a", SPREAD)], [LINEAR]);
-    expect(matchTagAttack(tag({ pattern: "rotating-arm" }), config)).toBeNull();
+    expect(matchTagAttack(tag({ pattern: "rotating-arm" }), config, config.primaryArchetypeId)).toBeNull();
   });
 
   test("a sprite authored only in another phase does not match", () => {
@@ -158,29 +158,29 @@ describe("matchTagAttack", () => {
       [LINEAR, projectileOf("other", { kind: "linear", rangeTiles: 3 })],
       [attackOf("b", "linear-a", RING)],
     );
-    expect(matchTagAttack(tag({ phaseIndex: 0 }), config)).toBeNull();
-    expect(matchTagAttack(tag({ phaseIndex: 1 }), config)?.attack.id).toBe("b");
+    expect(matchTagAttack(tag({ phaseIndex: 0 }), config, config.primaryArchetypeId)).toBeNull();
+    expect(matchTagAttack(tag({ phaseIndex: 1 }), config, config.primaryArchetypeId)?.attack.id).toBe("b");
   });
 
   test("returns null for an unknown phase, sprite and the volley pattern", () => {
-    expect(matchTagAttack(tag({ phaseIndex: 9 }), CONFIG)).toBeNull();
-    expect(matchTagAttack(tag({ spriteId: "nope" }), CONFIG)).toBeNull();
-    expect(matchTagAttack(tag({ pattern: "volley" }), CONFIG)).toBeNull();
+    expect(matchTagAttack(tag({ phaseIndex: 9 }), CONFIG, CONFIG.primaryArchetypeId)).toBeNull();
+    expect(matchTagAttack(tag({ spriteId: "nope" }), CONFIG, CONFIG.primaryArchetypeId)).toBeNull();
+    expect(matchTagAttack(tag({ pattern: "volley" }), CONFIG, CONFIG.primaryArchetypeId)).toBeNull();
   });
 
   test("tag shots replace arms and shots, keeping other fields", () => {
     // Plan V15 N37 supersedes M06 for rings: the default tag is a fixed-ring,
     // which has rate 0, so only the rate differs from the authored pattern.
-    const ring = matchTagAttack(tag({ shots: 7 }), CONFIG)!.pattern;
+    const ring = matchTagAttack(tag({ shots: 7 }), CONFIG, CONFIG.primaryArchetypeId)!.pattern;
     expect(ring).toEqual({ ...RING, arms: 7, clockwiseDegreesPerSecond: 0 });
     const spread = matchTagAttack(
       tag({ pattern: "spread", aim: "player", shots: 5 }),
-      CONFIG,
+      CONFIG, CONFIG.primaryArchetypeId,
     )!.pattern;
     expect(spread).toEqual({ ...SPREAD, shots: 5 });
     const scatter = matchTagAttack(
       tag({ pattern: "scatter", aim: "fixed", shots: 9 }),
-      CONFIG,
+      CONFIG, CONFIG.primaryArchetypeId,
     )!.pattern;
     expect(scatter).toEqual({ ...SCATTER, shots: 9 });
   });
@@ -204,7 +204,7 @@ describe("matchTagAttack", () => {
         [PRIMARY.id]: { ...archetype, phases: [{ ...phase, subPhases: [sub] }] },
       },
     };
-    expect(matchTagAttack(tag(), config)?.attack.id).toBe("in-sub");
+    expect(matchTagAttack(tag(), config, config.primaryArchetypeId)?.attack.id).toBe("in-sub");
   });
 });
 
@@ -213,15 +213,15 @@ describe("countUnmatchedTags", () => {
     expect(
       countUnmatchedTags(
         [tag(), tag({ spriteId: "x" }), tag({ pattern: "volley" })],
-        CONFIG,
+        CONFIG, CONFIG.primaryArchetypeId,
       ),
     ).toBe(2);
-    expect(countUnmatchedTags([], CONFIG)).toBe(0);
+    expect(countUnmatchedTags([], CONFIG, CONFIG.primaryArchetypeId)).toBe(0);
   });
 });
 
 const frame = (tags: readonly Tag[], timeSeconds: number, config = CONFIG) =>
-  previewAt({ tags, timeSeconds, config, playerTiles: PLAYER });
+  previewAt({ tags, timeSeconds, config, archetypeId: config.primaryArchetypeId, playerTiles: PLAYER });
 
 describe("previewAt", () => {
   test("an empty study and a future tag draw nothing", () => {
@@ -346,7 +346,7 @@ describe("previewAt", () => {
     const moved = previewAt({
       tags: [one],
       timeSeconds: 10,
-      config: CONFIG,
+      config: CONFIG, archetypeId: CONFIG.primaryArchetypeId,
       playerTiles: { x: EMITTER.x, y: EMITTER.y + 5 },
     });
     expect(moved.projectiles[0]!.orientationRadians).toBeCloseTo(Math.PI / 2, 9);
@@ -643,7 +643,7 @@ describe("previewAt front aim, heading and targeted bombs", () => {
       previewAt({
         tags: [front],
         timeSeconds: 10,
-        config: CONFIG,
+        config: CONFIG, archetypeId: CONFIG.primaryArchetypeId,
         playerTiles,
         headingRadians,
       }).projectiles[0]!.orientationRadians;
@@ -745,7 +745,7 @@ describe("initialHeadingSliderDegrees (N20)", () => {
       previewAt({
         tags: [],
         timeSeconds: 0,
-        config: CONFIG,
+        config: CONFIG, archetypeId: CONFIG.primaryArchetypeId,
         playerTiles: PLAYER,
         headingRadians: 1.25,
       }).headingRadians,
@@ -756,30 +756,30 @@ describe("initialHeadingSliderDegrees (N20)", () => {
 
 describe("tagMatchStatus and unmatched count (V16 S18)", () => {
   test("reports one status and reason per kind", () => {
-    expect(tagMatchStatus(tag(), CONFIG)).toEqual({ kind: "plays-as", attackId: "ring" });
-    expect(tagMatchStatus(tag({ spriteId: "nope" }), CONFIG)).toEqual({
+    expect(tagMatchStatus(tag(), CONFIG, CONFIG.primaryArchetypeId)).toEqual({ kind: "plays-as", attackId: "ring" });
+    expect(tagMatchStatus(tag({ spriteId: "nope" }), CONFIG, CONFIG.primaryArchetypeId)).toEqual({
       kind: "wont-preview",
       reason: "no-attack",
     });
-    expect(tagMatchStatus(tag({ phaseIndex: 9 }), CONFIG)).toEqual({
+    expect(tagMatchStatus(tag({ phaseIndex: 9 }), CONFIG, CONFIG.primaryArchetypeId)).toEqual({
       kind: "wont-preview",
       reason: "unknown-phase",
     });
-    expect(tagMatchStatus(tag({ pattern: "volley" }), CONFIG)).toEqual({
+    expect(tagMatchStatus(tag({ pattern: "volley" }), CONFIG, CONFIG.primaryArchetypeId)).toEqual({
       kind: "wont-preview",
       reason: "legacy-volley",
     });
     expect(
-      tagMatchStatus(tag({ pattern: "scatter", aim: "fixed" }), CONFIG),
+      tagMatchStatus(tag({ pattern: "scatter", aim: "fixed" }), CONFIG, CONFIG.primaryArchetypeId),
     ).toEqual({ kind: "plays-as", attackId: "scatter" });
     const playerOnly = configOf([attackOf("spread", "linear-a", SPREAD)], [LINEAR]);
     expect(
-      tagMatchStatus(tag({ pattern: "spread", aim: "fixed" }), playerOnly),
+      tagMatchStatus(tag({ pattern: "spread", aim: "fixed" }), playerOnly, playerOnly.primaryArchetypeId),
     ).toEqual({ kind: "wont-preview", reason: "needs-bearing" });
     expect(
       tagMatchStatus(
         tag({ pattern: "spread", aim: "fixed", fixedBearingDegrees: 10 }),
-        playerOnly,
+        playerOnly, playerOnly.primaryArchetypeId,
       ),
     ).toEqual({ kind: "plays-as", attackId: "spread" });
   });
@@ -791,10 +791,10 @@ describe("tagMatchStatus and unmatched count (V16 S18)", () => {
       tag({ phaseIndex: 9 }),
       tag({ pattern: "volley" }),
     ];
-    expect(countUnmatchedTags(tags, CONFIG)).toBe(
-      tags.filter((entry) => tagMatchStatus(entry, CONFIG).kind === "wont-preview").length,
+    expect(countUnmatchedTags(tags, CONFIG, CONFIG.primaryArchetypeId)).toBe(
+      tags.filter((entry) => tagMatchStatus(entry, CONFIG, CONFIG.primaryArchetypeId).kind === "wont-preview").length,
     );
-    expect(countUnmatchedTags(tags, CONFIG)).toBe(3);
+    expect(countUnmatchedTags(tags, CONFIG, CONFIG.primaryArchetypeId)).toBe(3);
   });
 });
 
@@ -822,42 +822,41 @@ describe("bomb matching and typed projectile values (V16 phase 60)", () => {
     tag({ spriteId: "bomb-a", pattern: "spread", aim: "player", shots: 1, ...overrides });
 
   test("a bomb matches the first attack of the phase in any family and builds the tag's pattern", () => {
-    const match = matchTagAttack(bombTag(), RING_BOMB_CONFIG);
+    const match = matchTagAttack(bombTag(), RING_BOMB_CONFIG, RING_BOMB_CONFIG.primaryArchetypeId);
     expect(match?.attack.id).toBe("bomb-ring");
     expect(match?.pattern).toMatchObject({ kind: "spread", shots: 1, arcDegrees: 0, aim: "player" });
     expect(match?.pattern).toMatchObject({ emitterRadiusTiles: RING.kind === "ring" ? RING.emitterRadiusTiles : 0 });
   });
 
   test("a typed radius wins over the borrowed one", () => {
-    const match = matchTagAttack(bombTag({ pattern: "scatter", coneDegrees: 30, shots: 2, emitterRadiusTiles: 0 }), RING_BOMB_CONFIG);
+    const match = matchTagAttack(bombTag({ pattern: "scatter", coneDegrees: 30, shots: 2, emitterRadiusTiles: 0 }), RING_BOMB_CONFIG, RING_BOMB_CONFIG.primaryArchetypeId);
     expect(match?.pattern).toMatchObject({ kind: "scatter", coneDegrees: 30 });
   });
 
   test("a bomb with no attack in its phase falls back to the first in any phase and says so", () => {
-    const status = tagMatchStatus(bombTag({ phaseIndex: 1 }), configOf([attackOf("bomb-ring", "bomb-a", RING)], [BOMB]));
+    const bombConfig = configOf([attackOf("bomb-ring", "bomb-a", RING)], [BOMB]);
+    const status = tagMatchStatus(bombTag({ phaseIndex: 1 }), bombConfig, bombConfig.primaryArchetypeId);
     expect(status).toEqual({ kind: "plays-as", attackId: "bomb-ring", borrowedFromPhaseIndex: 0 });
-    expect(tagMatchStatus(bombTag({ spriteId: "no-such" }), RING_BOMB_CONFIG)).toEqual({
+    expect(tagMatchStatus(bombTag({ spriteId: "no-such" }), RING_BOMB_CONFIG, RING_BOMB_CONFIG.primaryArchetypeId)).toEqual({
       kind: "wont-preview",
       reason: "no-attack",
     });
-    const phaseZero = tagMatchStatus(bombTag({ phaseIndex: 1 }), RING_BOMB_CONFIG);
+    const phaseZero = tagMatchStatus(bombTag({ phaseIndex: 1 }), RING_BOMB_CONFIG, RING_BOMB_CONFIG.primaryArchetypeId);
     expect(phaseZero).toEqual({ kind: "plays-as", attackId: "later-spread" });
-    const borrowed = tagMatchStatus(
-      bombTag({ phaseIndex: 0 }),
-      configOf([attackOf("other", "linear-a", RING)], [LINEAR, BOMB], [attackOf("far", "bomb-a", RING)]),
-    );
+    const borrowedConfig = configOf([attackOf("other", "linear-a", RING)], [LINEAR, BOMB], [attackOf("far", "bomb-a", RING)]);
+    const borrowed = tagMatchStatus(bombTag({ phaseIndex: 0 }), borrowedConfig, borrowedConfig.primaryArchetypeId);
     expect(borrowed).toEqual({ kind: "plays-as", attackId: "far", borrowedFromPhaseIndex: 1 });
   });
 
   test("a cross-family scatter with no cone has no pattern", () => {
     expect(
-      tagMatchStatus(bombTag({ pattern: "scatter", shots: 2 }), RING_BOMB_CONFIG),
+      tagMatchStatus(bombTag({ pattern: "scatter", shots: 2 }), RING_BOMB_CONFIG, RING_BOMB_CONFIG.primaryArchetypeId),
     ).toEqual({ kind: "wont-preview", reason: "needs-cone" });
   });
 
   test("a cross-family ring takes neutral defaults", () => {
     const spreadOnly = configOf([attackOf("bomb-spread", "bomb-a", SPREAD)], [BOMB]);
-    const match = matchTagAttack(bombTag({ pattern: "fixed-ring", shots: 4 }), spreadOnly);
+    const match = matchTagAttack(bombTag({ pattern: "fixed-ring", shots: 4 }), spreadOnly, spreadOnly.primaryArchetypeId);
     expect(match?.pattern).toMatchObject({
       kind: "ring",
       arms: 4,
@@ -869,7 +868,7 @@ describe("bomb matching and typed projectile values (V16 phase 60)", () => {
   test("typed range and time change the landing point and detonation frame", () => {
     const config = configOf([attackOf("bomb-spread", "bomb-a", { ...SPREAD, shots: 1, emitterRadiusTiles: 0 })], [BOMB]);
     const at = (overrides: Partial<Tag>, seconds: number) =>
-      previewAt({ tags: [bombTag(overrides)], timeSeconds: seconds, config, playerTiles: PLAYER });
+      previewAt({ tags: [bombTag(overrides)], timeSeconds: seconds, config, archetypeId: config.primaryArchetypeId, playerTiles: PLAYER });
     const landed = at({ bombRangeTiles: 4, bombTravelSeconds: 2 }, 12);
     expect(landed.detonations).toHaveLength(1);
     expect(landed.detonations[0]!.positionTiles.x).toBeCloseTo(EMITTER.x + 4, 9);
@@ -881,7 +880,7 @@ describe("bomb matching and typed projectile values (V16 phase 60)", () => {
     const config = configOf([attackOf("spread", "linear-a", { ...SPREAD, shots: 1, emitterRadiusTiles: 0 })], [LINEAR]);
     const base = tag({ pattern: "spread", aim: "player", shots: 1 });
     const at = (entry: Tag, seconds: number) =>
-      previewAt({ tags: [entry], timeSeconds: seconds, config, playerTiles: PLAYER }).projectiles;
+      previewAt({ tags: [entry], timeSeconds: seconds, config, archetypeId: config.primaryArchetypeId, playerTiles: PLAYER }).projectiles;
     expect(at({ ...base, bulletSpeedTilesPerSecond: 8, bulletRangeTiles: 4 }, 10.25)[0]!.positionTiles.x).toBeCloseTo(
       EMITTER.x + 2,
       9,
@@ -895,7 +894,7 @@ describe("bomb matching and typed projectile values (V16 phase 60)", () => {
       previewAt({
         tags: [{ ...base, bulletSpeedTilesPerSecond: 99 }],
         timeSeconds: 10.5,
-        config: boomerangConfig,
+        config: boomerangConfig, archetypeId: boomerangConfig.primaryArchetypeId,
         playerTiles: PLAYER,
       }).projectiles[0]!.positionTiles.x,
     ).toBeCloseTo(EMITTER.x + 2, 9);
@@ -933,7 +932,7 @@ describe("repeats and the saved-attack rotation clock (V16 phase 62)", () => {
       ...overrides,
     });
   const at = (tags: readonly Tag[], timeSeconds: number, saved = [SAVED], config = spiralConfig) =>
-    previewAt({ tags, savedAttacks: saved, timeSeconds, config, playerTiles: PLAYER });
+    previewAt({ tags, savedAttacks: saved, timeSeconds, config, archetypeId: config.primaryArchetypeId, playerTiles: PLAYER });
 
   test("a repeat draws a volley per cadence step with each volley's own age", () => {
     const repeat = linkedTag({ timeSeconds: 10, repeatEndSeconds: 11.2 });
@@ -992,5 +991,29 @@ describe("repeats and the saved-attack rotation clock (V16 phase 62)", () => {
     const started = performance.now();
     for (let run = 0; run < 5; run += 1) at([repeat], 59, [dense]);
     expect((performance.now() - started) / 5).toBeLessThan(100);
+  });
+});
+
+describe("tags follow the selected monster (J18)", () => {
+  const minionId = "red-killer-bee";
+  const minionAttack = ENCOUNTER_CONFIG.archetypes[minionId].phases[0].attacks[0];
+  const spriteId = ENCOUNTER_CONFIG.projectiles[minionAttack.projectileId].appearance!.id;
+  const family = minionAttack.pattern.kind;
+  const pattern = family === "ring" ? "fixed-ring" : family === "scatter" ? "scatter" : "spread";
+  const minionTag = (overrides: Partial<Tag> = {}) =>
+    tag({ spriteId, pattern, aim: "player", phaseIndex: 0, ...overrides });
+
+  test("a minion tag matches the minion's attack, not the boss's", () => {
+    const match = matchTagAttack(minionTag(), ENCOUNTER_CONFIG, minionId);
+    expect(match?.attack.id).toBe(minionAttack.id);
+    expect(
+      matchTagAttack(minionTag(), ENCOUNTER_CONFIG, ENCOUNTER_CONFIG.primaryArchetypeId),
+    ).toBeNull();
+  });
+
+  test("a phase index only the boss has is unknown on the minion", () => {
+    expect(
+      tagMatchStatus(minionTag({ phaseIndex: 3 }), ENCOUNTER_CONFIG, minionId),
+    ).toEqual({ kind: "wont-preview", reason: "unknown-phase" });
   });
 });

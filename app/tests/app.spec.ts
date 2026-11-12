@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
+import { loadTestClip } from "./tagger-clip.ts";
 import { hexToNumber, palette } from "../src/game/config/palette.ts";
 import appearanceData from "../src/game/data/projectile-appearances.json" with { type: "json" };
 import projectileData from "../src/game/data/projectiles.json" with { type: "json" };
@@ -2808,44 +2809,7 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   const dismiss = page.getByRole("button", { name: "Dismiss list" });
   if (await dismiss.isVisible()) await dismiss.click();
 
-  // A short WebM generated in the page, so no video file is ever stored.
-  const base64 = await page.evaluate(async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const context = canvas.getContext("2d")!;
-    const recorder = new MediaRecorder(canvas.captureStream(30), {
-      mimeType: "video/webm",
-    });
-    const chunks: Blob[] = [];
-    recorder.ondataavailable = (event) => chunks.push(event.data);
-    const stopped = new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-    recorder.start();
-    let frame = 0;
-    const timer = setInterval(() => {
-      context.fillStyle = `hsl(${(frame * 12) % 360}, 80%, 50%)`;
-      context.fillRect(0, 0, 64, 64);
-      frame += 1;
-    }, 33);
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    clearInterval(timer);
-    recorder.stop();
-    await stopped;
-    const bytes = new Uint8Array(
-      await new Blob(chunks, { type: "video/webm" }).arrayBuffer(),
-    );
-    let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return btoa(binary);
-  });
-  await page.locator('input[type="file"][accept="video/*"]').setInputFiles({
-    name: "clip.webm",
-    mimeType: "video/webm",
-    buffer: Buffer.from(base64, "base64"),
-  });
-  await page.getByLabel(/presented frame rate/i).fill("30");
+  await loadTestClip(page);
   await page.getByRole("button", { name: "Play", exact: true }).click();
   const frameTime = async () =>
     Number.parseFloat(
@@ -2857,6 +2821,7 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   // A rotating arm of red balls in phase 3, saved as a named attack with a typed cadence.
   await page.getByRole("button", { name: "red-ball", exact: true }).click();
   await page
+    .getByRole("region", { name: "Tag", exact: true })
     .locator("label", { has: page.locator("span", { hasText: /^Phase$/ }) })
     .locator("select")
     .selectOption("2");
@@ -2895,6 +2860,26 @@ test("the tagger records a linked repeat, ends it, tunes it and exports the save
   expect(exported).toContain('"id": "slow-spiral-tagged"');
   expect(exported).toContain('"cooldownAfterLastShotSeconds": 0.4');
   expect(exported).toContain('"clockwiseDegreesPerSecond": 45');
+});
+
+test("the draft panel shows one phase and Starts here anchors a block", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("./?tagger=1");
+  const dismiss = page.getByRole("button", { name: "Dismiss list" });
+  if (await dismiss.isVisible()) await dismiss.click();
+  await loadTestClip(page);
+
+  const draft = page.getByRole("region", { name: /Monster draft/ });
+  await draft.getByRole("button", { name: "Load from game" }).click();
+  await draft.getByLabel("Phase of the monster draft").selectOption("2");
+  // Only phase 3's block is listed; phase 2 and 4 have none shown.
+  await expect(draft.getByRole("heading", { level: 3 })).toHaveCount(1);
+  const startsHere = draft.getByRole("button", { name: /^Starts here: / });
+  await expect(startsHere).toHaveCount(1);
+  await startsHere.click();
+  await expect(draft.getByLabel(/^Anchor of /)).toHaveCount(1);
 });
 
 test.describe("live phase preview", () => {

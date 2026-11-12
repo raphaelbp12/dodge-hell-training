@@ -127,10 +127,16 @@ function rawBlockIds(rawFile: unknown): string[] {
   );
 }
 
-/** L04, L28, L29: a lossless copy of the attacks; anchors survive where the block does. */
+/**
+ * L04, L28, L29, amended by V19 J07: a lossless copy of the attacks; anchors
+ * survive where the block does. With no `previous` draft the whole monster is
+ * copied. With one, every other phase keeps `previous`'s attacks and only
+ * `phaseId`'s phase-level and sub-phase attacks come from the file.
+ */
 export function loadMonsterDraft(
   rawFile: unknown,
   previous: MonsterDraft | null,
+  phaseId: string,
 ): Readonly<{ draft: MonsterDraft; droppedAnchors: readonly string[] }> {
   const copy = <T>(value: T): T => structuredClone(value);
   const known = new Set(rawBlockIds(rawFile));
@@ -141,14 +147,18 @@ export function loadMonsterDraft(
     else droppedAnchors.push(id);
   return {
     draft: {
-      phases: rawPhasesOf(rawFile).map((phase) => ({
-        phaseId: phase.id,
-        attacks: copy(phase.attacks as AuthoredAttack[]),
-        subPhases: (phase.subPhases ?? []).map((sub) => ({
-          subPhaseId: sub.id,
-          attacks: copy(sub.attacks as AuthoredAttack[]),
-        })),
-      })),
+      phases: rawPhasesOf(rawFile).map((phase) => {
+        const kept = previous?.phases.find((entry) => entry.phaseId === phase.id);
+        if (kept && phase.id !== phaseId) return copy(kept);
+        return {
+          phaseId: phase.id,
+          attacks: copy(phase.attacks as AuthoredAttack[]),
+          subPhases: (phase.subPhases ?? []).map((sub) => ({
+            subPhaseId: sub.id,
+            attacks: copy(sub.attacks as AuthoredAttack[]),
+          })),
+        };
+      }),
       anchors,
     },
     droppedAnchors,
@@ -410,36 +420,37 @@ export function monsterFilePath(archetypeId: string): string {
 }
 
 /**
- * L30: the monster's current file with only its attack lists replaced from the
- * draft, in place. Refuses, naming the id, when a phase or sub-phase is on one
- * side only. Never includes an anchor (L22).
+ * L30, amended by V19 J04, J05: the monster's current file with only the
+ * selected phase's attack lists, phase-level and sub-phase, replaced from the
+ * draft, in place. Every other phase stays as the file has it. Refuses, naming
+ * the id, only when the selected phase or one of its sub-phases is on one side
+ * only. Never includes an anchor (L22).
  */
 export function monsterFileText(
   archetypeId: string,
   draft: MonsterDraft,
   currentRawFile: unknown,
   config: EncounterConfig,
+  phaseId: string,
 ): DraftResult<string> {
   const result = structuredClone(currentRawFile) as {
     phases: (RawPhase & { attacks: unknown })[];
   };
-  for (const draftPhase of draft.phases)
-    if (!result.phases.some((phase) => phase.id === draftPhase.phaseId))
-      return fail(`Phase "${draftPhase.phaseId}" is in the draft but not in the file.`);
-  for (const phase of result.phases) {
-    const draftPhase = draft.phases.find((entry) => entry.phaseId === phase.id);
-    if (!draftPhase) return fail(`Phase "${phase.id}" is in the file but not in the draft.`);
-    const rawSubs = phase.subPhases ?? [];
-    for (const sub of draftPhase.subPhases)
-      if (!rawSubs.some((raw) => raw.id === sub.subPhaseId))
-        return fail(`Sub-phase "${sub.subPhaseId}" is in the draft but not in the file.`);
-    for (const raw of rawSubs) {
-      const sub = draftPhase.subPhases.find((entry) => entry.subPhaseId === raw.id);
-      if (!sub) return fail(`Sub-phase "${raw.id}" is in the file but not in the draft.`);
-      raw.attacks = structuredClone(sub.attacks);
-    }
-    phase.attacks = structuredClone(draftPhase.attacks);
+  const phase = result.phases.find((entry) => entry.id === phaseId);
+  const draftPhase = draft.phases.find((entry) => entry.phaseId === phaseId);
+  if (!phase && !draftPhase) return fail(`Phase "${phaseId}" is in neither the draft nor the file.`);
+  if (!phase) return fail(`Phase "${phaseId}" is in the draft but not in the file.`);
+  if (!draftPhase) return fail(`Phase "${phaseId}" is in the file but not in the draft.`);
+  const rawSubs = phase.subPhases ?? [];
+  for (const sub of draftPhase.subPhases)
+    if (!rawSubs.some((raw) => raw.id === sub.subPhaseId))
+      return fail(`Sub-phase "${sub.subPhaseId}" is in the draft but not in the file.`);
+  for (const raw of rawSubs) {
+    const sub = draftPhase.subPhases.find((entry) => entry.subPhaseId === raw.id);
+    if (!sub) return fail(`Sub-phase "${raw.id}" is in the file but not in the draft.`);
+    raw.attacks = structuredClone(sub.attacks);
   }
+  phase.attacks = structuredClone(draftPhase.attacks);
   try {
     const archetypes = validateArchetypes(
       { archetypes: { ...AUTHORED_MONSTER_FILES, [archetypeId]: result } },

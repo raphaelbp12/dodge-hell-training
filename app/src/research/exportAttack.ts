@@ -116,9 +116,10 @@ export function slugOf(name: string, fallback: string): string {
 export function authoredAttackFromTag(
   tag: Tag,
   config: EncounterConfig,
+  archetypeId: string,
   savedAttack?: SavedAttack,
 ): ExportedAttack | null {
-  const match = matchTagAttack(tag, config);
+  const match = matchTagAttack(tag, config, archetypeId);
   if (!match) return null;
   const { attack, pattern } = match;
   const keepsTarget =

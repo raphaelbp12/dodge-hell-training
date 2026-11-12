@@ -383,16 +383,6 @@ Rules for this register:
 
 **Fidelity gap this leaves.** None to gameplay. Saved attacks must be recreated, or reached through a copy of an older study, for each new video.
 
-### D38 - Tags And Saved Attacks On Minions
-
-**What.** Let a minion's study record time-stamped tags and saved attacks, with the phase list, matching, preview and export following the selected monster.
-
-**Why deferred.** Plan V18's L09 keeps tags in the primary monster's study. A tag's phase is a boss phase and its matching reads the primary monster, so extending it touches every tag path, while the draft and anchors already serve the stated goal.
-
-**Blocked on.** A need for recorded shot timings or interval statistics for a minion.
-
-**Fidelity gap this leaves.** None to gameplay. A minion's shot times are read from the video by hand, and no interval statistics exist for minions.
-
 ### D39 - Editing Phase, Sub-Phase And Monster Values In The Tagger
 
 **What.** Let the draft editor change health gates, phase and sub-phase durations, telegraphs, movement, spawns, and monster-level values such as health, contact damage, body and blocking.
@@ -432,6 +422,16 @@ Rules for this register:
 **Blocked on.** A decision that fight-wide timing or position checks are worth a preview driven by the simulation, which also has to respect the rule against a second simulation clock.
 
 **Fidelity gap this leaves.** None to gameplay. The preview cannot confirm where a minion fires from, how a pattern looks from a moving monster, or how several monsters' patterns combine.
+
+### D43 - Setting A Block's Anchor From An Attack's First Shot
+
+**What.** A "First shot here" button on each draft attack that sets its block's anchor to the presented frame's time minus the block's telegraph and that attack's `initialDelaySeconds`.
+
+**Why deferred.** Plan V19's J10 keeps L17 and L20: an anchor marks the frame a block is entered and attacks are never anchored individually. The guide and the Starts here help text explain what to mark instead.
+
+**Blocked on.** A user finding that block entry is too hard to see in real footage to anchor reliably, while first shots are easy to see.
+
+**Fidelity gap this leaves.** None to gameplay. When a block's entry frame is ambiguous in a video, its anchor is the person's estimate, and the preview's timing inherits that error.
 
 ## Out Of Scope - Not Planned
 

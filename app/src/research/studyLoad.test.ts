@@ -158,10 +158,10 @@ describe("studyMonsterProblem", () => {
   } as const;
   const tag = { timeSeconds: 1, phaseIndex: 0, spriteId: "x", pattern: "rotating-arm", shots: 1 } as const;
 
-  test("catches an unknown monster and tags on a minion", () => {
+  test("catches an unknown monster but accepts tags on a minion (J18)", () => {
     expect(studyMonsterProblem(study, "q", ["q", "m"])).toBeNull();
     expect(studyMonsterProblem({ ...study, archetypeId: "zz" }, "q", ["q", "m"])).toMatch(/Unknown/);
-    expect(studyMonsterProblem({ ...study, archetypeId: "m", tags: [tag] }, "q", ["q", "m"])).toMatch(/primary/);
+    expect(studyMonsterProblem({ ...study, archetypeId: "m", tags: [tag] }, "q", ["q", "m"])).toBeNull();
   });
 });
 
@@ -188,9 +188,8 @@ describe("V18 names and visibility", () => {
     expect(observationFileName("q", "bee", "queen")).toBe("q-bee-observations.json");
   });
 
-  test("a minion study hides tagging; the switch lives in primary studies", () => {
-    expect(studySections(true, "draft")).toEqual({ tagging: false, previewTuning: false, sourceSwitch: false });
-    expect(studySections(false, "tags")).toEqual({ tagging: true, previewTuning: true, sourceSwitch: true });
-    expect(studySections(false, "draft").previewTuning).toBe(false);
+  test("every study shows tagging and the source switch; tuning follows the source (J18, J19)", () => {
+    expect(studySections("tags")).toEqual({ previewTuning: true, sourceSwitch: true });
+    expect(studySections("draft")).toEqual({ previewTuning: false, sourceSwitch: true });
   });
 });

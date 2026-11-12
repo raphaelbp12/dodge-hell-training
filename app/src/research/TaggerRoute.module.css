@@ -416,3 +416,21 @@
   border: 0;
   padding: 0;
 }
+
+.helpMark {
+  display: inline-block;
+  min-width: 1.2em;
+  margin-inline: 0.25em;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.75em;
+  line-height: 1.2;
+  text-align: center;
+  cursor: help;
+}
+
+.headingRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25em;
+}

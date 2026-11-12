@@ -266,10 +266,14 @@ function attacksOfPhase(phase: PhaseSpec): readonly AttackSpec[] {
  * first attack of its phase firing its sprite whatever the family, otherwise
  * the first in any phase, in authored order.
  */
-function resolveTagMatch(tag: Tag, config: EncounterConfig): Resolved {
+function resolveTagMatch(
+  tag: Tag,
+  config: EncounterConfig,
+  archetypeId: string,
+): Resolved {
   const family = FAMILY_BY_TAG_PATTERN[tag.pattern];
   if (!family) return { ok: false, reason: "legacy-volley" };
-  const phases = primaryArchetype(config).phases;
+  const phases = config.archetypes[archetypeId].phases;
   const phase = phases[tag.phaseIndex];
   if (!phase) return { ok: false, reason: "unknown-phase" };
   const firesSprite = (attack: AttackSpec) =>
@@ -305,14 +309,19 @@ function resolveTagMatch(tag: Tag, config: EncounterConfig): Resolved {
 export function matchTagAttack(
   tag: Tag,
   config: EncounterConfig,
+  archetypeId: string,
 ): PreviewMatch | null {
-  const resolved = resolveTagMatch(tag, config);
+  const resolved = resolveTagMatch(tag, config, archetypeId);
   return resolved.ok ? resolved.match : null;
 }
 
 /** S18: the one answer behind the Tag panel, the row badges, the export refusal and the unmatched count. */
-export function tagMatchStatus(tag: Tag, config: EncounterConfig): TagMatchStatus {
-  const resolved = resolveTagMatch(tag, config);
+export function tagMatchStatus(
+  tag: Tag,
+  config: EncounterConfig,
+  archetypeId: string,
+): TagMatchStatus {
+  const resolved = resolveTagMatch(tag, config, archetypeId);
   if (!resolved.ok) return { kind: "wont-preview", reason: resolved.reason };
   return {
     kind: "plays-as",
@@ -357,8 +366,12 @@ export function matchStatusText(
  * V16 S24: whether the tag's matched projectile is a `linear` bullet, the only
  * kind whose speed and range a tag may type.
  */
-export function matchesLinearBullet(tag: Tag, config: EncounterConfig): boolean {
-  const projectile = matchTagAttack(tag, config)?.projectile;
+export function matchesLinearBullet(
+  tag: Tag,
+  config: EncounterConfig,
+  archetypeId: string,
+): boolean {
+  const projectile = matchTagAttack(tag, config, archetypeId)?.projectile;
   return (
     projectile !== undefined &&
     projectile.type !== "bomb" &&
@@ -369,8 +382,9 @@ export function matchesLinearBullet(tag: Tag, config: EncounterConfig): boolean 
 export function countUnmatchedTags(
   tags: readonly Tag[],
   config: EncounterConfig,
+  archetypeId: string,
 ): number {
-  return tags.filter((tag) => tagMatchStatus(tag, config).kind === "wont-preview").length;
+  return tags.filter((tag) => tagMatchStatus(tag, config, archetypeId).kind === "wont-preview").length;
 }
 
 /**
@@ -543,6 +557,8 @@ export function previewAt(input: {
   savedAttacks?: readonly SavedAttack[];
   timeSeconds: number;
   config: EncounterConfig;
+  /** The monster whose phases the tags index (J18). */
+  archetypeId: string;
   playerTiles: Vector2;
   headingRadians?: number;
 }): PreviewFrame {
@@ -551,6 +567,7 @@ export function previewAt(input: {
     savedAttacks = [],
     timeSeconds,
     config,
+    archetypeId,
     playerTiles,
     headingRadians = 0,
   } = input;
@@ -561,7 +578,7 @@ export function previewAt(input: {
   const clockStarts = firstTimeByRotationClock(tags);
   tags.forEach((tag, tagIndex) => {
     if (tag.timeSeconds > timeSeconds) return;
-    const match = matchTagAttack(tag, config);
+    const match = matchTagAttack(tag, config, archetypeId);
     if (!match) return;
     const { projectile, pattern } = match;
     const appearance = projectile.appearance;
@@ -648,7 +665,7 @@ export function previewAt(input: {
     headingRadians,
     projectiles,
     detonations,
-    unmatchedTagCount: countUnmatchedTags(tags, config),
+    unmatchedTagCount: countUnmatchedTags(tags, config, archetypeId),
   };
 }
 

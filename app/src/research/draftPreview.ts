@@ -121,21 +121,35 @@ export type DraftFrame = Readonly<{
 /** One frame of the draft at `timeSeconds`, drawn from each volley's own age. */
 export function draftPreviewAt(input: {
   draft: MonsterDraft;
+  /** Every block of the monster, so any phase's anchor still ends a window. */
   blocks: readonly DraftBlock[];
+  /** J06: only this phase's blocks are drawn. */
+  phaseId: string;
   config: EncounterConfig;
   timeSeconds: number;
   videoEndSeconds: number;
   playerTiles: Vector2;
   headingRadians: number;
 }): DraftFrame {
-  const { draft, blocks, config, timeSeconds, videoEndSeconds, playerTiles, headingRadians } =
-    input;
+  const {
+    draft,
+    blocks,
+    phaseId,
+    config,
+    timeSeconds,
+    videoEndSeconds,
+    playerTiles,
+    headingRadians,
+  } = input;
+  const drawnBlockIds = new Set(
+    blocks.filter((block) => block.phaseId === phaseId).map((block) => block.id),
+  );
   const emitterTiles = emitterTilesOf(config);
   const projectiles: PreviewProjectile[] = [];
   const detonations: PreviewDetonation[] = [];
   const undrawn = new Set<string>();
   for (const window of blockWindows(blocks, draft.anchors, videoEndSeconds)) {
-    if (window.anchorSeconds > timeSeconds) continue;
+    if (window.anchorSeconds > timeSeconds || !drawnBlockIds.has(window.blockId)) continue;
     for (const authored of activeDraftAttacks(draft, window.blockId)) {
       const attack = attackSpecFromAuthored(authored);
       const projectile = config.projectiles[attack.projectileId];

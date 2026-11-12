@@ -121,9 +121,9 @@ export function currentDuration(
 }
 
 /**
- * V18 L09: the referential check the route runs on a loaded study. An unknown
- * monster, or tags and saved attacks on a minion, are load errors. Returns
- * null when the study is consistent.
+ * V18 L09, amended by V19 J18: the referential check the route runs on a loaded
+ * study. Only an unknown monster is a load error; every monster may hold tags
+ * and saved attacks. Returns null when the study is consistent.
  */
 export function studyMonsterProblem(
   study: StudyState,
@@ -133,11 +133,6 @@ export function studyMonsterProblem(
   const archetypeId = study.archetypeId ?? primaryArchetypeId;
   if (!monsterIds.includes(archetypeId))
     return `Unknown monster "${archetypeId}" in this encounter.`;
-  if (
-    archetypeId !== primaryArchetypeId &&
-    (study.tags.length > 0 || study.savedAttacks.length > 0)
-  )
-    return `Tags and saved attacks belong to the primary monster, not "${archetypeId}".`;
   return null;
 }
 
@@ -179,22 +174,16 @@ export function observationFileName(
 }
 
 export type StudySections = Readonly<{
-  /** Tag controls, sprite picker, tag table, summary, saved attacks, row export. */
-  tagging: boolean;
   /** The preview's tuning controls and unmatched-tag notice. */
   previewTuning: boolean;
   /** The Draft and Tags switch. */
   sourceSwitch: boolean;
 }>;
 
-/** V18 L09, L15: the one home of what a minion study hides. */
-export function studySections(
-  isMinion: boolean,
-  previewSource: "draft" | "tags",
-): StudySections {
+/** V19 J18, J19: every monster shows tagging and the source switch; tuning follows the source. */
+export function studySections(previewSource: "draft" | "tags"): StudySections {
   return {
-    tagging: !isMinion,
-    previewTuning: !isMinion && previewSource === "tags",
-    sourceSwitch: !isMinion,
+    previewTuning: previewSource === "tags",
+    sourceSwitch: true,
   };
 }

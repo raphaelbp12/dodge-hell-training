@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { AUTHORED_MONSTER_FILES, type AuthoredAttack } from "../game/config/data";
 import type { EncounterConfig } from "../game/config/encounter";
 import { ProjectileSprite } from "../ui/ProjectileSprite";
+import { HelpMark } from "./HelpMark";
+import * as help from "./helpText";
 import {
   addAttack,
   blockIdOf,
@@ -17,6 +19,7 @@ import {
   type DraftLocation,
   type MonsterDraft,
 } from "./monsterDraft";
+import type { PhaseOption } from "./taggingOptions";
 import { CommitInput } from "./TypedFieldControls";
 import styles from "./TaggerRoute.module.css";
 
@@ -26,6 +29,10 @@ type Props = Readonly<{
   draft: MonsterDraft | null;
   blocks: readonly DraftBlock[];
   hasVideo: boolean;
+  /** The selected monster's phases and the study's one selected phase (J02). */
+  phases: readonly PhaseOption[];
+  phaseIndex: number;
+  onPhaseChange: (phaseIndex: number) => void;
   /** Records the presented frame's `mediaTime` for a block, guarded by the route (T19). */
   onStartsHere: (blockId: string) => void;
   /** Every accepted change; the route marks the study dirty so autosave runs. */
@@ -52,15 +59,27 @@ const READ_ONLY_RING_FIELDS = [
 
 type Pattern = Record<string, unknown>;
 
+const CADENCE_HELP = {
+  shotsPerBurst: help.HELP_SHOTS_PER_BURST,
+  shotIntervalSeconds: help.HELP_SHOT_INTERVAL,
+  cooldownAfterLastShotSeconds: help.HELP_COOLDOWN,
+  initialDelaySeconds: help.HELP_INITIAL_DELAY,
+} as const;
+
 export function DraftPanel({
   archetypeId,
   config,
   draft,
   blocks,
   hasVideo,
+  phases,
+  phaseIndex,
+  onPhaseChange,
   onStartsHere,
   onChange,
 }: Props) {
+  const selectedPhase = phases[phaseIndex] ?? phases[0];
+  const phaseId = selectedPhase?.id ?? "";
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmLoad, setConfirmLoad] = useState(false);
@@ -68,11 +87,21 @@ export function DraftPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [newIds, setNewIds] = useState<Readonly<Record<string, string>>>({});
   const [copyNote, setCopyNote] = useState<string | null>(null);
+  // J01: changing phase, from either select, clears the attack editor's selection.
+  const [shownPhaseId, setShownPhaseId] = useState(phaseId);
+  if (shownPhaseId !== phaseId) {
+    setShownPhaseId(phaseId);
+    setSelected(null);
+    setConfirmDelete(false);
+    setConfirmLoad(false);
+    setCopyNote(null);
+  }
 
   const load = () => {
     const { draft: loaded, droppedAnchors } = loadMonsterDraft(
       AUTHORED_MONSTER_FILES[archetypeId],
       draft,
+      phaseId,
     );
     onChange(loaded);
     setSelected(null);
@@ -137,6 +166,7 @@ export function DraftPanel({
     attacks: readonly AuthoredAttack[],
   ) => (
     <div>
+      <HelpMark text={help.HELP_ATTACK_LIST} />
       <ul>
         {attacks.map((attack) => (
           <li key={attack.id}>
@@ -164,15 +194,17 @@ export function DraftPanel({
             setNewIds((current) => ({ ...current, [locationKey(at)]: event.target.value }))
           }
         />
+        <HelpMark text={help.HELP_NEW_ATTACK_ID} />
       </label>
       <button type="button" onClick={() => add(at)}>
         Add attack
       </button>
+      <HelpMark text={help.HELP_ADD_ATTACK} />
     </div>
   );
 
   const exportText = draft
-    ? monsterFileText(archetypeId, draft, AUTHORED_MONSTER_FILES[archetypeId], config)
+    ? monsterFileText(archetypeId, draft, AUTHORED_MONSTER_FILES[archetypeId], config, phaseId)
     : null;
 
   const copy = (text: string) => {
@@ -199,22 +231,41 @@ export function DraftPanel({
 
   return (
     <section className={styles.panel} aria-labelledby="draft-title">
-      <h2 id="draft-title">Monster draft: {archetypeId}</h2>
+      <div className={styles.headingRow}>
+        <h2 id="draft-title">Monster draft: {archetypeId}</h2>
+        <HelpMark text={help.HELP_DRAFT_HEADING} />
+      </div>
       <p className={styles.note}>
         A working copy of this monster&apos;s attacks. Phase and monster values
         are read-only here; change them by hand in the file.
       </p>
+      <label className={styles.field}>
+        <span>Phase</span>
+        <select
+          aria-label="Phase of the monster draft"
+          value={phaseIndex}
+          onChange={(event) => onPhaseChange(Number(event.target.value))}
+        >
+          {phases.map((phase) => (
+            <option key={phase.id} value={phase.index}>
+              {phase.label}
+            </option>
+          ))}
+        </select>
+        <HelpMark text={help.HELP_DRAFT_PHASE} />
+      </label>
       <button
         type="button"
         onClick={() => (draft ? setConfirmLoad(true) : load())}
       >
         Load from game
       </button>
+      <HelpMark text={help.HELP_DRAFT_LOAD} />
       {confirmLoad && (
         <div className={styles.confirm} role="alertdialog" aria-label="Confirm load">
           <span>
-            Loading replaces every attack in this draft with the game&apos;s
-            current ones. Anchors stay.
+            Loading replaces only the attacks of {phaseId} in this draft with
+            the game&apos;s current ones. Other phases and anchors stay.
           </span>
           <button type="button" onClick={load}>
             Confirm
@@ -236,7 +287,7 @@ export function DraftPanel({
       )}
       {draft && (
         <>
-          {draft.phases.map((phase) => {
+          {draft.phases.filter((phase) => phase.phaseId === phaseId).map((phase) => {
             const phaseBlocks = blocks.filter((block) => block.phaseId === phase.phaseId);
             return (
               <div key={phase.phaseId}>
@@ -246,7 +297,8 @@ export function DraftPanel({
                     const anchor = draft.anchors[block.id];
                     return (
                       <li key={block.id}>
-                        <strong>{block.label}</strong>{" "}
+                        <strong>{block.label}</strong>
+                        <HelpMark text={help.HELP_DRAFT_BLOCK} />{" "}
                         <small className={styles.note}>
                           telegraph {block.telegraphSeconds} s,{" "}
                           {block.durationSeconds === null
@@ -260,7 +312,8 @@ export function DraftPanel({
                           onClick={() => onStartsHere(block.id)}
                         >
                           Starts here
-                        </button>{" "}
+                        </button>
+                        <HelpMark text={help.HELP_STARTS_HERE} />{" "}
                         {anchor !== undefined && (
                           <>
                             <output aria-label={`Anchor of ${block.label}`}>
@@ -273,6 +326,7 @@ export function DraftPanel({
                             >
                               Clear
                             </button>
+                            <HelpMark text={help.HELP_CLEAR_ANCHOR} />
                           </>
                         )}
                       </li>
@@ -313,7 +367,10 @@ export function DraftPanel({
           )}
           <div className={styles.exportBox}>
             <label className={styles.field}>
-              <span>File for {monsterFilePath(archetypeId)}</span>
+              <span>
+                File for {monsterFilePath(archetypeId)} (only {phaseId}&apos;s
+                attacks are replaced)
+              </span>
               <textarea
                 readOnly
                 rows={14}
@@ -321,6 +378,7 @@ export function DraftPanel({
                 value={exportText?.ok ? exportText.value : (exportText?.error ?? "")}
                 onFocus={(event) => event.currentTarget.select()}
               />
+              <HelpMark text={help.HELP_EXPORT_BOX} />
             </label>
             <p className={styles.note}>
               Paste this over {monsterFilePath(archetypeId)} by hand; nothing is
@@ -335,6 +393,7 @@ export function DraftPanel({
             >
               Copy file
             </button>
+            <HelpMark text={help.HELP_COPY_FILE} />
             {copyNote && <span role="status"> {copyNote}</span>}
           </div>
         </>
@@ -360,7 +419,8 @@ function AttackEditor({
 }>) {
   const pattern = attack.pattern as unknown as Pattern;
   const kind = pattern.kind as (typeof KINDS)[number];
-  const number = (key: string, label: string, optional = false) => (
+  const number = (key: string, label: string, helpText: string, optional = false) => (
+    <>
     <CommitInput
       label={`${label} of ${attack.id}`}
       caption={label}
@@ -376,10 +436,13 @@ function AttackEditor({
         });
       }}
     />
+    <HelpMark text={helpText} />
+    </>
   );
   const armPattern = pattern.armPattern as Pattern | undefined;
   const armKind = (armPattern?.kind as string | undefined) ?? "single";
-  const armKey = (key: string, label: string) => (
+  const armKey = (key: string, label: string, helpText: string) => (
+    <>
     <CommitInput
       label={`${label} of ${attack.id}`}
       caption={label}
@@ -394,6 +457,8 @@ function AttackEditor({
         })
       }
     />
+    <HelpMark text={helpText} />
+    </>
   );
   const readOnly = READ_ONLY_RING_FIELDS.filter((key) => pattern[key] !== undefined);
   return (
@@ -412,6 +477,7 @@ function AttackEditor({
             </option>
           ))}
         </select>
+        <HelpMark text={help.HELP_ATTACK_PROJECTILE} />
       </label>
       {config.projectiles[attack.projectile] && (
         <ProjectileSprite projectile={config.projectiles[attack.projectile]} sizePixels={32} />
@@ -431,12 +497,13 @@ function AttackEditor({
             </option>
           ))}
         </select>
+        <HelpMark text={help.HELP_ATTACK_KIND} />
       </label>
       {kind === "ring" && (
         <>
-          {number("arms", "Arms")}
-          {number("initialPhaseDegrees", "Initial phase °")}
-          {number("clockwiseDegreesPerSecond", "Rate °/s")}
+          {number("arms", "Arms", help.HELP_RING_ARMS)}
+          {number("initialPhaseDegrees", "Initial phase °", help.HELP_RING_INITIAL_PHASE)}
+          {number("clockwiseDegreesPerSecond", "Rate °/s", help.HELP_RING_RATE)}
           <label>
             <span>Each arm fires</span>
             <select
@@ -457,17 +524,18 @@ function AttackEditor({
                 </option>
               ))}
             </select>
+            <HelpMark text={help.HELP_ARM_PATTERN} />
           </label>
-          {armKind === "ring" && armKey("arms", "Arm arms")}
-          {(armKind === "spread" || armKind === "scatter") && armKey("shots", "Shots per arm")}
-          {armKind === "spread" && armKey("arcDegrees", "Arm arc °")}
-          {armKind === "scatter" && armKey("coneDegrees", "Arm cone °")}
+          {armKind === "ring" && armKey("arms", "Arm arms", help.HELP_ARM_ARMS)}
+          {(armKind === "spread" || armKind === "scatter") && armKey("shots", "Shots per arm", help.HELP_ARM_SHOTS)}
+          {armKind === "spread" && armKey("arcDegrees", "Arm arc °", help.HELP_ARM_ARC)}
+          {armKind === "scatter" && armKey("coneDegrees", "Arm cone °", help.HELP_ARM_CONE)}
         </>
       )}
       {kind !== "ring" && (
         <>
-          {number("shots", "Shots")}
-          {kind === "spread" ? number("arcDegrees", "Arc °") : number("coneDegrees", "Cone °")}
+          {number("shots", "Shots", help.HELP_PATTERN_SHOTS)}
+          {kind === "spread" ? number("arcDegrees", "Arc °", help.HELP_PATTERN_ARC) : number("coneDegrees", "Cone °", help.HELP_PATTERN_CONE)}
           <label>
             <span>Aim</span>
             <select
@@ -483,12 +551,13 @@ function AttackEditor({
                 </option>
               ))}
             </select>
+            <HelpMark text={help.HELP_PATTERN_AIM} />
           </label>
-          {pattern.aim === "front" && number("offsetDegrees", "Offset °")}
-          {pattern.aim === "fixed" && number("fixedBearingDegrees", "Bearing °")}
+          {pattern.aim === "front" && number("offsetDegrees", "Offset °", help.HELP_PATTERN_OFFSET)}
+          {pattern.aim === "fixed" && number("fixedBearingDegrees", "Bearing °", help.HELP_PATTERN_BEARING)}
         </>
       )}
-      {number("emitterRadiusTiles", "Emitter radius (tiles)")}
+      {number("emitterRadiusTiles", "Emitter radius (tiles)", help.HELP_EMITTER_RADIUS)}
       <label>
         <input
           type="checkbox"
@@ -499,6 +568,7 @@ function AttackEditor({
           }
         />
         Lands on the player (bombs only)
+        <HelpMark text={help.HELP_TARGET_PLAYER} />
       </label>
       {(
         [
@@ -508,26 +578,30 @@ function AttackEditor({
           ["initialDelaySeconds", "Initial delay (s)"],
         ] as const
       ).map(([key, label]) => (
-        <CommitInput
-          key={key}
-          label={`${label} of ${attack.id}`}
-          caption={label}
-          value={String(attack.cadence[key])}
-          step="any"
-          onCommit={(text) =>
-            text.trim() !== "" && apply({ field: "cadence", key, value: Number(text) })
-          }
-        />
+        <Fragment key={key}>
+          <CommitInput
+            label={`${label} of ${attack.id}`}
+            caption={label}
+            value={String(attack.cadence[key])}
+            step="any"
+            onCommit={(text) =>
+              text.trim() !== "" && apply({ field: "cadence", key, value: Number(text) })
+            }
+          />
+          <HelpMark text={CADENCE_HELP[key]} />
+        </Fragment>
       ))}
       {readOnly.length > 0 && (
         <p className={styles.note}>
           Read-only, kept on export:{" "}
           {readOnly.map((key) => `${key} = ${JSON.stringify(pattern[key])}`).join("; ")}
+          <HelpMark text={help.HELP_READ_ONLY_FIELDS} />
         </p>
       )}
       <button type="button" onClick={onDelete}>
         {confirmingDelete ? "Confirm delete" : "Delete"}
       </button>
+      <HelpMark text={help.HELP_DELETE_ATTACK} />
       {confirmingDelete && (
         <button type="button" onClick={onCancelDelete}>
           Cancel

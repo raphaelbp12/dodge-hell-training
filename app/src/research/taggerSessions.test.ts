@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ENCOUNTER_CONFIG } from "../game/config/encounter";
+import { ENCOUNTER_CONFIG, encounterConfigOf } from "../game/config/encounter";
 import {
   buildDraft,
   restoreSticky,
@@ -187,7 +187,7 @@ test("buildDraft carries sticky selection and a null frame rate", () => {
 
 describe("restoreSticky", () => {
   test("keeps valid values", () => {
-    expect(restoreSticky(STICKY, ENCOUNTER_CONFIG)).toEqual({
+    expect(restoreSticky(STICKY, ENCOUNTER_CONFIG, ENCOUNTER_CONFIG.primaryArchetypeId)).toEqual({
       sticky: STICKY,
       notices: [],
     });
@@ -196,7 +196,7 @@ describe("restoreSticky", () => {
   test("falls back with a notice per missing value", () => {
     const result = restoreSticky(
       { ...STICKY, spriteId: "gone", phaseIndex: 99 },
-      ENCOUNTER_CONFIG,
+      ENCOUNTER_CONFIG, ENCOUNTER_CONFIG.primaryArchetypeId,
     );
     expect(result.sticky.spriteId).toBe(appearanceOptions()[0].id);
     expect(result.sticky.phaseIndex).toBe(0);
@@ -254,12 +254,12 @@ describe("draft version 2 (plan V16 S05)", () => {
   test("a missing chosen attack is cleared with a notice", () => {
     const restored = restoreSticky(
       { ...STICKY, savedAttackId: "gone" },
-      ENCOUNTER_CONFIG,
+      ENCOUNTER_CONFIG, ENCOUNTER_CONFIG.primaryArchetypeId,
       [attack],
     );
     expect(restored.sticky).not.toHaveProperty("savedAttackId");
     expect(restored.notices).toContain("attack-missing");
-    const kept = restoreSticky({ ...STICKY, savedAttackId: "a1" }, ENCOUNTER_CONFIG, [attack]);
+    const kept = restoreSticky({ ...STICKY, savedAttackId: "a1" }, ENCOUNTER_CONFIG, ENCOUNTER_CONFIG.primaryArchetypeId, [attack]);
     expect(kept.sticky.savedAttackId).toBe("a1");
     expect(kept.notices).not.toContain("attack-missing");
   });
@@ -310,5 +310,15 @@ describe("V18 monster slots", () => {
   test("a malformed draft is rejected", () => {
     const bad = { ...draft("a.mp4"), study: { ...study(), monsterDraft: { phases: 1, anchors: {} } } };
     expect(() => validateSessionDraft(bad)).toThrow(/monsterDraft/);
+  });
+});
+
+describe("restoreSticky for a minion (J23)", () => {
+  const QUEEN_CONFIG = encounterConfigOf("killer-bee-queen");
+  test("a phase index beyond the minion's phases falls back to phase 0", () => {
+    const result = restoreSticky({ ...STICKY, phaseIndex: 3 }, QUEEN_CONFIG, "red-killer-bee");
+    expect(result.sticky.phaseIndex).toBe(0);
+    expect(result.notices).toEqual(["phase-missing"]);
+    expect(restoreSticky({ ...STICKY, phaseIndex: 1 }, QUEEN_CONFIG, "killer-bee-nest-red").sticky.phaseIndex).toBe(1);
   });
 });
