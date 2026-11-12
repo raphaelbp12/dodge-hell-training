@@ -441,3 +441,53 @@
   align-items: baseline;
   gap: 0.25em;
 }
+
+.glossaryDialog {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: min(80vh, 40rem);
+  padding: 1rem 1.25rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  overflow-y: auto;
+  background: Canvas;
+  color: CanvasText;
+}
+
+.glossaryDialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.glossaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.glossaryHeader h2 {
+  margin: 0;
+}
+
+.glossaryList {
+  margin: 0;
+}
+
+.glossaryEntry {
+  padding-block: 0.6rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.glossaryEntry dt {
+  margin: 0 0 0.2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.glossaryEntry dd {
+  margin: 0;
+  font-weight: 400;
+  opacity: 0.8;
+  line-height: 1.45;
+}

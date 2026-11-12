@@ -69,6 +69,7 @@ import {
   videoChoiceDecision,
   encounterChangeDecision,
 } from "./studyLoad";
+import { GlossaryPanel } from "./GlossaryPanel";
 import { HelpMark } from "./HelpMark";
 import * as help from "./helpText";
 import { DraftPanel } from "./DraftPanel";
@@ -1349,6 +1350,7 @@ export function TaggerRoute() {
           Tag spawns at the presented frame. The video is never uploaded or
           committed.
         </p>
+        <GlossaryPanel />
       </header>
 
       {confirmation && (
