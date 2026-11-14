@@ -1,5 +1,5 @@
 /**
- * Pure study-file parsing and the load/video-choice decisions for the dev-only
+ * Pure study-file parsing and the load/video-choice decisions for the
  * tagger (plan V13 phase 44). No React, DOM or video API here.
  */
 import {

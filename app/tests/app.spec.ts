@@ -1097,6 +1097,7 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     id: 1,
     archetypeId: "crystal-worm-child-head",
     positionTiles: reset.enemies[0].positionTiles,
+    headingRadians: 0,
     spawnedAtSeconds: 0,
     attackClocks: [
       {
@@ -2738,6 +2739,22 @@ test("the Killer Bee Queen plays a bomb detonation effect", async ({
   expect(afterCleanup.bombExplosionsActive).toBe(0);
   expect(afterCleanup.phase).toBe("playing");
   expect(afterCleanup.player.healthHp).toBeGreaterThan(0);
+});
+
+test("production assets serve the tagger under the Pages project path", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const tagger = page.getByRole("heading", { name: / tagger$/, level: 1 });
+  const response = await page.goto("./?tagger=1");
+  expect(response?.ok()).toBe(true);
+  expect(new URL(page.url()).pathname).toBe("/dodge-hell-training/");
+  await expect(tagger).toBeVisible();
+  await page.goto("./");
+  await page.getByRole("link", { name: "Video tagger", exact: true }).click();
+  await expect(tagger).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test("the tagger preview panel shows, resizes and persists without a video", async ({

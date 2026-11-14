@@ -1,5 +1,5 @@
 /**
- * Hover help for the dev-only tagger (plan V19 J11-J13). Each text is a plain
+ * Hover help for the tagger (plan V19 J11-J13). Each text is a plain
  * sentence about what the tagger itself does, drawn from the tagger guide. No
  * text makes a claim about the game being recreated. Pure: no React, DOM or
  * storage, so the panels and their tests share the same constants.

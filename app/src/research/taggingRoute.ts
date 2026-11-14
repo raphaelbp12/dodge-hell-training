@@ -1,5 +1,5 @@
 /**
- * Pure helpers for the dev-only tagger route (T13/T14).
+ * Pure helpers for the tagger route (T13/T14).
  *
  * They live outside the React component so the query-string convention,
  * frame-step arithmetic, key map and provenance assembly are unit-testable

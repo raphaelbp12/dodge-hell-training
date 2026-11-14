@@ -1,5 +1,5 @@
 /**
- * Pure monster helpers for the dev-only tagger (plan V18 phase 74, trimmed by
+ * Pure monster helpers for the tagger (plan V18 phase 74, trimmed by
  * plan V20 steps 86.5 and 88.2): the monsters an encounter reaches, a
  * monster's blocks, the path of its file, and validated edits to one attack.
  * The monster file text now comes from `studyExport.ts`. No React, DOM,

@@ -24,7 +24,7 @@ export function Footer() {
         </a>
         <a href="https://www.realmofthemadgod.com/">Realm of the Mad God</a>
         <a href={REPOSITORY_URL}>Source code</a>
-        {import.meta.env.DEV && <a href="?tagger=1">Video tagger (dev)</a>}
+        <a href="?tagger=1">Video tagger</a>
       </nav>
       <p className={styles.build}>
         {commit ? (

@@ -1,5 +1,5 @@
 /**
- * Pure timeline preview for the dev-only tagger (plan V18 phase 75, plan V20
+ * Pure timeline preview for the tagger (plan V18 phase 75, plan V20
  * step 86.4): the volleys of a cadence inside a segment window, and one
  * preview frame of a study's tracks, observed or fitted. It runs no simulation
  * and owns no clock; the video's `mediaTime` is the only time it reads (M01, L32).
