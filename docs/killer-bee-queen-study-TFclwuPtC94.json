@@ -1,0 +1,1910 @@
+{
+  "schemaVersion": 5,
+  "encounterId": "killer-bee-queen",
+  "archetypeId": "killer-bee-queen",
+  "recordedAt": "2026-11-14T12:34:50.053Z",
+  "provenance": {
+    "sourceUrl": null,
+    "fileName": "killer-bee-queen-solo-nest-TFclwuPtC94.mp4",
+    "frameRate": 30,
+    "durationSeconds": 565.7
+  },
+  "boundaries": [
+    {
+      "timeSeconds": 301.133333,
+      "segmentId": "phase-1-honey-pond/circle-room",
+      "telegraphEndSeconds": 301.166667
+    },
+    {
+      "timeSeconds": 314.533333,
+      "segmentId": "phase-2-color-chase/yellow",
+      "telegraphEndSeconds": 316.3
+    },
+    {
+      "timeSeconds": 324.5,
+      "segmentId": "phase-2-color-chase/red",
+      "telegraphEndSeconds": 326.3
+    },
+    {
+      "timeSeconds": 334.366667,
+      "segmentId": "phase-2-color-chase/yellow",
+      "telegraphEndSeconds": 336.2
+    },
+    {
+      "timeSeconds": 340.833333,
+      "segmentId": "phase-3-pond-barrage",
+      "telegraphEndSeconds": 342.3
+    },
+    {
+      "timeSeconds": 358.833333,
+      "segmentId": "phase-4-glaive-circle",
+      "telegraphEndSeconds": 361.9
+    },
+    {
+      "timeSeconds": 370.366667,
+      "segmentId": "phase-5-color-return/red",
+      "telegraphEndSeconds": 375.6
+    },
+    {
+      "timeSeconds": 386.7,
+      "segmentId": "phase-5-color-return/yellow",
+      "telegraphEndSeconds": 388.933333
+    },
+    {
+      "timeSeconds": 395.433333,
+      "segmentId": "phase-6-nests",
+      "telegraphEndSeconds": 399.5
+    },
+    {
+      "timeSeconds": 428.566667,
+      "segmentId": "phase-7-beehemoths/blue",
+      "telegraphEndSeconds": 433.566667
+    },
+    {
+      "timeSeconds": 450.933333,
+      "segmentId": "phase-7-beehemoths/red",
+      "telegraphEndSeconds": 454.166667
+    },
+    {
+      "timeSeconds": 471.166667,
+      "segmentId": "phase-7-beehemoths/blue",
+      "telegraphEndSeconds": 474.433333
+    },
+    {
+      "timeSeconds": 491.4,
+      "segmentId": "phase-7-beehemoths/yellow",
+      "telegraphEndSeconds": 495.933333
+    },
+    {
+      "timeSeconds": 498.666667,
+      "segmentId": "phase-8-final",
+      "telegraphEndSeconds": 499.7
+    }
+  ],
+  "statusSpans": [
+    {
+      "kind": "invulnerable",
+      "inSeconds": 301.133333,
+      "outSeconds": 305.2
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 314.533333,
+      "outSeconds": 317.733333
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 324.5,
+      "outSeconds": 327.666667
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 334.366667,
+      "outSeconds": 337.566667
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 340.833333,
+      "outSeconds": 345.7
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 358.833333,
+      "outSeconds": 361.266667
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 370.366667,
+      "outSeconds": 376.633333
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 386.7,
+      "outSeconds": 388.933333
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 395.433333,
+      "outSeconds": 435.566667
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 450.933333,
+      "outSeconds": 455.933333
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 471.166667,
+      "outSeconds": 476.2
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 491.4,
+      "outSeconds": 497.866667
+    },
+    {
+      "kind": "invulnerable",
+      "inSeconds": 498.666667,
+      "outSeconds": 500.733333
+    }
+  ],
+  "tracks": [
+    {
+      "id": "blue-bomb-ring",
+      "location": {
+        "phaseId": "phase-1-honey-pond",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "blue-bomb-ring",
+        "projectile": "blue-bomb",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": [
+        {
+          "timeSeconds": 301.2,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 302,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 302.8,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 303.633333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 304.466667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 305.266667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 306.1,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 306.9,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 307.7,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 308.5,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 309.233333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 310.1,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 310.9,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 311.733333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 312.533333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 313.333333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 314.2,
+          "kind": "volley"
+        }
+      ]
+    },
+    {
+      "id": "white-bomb-targeted",
+      "location": {
+        "phaseId": "phase-1-honey-pond",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "white-bomb-targeted",
+        "projectile": "white-bomb-v1",
+        "tuningSource": "trainer-authored",
+        "target": "player",
+        "pattern": {
+          "kind": "spread",
+          "shots": 1,
+          "arcDegrees": 0,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.1,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": [
+        {
+          "timeSeconds": 301.2,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 304.266667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 307.166667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 310.3,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 313.366667,
+          "kind": "volley"
+        }
+      ]
+    },
+    {
+      "id": "red-stinger-spread",
+      "location": {
+        "phaseId": "phase-1-honey-pond",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "red-stinger-spread",
+        "projectile": "red-stinger-large-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 30,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.75,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": [
+        {
+          "timeSeconds": 301.166667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 305.233333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 307.266667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 309.233333,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 311.266667,
+          "kind": "volley"
+        },
+        {
+          "timeSeconds": 313.333333,
+          "kind": "volley"
+        }
+      ]
+    },
+    {
+      "id": "blue-stinger-spread",
+      "location": {
+        "phaseId": "phase-1-honey-pond",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "blue-stinger-spread",
+        "projectile": "blue-stinger-large",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 30,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.75,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-stinger-spread",
+      "location": {
+        "phaseId": "phase-1-honey-pond",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "yellow-stinger-spread",
+        "projectile": "yellow-stinger-small-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 30,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.75,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-stinger-spread-2",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-stinger-spread",
+        "projectile": "red-stinger-small",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 40,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.7,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-stinger-large-directed",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-stinger-large-directed",
+        "projectile": "red-stinger-large-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 1,
+          "arcDegrees": 0,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-bomb-ring",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-bomb-ring",
+        "projectile": "red-bomb-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 3.4,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-stinger-large-directed",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-stinger-large-directed",
+        "projectile": "blue-stinger-large",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 1,
+          "arcDegrees": 0,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-stinger-spiral",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-stinger-spiral",
+        "projectile": "blue-stinger-small-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 2,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 60
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.85,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-ball-scatter",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-ball-scatter",
+        "projectile": "blue-ball-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "scatter",
+          "shots": 10,
+          "coneDegrees": 360,
+          "aim": "fixed",
+          "fixedBearingDegrees": 0,
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.7,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-bomb-ring-2",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-bomb-ring",
+        "projectile": "blue-bomb",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 3.4,
+          "initialDelaySeconds": 2.12
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-stinger-spread-2",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-stinger-spread",
+        "projectile": "yellow-stinger-large",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 40,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.7,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-ball-spiral",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-ball-spiral",
+        "projectile": "yellow-ball-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 3,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": -50
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "white-bomb-ring",
+      "location": {
+        "phaseId": "phase-2-color-chase",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "white-bomb-ring",
+        "projectile": "white-bomb-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 12,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 3.4,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-ball-spiral-cw",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "blue-ball-spiral-cw",
+        "projectile": "blue-ball-v2",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 3,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 37.5
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.4,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-ball-spiral-ccw",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "blue-ball-spiral-ccw",
+        "projectile": "blue-ball-v2",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 3,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 60,
+          "clockwiseDegreesPerSecond": -37.5
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.4,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-ball-spiral-cw",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "red-ball-spiral-cw",
+        "projectile": "red-ball",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 2,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 40
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.4,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-ball-ring-frequent",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "yellow-ball-ring-frequent",
+        "projectile": "yellow-ball-v1",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.5,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "bee-shot-burst-occasional",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "bee-shot-burst-occasional",
+        "projectile": "bee-shot",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 3.04,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "white-bomb-compass-ring",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "white-bomb-compass-ring",
+        "projectile": "white-bomb-v1",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 3.23,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-glaive-wave",
+      "location": {
+        "phaseId": "phase-3-pond-barrage",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "red-glaive-wave",
+        "projectile": "red-glaive-v1",
+        "tuningSource": "video-observation",
+        "pattern": {
+          "kind": "ring",
+          "arms": 60,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 6.02,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-glaive-spread-ring",
+      "location": {
+        "phaseId": "phase-4-glaive-circle",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "yellow-glaive-spread-ring",
+        "projectile": "yellow-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0,
+          "perBurstAdvanceDegrees": 7
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.3,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-glaive-spread-ring",
+      "location": {
+        "phaseId": "phase-4-glaive-circle",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "red-glaive-spread-ring",
+        "projectile": "red-glaive-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 30,
+          "clockwiseDegreesPerSecond": 0,
+          "perBurstAdvanceDegrees": 11
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.3,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-glaive-spread-ring",
+      "location": {
+        "phaseId": "phase-4-glaive-circle",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "blue-glaive-spread-ring",
+        "projectile": "blue-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 60,
+          "clockwiseDegreesPerSecond": 0,
+          "perBurstAdvanceDegrees": 13
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.3,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "hive-spiral-shot-shotgun",
+      "location": {
+        "phaseId": "phase-4-glaive-circle",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "hive-spiral-shot-shotgun",
+        "projectile": "hive-spiral-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 20,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-ball-stream-scatter",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-ball-stream-scatter",
+        "projectile": "red-ball",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "scatter",
+          "shots": 6,
+          "coneDegrees": 150,
+          "aim": "fixed",
+          "fixedBearingDegrees": 0,
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.05,
+          "initialDelaySeconds": 0.42
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-glaive-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-glaive-ring",
+        "projectile": "red-glaive-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-hive-spiral-shotgun",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-hive-spiral-shotgun",
+        "projectile": "hive-spiral-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 20,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-stinger-large-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-stinger-large-ring",
+        "projectile": "red-stinger-large-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 22.5,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 2.55
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-ball-all-directions-scatter",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-ball-all-directions-scatter",
+        "projectile": "blue-ball-v3",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "scatter",
+          "shots": 12,
+          "coneDegrees": 360,
+          "aim": "fixed",
+          "fixedBearingDegrees": 0,
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.05,
+          "initialDelaySeconds": 0.42
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-glaive-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-glaive-ring",
+        "projectile": "blue-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-stinger-small-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-stinger-small-ring",
+        "projectile": "blue-stinger-small-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.4,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-hive-range-shotgun",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-hive-range-shotgun",
+        "projectile": "hive-range-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 5,
+          "arcDegrees": 60,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 2.55
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-bee-shot-spiral",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-bee-shot-spiral",
+        "projectile": "bee-shot",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 2,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": -40
+        },
+        "cadence": {
+          "shotsPerBurst": 3,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.4,
+          "initialDelaySeconds": 0.42
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-glaive-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-glaive-ring",
+        "projectile": "yellow-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.4,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-stinger-large-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-stinger-large-ring",
+        "projectile": "yellow-stinger-large",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-hive-shot-ring",
+      "location": {
+        "phaseId": "phase-5-color-return",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-hive-shot-ring",
+        "projectile": "hive-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 45,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.8,
+          "initialDelaySeconds": 2.55
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "stinger-machinegun",
+      "location": {
+        "phaseId": "phase-6-nests",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "stinger-machinegun",
+        "projectile": "red-stinger-small",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 2,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 90,
+          "clockwiseDegreesPerSecond": 12,
+          "gapSectorsDegrees": [
+            [
+              90,
+              180
+            ],
+            [
+              270,
+              0
+            ]
+          ],
+          "armSpreadDegreesPerSecond": 15,
+          "maxArmSpreadDegrees": 45
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.1,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "slowing-bee-spiral",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "slowing-bee-spiral",
+        "projectile": "bee-shot",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 1,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 40
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.36,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-ball-spiral-2",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-ball-spiral",
+        "projectile": "yellow-ball-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 1,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 90,
+          "clockwiseDegreesPerSecond": -40
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.36,
+          "initialDelaySeconds": 0.17
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-stinger-burst",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-stinger-burst",
+        "projectile": "yellow-stinger-large",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.7,
+          "initialDelaySeconds": 0.42
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "yellow-blast-burst",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "yellow-blast-burst",
+        "projectile": "hive-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 30,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.7,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "white-bomb-advance",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "yellow"
+      },
+      "attack": {
+        "id": "white-bomb-advance",
+        "projectile": "white-bomb-v2",
+        "tuningSource": "wiki-prose",
+        "pattern": {
+          "kind": "ring",
+          "arms": 4,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0,
+          "perBurstAdvanceDegrees": 15
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.5,
+          "initialDelaySeconds": 1.5
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-ball-ring",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-ball-ring",
+        "projectile": "red-ball",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "hive-spiral-ring",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "hive-spiral-ring",
+        "projectile": "hive-spiral-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 30,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 0.64
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-stinger-wide-spread",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-stinger-wide-spread",
+        "projectile": "red-stinger-large-v3",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 5,
+          "arcDegrees": 90,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "red-bomb-ring-2",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "red"
+      },
+      "attack": {
+        "id": "red-bomb-ring",
+        "projectile": "red-bomb-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 60,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.7,
+          "initialDelaySeconds": 1.91
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-glaive-spiral",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-glaive-spiral",
+        "projectile": "blue-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 2,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 50
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 0.43,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-ball-ring",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-ball-ring",
+        "projectile": "blue-ball-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 8,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 0.42
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-stinger-small-spread",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-stinger-small-spread",
+        "projectile": "blue-stinger-small-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 30,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "blue-stinger-large-spread",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "blue-stinger-large-spread",
+        "projectile": "blue-stinger-large",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "spread",
+          "shots": 3,
+          "arcDegrees": 30,
+          "aim": "player",
+          "emitterRadiusTiles": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 1.28,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "hive-range-ring",
+      "location": {
+        "phaseId": "phase-7-beehemoths",
+        "subPhaseId": "blue"
+      },
+      "attack": {
+        "id": "hive-range-ring",
+        "projectile": "hive-range-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 12,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.12,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-red-stinger-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-red-stinger-burst",
+        "projectile": "red-stinger-large-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 0,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 0
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-yellow-stinger-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-yellow-stinger-burst",
+        "projectile": "yellow-stinger-small-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 30,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 0.42
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-blue-ball-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-blue-ball-burst",
+        "projectile": "blue-ball-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 60,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 0.85
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-hive-range-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-hive-range-burst",
+        "projectile": "hive-range-shot-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 90,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 1.27
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-yellow-glaive-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-yellow-glaive-burst",
+        "projectile": "yellow-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 120,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 1.7
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-red-glaive-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-red-glaive-burst",
+        "projectile": "red-glaive-v2",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 150,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 2.12
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    },
+    {
+      "id": "final-blue-glaive-burst",
+      "location": {
+        "phaseId": "phase-8-final",
+        "subPhaseId": null
+      },
+      "attack": {
+        "id": "final-blue-glaive-burst",
+        "projectile": "blue-glaive-v1",
+        "tuningSource": "trainer-authored",
+        "pattern": {
+          "kind": "ring",
+          "arms": 6,
+          "emitterRadiusTiles": 0,
+          "initialPhaseDegrees": 180,
+          "clockwiseDegreesPerSecond": 0
+        },
+        "cadence": {
+          "shotsPerBurst": 1,
+          "shotIntervalSeconds": 0.1,
+          "cooldownAfterLastShotSeconds": 2.55,
+          "initialDelaySeconds": 2.55
+        }
+      },
+      "cadenceSource": "authored",
+      "marks": []
+    }
+  ],
+  "scratch": [],
+  "acceptedSegmentValues": {}
+}
