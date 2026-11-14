@@ -6,7 +6,7 @@ This phase adds the pure model of a timeline study (E02-E08, E13, E16-E18) as ne
 
 ### Step 84.1 - Study Types, Segments And Windows
 
-Status: pending. Dependencies: phase 83.
+Status: complete. Dependencies: phase 83.
 
 **Implementation prompt**
 
@@ -59,7 +59,7 @@ Every function listed exists with the given signature and the tests pass. No fil
 
 ### Step 84.2 - The Cadence Fit
 
-Status: pending. Dependencies: 84.1.
+Status: complete. Dependencies: 84.1.
 
 **Implementation prompt**
 
@@ -120,7 +120,7 @@ Every function exists with its signature, the algorithm follows the seven number
 
 ### Step 84.3 - Pure Study Edits
 
-Status: pending. Dependencies: 84.2.
+Status: complete. Dependencies: 84.2.
 
 **Implementation prompt**
 
@@ -167,7 +167,7 @@ Every function exists with its signature, every refusal text is a full sentence,
 
 ### Step 84.4 - Loading A Monster And Converting Legacy Studies
 
-Status: pending. Dependencies: 84.3.
+Status: complete. Dependencies: 84.3.
 
 **Implementation prompt**
 
@@ -225,7 +225,7 @@ Every function exists with its signature, the six numbered conversion rules are 
 
 ### Step 84.5 - Warnings
 
-Status: pending. Dependencies: 84.4.
+Status: complete. Dependencies: 84.4.
 
 **Implementation prompt**
 
@@ -269,3 +269,21 @@ Failing-first tests in `app/src/research/studyWarnings.test.ts`, one per numbere
 **Acceptance**
 
 The seven rules produce the given sentences and nothing else, and the tests pass. `npm run verify` passes once at the end of the phase.
+
+## Execution Record
+
+Status: complete (2026-11-13).
+
+Added five pure modules under `app/src/research/`, each with its test file: `study.ts` (v5 types copied from the plan, `segmentIdOf`, `segmentsOfMonster`, `nextSegmentId`, `segmentWindows`, `windowsForTrack`, `windowAt`, `validateStudyV5`), `cadenceFit.ts` (`BURST_GAP_SPLIT_RATIO`, `medianOf`, `predictedVolleyTime`, `splitGaps`, `fitCadence`, `pairDetonations`), `studyEdits.ts` (every listed edit, sharing one `withTrack` helper), `studyMigrate.ts` (`tracksFromMonsterFile`, `emptyStudy`, `studyV5FromLegacy`) and `studyWarnings.ts` (`RESIDUAL_WARNING_FRAMES`, `studyWarnings`). No existing file changed; `repeat.ts`, `tagging.ts` and the tag model are untouched, nothing under `app/src/game/` changed, and `docs/killer-bee-queen-observations.json` is byte-identical.
+
+Decisions made under the user's grant of autonomy:
+
+- The Queen's file repeats five attack ids across attack lists (for example `blue-bomb-ring`), so "track id equals attack id" cannot hold with unique track ids. A repeated attack id gets a numeric suffix (`-2`, `-3`) on the track id only; the attack itself stays byte-identical so phase 88's round-trip export holds. Tracks created from legacy saved attacks and unlinked tags set `attack.id` to the track id.
+- `nextSegmentId` with null or an unknown id returns the first segment. `addBoundary` takes the latest boundary at or before the new time, so pressing `S` twice on one frame keeps cycling.
+- `windowAt` uses half-open windows, so an empty window from two equal-time boundaries never contains a time; a time exactly at the video end belongs to the last window.
+- `fitCadence` computes the residual when the fields a prediction needs are known: the shot interval is required only above one shot per burst. The prediction walk runs to the first predicted volley after the group's last mark, so the last mark's nearest prediction is fair.
+- In the legacy conversion, a typed bomb time or range moves to the track's `projectileOverride` (a bomb track only, range dropped for a targeted bomb) and the attack keeps the catalog projectile id, because the variant id `authoredAttackFromTag` writes names no catalog entry. Typed bullet speed and range have no home in a track and drop silently (rule 5). A saved attack with no linked tag is built from its own fields at the first phase; if that matches no attack it is dropped with the notice "Saved attack <name> matched no attack and was dropped." An unmatched unlinked group's notice is "<n> tags matched no attack and went to the scratch track."
+- `studyEdits` refusals added beyond the listed ones: a non-finite or negative time, an unknown track, an out-of-range boundary or span index, a blank segment or phase, a non-positive threshold or scale, a negative accepted value, and an empty or stale scratch selection. `duplicateTrack` drops the end mark and the measured ranges with the marks. Undefined withdraws a threshold, accepted value or scale.
+- `studyWarnings` lists warnings rule by rule (all of rule 4, then all of rule 5, and so on). Rule 5 allows one frame of slack before the window end. Each test file keeps its own small study fixture rather than adding a shared helper module.
+
+**Checks.** Focused: `npx vitest run` on the five new test files passed (60 tests). `npm run verify` (via the verifier subagent): lint PASS, typecheck PASS, test FAIL on exactly one test, the known pre-existing snapshot mismatch in `src/game/simulation/bomb-split-characterization.test.ts`, which also fails on a clean `main` and is unrelated (1555 of 1556 passed). The gate therefore skipped build; `npm run build` was run on its own and passed. The phase names no Playwright test and changes no interface, so none was run.

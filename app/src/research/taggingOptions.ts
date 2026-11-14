@@ -3,7 +3,6 @@
  * phase 34.3). Everything here reads `game/config/` one way (T13) and stays
  * independent of React, the DOM and the video APIs.
  */
-import type { MonsterDraft } from "./monsterDraft";
 import { phaseLabel } from "../game/config/drill";
 import {
   PROJECTILE_APPEARANCES,
@@ -15,7 +14,6 @@ import {
   groupKey,
   TAG_ATTACK_FIELD_KEYS,
   validateObservationExport,
-  type IntervalSummary,
   type ObservationExport,
   type SavedAttack,
   type StoredTag,
@@ -25,6 +23,7 @@ import {
   type TagAttackFields,
   type TagPattern,
   type VideoProvenance,
+  type MonsterDraft,
 } from "./tagging";
 
 export type AppearanceOption = Readonly<{
@@ -648,53 +647,12 @@ export function assembleExport(input: {
   }) as ObservationExport;
 }
 
-export type SummaryRow = Readonly<{
-  phase: string;
-  sprite: string;
-  pattern: string;
-  aim: string;
-  armPattern: string;
-  /** V16 S14: "player" for a targeted bomb throw, else a dash. */
-  target: string;
-  /** V16 S46: the saved attack's name, else a dash. */
-  attack: string;
-  scope: string;
-  sampleCount: number;
-  mean: string;
-  deviation: string;
-  intervals: string;
-}>;
 
-/**
- * Z11: display strings for one summary result. An unknown phase index shows
- * raw; an empty interval list shows an em dash.
- */
-export function formatSummaryRow(
-  summary: IntervalSummary,
-  phases: readonly PhaseOption[],
-  savedAttacks: readonly SavedAttack[] = [],
-): SummaryRow {
-  const phase = phases.find((option) => option.index === summary.phaseIndex);
-  const seconds = (value: number) => `${value.toFixed(3)} s`;
-  return {
-    phase: phase ? phase.label : String(summary.phaseIndex),
-    sprite: summary.spriteId,
-    pattern: summary.pattern,
-    aim: summary.aim ?? "—",
-    armPattern: summary.armPattern ?? "—",
-    target: summary.target ?? "—",
-    attack:
-      summary.savedAttackId === undefined
-        ? "—"
-        : (savedAttacks.find((entry) => entry.id === summary.savedAttackId)?.name ??
-          summary.savedAttackId),
-    scope: summary.scope,
-    sampleCount: summary.sampleCount,
-    mean: summary.sampleCount === 0 ? "—" : seconds(summary.meanSeconds),
-    deviation: summary.sampleCount === 0 ? "—" : seconds(summary.stdevSeconds),
-    intervals:
-      summary.intervalsSeconds.length === 0
-        ? "—"
-        : summary.intervalsSeconds.map((value) => value.toFixed(3)).join(", "),
-  };
+
+/** Only the attack fields of a tag or saved attack, in a stable shape. */
+export function attackFieldsOf(source: TagAttackFields): TagAttackFields {
+  const fields: Record<string, unknown> = {};
+  for (const key of TAG_ATTACK_FIELD_KEYS)
+    if (source[key] !== undefined) fields[key] = source[key];
+  return conformAttackFields(fields as unknown as TagAttackFields);
 }

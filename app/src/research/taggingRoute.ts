@@ -47,17 +47,33 @@ export type TaggerAction =
     }>
   | Readonly<{ kind: "jump"; direction: -1 | 1; seconds: number }>
   | Readonly<{ kind: "play-pause" }>
-  | Readonly<{ kind: "record"; mode: "standalone" | "new-burst" | "continue-burst" }>
-  | Readonly<{ kind: "set-shots"; shots: number }>
+  | Readonly<{ kind: "record" }>
+  | Readonly<{ kind: "boundary" }>
+  | Readonly<{ kind: "telegraph-end" }>
+  | Readonly<{ kind: "invulnerable" }>
+  | Readonly<{ kind: "end-mark" }>
+  | Readonly<{ kind: "detonation" }>
+  | Readonly<{ kind: "remove-mark" }>
+  /** 1-9 is the attack track at that position; 0 is the scratch track. */
+  | Readonly<{ kind: "select-track"; position: number }>
   | Readonly<{ kind: "step-volley"; direction: -1 | 1 }>;
+
+const LETTER_ACTIONS: Readonly<Record<string, TaggerAction>> = {
+  s: { kind: "boundary" },
+  t: { kind: "telegraph-end" },
+  i: { kind: "invulnerable" },
+  x: { kind: "end-mark" },
+  e: { kind: "detonation" },
+};
 
 /**
  * The one key map the route binds: arrows step one frame, Shift+arrows jump
- * five seconds, PageUp/PageDown jump thirty, space toggles playback, Enter
- * records a standalone tag, B records a volley that starts a new burst, Shift+Enter
- * adds a volley to the latest matching burst, 1-9 set the sticky shot count, and [ and ] seek to the
- * previous and next volley (V16 S17; no frame rate needed). Everything else belongs to the
- * browser or another control.
+ * five seconds, PageUp/PageDown jump thirty, space toggles playback, and [
+ * and ] seek to the previous and next volley (V16 S17; no frame rate needed).
+ * Plan V20 E10: Enter adds a volley mark, E a detonation mark, S a boundary,
+ * T a telegraph end, I opens or closes an invulnerable span, X sets the end
+ * mark, Delete or Backspace removes a mark, 1-9 select an attack track and 0
+ * the scratch track. Everything else belongs to the browser or another control.
  */
 export function actionForKey(
   key: string,
@@ -87,12 +103,11 @@ export function actionForKey(
   if (key === "[") return { kind: "step-volley", direction: -1 };
   if (key === "]") return { kind: "step-volley", direction: 1 };
   if (key === " ") return { kind: "play-pause" };
-  if (key === "Enter" && shiftKey)
-    return { kind: "record", mode: "continue-burst" };
-  if (key === "Enter") return { kind: "record", mode: "standalone" };
-  if (key === "b" || key === "B") return { kind: "record", mode: "new-burst" };
-  if (/^[1-9]$/.test(key)) return { kind: "set-shots", shots: Number(key) };
-  return null;
+  if (key === "Enter") return shiftKey ? null : { kind: "record" };
+  if (key === "Delete" || key === "Backspace") return { kind: "remove-mark" };
+  if (/^[0-9]$/.test(key)) return { kind: "select-track", position: Number(key) };
+  const letter = LETTER_ACTIONS[key.toLowerCase()];
+  return key.length === 1 && letter ? letter : null;
 }
 
 export type KeyTarget = Readonly<{

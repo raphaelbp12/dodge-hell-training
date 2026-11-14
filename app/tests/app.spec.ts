@@ -2755,7 +2755,7 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
       frameRate: 30,
       durationSeconds: 60,
     },
-    recordedAt: "2026-11-05",
+    recordedAt: "2026-11-05T12:00:00.000Z",
     tags: [
       {
         timeSeconds: 10,
@@ -2771,7 +2771,7 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(study)),
   });
-  const tagStep = page.getByRole("button", { name: /^Tag volleys/ });
+  const tagStep = page.getByRole("button", { name: /^Attacks/ });
   await tagStep.click();
   const canvas = page.getByLabel("Tag preview canvas");
   const side = async () => {
@@ -2779,7 +2779,7 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
     return [Math.round(box.width), Math.round(box.height)];
   };
   await expect(canvas).toBeVisible();
-  expect(await side()).toEqual([480, 480]);
+  await expect.poll(side).toEqual([480, 480]);
   await expect(page.getByText("Open a video to see the preview")).toBeVisible();
 
   await page.getByRole("button", { name: "Hide preview" }).click();
@@ -2788,9 +2788,9 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
   await expect(canvas).toBeVisible();
 
   await page.getByRole("button", { name: "Small", exact: true }).click();
-  expect(await side()).toEqual([320, 320]);
+  await expect.poll(side).toEqual([320, 320]);
   await page.getByRole("button", { name: "Large", exact: true }).click();
-  expect(await side()).toEqual([720, 720]);
+  await expect.poll(side).toEqual([720, 720]);
 
   await page.getByRole("button", { name: "Video size large" }).click();
   await page.getByRole("button", { name: "Hide preview" }).click();
@@ -2801,73 +2801,52 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
   ).toHaveAttribute("aria-pressed", "true");
   await expect(canvas).toHaveCount(0);
   await page.getByRole("button", { name: "Show preview" }).click();
-  expect(await side()).toEqual([720, 720]);
+  await expect.poll(side).toEqual([720, 720]);
 });
 
-test("the tagger records a linked repeat, ends it, tunes it and exports the saved attack", async ({
+test("the structure step marks a boundary, a telegraph end and an invulnerable span by key", async ({
   page,
 }) => {
   test.setTimeout(90_000);
   await page.goto("./?tagger=1");
   const dismiss = page.getByRole("button", { name: "Dismiss list" });
   if (await dismiss.isVisible()) await dismiss.click();
-
   await loadTestClip(page);
-  const tagStep = page.getByRole("button", { name: /^Tag volleys/ });
-  const reviewStep = page.getByRole("button", { name: /^Review tags/ });
-  await tagStep.click();
-  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: /^Structure/ }).click();
   const frameTime = async () =>
-    Number.parseFloat(
-      (await page.getByLabel("Current frame time").textContent()) ?? "0",
-    );
-  await expect.poll(frameTime).toBeGreaterThan(0.3);
+    Number.parseFloat((await page.getByLabel("Current frame time").textContent()) ?? "0");
+  const goTo = async (seconds: string) => {
+    await page.getByLabel("Go to time").fill(seconds);
+    await page.getByLabel("Go to time").press("Enter");
+    await expect.poll(frameTime).toBeGreaterThan(Number(seconds) - 0.1);
+    await expect(page.getByRole("button", { name: /^Segment starts here/ })).toBeEnabled();
+  };
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect.poll(frameTime).toBeGreaterThan(0.2);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
 
-  // A rotating arm of red balls in phase 3, saved as a named attack with a typed cadence.
-  await page.getByRole("button", { name: "red-ball", exact: true }).click();
-  await page.getByRole("combobox", { name: "Phase", exact: true }).selectOption("2");
-  await page.getByLabel("Clockwise degrees per second").fill("30");
-  await expect(page.getByRole("status", { name: "Match status" })).toContainText(
-    "Plays as",
-  );
-  await page.getByRole("button", { name: "Save as attack" }).click();
-  await page.getByLabel("Saved attack name").fill("Slow spiral");
-  await page.getByLabel("Saved attack cooldown in seconds").fill("0.4");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const structure = page.getByRole("region", { name: "Structure" });
+  await goTo("0.5");
+  await page.keyboard.press("s");
+  await expect(structure.getByRole("combobox", { name: /^Segment of boundary/ })).toHaveCount(1);
+  await goTo("1");
+  await page.keyboard.press("t");
+  await expect(structure.getByRole("cell", { name: /s, \d+ frames/ })).toBeVisible();
+  await page.keyboard.press("i");
+  await expect(structure.getByRole("button", { name: /Invulnerable ends here/ })).toBeVisible();
+  await goTo("1.5");
+  await page.keyboard.press("i");
+  await expect(structure.getByText(/long/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Structure/ })).toContainText("1 boundary");
 
-  await page.getByRole("button", { name: "Record tag" }).click();
-  const attackCell = page
-    .getByRole("region", { name: /^Tags/ })
-    .getByRole("cell", { name: "Slow spiral" });
-  await reviewStep.click();
-  await expect(attackCell).toBeVisible();
-  await tagStep.click();
-
-  // Move on, wait for the seeked frame, then end the repeat there.
-  await page.getByLabel("Go to time").fill("1.5");
-  await page.getByLabel("Go to time").press("Enter");
-  await expect.poll(frameTime).toBeGreaterThan(1);
-  await expect(page.getByRole("button", { name: "Record tag" })).toBeEnabled();
-  await page.getByRole("button", { name: "Start burst (B)" }).focus();
-  await page.getByRole("button", { name: "End repeat here" }).click();
-  await reviewStep.click();
-  await expect(page.getByLabel("Repeat end of tag 1")).not.toHaveValue("");
-  await expect(page.getByText(/not previewed/)).toHaveCount(0);
-
-  // Select the row and tune the saved attack's rotation rate in the preview.
-  await attackCell.click();
-  await page.getByLabel("Tune rotation rate, degrees per second").fill("45");
-  await page.getByLabel("Tune rotation rate, degrees per second").press("Enter");
-
-  await page.getByRole("button", { name: /Export tag at .* as an attack/ }).click();
-  const exported = await page.getByLabel("Attack JSON for tag 1").inputValue();
-  expect(exported).toContain('"id": "slow-spiral-tagged"');
-  expect(exported).toContain('"cooldownAfterLastShotSeconds": 0.4');
-  expect(exported).toContain('"clockwiseDegreesPerSecond": 45');
+  // E20: a click in a track's row selects that track.
+  const rows = page.getByLabel("Timeline tracks");
+  const box = (await rows.boundingBox())!;
+  await rows.click({ position: { x: box.width / 2, y: 14 * 2 + 7 } });
+  await expect(rows).not.toHaveAttribute("data-selected-row", "scratch");
 });
 
-test("the draft panel shows one phase and Starts here anchors a block", async ({
+test("the attacks step marks volleys by key, fits them and accepts the fit", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -2875,17 +2854,142 @@ test("the draft panel shows one phase and Starts here anchors a block", async ({
   const dismiss = page.getByRole("button", { name: "Dismiss list" });
   if (await dismiss.isVisible()) await dismiss.click();
   await loadTestClip(page);
-  await page.getByRole("button", { name: /^Draft monster/ }).click();
+  const frameTime = async () =>
+    Number.parseFloat((await page.getByLabel("Current frame time").textContent()) ?? "0");
+  const goTo = async (seconds: string) => {
+    await page.getByLabel("Go to time").fill(seconds);
+    await page.getByLabel("Go to time").press("Enter");
+    await expect.poll(frameTime).toBeGreaterThan(Number(seconds) - 0.1);
+    await page.waitForTimeout(600);
+  };
+  await page.getByRole("button", { name: /^Structure/ }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect.poll(frameTime).toBeGreaterThan(0.2);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await goTo("0.1");
+  await page.keyboard.press("s");
 
-  const draft = page.getByRole("region", { name: /Monster draft/ });
-  await draft.getByRole("button", { name: "Load from game" }).click();
-  await page.getByRole("combobox", { name: "Phase", exact: true }).selectOption("2");
-  // Only phase 3's block is listed; phase 2 and 4 have none shown.
-  await expect(draft.getByRole("heading", { level: 3 })).toHaveCount(1);
-  const startsHere = draft.getByRole("button", { name: /^Starts here: / });
-  await expect(startsHere).toHaveCount(1);
-  await startsHere.click();
-  await expect(draft.getByLabel(/^Anchor of /)).toHaveCount(1);
+  await page.getByRole("button", { name: /^Attacks/ }).click();
+  await page.getByRole("heading", { name: "Attack tracks" }).click();
+  await page.keyboard.press("1");
+  const tracks = page.getByRole("list", { name: "Attack tracks" });
+  await expect(tracks.getByRole("button").first()).toHaveAttribute("aria-pressed", "true");
+  const marks = page.getByRole("table", { name: /^Marks of / });
+  for (const time of ["0.5", "1", "1.5"]) {
+    await goTo(time);
+    await page.keyboard.press("Enter");
+  }
+  await expect(marks.getByRole("row")).toHaveCount(4);
+  await expect(page.getByText(/^3 volleys/)).toBeVisible();
+  await page.keyboard.press("x");
+  await expect(page.getByText(/^End mark at 1\.\d{3} s/)).toBeVisible();
+  await page.keyboard.press("Delete");
+  await expect(marks.getByRole("row")).toHaveCount(3);
+  await page.getByRole("button", { name: "Accept all" }).click();
+  await expect(tracks.getByRole("button").first()).toContainText("fitted");
+  await expect(page.getByRole("button", { name: /^Attacks/ })).toContainText("2 marks on 1 tracks");
+});
+
+test.describe("timeline tagger", () => {
+  test("boundaries, marks and a span are recorded by key, and Reconcile copies the monster file", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(120_000);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("./?tagger=1");
+    const dismiss = page.getByRole("button", { name: "Dismiss list" });
+    if (await dismiss.isVisible()) await dismiss.click();
+    await loadTestClip(page);
+    const frameTime = async () =>
+      Number.parseFloat((await page.getByLabel("Current frame time").textContent()) ?? "0");
+    const goTo = async (seconds: string) => {
+      await page.getByLabel("Go to time").fill(seconds);
+      await page.getByLabel("Go to time").press("Enter");
+      await expect.poll(frameTime).toBeGreaterThan(Number(seconds) - 0.1);
+      await page.waitForTimeout(600);
+    };
+    await page.getByRole("button", { name: /^Structure/ }).click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expect.poll(frameTime).toBeGreaterThan(0.2);
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+
+    const structure = page.getByRole("region", { name: "Structure" });
+    for (const time of ["0.2", "0.4"]) {
+      await goTo(time);
+      await page.keyboard.press("s");
+    }
+    await expect(structure.getByRole("combobox", { name: /^Segment of boundary/ })).toHaveCount(2);
+
+    await page.getByRole("button", { name: /^Attacks/ }).click();
+    await page.getByRole("heading", { name: "Attack tracks" }).click();
+    await page.keyboard.press("1");
+    for (const time of ["0.8", "1.2", "1.6"]) {
+      await goTo(time);
+      await page.keyboard.press("Enter");
+    }
+    await expect(page.getByRole("table", { name: /^Marks of / }).getByRole("row")).toHaveCount(4);
+    await expect(page.getByRole("button", { name: /^Attacks/ })).toContainText("3 marks on 1 tracks");
+
+    await page.getByRole("button", { name: /^Structure/ }).click();
+    await goTo("2");
+    await page.keyboard.press("i");
+    await goTo("2.4");
+    await page.keyboard.press("i");
+    await expect(structure.getByText(/long/)).toHaveCount(1);
+
+    await page.getByRole("button", { name: /^Reconcile/ }).click();
+    const reconcile = page.getByRole("region", { name: "Reconcile" });
+    await expect(
+      reconcile.getByRole("list", { name: "Warnings" }).or(reconcile.getByText("No warnings.")),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Reconcile/ })).toContainText(/\d+ warnings?/);
+    await reconcile.getByRole("button", { name: "Copy file" }).click();
+    await expect(reconcile.getByRole("status")).toHaveText("Copied.");
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toContain('"id": "blue-bomb-ring"');
+    await expect(reconcile.getByLabel("Monster file text")).toHaveValue(/"id": "blue-bomb-ring"/);
+  });
+});
+
+test("a legacy study converts with a notice and a reload restores the v5 session", async ({
+  page,
+}) => {
+  await page.goto("./?tagger=1");
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
+  const legacy = {
+    schemaVersion: 2,
+    encounterId: "killer-bee-queen",
+    provenance: { sourceUrl: null, fileName: "legacy.mp4", frameRate: 30, durationSeconds: 60 },
+    recordedAt: "2026-11-05T12:00:00.000Z",
+    tags: [
+      { timeSeconds: 10, phaseIndex: 2, spriteId: "bee-shot", pattern: "fixed-ring", shots: 4 },
+    ],
+  };
+  await page.locator('input[type="file"][accept*="json"]').setInputFiles({
+    name: "legacy.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(legacy)),
+  });
+  await expect(page.getByRole("status").filter({ hasText: /was converted/ })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  // An edit makes the study dirty, so the autosave writes a version 4 draft.
+  await page.getByLabel(/presented frame rate/i).fill("60");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.keys(window.localStorage)
+          .filter((key) => key.startsWith("dodge-hell-training.tagger-session."))
+          .map((key) => JSON.parse(window.localStorage.getItem(key)!).draftVersion),
+      ),
+    )
+    .toEqual([4]);
+  await page.reload();
+  await page.getByRole("button", { name: "Restore" }).click();
+  await page.getByRole("button", { name: /^Structure/ }).click();
+  await expect(page.getByRole("button", { name: /^Structure/ })).toContainText("1 boundary");
+  await expect(page.getByRole("button", { name: /^Attacks/ })).toContainText("1 marks on 1 tracks");
 });
 
 test.describe("live phase preview", () => {

@@ -6,7 +6,7 @@ This phase builds the Attacks step: the track list, marks, the live cadence fit 
 
 ### Step 86.1 - The Track Panel
 
-Status: pending. Dependencies: phase 85.
+Status: complete. Dependencies: phase 85.
 
 **Implementation prompt**
 
@@ -26,7 +26,7 @@ The track list shows every loaded attack with its sprite, the editor edits the s
 
 ### Step 86.2 - Marks
 
-Status: pending. Dependencies: 86.1.
+Status: complete. Dependencies: 86.1.
 
 **Implementation prompt**
 
@@ -46,7 +46,7 @@ With a video open, Enter adds a mark on the selected track, Delete removes the m
 
 ### Step 86.3 - The Fit Panel
 
-Status: pending. Dependencies: 86.2.
+Status: complete. Dependencies: 86.2.
 
 **Implementation prompt**
 
@@ -66,7 +66,7 @@ The fit updates as marks are added, accepting writes the cadence and the ghost t
 
 ### Step 86.4 - Observed And Ghost Volleys In The Preview
 
-Status: pending. Dependencies: 86.3.
+Status: complete. Dependencies: 86.3.
 
 **Implementation prompt**
 
@@ -91,7 +91,7 @@ The preview draws marks as observed volleys, the accepted cadence as ghosts, and
 
 ### Step 86.5 - Removing The Replaced Code
 
-Status: pending. Dependencies: 86.4.
+Status: complete. Dependencies: 86.4.
 
 **Implementation prompt**
 
@@ -113,3 +113,57 @@ Update `app/tests/app.spec.ts`: remove the tagger cases that drive the removed c
 **Acceptance**
 
 Every listed module is removed or trimmed, no dead export remains in `research/` (check with `npx oxlint` through `npm run verify`), the Queen observation file still loads, and `npm run verify` passes once at the end of the phase.
+
+## Execution Record
+
+Status: complete (2026-11-13), except one blocked visual check (see Manual checks). `npm run verify` is deferred to the end of plan V20 on the coordinator's instruction.
+
+**86.1.** `TrackPanel.tsx` renders the Attacks step: a numbered track list (positions 1-9 show their digit, a tenth or later track shows a dot and is selected by click) with id, segment label, `ProjectileSprite`, mark count and `cadenceSource`; "Add attack" (id plus segment select), "Duplicate", "Delete" with a second-click confirmation, and "Reload from game". "Reload from game" reports how many tracks with marks it kept. `AttackEditor` moved to `AttackEditor.tsx`, and `CommitInput` moved to `CommitInput.tsx` so the editor no longer depends on `TypedFieldControls.tsx`. The route applies an editor change through the new pure `changedAttack` in `monsterDraft.ts` and then `setTrackAttack`, with `"typed"` for a cadence field and the current source otherwise. A segment select beside the editor calls `setTrackLocation`. Digit keys select a track, and `0` selects scratch. `monsterDraft.ts` gains `changedAttack` and `newAttack`; `editAttack` and `addAttack` now delegate to them. `studyEdits.ts` gains `reloadTracks`.
+
+**86.2.** The route wires three keys: Enter (`addMark` of kind `"volley"`, on the selected track or on scratch), X (`setEndMark`) and Delete/Backspace (`removeMarkNear` with a tolerance of `2 * volleyStepTolerance(frameRate)`). All three pass the existing presented-frame guard (`markAtFrame`, T19), and X ignores auto-repeat like Enter. `TrackPanel` shows the selected track's marks table in time order (the time seeks, and each row has Remove), a line for the end mark, and the scratch section. That section has checkboxes and "Create attack from selected marks", which calls `createTrackFromScratch`. `[` and `]` step between the selected track's marks, or between every mark when no track is selected.
+
+**86.3.** `FitPanel.tsx` shows the four-row fit table. Each row has the fitted value (a time to three decimals, or an E06 sentence when null), the current value and Accept. Below it are Accept all, a line with the volley and complete-burst counts and the largest residual (in frames when the rate is known), and the threshold field. The field shows when the automatic split is ambiguous, when an override is set, or after "Set threshold"; a blank clears the override. `cadenceFit.ts` gains `MAX_PREDICTED_VOLLEYS_PER_WINDOW` (2000, a guard, not a game value) and `predictedTimesInWindows`, which the route passes to `timelineRows` as `predicted`.
+
+**86.4.** `draftPreview.ts` gains `projectilesOfVolley`, `windowsFromBoundaries`, `observedPreviewAt` and `fittedPreviewAt`. `draftPreviewAt` now draws through `projectilesOfVolley`, and its existing tests, including the simulation comparisons, pass unchanged. `PreviewProjectile` and `PreviewDetonation` gain `ghost?`. `previewDraw.ts` draws a ghost at `GHOST_ALPHA` (0.35) and restores the alpha afterwards. `PreviewPanel.tsx` now takes `study`, `segments`, `windows` and `selectedTrackIndex`. It has an Observed/Fitted/Both `Segmented` control (default Both) and no tuning section. A drawn projectile's `tagIndex` is its track's index in the study, so the selected track's projectiles get the highlight ring.
+
+**86.5.**
+
+- Deleted, with their tests where they had any: `TypedFieldControls.tsx`, `SavedAttackPanel.tsx`, `savedAttacks.ts`, `repeat.ts`, `tuning.ts` and `DraftPanel.tsx`.
+- The route no longer has the Tag panel, the Tags table, the Summary, the sticky state or the tuning props.
+- `previewModel.ts` keeps only `emitterTilesOf`, `initialHeadingSliderDegrees`, `poseAtAge`, `evenDrawsFor`, `drawnLifetimeSeconds` and the `Preview*` types, and its test covers only those.
+- `matchTagAttack` and the pattern helpers it uses were copied into `studyMigrate.ts` as private functions. A new private `authoredAttackFromLegacyTag` there now does the legacy conversion's matching. `authoredAttackFromTag` and `attackJson` were then removed from `exportAttack.ts`.
+- `projectileVariantOf` is exported, and `exportAttack.test.ts` now tests it directly.
+- `tagging.ts` lost `IntervalScope`, `IntervalSummary` and `summarizeTags`; `taggingOptions.ts` lost `formatSummaryRow`. Their tests were trimmed to match.
+- Eleven help texts and `studySections`, which nothing used any more, were removed.
+
+Decisions:
+
+- `windowsFromBoundaries` takes only the windows. The prompt's `blocks` parameter had no use, and an unused parameter would be lint noise.
+- `projectilesOfVolley` also takes `epochSeconds`, because the ring phase and `secondsSinceEpoch` count from the window epoch. It also takes `tagIndex` and an optional `ghost`.
+- An observed mark outside every window of its track draws with burst and volley index 0, counted from the mark itself.
+- A track made by "Add attack" or from scratch marks uses `NEW_ATTACK_DEFAULTS` and starts with `cadenceSource: "typed"`. Those defaults are an input convenience for the person, not authored values.
+- The track delete button sits below the track list. `AttackEditor` renders its own delete only when `onDelete` is passed, and `TrackPanel` does not pass it. This is the only change to the editor.
+- `reloadTracks` puts a kept marked track at the file's position for its id. A marked track whose id the file no longer has goes at the end.
+- `attackFieldsOf` moved to `taggingOptions.ts`, beside `conformAttackFields`, which it uses. Moving it to `tagging.ts` would have created an import cycle.
+- `groupKey` and `resolveTags` stay, because `taggingOptions.ts` and the legacy conversion still import them.
+- Phase 88 (`studyExport.ts`) is not implemented, so the monster-draft functions stay as rule 5 of step 86.5 says. These are `MonsterDraft`, `loadMonsterDraft`, `setAnchor`, `clearAnchor`, `activeDraftAttacks`, `monsterFileText` and the edit functions. `draftPreviewAt` stays for the same reason.
+- Some tag-era helpers stay in `taggingOptions.ts`; only the legacy session code and their own tests use them, and this phase does not list them. CSS classes of the removed panels stay in `TaggerRoute.module.css`.
+- `app/tests/app.spec.ts` had no tagger test left that drove a removed control, because phase 85 had already replaced them. One test was added for this phase's manual checks: "the attacks step marks volleys by key, fits them and accepts the fit".
+
+**Checks.**
+
+- The new tests were seen failing first: `TrackPanel.test.tsx`, `FitPanel.test.tsx`, the step 86.4 cases in `draftPreview.test.ts`, `reloadTracks`, `changedAttack` and `newAttack`, and `predictedTimesInWindows`.
+- `npx vitest run src/research`: 411 passed.
+- `npx tsc --noEmit -p tsconfig.app.json` passed after each removal group. Note that `-p app` (the root `tsconfig.json`) checks nothing because it uses project references.
+- `npx oxlint src/research tests`: no findings.
+- `npx vite build`: passed.
+- Playwright (`--grep`): the new Attacks-step test and the three existing tagger tests passed, 4 of 4.
+- `npm run verify`: not run. On the coordinator's instruction it is deferred to the end of plan V20.
+- Nothing under `app/src/game/` changed, and `docs/killer-bee-queen-observations.json` is unchanged.
+
+**Manual checks.**
+
+- 86.2, performed through Playwright on the generated test clip. Key 1 selects the first track. Enter at three frames adds three rows to the marks table. X shows the end mark. Delete at the playhead removes the latest mark. The step status reads "2 marks on 1 tracks".
+- 86.3, performed through Playwright. The fit line updates to "3 volleys" as marks are added, and Accept all sets the track's cadence source to "fitted".
+- 86.4, partly performed. Observed and ghost drawing is covered by unit tests, and the preview renders during the Playwright runs.
+- Blocked: nobody looked at the canvas or the timeline by eye, so the ghost alpha and the ghost ticks moving after an accept are unchecked.

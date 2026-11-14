@@ -11,11 +11,17 @@ import {
   videoChoiceDecision,
   monsterSwitchPlan,
   observationFileName,
-  studySections,
   studyMonsterProblem,
 } from "./studyLoad";
+import type { StudyState } from "./tagging";
+import type { StudyV5 } from "./study";
 
 const KNOWN = ["killer-bee-queen"];
+
+const legacy = (study: StudyState | StudyV5): StudyState => {
+  if ("schemaVersion" in study) throw new Error("expected a legacy study");
+  return study;
+};
 
 function file(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
@@ -47,9 +53,29 @@ describe("parseStudyFile", () => {
       new URL("../../../docs/killer-bee-queen-observations.json", import.meta.url),
       "utf8",
     );
-    const study = parseStudyFile(text, KNOWN);
+    const study = legacy(parseStudyFile(text, KNOWN));
     expect(study.provenance.frameRate).toBeNull();
     expect(study.tags.length).toBeGreaterThan(0);
+  });
+
+  test("accepts a v2 file as a legacy study and a v5 file unchanged", () => {
+    expect("schemaVersion" in parseStudyFile(file(), KNOWN)).toBe(false);
+    const v5: StudyV5 = {
+      schemaVersion: 5,
+      encounterId: "killer-bee-queen",
+      archetypeId: "killer-bee-queen",
+      recordedAt: "2026-11-13T00:00:00.000Z",
+      provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 100 },
+      boundaries: [{ timeSeconds: 1, segmentId: "p1" }],
+      statusSpans: [],
+      tracks: [],
+      scratch: [{ timeSeconds: 2, kind: "volley" }],
+      acceptedSegmentValues: {},
+    };
+    expect(parseStudyFile(JSON.stringify(v5), KNOWN)).toEqual(v5);
+    expect(() =>
+      parseStudyFile(JSON.stringify({ ...v5, boundaries: [{ timeSeconds: -1, segmentId: "p" }] }), KNOWN),
+    ).toThrow(/not a valid study/);
   });
 
   test("refuses invalid JSON readably", () => {
@@ -67,7 +93,7 @@ describe("parseStudyFile", () => {
   });
 
   test("accepts an unknown sprite and out-of-range phase", () => {
-    const study = parseStudyFile(file(), KNOWN);
+    const study = legacy(parseStudyFile(file(), KNOWN));
     expect(study.tags[0]).toMatchObject({ spriteId: "gone-sprite" });
     expect(study.tags[0].phaseIndex).toBe(99);
     expect(study.provenance.frameRate).toBe(30);
@@ -188,8 +214,4 @@ describe("V18 names and visibility", () => {
     expect(observationFileName("q", "bee", "queen")).toBe("q-bee-observations.json");
   });
 
-  test("every study shows tagging and the source switch; tuning follows the source (J18, J19)", () => {
-    expect(studySections("tags")).toEqual({ previewTuning: true, sourceSwitch: true });
-    expect(studySections("draft")).toEqual({ previewTuning: false, sourceSwitch: true });
-  });
 });

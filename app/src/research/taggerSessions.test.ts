@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 import { ENCOUNTER_CONFIG, encounterConfigOf } from "../game/config/encounter";
 import {
   buildDraft,
+  isLegacyDraft,
+  markCountOf,
   restoreSticky,
   shouldWriteDraft,
   TAGGER_SESSION_KEY_PREFIX,
@@ -11,6 +13,7 @@ import {
 } from "./taggerSessions";
 import { appearanceOptions, type StickySelection } from "./taggingOptions";
 import type { StudyState } from "./tagging";
+import type { StudyV5 } from "./study";
 
 class FakeStorage implements SessionStorage {
   data = new Map<string, string>();
@@ -56,24 +59,84 @@ function study(fileName = "a.mp4", frameRate: number | null = 30): StudyState {
   };
 }
 
+/** A version 3 draft, as the tagger wrote before plan V20. */
 function draft(fileName = "a.mp4", frameRate: number | null = 30) {
-  return buildDraft({
+  return {
+    draftVersion: 3 as const,
     study: study(fileName, frameRate),
     sticky: STICKY,
     savedAt: "2026-11-05T12:00:00.000Z",
+  };
+}
+
+function studyV5(fileName = "a.mp4", archetypeId = "killer-bee-queen"): StudyV5 {
+  return {
+    schemaVersion: 5,
+    encounterId: "killer-bee-queen",
+    archetypeId,
+    recordedAt: "2026-11-13T00:00:00.000Z",
+    provenance: { sourceUrl: null, fileName, frameRate: 30, durationSeconds: 100 },
+    boundaries: [{ timeSeconds: 1, segmentId: "p1" }],
+    statusSpans: [],
+    tracks: [
+      {
+        id: "bee",
+        location: { phaseId: "p1", subPhaseId: null },
+        attack: { id: "bee" } as StudyV5["tracks"][number]["attack"],
+        cadenceSource: "authored",
+        marks: [{ timeSeconds: 2, kind: "volley" }, { timeSeconds: 3, kind: "volley" }],
+      },
+    ],
+    scratch: [{ timeSeconds: 4, kind: "volley" }],
+    acceptedSegmentValues: {},
+  };
+}
+
+function draftV4(fileName = "a.mp4", archetypeId = "killer-bee-queen") {
+  return buildDraft({
+    study: studyV5(fileName, archetypeId),
+    selectedTrackId: "bee",
+    savedAt: "2026-11-05T12:00:00.000Z",
   });
 }
+
+describe("version 4 drafts (plan V20 E14)", () => {
+  test("a version 4 draft round-trips through storage", () => {
+    const storage = new FakeStorage();
+    const sessions = new TaggerSessions(() => storage);
+    sessions.write(draftV4("a.mp4"), "killer-bee-queen");
+    expect(sessions.read(TaggerSessions.keyFor("a.mp4"))).toEqual({ ok: true, value: draftV4("a.mp4") });
+    expect(draftV4().draftVersion).toBe(4);
+  });
+
+  test("a version 3 draft is returned as legacy", () => {
+    const restored = validateSessionDraft(JSON.parse(JSON.stringify(draft())));
+    expect(isLegacyDraft(restored)).toBe(true);
+    expect(isLegacyDraft(draftV4())).toBe(false);
+  });
+
+  test("a version 4 draft with an invalid study or selection is rejected", () => {
+    const bad = JSON.parse(JSON.stringify(draftV4()));
+    bad.study.boundaries[0].timeSeconds = -1;
+    expect(() => validateSessionDraft(bad)).toThrow();
+    expect(() => validateSessionDraft({ ...draftV4(), selectedTrackId: 3 })).toThrow(/selectedTrackId/);
+  });
+
+  test("markCountOf sums the marks over tracks and scratch", () => {
+    expect(markCountOf(studyV5())).toBe(3);
+  });
+});
 
 describe("TaggerSessions", () => {
   test("round-trips a draft with one slot per file name", () => {
     const storage = new FakeStorage();
     const sessions = new TaggerSessions(() => storage);
-    sessions.write(draft("a.mp4"));
-    sessions.write(draft("b.mp4"));
-    sessions.write(draft("a.mp4"));
+    sessions.write(draftV4("a.mp4"), "killer-bee-queen");
+    sessions.write(draftV4("b.mp4"), "killer-bee-queen");
+    sessions.write(draftV4("a.mp4"), "killer-bee-queen");
     expect(storage.data.size).toBe(2);
     const read = sessions.read(TaggerSessions.keyFor("a.mp4"));
-    expect(read).toEqual({ ok: true, value: draft("a.mp4") });
+    expect(read).toEqual({ ok: true, value: draftV4("a.mp4") });
   });
 
   test("lists readable and unreadable slots and ignores unrelated keys", () => {
@@ -82,11 +145,13 @@ describe("TaggerSessions", () => {
     storage.data.set(`${TAGGER_SESSION_KEY_PREFIX}corrupt`, "{nope");
     storage.data.set(`${TAGGER_SESSION_KEY_PREFIX}invalid`, '{"draftVersion":1}');
     const sessions = new TaggerSessions(() => storage);
-    sessions.write(draft("a.mp4"));
+    storage.data.set(TaggerSessions.keyFor("a.mp4"), JSON.stringify(draft("a.mp4")));
+    sessions.write(draftV4("b.mp4"), "killer-bee-queen");
     const result = sessions.list();
     if (!result.ok) throw new Error("expected ok");
     expect(result.value).toEqual([
-      { readable: true, key: TaggerSessions.keyFor("a.mp4"), fileName: "a.mp4", archetypeId: null, tagCount: 1, savedAt: "2026-11-05T12:00:00.000Z" },
+      { readable: true, key: TaggerSessions.keyFor("a.mp4"), fileName: "a.mp4", archetypeId: null, markCount: 1, savedAt: "2026-11-05T12:00:00.000Z" },
+      { readable: true, key: TaggerSessions.keyFor("b.mp4"), fileName: "b.mp4", archetypeId: "killer-bee-queen", markCount: 3, savedAt: "2026-11-05T12:00:00.000Z" },
       { readable: false, key: `${TAGGER_SESSION_KEY_PREFIX}corrupt` },
       { readable: false, key: `${TAGGER_SESSION_KEY_PREFIX}invalid` },
     ]);
@@ -95,8 +160,8 @@ describe("TaggerSessions", () => {
   test("discard removes only that slot", () => {
     const storage = new FakeStorage();
     const sessions = new TaggerSessions(() => storage);
-    sessions.write(draft("a.mp4"));
-    sessions.write(draft("b.mp4"));
+    sessions.write(draftV4("a.mp4"), "killer-bee-queen");
+    sessions.write(draftV4("b.mp4"), "killer-bee-queen");
     sessions.discard(TaggerSessions.keyFor("a.mp4"));
     expect([...storage.data.keys()]).toEqual([TaggerSessions.keyFor("b.mp4")]);
   });
@@ -109,14 +174,14 @@ describe("TaggerSessions", () => {
     const storage = new FakeStorage();
     const sessions = new TaggerSessions(() => storage);
     storage.failWrite = true;
-    expect(sessions.write(draft()).ok).toBe(false);
+    expect(sessions.write(draftV4()).ok).toBe(false);
     storage.failRead = true;
     expect(sessions.read("k").ok).toBe(false);
     const unavailable = new TaggerSessions(() => {
       throw new Error("blocked");
     });
     expect(unavailable.list()).toEqual({ ok: false, error: "blocked" });
-    expect(unavailable.write(draft()).ok).toBe(false);
+    expect(unavailable.write(draftV4()).ok).toBe(false);
   });
 
   test("rejects invalid tags and sticky values", () => {
@@ -170,19 +235,13 @@ describe("saved sessions carry typed geometry (plan V15 phase 53)", () => {
 
 describe("shouldWriteDraft", () => {
   test.each([
-    [false, 3, false],
-    [true, 0, false],
-    [true, 3, true],
-  ])("dirty %s, %i tags -> %s", (dirty, tagCount, expected) => {
-    expect(shouldWriteDraft({ dirty, tagCount })).toBe(expected);
+    [false, 3, 1, false],
+    [true, 0, 0, false],
+    [true, 3, 0, true],
+    [true, 0, 2, true],
+  ])("dirty %s, %i marks, %i boundaries -> %s", (dirty, markCount, boundaryCount, expected) => {
+    expect(shouldWriteDraft({ dirty, markCount, boundaryCount })).toBe(expected);
   });
-});
-
-test("buildDraft carries sticky selection and a null frame rate", () => {
-  const built = draft("a.mp4", null);
-  expect(built.sticky).toEqual(STICKY);
-  expect(built.study.provenance.frameRate).toBeNull();
-  expect(built.draftVersion).toBe(3);
 });
 
 describe("restoreSticky", () => {
@@ -223,6 +282,7 @@ describe("draft version 2 (plan V16 S05)", () => {
       sticky: STICKY,
     };
     const upgraded = validateSessionDraft(v1);
+    if (!isLegacyDraft(upgraded)) throw new Error("expected legacy");
     expect(upgraded.draftVersion).toBe(3);
     expect(upgraded.study.savedAttacks).toEqual([]);
     expect(upgraded.study.tags).toEqual(v1Study.tags);
@@ -234,20 +294,12 @@ describe("draft version 2 (plan V16 S05)", () => {
       savedAttacks: [attack],
       tags: [{ timeSeconds: 2, phaseIndex: 0, savedAttackId: "a1" }],
     };
-    const value = buildDraft({
-      study: withAttack,
-      sticky: { ...STICKY, savedAttackId: "a1" },
-      savedAt: "2026-11-05T12:00:00.000Z",
-    });
+    const value = { ...draft(), study: withAttack, sticky: { ...STICKY, savedAttackId: "a1" } };
     expect(validateSessionDraft(JSON.parse(JSON.stringify(value)))).toEqual(value);
   });
 
   test("rejects a linked tag naming a missing attack", () => {
-    const value = buildDraft({
-      study: { ...study(), tags: [{ timeSeconds: 2, phaseIndex: 0, savedAttackId: "no" }] },
-      sticky: STICKY,
-      savedAt: "2026-11-05T12:00:00.000Z",
-    });
+    const value = { ...draft(), study: { ...study(), tags: [{ timeSeconds: 2, phaseIndex: 0, savedAttackId: "no" }] } };
     expect(() => validateSessionDraft(value)).toThrow(/savedAttackId/);
   });
 
@@ -271,17 +323,14 @@ describe("draft version 2 (plan V16 S05)", () => {
       `${TAGGER_SESSION_KEY_PREFIX}old.mp4`,
       JSON.stringify({ draftVersion: 1, savedAt: "2026-11-05T12:00:00.000Z", study: v1Study, sticky: STICKY }),
     );
-    new TaggerSessions(() => storage).write(draft("new.mp4"));
+    new TaggerSessions(() => storage).write(draftV4("new.mp4"));
     const listed = new TaggerSessions(() => storage).list();
     expect(listed.ok && listed.value.every((entry) => entry.readable)).toBe(true);
   });
 });
 
 describe("V18 monster slots", () => {
-  const minion = (name: string) => ({
-    ...draft(name),
-    study: { ...study(name), archetypeId: "red-killer-bee", tags: [], savedAttacks: [] },
-  });
+  const minion = (name: string) => draftV4(name, "red-killer-bee");
 
   test("two monsters on one video use two slots", () => {
     const store = new Map<string, string>();
@@ -292,7 +341,7 @@ describe("V18 monster slots", () => {
       setItem: (k, v) => void store.set(k, v),
       removeItem: (k) => void store.delete(k),
     }));
-    sessions.write(draft("a.mp4"), "killer-bee-queen");
+    sessions.write(draftV4("a.mp4"), "killer-bee-queen");
     sessions.write(minion("a.mp4"), "killer-bee-queen");
     expect(store.size).toBe(2);
     expect(TaggerSessions.keyFor("a.mp4")).toBe(TAGGER_SESSION_KEY_PREFIX + "a.mp4");
@@ -302,6 +351,7 @@ describe("V18 monster slots", () => {
   test("a version 2 slot restores as the primary monster with no draft", () => {
     const old = { ...draft("a.mp4"), draftVersion: 2 };
     const restored = validateSessionDraft(old);
+    if (!isLegacyDraft(restored)) throw new Error("expected legacy");
     expect(restored.draftVersion).toBe(3);
     expect(restored.study.archetypeId).toBeNull();
     expect(restored.study.monsterDraft).toBeNull();

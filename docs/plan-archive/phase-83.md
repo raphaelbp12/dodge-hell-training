@@ -6,7 +6,7 @@ This phase changes words only. It runs first so that every later phase, and ever
 
 ### Step 83.1 - The Glossary List
 
-Status: pending. Dependencies: none.
+Status: complete. Dependencies: none.
 
 **Implementation prompt**
 
@@ -101,7 +101,7 @@ The test passes. `npx vitest run src/research/glossary.test.ts` is green. No oth
 
 ### Step 83.2 - The Words In Use
 
-Status: pending. Dependencies: 83.1.
+Status: complete. Dependencies: 83.1.
 
 **Implementation prompt**
 
@@ -119,3 +119,22 @@ A grep over `app/src/research/*.ts`, `app/src/research/*.tsx` and `docs/tagger-g
 **Acceptance**
 
 Every string replacement listed is made, the grep finds no interface text with a retired word, the targeted Playwright cases pass, and `npm run verify` passes once at the end of the phase.
+
+## Execution Record
+
+Status: complete (2026-11-13).
+
+**Step 83.1.** `app/src/research/glossary.ts` now exports `REQUIRED_TERMS` and the 56-entry `GLOSSARY` exactly as prompted, with one wording deviation: the Warning meaning says "Warnings never stop an export" instead of "never block an export", because the step's own check forbids the word "block" in any meaning. `app/src/research/glossary.test.ts` (new) was written first and failed on that sentence, then passed. `GlossaryPanel.tsx` is unchanged and its test still passes.
+
+**Step 83.2.** String-only replacements, no behaviour or identifier changes:
+
+- `helpText.ts` and `stepGuide.ts`: block to segment, anchor(s) to boundary/boundaries, typed estimate(s) to estimate(s), Starts here to Segment starts here, inside quoted strings only; constant names such as `HELP_DRAFT_BLOCK` and `HELP_CLEAR_ANCHOR` are kept.
+- `DraftPanel.tsx`: visible text and `aria-label`s now say "Segment starts here", "Boundary of", "Clear boundary:", "No boundary", and the hint and dropped-boundaries notice use segment and boundary.
+- `TypedFieldControls.tsx`, `SavedAttackPanel.tsx`, `TaggerRoute.tsx`: "(typed estimate)" labels become "(estimate)", "Typed estimates (not measurements)" becomes "Estimates (not measurements)", "Rotation (estimates)", the boundary error messages and the "N of M segments with a boundary" count. "Update from sticky" became "Update from current fields" (a decision: the prompt names no replacement for "sticky").
+- `PreviewPanel.tsx` (not listed in the prompt) also had "(typed estimate)" and "Tuning (typed estimates)" interface text; it was changed the same way so the step's grep over `app/src/research/*.tsx` is clean.
+- `app/tests/app.spec.ts`: the draft-panel case's selectors and title now use "Segment starts here" and "Boundary of".
+- `docs/tagger-guide.md`: the Terms section is the required sentence plus one bullet per `GLOSSARY` entry, generated from the file. In the rest of the guide only the bold control names were updated (**Segment starts here**, **Update from current fields**); its prose still uses the old words and is left for phase 88, which rewrites the guide.
+
+The grep for the retired words now finds only identifiers and comments in `app/src/research`. Nothing under `app/src/game/` changed.
+
+**Checks.** `npx vitest run src/research` passed (21 files, 453 tests). `npm run verify`: lint PASS and typecheck PASS. The test gate FAILs on one test, `src/game/simulation/bomb-split-characterization.test.ts` ("the full fight behaves as recorded (immortal)", a snapshot mismatch). It fails the same way on a clean `main` with these changes stashed and does not involve this phase, so it was not touched. Because of that failure the gate skipped build, so `npm run build` was run on its own and passed. Before that, `npm ci` had to be run because the local `node_modules` was missing `@fontsource-variable/grenze-gotisch`; the lockfile did not change. `npm run test:e2e -- --grep "tagger|draft panel"` passed 3 of 3 after `npm ci`; before it, those cases failed on clean `main` as well, because the dev server could not resolve the font import.

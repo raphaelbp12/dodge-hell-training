@@ -13,7 +13,6 @@ import {
   pixelGridCells,
   assignBurst,
   editTag,
-  formatSummaryRow,
   armPatternAllowed,
   DEFAULT_SHOTS_PER_ARM,
   OFFERABLE_PATTERNS,
@@ -341,39 +340,6 @@ describe("sortNewestFirst", () => {
   });
 });
 
-describe("formatSummaryRow", () => {
-  const phases = phaseOptions(QUEEN, QUEEN.primaryArchetypeId);
-  const base = {
-    phaseIndex: 0,
-    spriteId: "red-glaive",
-    pattern: "rotating-arm" as const,
-    scope: "all" as const,
-    sampleCount: 2,
-    meanSeconds: 1.23456,
-    stdevSeconds: 0.5,
-    intervalsSeconds: [1, 1.4691],
-  };
-
-  test("rounds to milliseconds and lists intervals", () => {
-    const row = formatSummaryRow(base, phases);
-    expect(row.mean).toBe("1.235 s");
-    expect(row.deviation).toBe("0.500 s");
-    expect(row.intervals).toBe("1.000, 1.469");
-    expect(row.aim).toBe("—");
-    expect(row.phase).toBe(phases[0].label);
-  });
-
-  test("shows an empty interval list and an unknown phase raw", () => {
-    const row = formatSummaryRow(
-      { ...base, phaseIndex: 99, sampleCount: 0, intervalsSeconds: [] },
-      phases,
-    );
-    expect(row.intervals).toBe("—");
-    expect(row.mean).toBe("—");
-    expect(row.phase).toBe("99");
-  });
-});
-
 describe("composite and typed-geometry options (plan V15 phase 53)", () => {
   const composite = (overrides: Partial<Tag> = {}) =>
     tag({ pattern: "fixed-ring", armPattern: "spread", shotsPerArm: 3, armArcDegrees: 20, ...overrides });
@@ -519,20 +485,6 @@ describe("composite and typed-geometry options (plan V15 phase 53)", () => {
     expect(readoutInterval(tags, { ...STICKY, armPattern: "spread", shotsPerArm: 3, armArcDegrees: 20 })).toBeNull();
   });
 
-  test("a summary row names its arm pattern", () => {
-    const base = {
-      phaseIndex: 0,
-      spriteId: "red-glaive",
-      pattern: "fixed-ring" as const,
-      scope: "all" as const,
-      sampleCount: 0,
-      meanSeconds: 0,
-      stdevSeconds: 0,
-      intervalsSeconds: [],
-    };
-    expect(formatSummaryRow(base, phaseOptions(QUEEN, QUEEN.primaryArchetypeId)).armPattern).toBe("—");
-    expect(formatSummaryRow({ ...base, armPattern: "ring" }, phaseOptions(QUEEN, QUEEN.primaryArchetypeId)).armPattern).toBe("ring");
-  });
 });
 
 describe("stickyFromTag", () => {
@@ -743,33 +695,6 @@ describe("burst continuation across targeted and untargeted bombs", () => {
     const untargetedBurst = [createTag(1, sticky, 1)];
     expect(assignBurst(untargetedBurst, { ...sticky, target: "player" }, "continue")).toBeNull();
     expect(assignBurst(untargetedBurst, sticky, "continue")).toBe(1);
-  });
-});
-
-describe("formatSummaryRow attack column (V16 S46)", () => {
-  test("resolves a saved attack's name, with a dash for none", () => {
-    const base = {
-      phaseIndex: 0,
-      spriteId: "red-glaive",
-      pattern: "rotating-arm" as const,
-      scope: "all" as const,
-      sampleCount: 0,
-      meanSeconds: 0,
-      stdevSeconds: 0,
-      intervalsSeconds: [],
-    };
-    const attack = {
-      id: "attack-1",
-      name: "Spiral",
-      spriteId: "red-glaive",
-      pattern: "rotating-arm" as const,
-      shots: 2,
-      cadence: { shotsPerBurst: 1, cooldownAfterLastShotSeconds: 1 },
-    };
-    const phases = phaseOptions(QUEEN, QUEEN.primaryArchetypeId);
-    expect(formatSummaryRow({ ...base, savedAttackId: "attack-1" }, phases, [attack]).attack).toBe("Spiral");
-    expect(formatSummaryRow(base, phases, [attack]).attack).toBe("—");
-    expect(formatSummaryRow({ ...base, target: "player" }, phases).target).toBe("player");
   });
 });
 

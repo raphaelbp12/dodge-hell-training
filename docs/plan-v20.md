@@ -227,33 +227,33 @@ export type SessionDraft = Readonly<{
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 83 | Vocabulary And Glossary | pending | None |
-| 84 | The Study Model | pending | Phase 83 |
-| 85 | The Structure Step | pending | Phase 84 |
-| 86 | The Attacks Step | pending | Phase 85 |
-| 87 | Bombs | pending | Phase 86 |
-| 88 | Reconcile, Export And Guide | pending | Phase 87 |
+| 83 | Vocabulary And Glossary | complete | None |
+| 84 | The Study Model | complete | Phase 83 |
+| 85 | The Structure Step | complete | Phase 84 |
+| 86 | The Attacks Step | complete | Phase 85 |
+| 87 | Bombs | complete | Phase 86 |
+| 88 | Reconcile, Export And Guide | complete | Phase 87 |
 
 ## Phase 83: Vocabulary And Glossary
 
-Status: pending. Dependencies: none. Steps in [`plan/phase-83.md`](plan/phase-83.md).
+Status: complete. Dependencies: none. Outcome: the tagger glossary holds the plan's 56 required terms and the interface, help, step-guide and guide-terms text no longer use block, anchor, sticky or typed estimate; record in [`plan-archive/phase-83.md`](plan-archive/phase-83.md).
 
 ## Phase 84: The Study Model
 
-Status: pending. Dependencies: phase 83. Steps in [`plan/phase-84.md`](plan/phase-84.md).
+Status: complete. Dependencies: phase 83. Steps and execution record in [`plan-archive/phase-84.md`](plan-archive/phase-84.md). Outcome: the pure v5 study model (types, segments and windows, the cadence fit, pure edits, monster loading and legacy conversion, and warnings) exists under `app/src/research/` with tests, and no interface changed.
 
 ## Phase 85: The Structure Step
 
-Status: pending. Dependencies: phase 84. Steps in [`plan/phase-85.md`](plan/phase-85.md).
+Status: complete. Dependencies: phase 84. Steps and execution record in [`plan-archive/phase-85.md`](plan-archive/phase-85.md). Outcome: the route holds one v5 study, sessions and study files carry it, and the Structure step marks boundaries, telegraph ends and invulnerable spans on a multi-row timeline.
 
 ## Phase 86: The Attacks Step
 
-Status: pending. Dependencies: phase 85. Steps in [`plan/phase-86.md`](plan/phase-86.md).
+Status: complete. Dependencies: phase 85. Steps and execution record in [`plan-archive/phase-86.md`](plan-archive/phase-86.md). Outcome: the Attacks step lists the tracks, records volley and end marks by key, fits and accepts cadences with ghost ticks on the timeline, and previews observed and fitted volleys, and the tag, saved-attack, repeat, tuning and draft-panel code is gone.
 
 ## Phase 87: Bombs
 
-Status: pending. Dependencies: phase 86. Steps in [`plan/phase-87.md`](plan/phase-87.md).
+Status: complete. Dependencies: phase 86. Steps and execution record in [`plan-archive/phase-87.md`](plan-archive/phase-87.md). Outcome: a bomb track takes detonation marks by `E`, and its measured flight time and range (after a scale calibration in the Structure step) can be accepted into its projectile override, which the observed preview uses.
 
 ## Phase 88: Reconcile, Export And Guide
 
-Status: pending. Dependencies: phase 87. Steps in [`plan/phase-88.md`](plan/phase-88.md).
+Status: complete, with the real-video acceptance blocked and `npm run verify` deferred to the end of the plan. Dependencies: phase 87. Steps and execution record in [`plan-archive/phase-88.md`](plan-archive/phase-88.md). Outcome: the Reconcile step shows warnings and measured segment values to accept, and exports the monster file rewritten from the tracks (byte-identical for all 12 untouched monsters), a projectile variant per measured bomb and the study JSON, with Playwright coverage and a rewritten tagger guide.

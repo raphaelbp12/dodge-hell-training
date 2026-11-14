@@ -4,13 +4,16 @@ import { describe, expect, test } from "vitest";
 import {
   resolveTags,
   studyFromExport,
-  summarizeTags,
   validateObservationExport,
   type ObservationExport,
   type SavedAttack,
   type Tag,
   type TagV1,
 } from "./tagging";
+
+/** Plan V20: `studyFromExport` also returns a v5 study; these tests read legacy files. */
+const legacyStudyFromExport = (validated: Parameters<typeof studyFromExport>[0]) =>
+  studyFromExport(validated) as import("./tagging").StudyState;
 
 /** A schema-v1 tag; the v1 cases below keep covering the committed evidence shape. */
 function tag(overrides: Partial<TagV1> = {}): TagV1 {
@@ -245,8 +248,12 @@ describe("validateObservationExport v2", () => {
 
   test("rejects an unknown schema version", () => {
     expect(() =>
-      validateObservationExport(observation2([tag2()], { schemaVersion: 5 })),
+      validateObservationExport(observation2([tag2()], { schemaVersion: 6 })),
     ).toThrow(/schemaVersion/);
+    // Plan V20: version 5 delegates to the v5 study validator.
+    expect(() =>
+      validateObservationExport(observation2([tag2()], { schemaVersion: 5 })),
+    ).toThrow(/Study/);
     expect(() =>
       validateObservationExport(observation2([tag2()], { schemaVersion: 1 })),
     ).toThrow(/schemaVersion/);
@@ -282,7 +289,7 @@ describe("studyFromExport", () => {
       tags: [tag(), tag({ kind: "rotating-arm", timeSeconds: 11 })],
     });
     const before = JSON.stringify(value);
-    const study = studyFromExport(
+    const study = legacyStudyFromExport(
       validateObservationExport(value),
     );
     expect(JSON.stringify(value)).toBe(before);
@@ -299,155 +306,10 @@ describe("studyFromExport", () => {
   test("copies v2 values unchanged", () => {
     const tags = [tag2({ burstId: 2 }), tag2({ pattern: "spread", aim: "fixed" })];
     const value = observation2(tags);
-    const study = studyFromExport(validateObservationExport(value));
+    const study = legacyStudyFromExport(validateObservationExport(value));
     expect(study.tags).toEqual(tags);
     expect(study.provenance.frameRate).toBe(60);
     expect(study.encounterId).toBe("killer-bee-queen");
-  });
-});
-
-describe("summarizeTags", () => {
-  test("returns no summaries for no tags", () => {
-    expect(summarizeTags([])).toEqual([]);
-  });
-
-  test("a no-burst group keeps one all result with sorted intervals", () => {
-    const tags = [
-      tag2({ timeSeconds: 12 }),
-      tag2({ timeSeconds: 10 }),
-      tag2({ timeSeconds: 11 }),
-    ];
-    expect(summarizeTags(tags)).toEqual([
-      {
-        phaseIndex: 2,
-        spriteId: "red-glaive",
-        pattern: "rotating-arm",
-        scope: "all",
-        sampleCount: 2,
-        meanSeconds: 1,
-        stdevSeconds: 0,
-        intervalsSeconds: [1, 1],
-      },
-    ]);
-  });
-
-  test("keeps patterns separate when only the pattern differs", () => {
-    const summaries = summarizeTags([
-      tag2({ timeSeconds: 10 }),
-      tag2({ timeSeconds: 11 }),
-      tag2({ timeSeconds: 12, pattern: "fixed-ring" }),
-      tag2({ timeSeconds: 15, pattern: "fixed-ring" }),
-    ]);
-    expect(summaries.map((s) => [s.pattern, s.sampleCount])).toEqual([
-      ["fixed-ring", 1],
-      ["rotating-arm", 1],
-    ]);
-  });
-
-  test("keeps concurrent groups with different aim separate", () => {
-    const summaries = summarizeTags([
-      tag2({ pattern: "spread", aim: "player", timeSeconds: 1 }),
-      tag2({ pattern: "spread", aim: "fixed", timeSeconds: 2 }),
-      tag2({ pattern: "spread", aim: "player", timeSeconds: 4 }),
-    ]);
-    expect(summaries.map((s) => [s.aim, s.sampleCount])).toEqual([
-      ["fixed", 0],
-      ["player", 1],
-    ]);
-  });
-
-  test("keeps a one-tag group with zero samples", () => {
-    expect(summarizeTags([tag2()])).toEqual([
-      {
-        phaseIndex: 2,
-        spriteId: "red-glaive",
-        pattern: "rotating-arm",
-        scope: "all",
-        sampleCount: 0,
-        meanSeconds: 0,
-        stdevSeconds: 0,
-        intervalsSeconds: [],
-      },
-    ]);
-  });
-
-  test("uses population standard deviation", () => {
-    const tags = [0, 1, 3, 6].map((timeSeconds) => tag2({ timeSeconds }));
-    const [summary] = summarizeTags(tags);
-    expect(summary.sampleCount).toBe(3);
-    expect(summary.meanSeconds).toBe(2);
-    // Population variance of [1, 2, 3] is 2/3.
-    expect(summary.stdevSeconds).toBeCloseTo(Math.sqrt(2 / 3), 12);
-  });
-
-  test("orders summaries by phase, sprite, pattern, aim then scope", () => {
-    const tags = [
-      tag2({ phaseIndex: 3, spriteId: "a", pattern: "volley" }),
-      tag2({ phaseIndex: 1, spriteId: "b", pattern: "volley" }),
-      tag2({ phaseIndex: 1, spriteId: "a", pattern: "volley" }),
-      tag2({ phaseIndex: 1, spriteId: "a", pattern: "rotating-arm" }),
-    ];
-    const first = summarizeTags(tags);
-    const second = summarizeTags([...tags].reverse());
-    expect(first).toEqual(second);
-    expect(first.map((s) => [s.phaseIndex, s.spriteId, s.pattern])).toEqual([
-      [1, "a", "rotating-arm"],
-      [1, "a", "volley"],
-      [1, "b", "volley"],
-      [3, "a", "volley"],
-    ]);
-  });
-
-  test("the upgraded pilot tags stay one all result", () => {
-    const exportUrl = new URL(
-      "../../../docs/killer-bee-queen-observations.json",
-      import.meta.url,
-    );
-    const study = studyFromExport(
-      validateObservationExport(JSON.parse(readFileSync(exportUrl, "utf8"))),
-    );
-    const summaries = summarizeTags(resolveTags(study.tags, study.savedAttacks));
-    expect(summaries.length).toBeGreaterThan(0);
-    expect(summaries.every((s) => s.scope === "all")).toBe(true);
-  });
-
-  test("splits two bursts into between and within intervals", () => {
-    // Burst 1 at 0, 0.5, 1.0; burst 2 at 4, 4.5; one standalone at 8.
-    const tags = [
-      tag2({ timeSeconds: 0, burstId: 1 }),
-      tag2({ timeSeconds: 0.5, burstId: 1 }),
-      tag2({ timeSeconds: 1, burstId: 1 }),
-      tag2({ timeSeconds: 4, burstId: 2 }),
-      tag2({ timeSeconds: 4.5, burstId: 2 }),
-      tag2({ timeSeconds: 8 }),
-    ];
-    const summaries = summarizeTags(tags);
-    expect(summaries.map((s) => s.scope)).toEqual([
-      "between-bursts",
-      "within-bursts",
-    ]);
-    expect(summaries[0].intervalsSeconds).toEqual([4, 4]);
-    expect(summaries[0].meanSeconds).toBe(4);
-    expect(summaries[1].intervalsSeconds).toEqual([0.5, 0.5, 0.5]);
-    expect(summaries[1].sampleCount).toBe(3);
-  });
-
-  test("a single one-volley burst yields zero-sample results", () => {
-    const summaries = summarizeTags([tag2({ burstId: 1 })]);
-    expect(summaries.map((s) => [s.scope, s.sampleCount])).toEqual([
-      ["between-bursts", 0],
-      ["within-bursts", 0],
-    ]);
-  });
-
-  test("emits no cadence-mapping fields", () => {
-    const [summary] = summarizeTags([tag2({ burstId: 1 }), tag2({ burstId: 1, timeSeconds: 11 })]);
-    for (const field of [
-      "shotsPerBurst",
-      "shotIntervalSeconds",
-      "cooldownAfterLastShotSeconds",
-    ])
-      expect(summary).not.toHaveProperty(field);
   });
 });
 
@@ -522,32 +384,13 @@ describe("composite and typed-geometry tag fields (plan V15 phase 53)", () => {
   test("a v2 file without the new fields is unchanged and the studies keep them out", () => {
     const value = observation2([tag2(), tag2({ pattern: "spread", aim: "player" })]);
     expect(validateObservationExport(value)).toBe(value);
-    const study = studyFromExport(validateObservationExport(value));
+    const study = legacyStudyFromExport(validateObservationExport(value));
     for (const entry of study.tags) {
       expect(entry).not.toHaveProperty("armPattern");
       expect(entry).not.toHaveProperty("clockwiseDegreesPerSecond");
     }
   });
 
-  test("a composite and a plain ring of one sprite summarize separately (N31)", () => {
-    const summaries = summarizeTags([
-      tag2({ pattern: "fixed-ring", timeSeconds: 1 }),
-      tag2({ pattern: "fixed-ring", timeSeconds: 2 }),
-      tag2({ pattern: "fixed-ring", armPattern: "ring", shotsPerArm: 2, timeSeconds: 3 }),
-      tag2({ pattern: "fixed-ring", armPattern: "ring", shotsPerArm: 2, timeSeconds: 5 }),
-    ]);
-    expect(summaries).toHaveLength(2);
-    expect(summaries.map((summary) => summary.armPattern)).toEqual([undefined, "ring"]);
-  });
-
-  test("rotation and arc values do not join the grouping key", () => {
-    const summaries = summarizeTags([
-      tag2({ timeSeconds: 1, clockwiseDegreesPerSecond: 10, initialPhaseDegrees: 0 }),
-      tag2({ timeSeconds: 2, clockwiseDegreesPerSecond: 99, initialPhaseDegrees: 40 }),
-    ]);
-    expect(summaries).toHaveLength(1);
-    expect(summaries[0].sampleCount).toBe(1);
-  });
 });
 
 function savedAttack(overrides: Partial<SavedAttack> = {}): SavedAttack {
@@ -579,17 +422,17 @@ describe("validateObservationExport v3", () => {
       [savedAttack()],
     );
     expect(validateObservationExport(value)).toBe(value);
-    const study = studyFromExport(validateObservationExport(value));
+    const study = legacyStudyFromExport(validateObservationExport(value));
     expect(study.savedAttacks).toHaveLength(1);
     expect(study.tags).toHaveLength(2);
   });
 
   test("v1 and v2 files load with empty saved attacks", () => {
     expect(
-      studyFromExport(validateObservationExport(observation())).savedAttacks,
+      legacyStudyFromExport(validateObservationExport(observation())).savedAttacks,
     ).toEqual([]);
     expect(
-      studyFromExport(validateObservationExport(observation2([tag2()]))).savedAttacks,
+      legacyStudyFromExport(validateObservationExport(observation2([tag2()]))).savedAttacks,
     ).toEqual([]);
   });
 
@@ -598,7 +441,7 @@ describe("validateObservationExport v3", () => {
       "../../../docs/killer-bee-queen-observations.json",
       import.meta.url,
     );
-    const study = studyFromExport(
+    const study = legacyStudyFromExport(
       validateObservationExport(JSON.parse(readFileSync(exportUrl, "utf8"))),
     );
     expect(study.savedAttacks).toEqual([]);
@@ -735,54 +578,6 @@ describe("resolveTags", () => {
   });
 });
 
-describe("grouping with target and saved attack (V16 S14)", () => {
-  const bomb = { spriteId: "white-bomb", pattern: "spread" as const, aim: "player" as const, shots: 1 };
-
-  test("targeted and untargeted throws summarize as separate groups", () => {
-    const summaries = summarizeTags([
-      tag2({ ...bomb, timeSeconds: 1 }),
-      tag2({ ...bomb, timeSeconds: 2, target: "player" }),
-      tag2({ ...bomb, timeSeconds: 4, target: "player" }),
-    ]);
-    expect(summaries).toHaveLength(2);
-    expect(summaries.find((row) => row.target === "player")?.intervalsSeconds).toEqual([2]);
-  });
-
-  test("a study with neither field groups as before", () => {
-    const summaries = summarizeTags([tag2({ timeSeconds: 1 }), tag2({ timeSeconds: 3 })]);
-    expect(summaries).toHaveLength(1);
-    expect(summaries[0]).not.toHaveProperty("target");
-    expect(summaries[0]).not.toHaveProperty("savedAttackId");
-  });
-
-  test("a saved attack's tags summarize apart from loose ones", () => {
-    const summaries = summarizeTags([
-      tag2({ timeSeconds: 1 }),
-      tag2({ timeSeconds: 3, savedAttackId: "a1" }),
-    ]);
-    expect(summaries).toHaveLength(2);
-  });
-});
-
-describe("repeat rows in the summary (V16 S46)", () => {
-  test("a repeat row and a later row of one attack give one interval between their start times", () => {
-    const summaries = summarizeTags([
-      tag2({ timeSeconds: 10, savedAttackId: "a1", repeatEndSeconds: 40 }),
-      tag2({ timeSeconds: 52, savedAttackId: "a1" }),
-    ]);
-    expect(summaries).toHaveLength(1);
-    expect(summaries[0]!.sampleCount).toBe(1);
-    expect(summaries[0]!.intervalsSeconds).toEqual([42]);
-  });
-
-  test("a lone repeat row contributes no interval", () => {
-    const summaries = summarizeTags([
-      tag2({ timeSeconds: 10, savedAttackId: "a1", repeatEndSeconds: 40 }),
-    ]);
-    expect(summaries[0]!.sampleCount).toBe(0);
-  });
-});
-
 describe("V18 schema v4", () => {
   const provenance = { sourceUrl: null, fileName: "a.mp4", frameRate: 30, durationSeconds: 10 };
   const base = {
@@ -797,7 +592,7 @@ describe("V18 schema v4", () => {
   };
 
   test("round-trips a draft and anchors", () => {
-    const study = studyFromExport(validateObservationExport(base));
+    const study = legacyStudyFromExport(validateObservationExport(base));
     expect(study.archetypeId).toBe("red-killer-bee");
     expect(study.monsterDraft).toEqual(base.monsterDraft);
   });
@@ -811,7 +606,7 @@ describe("V18 schema v4", () => {
   });
 
   test("older versions load as the primary monster with no draft", () => {
-    const v3 = studyFromExport(
+    const v3 = legacyStudyFromExport(
       validateObservationExport({ ...base, schemaVersion: 3, archetypeId: undefined, monsterDraft: undefined }),
     );
     expect(v3.archetypeId).toBeNull();

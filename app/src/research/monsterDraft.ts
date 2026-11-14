@@ -1,15 +1,11 @@
 /**
- * Pure monster draft for the dev-only tagger (plan V18 phase 74): the monsters
- * an encounter reaches, a monster's blocks, a lossless copy of its authored
- * attacks, edits to them, and the text of its whole data file. No React, DOM,
+ * Pure monster helpers for the dev-only tagger (plan V18 phase 74, trimmed by
+ * plan V20 steps 86.5 and 88.2): the monsters an encounter reaches, a
+ * monster's blocks, the path of its file, and validated edits to one attack.
+ * The monster file text now comes from `studyExport.ts`. No React, DOM,
  * storage or simulation here, and nothing is written anywhere (L02, L23).
  */
-import {
-  AUTHORED_MONSTER_FILES,
-  validateArchetypes,
-  validateAttack,
-  type AuthoredAttack,
-} from "../game/config/data";
+import { validateAttack, type AuthoredAttack } from "../game/config/data";
 import {
   attackSpecFromAuthored,
   validateAttackSpec,
@@ -31,34 +27,9 @@ export type DraftBlock = Readonly<{
   durationSeconds: number | null;
 }>;
 
-export type MonsterDraft = Readonly<{
-  phases: readonly Readonly<{
-    phaseId: string;
-    attacks: readonly AuthoredAttack[];
-    subPhases: readonly Readonly<{
-      subPhaseId: string;
-      attacks: readonly AuthoredAttack[];
-    }>[];
-  }>[];
-  /** Block id to video seconds; never exported (L22). */
-  anchors: Readonly<Record<string, number>>;
-}>;
-
 export type DraftResult<T> =
   | Readonly<{ ok: true; value: T }>
   | Readonly<{ ok: false; error: string }>;
-
-/** Names a phase, or one of its sub-phases, whose attack list is meant. */
-export type DraftLocation = Readonly<{
-  phaseId: string;
-  subPhaseId: string | null;
-}>;
-
-type RawPhase = {
-  id: string;
-  attacks: unknown;
-  subPhases?: { id: string; attacks: unknown }[] | null;
-};
 
 const BLOCK_SEPARATOR = "/";
 
@@ -115,82 +86,9 @@ export function blocksOfMonster(archetype: EnemyArchetype): readonly DraftBlock[
   });
 }
 
-function rawPhasesOf(rawFile: unknown): RawPhase[] {
-  return (rawFile as { phases: RawPhase[] }).phases;
-}
-
-function rawBlockIds(rawFile: unknown): string[] {
-  return rawPhasesOf(rawFile).flatMap((phase) =>
-    phase.subPhases && phase.subPhases.length > 0
-      ? phase.subPhases.map((sub) => blockIdOf(phase.id, sub.id))
-      : [phase.id],
-  );
-}
-
-/**
- * L04, L28, L29, amended by V19 J07: a lossless copy of the attacks; anchors
- * survive where the block does. With no `previous` draft the whole monster is
- * copied. With one, every other phase keeps `previous`'s attacks and only
- * `phaseId`'s phase-level and sub-phase attacks come from the file.
- */
-export function loadMonsterDraft(
-  rawFile: unknown,
-  previous: MonsterDraft | null,
-  phaseId: string,
-): Readonly<{ draft: MonsterDraft; droppedAnchors: readonly string[] }> {
-  const copy = <T>(value: T): T => structuredClone(value);
-  const known = new Set(rawBlockIds(rawFile));
-  const anchors: Record<string, number> = {};
-  const droppedAnchors: string[] = [];
-  for (const [id, seconds] of Object.entries(previous?.anchors ?? {}))
-    if (known.has(id)) anchors[id] = seconds;
-    else droppedAnchors.push(id);
-  return {
-    draft: {
-      phases: rawPhasesOf(rawFile).map((phase) => {
-        const kept = previous?.phases.find((entry) => entry.phaseId === phase.id);
-        if (kept && phase.id !== phaseId) return copy(kept);
-        return {
-          phaseId: phase.id,
-          attacks: copy(phase.attacks as AuthoredAttack[]),
-          subPhases: (phase.subPhases ?? []).map((sub) => ({
-            subPhaseId: sub.id,
-            attacks: copy(sub.attacks as AuthoredAttack[]),
-          })),
-        };
-      }),
-      anchors,
-    },
-    droppedAnchors,
-  };
-}
-
-/** L18: the phase's attacks, then the sub-phase's, as the game's `activeAttacks`. */
-export function activeDraftAttacks(
-  draft: MonsterDraft,
-  blockId: string,
-): readonly AuthoredAttack[] {
-  for (const phase of draft.phases) {
-    if (blockId === phase.phaseId) return phase.attacks;
-    for (const sub of phase.subPhases)
-      if (blockId === blockIdOf(phase.phaseId, sub.subPhaseId))
-        return [...phase.attacks, ...sub.attacks];
-  }
-  return [];
-}
-
-export function setAnchor(
-  draft: MonsterDraft,
-  blockId: string,
-  seconds: number,
-): MonsterDraft {
-  return { ...draft, anchors: { ...draft.anchors, [blockId]: seconds } };
-}
-
-export function clearAnchor(draft: MonsterDraft, blockId: string): MonsterDraft {
-  const anchors = { ...draft.anchors };
-  delete anchors[blockId];
-  return { ...draft, anchors };
+/** L24: the repository-relative path of a monster's file. */
+export function monsterFilePath(archetypeId: string): string {
+  return `app/src/game/data/enemies/${archetypeId}.json`;
 }
 
 // ---- Editing attacks (74.2) -----------------------------------------------
@@ -245,42 +143,6 @@ export type AttackChange =
   | Readonly<{ field: "aim"; value: "player" | "front" | "fixed" }>
   /** Any other pattern field; an undefined value removes it. */
   | Readonly<{ field: "pattern"; key: string; value: unknown }>;
-
-type Owner = { attacks: readonly AuthoredAttack[] };
-
-function ownerOf(draft: MonsterDraft, at: DraftLocation): Owner | null {
-  const phase = draft.phases.find((entry) => entry.phaseId === at.phaseId);
-  if (!phase) return null;
-  if (at.subPhaseId === null) return phase;
-  return phase.subPhases.find((sub) => sub.subPhaseId === at.subPhaseId) ?? null;
-}
-
-function withAttacks(
-  draft: MonsterDraft,
-  at: DraftLocation,
-  attacks: readonly AuthoredAttack[],
-): MonsterDraft {
-  return {
-    ...draft,
-    phases: draft.phases.map((phase) => {
-      if (phase.phaseId !== at.phaseId) return phase;
-      if (at.subPhaseId === null) return { ...phase, attacks };
-      return {
-        ...phase,
-        subPhases: phase.subPhases.map((sub) =>
-          sub.subPhaseId === at.subPhaseId ? { ...sub, attacks } : sub,
-        ),
-      };
-    }),
-  };
-}
-
-function allIds(draft: MonsterDraft): string[] {
-  return draft.phases.flatMap((phase) => [
-    ...phase.attacks.map((attack) => attack.id),
-    ...phase.subPhases.flatMap((sub) => sub.attacks.map((attack) => attack.id)),
-  ]);
-}
 
 /** Runs the game's own validators; returns their message unchanged on refusal. */
 function validated(
@@ -341,46 +203,25 @@ function applyChange(
   return { attack: next as AuthoredAttack, removed };
 }
 
-/** L10, L13, L26: edits one attack, keeping its id and field order where it can. */
-export function editAttack(
-  draft: MonsterDraft,
-  at: DraftLocation,
-  attackId: string,
+/** Plan V20 step 86.1: one change to one attack, validated against the other ids. */
+export function changedAttack(
+  current: AuthoredAttack,
   change: AttackChange,
+  otherIds: readonly string[],
   config: EncounterConfig,
-): DraftResult<Readonly<{ draft: MonsterDraft; removed: readonly string[] }>> {
-  const owner = ownerOf(draft, at);
-  const current = owner?.attacks.find((attack) => attack.id === attackId);
-  if (!owner || !current) return fail(`No attack "${attackId}" at that location.`);
+): DraftResult<Readonly<{ attack: AuthoredAttack; removed: readonly string[] }>> {
   const { attack, removed } = applyChange(current, change);
-  const checked = validated(
-    attack,
-    allIds(draft).filter((id) => id !== attackId),
-    config,
-  );
+  const checked = validated(attack, otherIds, config);
   if (!checked.ok) return checked;
-  return {
-    ok: true,
-    value: {
-      draft: withAttacks(
-        draft,
-        at,
-        owner.attacks.map((entry) => (entry.id === attackId ? checked.value : entry)),
-      ),
-      removed,
-    },
-  };
+  return { ok: true, value: { attack: checked.value, removed } };
 }
 
-/** L10, L12: adds a convenience attack using the catalog's first projectile. */
-export function addAttack(
-  draft: MonsterDraft,
-  at: DraftLocation,
+/** L10, L12: a convenience attack using the catalog's first projectile. */
+export function newAttack(
   id: string,
+  otherIds: readonly string[],
   config: EncounterConfig,
-): DraftResult<MonsterDraft> {
-  const owner = ownerOf(draft, at);
-  if (!owner) return fail("No such phase or sub-phase.");
+): DraftResult<AuthoredAttack> {
   const projectile = Object.keys(config.projectiles)[0];
   const attack = {
     id,
@@ -389,82 +230,5 @@ export function addAttack(
     pattern: { ...NEW_ATTACK_DEFAULTS.pattern },
     cadence: { ...NEW_ATTACK_DEFAULTS.cadence },
   } as AuthoredAttack;
-  const checked = validated(attack, allIds(draft), config);
-  if (!checked.ok) return checked;
-  return { ok: true, value: withAttacks(draft, at, [...owner.attacks, checked.value]) };
-}
-
-export function deleteAttack(
-  draft: MonsterDraft,
-  at: DraftLocation,
-  attackId: string,
-): DraftResult<MonsterDraft> {
-  const owner = ownerOf(draft, at);
-  if (!owner?.attacks.some((attack) => attack.id === attackId))
-    return fail(`No attack "${attackId}" at that location.`);
-  return {
-    ok: true,
-    value: withAttacks(
-      draft,
-      at,
-      owner.attacks.filter((attack) => attack.id !== attackId),
-    ),
-  };
-}
-
-// ---- The export text (74.3) ------------------------------------------------
-
-/** L24: the repository-relative path of a monster's file. */
-export function monsterFilePath(archetypeId: string): string {
-  return `app/src/game/data/enemies/${archetypeId}.json`;
-}
-
-/**
- * L30, amended by V19 J04, J05: the monster's current file with only the
- * selected phase's attack lists, phase-level and sub-phase, replaced from the
- * draft, in place. Every other phase stays as the file has it. Refuses, naming
- * the id, only when the selected phase or one of its sub-phases is on one side
- * only. Never includes an anchor (L22).
- */
-export function monsterFileText(
-  archetypeId: string,
-  draft: MonsterDraft,
-  currentRawFile: unknown,
-  config: EncounterConfig,
-  phaseId: string,
-): DraftResult<string> {
-  const result = structuredClone(currentRawFile) as {
-    phases: (RawPhase & { attacks: unknown })[];
-  };
-  const phase = result.phases.find((entry) => entry.id === phaseId);
-  const draftPhase = draft.phases.find((entry) => entry.phaseId === phaseId);
-  if (!phase && !draftPhase) return fail(`Phase "${phaseId}" is in neither the draft nor the file.`);
-  if (!phase) return fail(`Phase "${phaseId}" is in the draft but not in the file.`);
-  if (!draftPhase) return fail(`Phase "${phaseId}" is in the file but not in the draft.`);
-  const rawSubs = phase.subPhases ?? [];
-  for (const sub of draftPhase.subPhases)
-    if (!rawSubs.some((raw) => raw.id === sub.subPhaseId))
-      return fail(`Sub-phase "${sub.subPhaseId}" is in the draft but not in the file.`);
-  for (const raw of rawSubs) {
-    const sub = draftPhase.subPhases.find((entry) => entry.subPhaseId === raw.id);
-    if (!sub) return fail(`Sub-phase "${raw.id}" is in the file but not in the draft.`);
-    raw.attacks = structuredClone(sub.attacks);
-  }
-  phase.attacks = structuredClone(draftPhase.attacks);
-  try {
-    const archetypes = validateArchetypes(
-      { archetypes: { ...AUTHORED_MONSTER_FILES, [archetypeId]: result } },
-      new Set(Object.keys(config.projectiles)),
-      config.maxConcurrentMinions,
-    );
-    for (const phase of archetypes[archetypeId].phases)
-      for (const attack of [
-        ...phase.attacks,
-        ...(phase.subPhases ?? []).flatMap((sub) => sub.attacks),
-      ])
-        validateAttackSpec(config, attackSpecFromAuthored(attack));
-  } catch (cause) {
-    return fail(cause instanceof Error ? cause.message : String(cause));
-  }
-  return { ok: true, value: `${JSON.stringify(result, null, 2)}\n` };
+  return validated(attack, otherIds, config);
 }

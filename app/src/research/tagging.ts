@@ -6,7 +6,25 @@
  * particular must stay free of React, the DOM, the video APIs, Phaser and the
  * simulation/session layers so the derivation is testable as plain arithmetic.
  */
-import type { MonsterDraft } from "./monsterDraft";
+import type { AuthoredAttack } from "../game/config/data";
+import { validateStudyV5, type StudyV5 } from "./study";
+
+/**
+ * V18 L28: the monster draft a v4 study or session stored. Kept only so those
+ * files still load and convert (plan V20 E02); nothing writes it any more.
+ */
+export type MonsterDraft = Readonly<{
+  phases: readonly Readonly<{
+    phaseId: string;
+    attacks: readonly AuthoredAttack[];
+    subPhases: readonly Readonly<{
+      subPhaseId: string;
+      attacks: readonly AuthoredAttack[];
+    }>[];
+  }>[];
+  /** Block id to video seconds; never exported (L22). */
+  anchors: Readonly<Record<string, number>>;
+}>;
 
 export type TagKindV1 = "volley" | "rotating-arm";
 
@@ -173,11 +191,15 @@ export type ObservationExportV4 = Readonly<{
 
 export type ObservationExport = ObservationExportV4;
 
+/** Plan V20 E02: a v5 study file is the timeline study itself. */
+export type ObservationExportV5 = StudyV5;
+
 type AnyObservationExport =
   | ObservationExportV1
   | ObservationExportV2
   | ObservationExportV3
-  | ObservationExportV4;
+  | ObservationExportV4
+  | ObservationExportV5;
 
 /** A loaded or restored study, before it can be exported. */
 export type StudyState = Readonly<{
@@ -194,26 +216,6 @@ export type StudyState = Readonly<{
   savedAttacks: readonly SavedAttack[];
   tags: readonly StoredTag[];
   monsterDraft: MonsterDraft | null;
-}>;
-
-export type IntervalScope = "all" | "between-bursts" | "within-bursts";
-
-export type IntervalSummary = Readonly<{
-  phaseIndex: number;
-  spriteId: string;
-  pattern: TagPattern;
-  aim?: TagAim;
-  armPattern?: TagArmPattern;
-  /** V16 S14: targeted and untargeted throws summarize apart. */
-  target?: "player";
-  /** V16 S14: a saved attack's tags summarize apart from loose ones. */
-  savedAttackId?: string;
-  scope: IntervalScope;
-  /** Intervals observed in this scope. */
-  sampleCount: number;
-  meanSeconds: number;
-  stdevSeconds: number;
-  intervalsSeconds: readonly number[];
 }>;
 
 const TAG_KINDS_V1: readonly TagKindV1[] = ["volley", "rotating-arm"];
@@ -611,8 +613,9 @@ export function validateObservationExport(
 ): AnyObservationExport {
   const source = record(value, "");
   const version = source.schemaVersion;
+  if (version === 5) return validateStudyV5(value);
   if (version !== undefined && version !== 2 && version !== 3 && version !== 4)
-    reject("schemaVersion", "must be 2, 3 or 4 when present");
+    reject("schemaVersion", "must be 2, 3, 4 or 5 when present");
   nonEmptyString(source.encounterId, "encounterId");
   provenance(source.provenance);
   isoDate(source.recordedAt, "recordedAt");
@@ -644,7 +647,8 @@ export function validateObservationExport(
  */
 export function studyFromExport(
   validated: AnyObservationExport,
-): StudyState {
+): StudyState | StudyV5 {
+  if ("schemaVersion" in validated && validated.schemaVersion === 5) return validated;
   const { sourceUrl, fileName, durationSeconds } = validated.provenance;
   if ("schemaVersion" in validated)
     return {
@@ -699,151 +703,6 @@ export function resolveTags(
       if (attack[key] !== undefined) fields[key] = attack[key];
     return { ...fields, ...entry } as Tag;
   });
-}
-
-type MutableGroup = {
-  phaseIndex: number;
-  spriteId: string;
-  pattern: TagPattern;
-  aim?: TagAim;
-  armPattern?: TagArmPattern;
-  target?: "player";
-  savedAttackId?: string;
-  tags: Tag[];
-};
-
-const SCOPE_ORDER: Readonly<Record<IntervalScope, number>> = {
-  all: 0,
-  "between-bursts": 1,
-  "within-bursts": 2,
-};
-
-function compareText(first: string, second: string): number {
-  if (first < second) return -1;
-  if (first > second) return 1;
-  return 0;
-}
-
-function compareSummaries(
-  first: IntervalSummary,
-  second: IntervalSummary,
-): number {
-  return (
-    first.phaseIndex - second.phaseIndex ||
-    compareText(first.spriteId, second.spriteId) ||
-    compareText(first.pattern, second.pattern) ||
-    compareText(first.aim ?? "", second.aim ?? "") ||
-    compareText(first.armPattern ?? "", second.armPattern ?? "") ||
-    compareText(first.target ?? "", second.target ?? "") ||
-    compareText(first.savedAttackId ?? "", second.savedAttackId ?? "") ||
-    SCOPE_ORDER[first.scope] - SCOPE_ORDER[second.scope]
-  );
-}
-
-function mean(values: readonly number[]): number {
-  return values.reduce((total, value) => total + value, 0) / values.length;
-}
-
-function differences(times: readonly number[]): number[] {
-  return times.slice(1).map((time, index) => time - times[index]);
-}
-
-function byTime(first: number, second: number): number {
-  return first - second;
-}
-
-function summaryOf(
-  group: MutableGroup,
-  scope: IntervalScope,
-  intervals: readonly number[],
-): IntervalSummary {
-  const base = {
-    phaseIndex: group.phaseIndex,
-    spriteId: group.spriteId,
-    pattern: group.pattern,
-    ...(group.aim === undefined ? {} : { aim: group.aim }),
-    ...(group.armPattern === undefined ? {} : { armPattern: group.armPattern }),
-    ...(group.target === undefined ? {} : { target: group.target }),
-    ...(group.savedAttackId === undefined ? {} : { savedAttackId: group.savedAttackId }),
-    scope,
-    intervalsSeconds: intervals,
-  };
-  if (intervals.length === 0)
-    return { ...base, sampleCount: 0, meanSeconds: 0, stdevSeconds: 0 };
-  const average = mean(intervals);
-  const variance = mean(intervals.map((interval) => (interval - average) ** 2));
-  return {
-    ...base,
-    sampleCount: intervals.length,
-    meanSeconds: average,
-    stdevSeconds: Math.sqrt(variance),
-  };
-}
-
-function summariesOf(group: MutableGroup): IntervalSummary[] {
-  if (group.tags.every((entry) => entry.burstId === undefined))
-    return [
-      summaryOf(
-        group,
-        "all",
-        differences(group.tags.map((entry) => entry.timeSeconds).sort(byTime)),
-      ),
-    ];
-  // A burst is its tags sharing a burstId; a standalone tag is a burst of one.
-  const bursts = new Map<string, number[]>();
-  group.tags.forEach((entry, index) => {
-    const key =
-      entry.burstId === undefined ? `s${index}` : `b${entry.burstId}`;
-    const times = bursts.get(key);
-    if (times) times.push(entry.timeSeconds);
-    else bursts.set(key, [entry.timeSeconds]);
-  });
-  const ordered = [...bursts.values()]
-    .map((times) => [...times].sort(byTime))
-    .sort((first, second) => first[0] - second[0]);
-  return [
-    summaryOf(group, "between-bursts", differences(ordered.map((times) => times[0]))),
-    summaryOf(
-      group,
-      "within-bursts",
-      ordered.flatMap((times) => differences(times)),
-    ),
-  ];
-}
-
-/**
- * Groups by `(phaseIndex, spriteId, pattern, aim, armPattern)` (Z06, N31), then derives the
- * interval sample count, mean and population standard deviation (T32).
- *
- * A group with no burst ids yields one `all` result. A group with any burst id
- * yields separate between-burst and within-burst results (Z10).
- *
- * Population statistics are the right choice here: these are complete
- * observations of a tagged run, not a sample drawn from a larger population.
- * The derivation deliberately emits nothing shaped like authored cadence
- * (`shotsPerBurst`, `shotIntervalSeconds`, `cooldownAfterLastShotSeconds`);
- * that mapping is the tuning decision held under D13 and T08 forbids making
- * it here.
- */
-export function summarizeTags(tags: readonly Tag[]): readonly IntervalSummary[] {
-  const groups = new Map<string, MutableGroup>();
-  for (const entry of tags) {
-    const key = groupKey(entry);
-    const group = groups.get(key);
-    if (group) group.tags.push(entry);
-    else
-      groups.set(key, {
-        phaseIndex: entry.phaseIndex,
-        spriteId: entry.spriteId,
-        pattern: entry.pattern,
-        aim: entry.aim,
-        armPattern: entry.armPattern,
-        target: entry.target,
-        savedAttackId: entry.savedAttackId,
-        tags: [entry],
-      });
-  }
-  return [...groups.values()].flatMap(summariesOf).sort(compareSummaries);
 }
 
 /** The Z06 grouping key (V16 S14 adds target and saved attack), shared with the tagger's live readout. */

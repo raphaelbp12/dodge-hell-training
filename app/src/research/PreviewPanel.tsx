@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EncounterConfig } from "../game/config/encounter";
 import type { Vector2 } from "../game/models";
-import { draftPreviewAt } from "./draftPreview";
+import { fittedPreviewAt, observedPreviewAt } from "./draftPreview";
 import { HelpMark } from "./HelpMark";
 import { HELP_SECTION_PREVIEW } from "./helpText";
-import type { DraftBlock, MonsterDraft } from "./monsterDraft";
 import { drawPreviewFrame, drawEmptyPreview } from "./previewDraw";
-import {
-  countUnmatchedTags,
-  initialHeadingSliderDegrees,
-  previewAt,
-} from "./previewModel";
+import { initialHeadingSliderDegrees, type PreviewFrame } from "./previewModel";
 import {
   PREVIEW_SIZE_PIXELS,
   type PreviewPreferenceValue,
@@ -24,15 +19,8 @@ import {
   zoomAbout,
   type PreviewView,
 } from "./previewView";
-import type { SavedAttack, Tag } from "./tagging";
-import {
-  DEFAULT_TUNING_SHOT_INTERVAL_SECONDS,
-  TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND,
-  type TunableValue,
-  type TuningChange,
-  type TuningField,
-} from "./tuning";
-import { CommitInput } from "./TypedFieldControls";
+import type { Segment, SegmentWindow, StudyV5 } from "./study";
+import { Segmented } from "./TaggerControls";
 import styles from "./PreviewPanel.module.css";
 
 const PLAYER_SLIDER_STEP_TILES = 0.1;
@@ -41,81 +29,37 @@ const HEADING_SLIDER_STEP_DEGREES = 1;
 const SIZES: readonly PreviewSize[] = ["small", "medium", "large"];
 const NO_VIDEO_NOTE = "Open a video to see the preview";
 
-/** What the tuning section edits and how (V16 S48, S49). */
-export type TuningProps = Readonly<{
-  /** "Tuning saved attack ...", "Tuning this tag only", or null with no row selected. */
-  target: string | null;
-  values: readonly TunableValue[];
-  /** Returns whether the change was accepted, so a refused input restores its text. */
-  onChange: (change: TuningChange) => boolean;
-}>;
-
-const TUNING_LABEL: Readonly<Record<TuningField, string>> = {
-  clockwiseDegreesPerSecond: "Rotation rate, degrees per second",
-  initialPhaseDegrees: "Initial phase, degrees",
-  emitterRadiusTiles: "Emitter radius, tiles",
-  shotsPerBurst: "Shots per burst",
-  shotIntervalSeconds: "Shot interval, seconds",
-  cooldownAfterLastShotSeconds: "Cooldown after the last shot, seconds",
-};
-
-/** Optional values may be blanked; the cadence values may not. */
-const BLANK_ALLOWED: readonly TuningField[] = [
-  "clockwiseDegreesPerSecond",
-  "initialPhaseDegrees",
-  "emitterRadiusTiles",
-];
-
-/** V18 L15: the draft the panel draws instead of the tags. */
-export type DraftSource = Readonly<{
-  draft: MonsterDraft;
-  blocks: readonly DraftBlock[];
-  /** J06: only this phase's blocks are drawn. */
-  phaseId: string;
-  videoEndSeconds: number;
-}>;
+/** E12: what the preview draws. */
+const PREVIEW_MODES = ["Observed", "Fitted", "Both"] as const;
+type PreviewMode = (typeof PREVIEW_MODES)[number];
 
 type Props = Readonly<{
-  /** Null draws the tags (unchanged); a value draws the draft with the video's `mediaTime`. */
-  draftSource?: DraftSource | null;
-  /** Shown in every study (V19 J19). */
-  sourceSwitch?: Readonly<{
-    value: "draft" | "tags";
-    onChange: (next: "draft" | "tags") => void;
-  }>;
-  /** Hides the tuning section and unmatched-tag notice. */
-  showTuning?: boolean;
-  tags: readonly Tag[];
-  /** Needed to expand repeat rows into volleys. */
-  savedAttacks: readonly SavedAttack[];
+  study: StudyV5 | null;
+  segments: readonly Segment[];
+  windows: readonly SegmentWindow[];
   mediaTime: number;
   hasVideo: boolean;
   config: EncounterConfig;
-  /** The monster the tags index (J18). */
-  archetypeId: string;
-  highlightedTagIndices: readonly number[];
-  tuning: TuningProps;
+  /** The selected track's index in the study, highlighted; null for none. */
+  selectedTrackIndex: number | null;
   /** The persisted layout, owned by the route (shown and size). */
   layout: PreviewPreferenceValue;
   onLayoutChange: (next: PreviewPreferenceValue) => void;
 }>;
 
 /**
- * Draws every tagged volley at the presented video time onto a plain 2D
- * canvas (M10). React holds only the inputs; no element exists per projectile.
+ * Draws the study's observed volleys, its fitted volleys as ghosts, or both,
+ * at the presented video time onto a plain 2D canvas (M10, E12). React holds
+ * only the inputs; no element exists per projectile.
  */
 export function PreviewPanel({
-  draftSource = null,
-  sourceSwitch,
-  showTuning = true,
-  tags,
-  savedAttacks,
+  study,
+  segments,
+  windows,
   mediaTime,
   hasVideo,
   config,
-  archetypeId,
-  highlightedTagIndices,
-  tuning,
+  selectedTrackIndex,
   layout,
   onLayoutChange,
 }: Props) {
@@ -123,6 +67,7 @@ export function PreviewPanel({
   const { shown, size } = layout;
   const canvasPixels = PREVIEW_SIZE_PIXELS[size];
   const [view, setView] = useState<PreviewView>(() => fitView(shape));
+  const [mode, setMode] = useState<PreviewMode>("Both");
   const [playerTiles, setPlayerTiles] = useState<Vector2>(
     config.player.spawnTiles,
   );
@@ -135,30 +80,37 @@ export function PreviewPanel({
   const canvas = useRef<HTMLCanvasElement>(null);
   const drag = useRef<Vector2 | null>(null);
   const ranges = playerSliderRanges(shape);
-  const unmatchedCount = useMemo(
-    () => countUnmatchedTags(tags, config, archetypeId),
-    [tags, config, archetypeId],
-  );
 
-  const playerAndHeading = {
-    playerTiles,
-    headingRadians: (headingDegrees * Math.PI) / 180,
-  };
-  const draftResult = useMemo(
-    () =>
-      draftSource === null
-        ? null
-        : draftPreviewAt({
-            draft: draftSource.draft,
-            blocks: draftSource.blocks,
-            phaseId: draftSource.phaseId,
-            config,
-            timeSeconds: mediaTime,
-            videoEndSeconds: draftSource.videoEndSeconds,
-            ...playerAndHeading,
-          }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draftSource, config, mediaTime, playerTiles, headingDegrees],
+  const result = useMemo(() => {
+    if (study === null) return null;
+    const input = {
+      study,
+      segments,
+      windows,
+      config,
+      timeSeconds: mediaTime,
+      playerTiles,
+      headingRadians: (headingDegrees * Math.PI) / 180,
+    };
+    const observed = mode === "Fitted" ? null : observedPreviewAt(input);
+    const fitted = mode === "Observed" ? null : fittedPreviewAt(input);
+    const base = (observed ?? fitted)!;
+    const frame: PreviewFrame = {
+      ...base.frame,
+      projectiles: [
+        ...(fitted?.frame.projectiles ?? []),
+        ...(observed?.frame.projectiles ?? []),
+      ],
+      detonations: [
+        ...(fitted?.frame.detonations ?? []),
+        ...(observed?.frame.detonations ?? []),
+      ],
+    };
+    return { frame, undrawnAttackIds: base.undrawnAttackIds };
+  }, [study, segments, windows, config, mediaTime, playerTiles, headingDegrees, mode]);
+  const highlighted = useMemo(
+    () => (selectedTrackIndex === null ? [] : [selectedTrackIndex]),
+    [selectedTrackIndex],
   );
 
   const chooseSize = (next: PreviewSize) => {
@@ -171,42 +123,12 @@ export function PreviewPanel({
   useEffect(() => {
     const context = canvas.current?.getContext("2d");
     if (!shown || !context) return;
-    if (!hasVideo) {
+    if (!hasVideo || result === null) {
       drawEmptyPreview(context, canvasPixels);
       return;
     }
-    drawPreviewFrame(
-      context,
-      draftResult
-        ? draftResult.frame
-        : previewAt({
-            tags,
-            savedAttacks,
-            timeSeconds: mediaTime,
-            config,
-            archetypeId,
-            playerTiles,
-            headingRadians: (headingDegrees * Math.PI) / 180,
-          }),
-      view,
-      canvasPixels,
-      highlightedTagIndices,
-    );
-  }, [
-    shown,
-    hasVideo,
-    draftResult,
-    tags,
-    savedAttacks,
-    mediaTime,
-    config,
-    archetypeId,
-    playerTiles,
-    headingDegrees,
-    view,
-    canvasPixels,
-    highlightedTagIndices,
-  ]);
+    drawPreviewFrame(context, result.frame, view, canvasPixels, highlighted);
+  }, [shown, hasVideo, result, view, canvasPixels, highlighted]);
 
   // React's onWheel is passive, so the page-scroll guard needs a native listener.
   useEffect(() => {
@@ -230,20 +152,13 @@ export function PreviewPanel({
 
   return (
     <aside className={styles.panel} aria-label="Tag preview">
-      {sourceSwitch && (
-        <div className={styles.controls} role="group" aria-label="Preview source">
-          {(["tags", "draft"] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={sourceSwitch.value === option}
-              onClick={() => sourceSwitch.onChange(option)}
-            >
-              {option === "tags" ? "Tags" : "Draft"}
-            </button>
-          ))}
-        </div>
-      )}
+      <Segmented
+        legend="Draw"
+        name="preview-mode"
+        options={PREVIEW_MODES}
+        value={mode}
+        onChange={setMode}
+      />
       <div className={styles.controls}>
         <button
           type="button"
@@ -303,22 +218,17 @@ export function PreviewPanel({
               {NO_VIDEO_NOTE}
             </p>
           )}
-          {draftResult && (
+          {result && (
             <p className={styles.note} role="status">
-              Drawing the draft: one fixed emitter, no movement, and only the
-              selected monster. A block with no anchor draws nothing.
+              Observed volleys are the marks; fitted volleys, drawn faint, are
+              each track&apos;s cadence in its windows. One fixed emitter, no
+              movement, and only the selected monster.
             </p>
           )}
-          {draftResult && draftResult.undrawnAttackIds.length > 0 && (
+          {result && result.undrawnAttackIds.length > 0 && (
             <p className={styles.note} role="status">
-              No sprite for: {draftResult.undrawnAttackIds.join(", ")}. These
+              No sprite for: {result.undrawnAttackIds.join(", ")}. These
               attacks can be edited and exported but not seen.
-            </p>
-          )}
-          {!draftResult && showTuning && unmatchedCount > 0 && (
-            <p className={styles.note} role="status">
-              {unmatchedCount} {unmatchedCount === 1 ? "tag" : "tags"} not
-              previewed
             </p>
           )}
           {(["x", "y"] as const).map((axis) => (
@@ -352,75 +262,8 @@ export function PreviewPanel({
             />
             <output>{headingDegrees.toFixed(0)}</output>
           </label>
-          {!draftResult && showTuning && <TuningSection tuning={tuning} />}
         </>
       )}
     </aside>
-  );
-}
-
-/**
- * The tuning controls (V16 S47-S50): number fields for the selected row's typed
- * estimates, plus a rate slider. They edit only the study, never game data, and
- * redraw through the one preview effect.
- */
-function TuningSection({ tuning }: Readonly<{ tuning: TuningProps }>) {
-  if (tuning.target === null)
-    return (
-      <p className={styles.note}>
-        Select a tag row to tune its typed estimates while watching the
-        preview.
-      </p>
-    );
-  const spb = tuning.values.find((entry) => entry.field === "shotsPerBurst")?.value;
-  const hasInterval = tuning.values.some((entry) => entry.field === "shotIntervalSeconds");
-  return (
-    <fieldset className={styles.tuning}>
-      <legend>Tuning (typed estimates)</legend>
-      <p className={styles.note}>{tuning.target}</p>
-      {tuning.values.length === 0 && (
-        <p className={styles.note}>Nothing on this tag can be tuned here.</p>
-      )}
-      {tuning.values.map(({ field, value }) => (
-        <div key={field} className={styles.tuningRow}>
-          <CommitInput
-            label={`Tune ${TUNING_LABEL[field].toLowerCase()}`}
-            caption={`${TUNING_LABEL[field]} (typed estimate)`}
-            value={value === undefined ? "" : String(value)}
-            step="any"
-            blankAllowed={BLANK_ALLOWED.includes(field)}
-            onCommit={(text) => {
-              const blank = text.trim() === "";
-              const next = blank ? null : Number(text);
-              const raisesBurst =
-                field === "shotsPerBurst" && next !== null && next > 1 && !hasInterval;
-              return tuning.onChange({
-                field,
-                value: next,
-                ...(raisesBurst && spb !== undefined
-                  ? { shotIntervalSeconds: DEFAULT_TUNING_SHOT_INTERVAL_SECONDS }
-                  : {}),
-              });
-            }}
-          />
-          {field === "clockwiseDegreesPerSecond" && (
-            <input
-              type="range"
-              aria-label="Rotation rate slider"
-              min={-TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND}
-              max={TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND}
-              step={1}
-              value={Math.max(
-                -TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND,
-                Math.min(TUNING_RATE_SLIDER_MAX_DEGREES_PER_SECOND, value ?? 0),
-              )}
-              onChange={(event) =>
-                tuning.onChange({ field, value: Number(event.target.value) })
-              }
-            />
-          )}
-        </div>
-      ))}
-    </fieldset>
   );
 }

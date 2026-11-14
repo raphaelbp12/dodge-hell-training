@@ -57,15 +57,34 @@ describe("actionForKey", () => {
       deltaSeconds: 1 / 30,
     });
     expect(actionForKey(" ", 60)).toEqual({ kind: "play-pause" });
-    expect(actionForKey("Enter", 60)).toEqual({ kind: "record", mode: "standalone" });
-    expect(actionForKey("b", 60)).toEqual({ kind: "record", mode: "new-burst" });
-    expect(actionForKey("B", 60, true)).toEqual({ kind: "record", mode: "new-burst" });
-    expect(actionForKey("Enter", 60, true)).toEqual({
-      kind: "record",
-      mode: "continue-burst",
-    });
-    expect(actionForKey("3", 60)).toEqual({ kind: "set-shots", shots: 3 });
-    expect(actionForKey("9", 60)).toEqual({ kind: "set-shots", shots: 9 });
+    expect(actionForKey("Enter", 60)).toEqual({ kind: "record" });
+  });
+
+  test.each([
+    ["s", { kind: "boundary" }],
+    ["S", { kind: "boundary" }],
+    ["t", { kind: "telegraph-end" }],
+    ["T", { kind: "telegraph-end" }],
+    ["i", { kind: "invulnerable" }],
+    ["I", { kind: "invulnerable" }],
+    ["x", { kind: "end-mark" }],
+    ["X", { kind: "end-mark" }],
+    ["e", { kind: "detonation" }],
+    ["E", { kind: "detonation" }],
+    ["Delete", { kind: "remove-mark" }],
+    ["Backspace", { kind: "remove-mark" }],
+    ["0", { kind: "select-track", position: 0 }],
+    ["1", { kind: "select-track", position: 1 }],
+    ["9", { kind: "select-track", position: 9 }],
+  ])("E10 maps %s", (key, action) => {
+    expect(actionForKey(key, 60)).toEqual(action);
+  });
+
+  test("E10 removes B, Shift+Enter and the shot-count digits", () => {
+    expect(actionForKey("b", 60)).toBeNull();
+    expect(actionForKey("B", 60, true)).toBeNull();
+    expect(actionForKey("Enter", 60, true)).toBeNull();
+    expect(actionForKey("3", 60)).not.toEqual({ kind: "set-shots", shots: 3 });
   });
 
   test("maps coarse jumps", () => {
@@ -100,7 +119,6 @@ describe("actionForKey", () => {
   });
 
   test("ignores keys it does not own", () => {
-    expect(actionForKey("0", 60)).toBeNull();
     expect(actionForKey("a", 60)).toBeNull();
     expect(actionForKey("Escape", 60)).toBeNull();
   });

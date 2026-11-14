@@ -6,7 +6,7 @@ This phase moves the route onto the v5 study, makes sessions and study files car
 
 ### Step 85.1 - The Route Holds A V5 Study
 
-Status: pending. Dependencies: phase 84.
+Status: complete. Dependencies: phase 84.
 
 **Implementation prompt**
 
@@ -31,7 +31,7 @@ The route compiles with one study state, a page reload restores a v5 session, lo
 
 ### Step 85.2 - The Multi-Row Timeline
 
-Status: pending. Dependencies: 85.1.
+Status: complete. Dependencies: 85.1.
 
 **Implementation prompt**
 
@@ -73,7 +73,7 @@ The timeline shows one row per track, selecting a row sets `selectedTrackId` in 
 
 ### Step 85.3 - The Structure Panel And Its Keys
 
-Status: pending. Dependencies: 85.2.
+Status: complete. Dependencies: 85.2.
 
 **Implementation prompt**
 
@@ -97,7 +97,7 @@ Pressing `S`, `T` and `I` with a video open edits the study as E04 and E05 descr
 
 ### Step 85.4 - Steps And Guide Text
 
-Status: pending. Dependencies: 85.3.
+Status: complete. Dependencies: 85.3.
 
 **Implementation prompt**
 
@@ -117,3 +117,34 @@ Keep the Attacks and Reconcile panels as placeholders that show their guide text
 **Acceptance**
 
 The four steps show, each with its guide, and `npm run verify` passes once at the end of the phase.
+
+## Execution Record
+
+Status: complete (2026-11-13).
+
+**85.1.** `TaggerRoute.tsx` now holds one `study: StudyV5 | null` and one `selectedTrackId`. The `storedTags`, `savedAttacks` and `monsterDraft` state are gone, and so is the header's phase select, which was the `sticky.phaseIndex`. The retired Tag, Review and Draft panels render from `legacyViewOf(study)`, which has empty tags and saved attacks and a null draft. Their edit callbacks only show a "retired" error, and their row table and export-attack box were removed because they could never render. A video or monster choice builds the study with `emptyStudy`. A loaded study file or restored session that is legacy goes through `studyV5FromLegacy`. Every edit goes through `studyEdits.ts` (`applyStudyEdit`). The export writes the v5 study with refreshed provenance and `recordedAt`. `tagging.ts` gains `ObservationExportV5`, its validator delegates version 5 to `validateStudyV5`, and `studyFromExport` and `parseStudyFile` return `StudyState | StudyV5`. `taggerSessions.ts` has the version 4 `SessionDraft`, plus `LegacySessionDraft`, `isLegacyDraft` and `markCountOf`. `shouldWriteDraft` takes `{ dirty, markCount, boundaryCount }`, and the session list reports `markCount`.
+
+**85.2.** `timelineModel.ts` gains `TIMELINE_ROW_HEIGHT_PX` and `timelineRows`. `TaggerTimeline.tsx` draws one canvas, sized to its layout width, with a row label, faint ticks at 40 % alpha, hollow outline ticks, full-height labelled boundary ticks and a playhead line. A click in a row's band selects that row. The scrub bar and the goto field below it still seek.
+
+**85.3.** `StructurePanel.tsx` was added, and `actionForKey` follows the E10 map. The route wires S, T and I. Enter, E, X, Delete/Backspace and the digits are no-ops until phases 86 and 87. Enter and the S, T and I keys ignore auto-repeat. Four help texts were added.
+
+**85.4.** The steps are now `setup | structure | attacks | reconcile`. `STEP_GUIDES` was rewritten. The Attacks and Reconcile steps show a placeholder with their guide text above the retired panels. The step statuses are "<n> boundaries", "<n> marks on <m> tracks" and "not yet checked".
+
+Decisions:
+
+- A legacy load or restore always shows one extra notice saying that the study was converted. The committed Queen observations produce no notices of their own, and the acceptance asks for one.
+- An end mark outside every window of its track draws its bar to the video end.
+- The track row label is the track id.
+- `[` and `]` step through every mark on every track and scratch.
+- The scratch row selects "no track" (null).
+- `studyMonsterProblem` now takes either study shape.
+- Choosing a video, changing the encounter, or loading or restoring a study asks for confirmation when the study holds marks or boundaries.
+- The `.workspace[data-step="review"]` CSS now targets `reconcile`.
+
+Playwright: the three tagger tests that depended on retired behaviour were replaced or updated.
+
+- The preview test now uses the Attacks step, has a valid ISO `recordedAt`, and polls its size checks. The polling fixes a race that the heavier render exposed.
+- "the structure step marks a boundary, a telegraph end and an invulnerable span by key" replaces the linked-repeat test.
+- "a legacy study converts with a notice and a reload restores the v5 session" replaces the draft-panel test.
+
+**Checks.** Focused vitest runs over `src/research`: 540 passed. The new tests were seen failing first, except the `studyLoad` v5 case, which was written after the `tagging.ts` change. The three Playwright tests passed, and the preview test passed 6 of 6 under `--repeat-each`. `npm run verify` (verifier): lint passed with warnings only, typecheck passed, and test failed only on the known pre-existing `bomb-split-characterization` snapshot (1582 of 1583 passed). That skipped build, so `npm run build` was run alone and passed. Manual check: performed through the Playwright tests above (S, T and I edit the study and the table, a row click selects a track, a reload restores a version 4 session). The canvas appearance itself was not inspected by eye. Nothing under `app/src/game/` changed.

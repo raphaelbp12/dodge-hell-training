@@ -26,7 +26,7 @@ This file is the reusable process for every planning effort in this repository: 
 | V17 | 65-72 | active | H | [docs/plan-v17.md](docs/plan-v17.md) |
 | V18 | 73-78 | phases 73-75 complete; 76-78 implemented, manual checks blocked | L | [`docs/plan-v18.md`](docs/plan-v18.md) |
 | V19 | 79-82 | complete (manual checks pending) | J | [`docs/plan-v19.md`](docs/plan-v19.md) |
-| V20 | 83-88 | drafted | E | [`docs/plan-v20.md`](docs/plan-v20.md) |
+| V20 | 83-88 | complete (manual checks pending; final `npm run verify` pending) | E | [`docs/plan-v20.md`](docs/plan-v20.md) |
 
 (V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 

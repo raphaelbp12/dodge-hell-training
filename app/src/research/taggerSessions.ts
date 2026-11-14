@@ -20,10 +20,21 @@ import {
   type StickySelection,
 } from "./taggingOptions";
 import type { EncounterConfig } from "../game/config/encounter";
+import { validateStudyV5, type StudyV5 } from "./study";
 
 export const TAGGER_SESSION_KEY_PREFIX = "dodge-hell-training.tagger-session.";
 
+/** Plan V20 E14: a version 4 draft carries a v5 study and the selected track. */
 export type SessionDraft = Readonly<{
+  draftVersion: 4;
+  /** ISO-8601 time of this write. */
+  savedAt: string;
+  study: StudyV5;
+  selectedTrackId: string | null;
+}>;
+
+/** A draft written before plan V20; the route converts it with `studyV5FromLegacy`. */
+export type LegacySessionDraft = Readonly<{
   /**
    * V16 S05: version 1 drafts upgrade on restore with no saved attacks.
    * V18: version 3 carries the study's monster and draft; older drafts are the
@@ -70,14 +81,37 @@ function positiveFinite(value: unknown, path: string): number {
   return value;
 }
 
-/** Structural validation of a saved draft; throws on malformed input. */
-export function validateSessionDraft(value: unknown): SessionDraft {
+export function isLegacyDraft(
+  draft: SessionDraft | LegacySessionDraft,
+): draft is LegacySessionDraft {
+  return draft.draftVersion !== 4;
+}
+
+/** Every mark on the study's tracks and scratch track. */
+export function markCountOf(study: StudyV5): number {
+  return study.tracks.reduce((sum, track) => sum + track.marks.length, study.scratch.length);
+}
+
+/**
+ * Structural validation of a saved draft; throws on malformed input. Versions
+ * 1-3 come back as a legacy draft for the route to convert (E14).
+ */
+export function validateSessionDraft(value: unknown): SessionDraft | LegacySessionDraft {
   const source = record(value, "");
   const version = source.draftVersion;
-  if (version !== 1 && version !== 2 && version !== 3)
-    reject("draftVersion", "must be 1, 2 or 3");
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4)
+    reject("draftVersion", "must be 1, 2, 3 or 4");
   const savedAt = nonEmptyString(source.savedAt, "savedAt");
   if (Number.isNaN(Date.parse(savedAt))) reject("savedAt", "must be a date");
+  if (version === 4) {
+    try {
+      validateStudyV5(source.study);
+    } catch (cause) {
+      reject("study", cause instanceof Error ? cause.message : String(cause));
+    }
+    if (source.selectedTrackId !== null) nonEmptyString(source.selectedTrackId, "selectedTrackId");
+    return value as SessionDraft;
+  }
   const study = record(source.study, "study");
   nonEmptyString(study.encounterId, "study.encounterId");
   const provenance = record(study.provenance, "study.provenance");
@@ -138,7 +172,7 @@ export function validateSessionDraft(value: unknown): SessionDraft {
   }
   if (sticky.savedAttackId !== undefined)
     nonEmptyString(sticky.savedAttackId, "sticky.savedAttackId");
-  if (version === 3) return value as SessionDraft;
+  if (version === 3) return value as LegacySessionDraft;
   return {
     ...(value as Record<string, unknown>),
     draftVersion: 3,
@@ -148,34 +182,34 @@ export function validateSessionDraft(value: unknown): SessionDraft {
       archetypeId: null,
       monsterDraft: null,
     },
-  } as unknown as SessionDraft;
+  } as unknown as LegacySessionDraft;
 }
 
-/** Z28/Z30: the draft built from the live session at write time. */
+/** E14: the draft built from the live session at write time. */
 export function buildDraft(input: {
-  study: StudyState;
-  sticky: StickySelection;
+  study: StudyV5;
+  selectedTrackId: string | null;
   savedAt: string;
 }): SessionDraft {
   return {
-    draftVersion: 3,
+    draftVersion: 4,
     savedAt: input.savedAt,
     study: input.study,
-    sticky: input.sticky,
+    selectedTrackId: input.selectedTrackId,
   };
 }
 
 /**
- * Z30: a slot is written only after a first tag or edit (dirty) and only while
- * the session holds at least one tag, so deleting the last tag keeps the slot.
+ * Z30, amended by E14: a slot is written only after an edit (dirty) and only
+ * while the study holds a mark or a boundary, so removing the last one keeps
+ * the slot.
  */
 export function shouldWriteDraft(input: {
   dirty: boolean;
-  tagCount: number;
-  /** V18: a study holding a monster draft is worth saving without tags. */
-  hasDraft?: boolean;
+  markCount: number;
+  boundaryCount: number;
 }): boolean {
-  return input.dirty && (input.tagCount > 0 || input.hasDraft === true);
+  return input.dirty && (input.markCount > 0 || input.boundaryCount > 0);
 }
 
 export type SessionNotice =
@@ -225,7 +259,8 @@ export type SessionListEntry =
       fileName: string;
       /** Null is the primary monster (L33). */
       archetypeId: string | null;
-      tagCount: number;
+      /** Marks over tracks and scratch; a legacy draft's tag count. */
+      markCount: number;
       savedAt: string;
     }>
   | Readonly<{ readable: false; key: string }>;
@@ -290,7 +325,9 @@ export class TaggerSessions {
             key,
             fileName: draft.study.provenance.fileName,
             archetypeId: draft.study.archetypeId,
-            tagCount: draft.study.tags.length,
+            markCount: isLegacyDraft(draft)
+              ? draft.study.tags.length
+              : markCountOf(draft.study),
             savedAt: draft.savedAt,
           };
         } catch {
@@ -300,7 +337,7 @@ export class TaggerSessions {
     });
   }
 
-  read(key: string): SessionResult<SessionDraft> {
+  read(key: string): SessionResult<SessionDraft | LegacySessionDraft> {
     return this.guard((storage) => {
       const text = storage.getItem(key);
       if (text === null) throw new Error("The saved session is missing.");

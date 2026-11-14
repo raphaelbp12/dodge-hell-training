@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import styles from "./TaggerRoute.module.css";
 
 /** The tagger's working steps, in the order a study is usually made. */
-export type TaggerStep = "setup" | "tag" | "review" | "draft";
+export type TaggerStep = "setup" | "structure" | "attacks" | "reconcile";
 
 export type StepItem = Readonly<{
   id: TaggerStep;
   name: string;
-  /** A short line saying where this step stands, such as "3 tags". */
+  /** A short line saying where this step stands, such as "3 boundaries". */
   status: string;
   done?: boolean;
 }>;

@@ -4,6 +4,7 @@ import { AUTHORED_MONSTER_FILES, type AuthoredAttack } from "../game/config/data
 import {
   archetypeOf,
   attackSpecFromAuthored,
+  ENCOUNTER_CONFIGS,
   encounterConfigOf,
   type EncounterConfig,
 } from "../game/config/encounter";
@@ -14,59 +15,17 @@ import {
 } from "../game/simulation/simulation";
 import { resolveBearings } from "../game/simulation/patterns";
 import {
-  blockWindows,
-  draftPreviewAt,
   draftVolleysLiveAt,
-  NO_TAG_INDEX,
+  fittedPreviewAt,
+  observedPreviewAt,
+  windowsFromBoundaries,
   type BlockWindow,
 } from "./draftPreview";
-import {
-  blocksOfMonster,
-  loadMonsterDraft,
-  setAnchor,
-  type DraftBlock,
-} from "./monsterDraft";
+import { segmentsOfMonster, segmentWindows, type SegmentWindow, type StudyV5 } from "./study";
+import { emptyStudy } from "./studyMigrate";
 
 const queen = encounterConfigOf("killer-bee-queen");
 const IDLE = { north: false, south: false, east: false, west: false };
-
-const block = (id: string, telegraph: number, duration: number | null): DraftBlock => ({
-  id,
-  phaseId: id,
-  subPhaseId: null,
-  label: id,
-  telegraphSeconds: telegraph,
-  durationSeconds: duration,
-});
-
-describe("blockWindows", () => {
-  test("epoch adds the telegraph and unanchored blocks have no window", () => {
-    const [window, ...rest] = blockWindows([block("a", 2, null), block("b", 1, null)], { a: 10 }, 100);
-    expect(window).toMatchObject({ blockId: "a", anchorSeconds: 10, epochSeconds: 12, endSeconds: 100 });
-    expect(rest).toEqual([]);
-  });
-
-  test("a timed block stops at its duration, or earlier at a nearer next anchor", () => {
-    const blocks = [block("a", 0, 29), block("b", 0, null)];
-    expect(blockWindows(blocks, { a: 5 }, 100)[0].endSeconds).toBe(34);
-    const both = blockWindows(blocks, { a: 5, b: 20 }, 100);
-    expect(both.find((w) => w.blockId === "a")!.endSeconds).toBe(20);
-    expect(both.find((w) => w.blockId === "b")!.endSeconds).toBe(100);
-  });
-
-  test("an untimed block stops at the next anchor", () => {
-    const blocks = [block("a", 0, null), block("b", 0, null)];
-    expect(blockWindows(blocks, { a: 5, b: 9 }, 100)[0].endSeconds).toBe(9);
-  });
-
-  test("a same-time pair resolves in authored order, the later one winning", () => {
-    const blocks = [block("a", 0, null), block("b", 0, null)];
-    const [first, second] = blockWindows(blocks, { a: 5, b: 5 }, 100);
-    expect(first.blockId).toBe("a");
-    expect(first.endSeconds).toBe(5);
-    expect(second.endSeconds).toBe(100);
-  });
-});
 
 describe("draftVolleysLiveAt", () => {
   const window: BlockWindow = { blockId: "a", anchorSeconds: 0, epochSeconds: 2, endSeconds: 20 };
@@ -165,51 +124,53 @@ describe("draftVolleysLiveAt against the simulation", () => {
   }
 });
 
-describe("draftPreviewAt", () => {
-  const raw = AUTHORED_MONSTER_FILES["killer-bee-queen"];
-  const blocks = blocksOfMonster(archetypeOf(queen, "killer-bee-queen"));
-  const loaded = loadMonsterDraft(raw, null, "phase-3-pond-barrage").draft;
+/** A study holding one track of `authored` in segment "only", fitted in one window from 0 s. */
+function fittedOne(
+  authored: AuthoredAttack,
+  config: EncounterConfig,
+  input: Readonly<{ telegraphSeconds?: number; endSeconds?: number; timeSeconds: number; playerTiles?: { x: number; y: number } }>,
+) {
+  const study: StudyV5 = {
+    schemaVersion: 5,
+    encounterId: "e",
+    archetypeId: "m",
+    recordedAt: "2026-11-13T00:00:00.000Z",
+    provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 1e6 },
+    boundaries: [],
+    statusSpans: [],
+    tracks: [{ id: authored.id, location: { phaseId: "only", subPhaseId: null }, attack: authored, cadenceSource: "authored", marks: [] }],
+    scratch: [],
+    acceptedSegmentValues: {},
+  };
+  const windows: SegmentWindow[] = [
+    { segmentId: "only", startSeconds: 0, epochSeconds: input.telegraphSeconds ?? 0, endSeconds: input.endSeconds ?? 1e6 },
+  ];
+  return fittedPreviewAt({
+    study,
+    segments: [],
+    windows,
+    config,
+    timeSeconds: input.timeSeconds,
+    playerTiles: input.playerTiles ?? { x: 0, y: 0 },
+    headingRadians: 0,
+  });
+}
+
+describe("fittedPreviewAt on one track", () => {
   const player = { x: 0, y: 0 };
-  const frameAt = (draft: typeof loaded, time: number, phaseId = "phase-3-pond-barrage") =>
-    draftPreviewAt({ draft, blocks, phaseId, config: queen, timeSeconds: time, videoEndSeconds: 200, playerTiles: player, headingRadians: 0 });
+  const single = (cooldown: number): AuthoredAttack =>
+    ({
+      id: "one",
+      projectile: Object.keys(queen.projectiles).find((id) => queen.projectiles[id].appearance && queen.projectiles[id].type === "bullet")!,
+      tuningSource: "video-observation",
+      pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
+      cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: cooldown, initialDelaySeconds: 0 },
+    }) as AuthoredAttack;
 
-  test("an unanchored draft draws nothing", () => {
-    const { frame } = frameAt(loaded, 30);
-    expect(frame.projectiles).toHaveLength(0);
-    expect(frame.detonations).toHaveLength(0);
-    expect(frame.unmatchedTagCount).toBe(0);
-  });
-
-  test("an anchored block draws shots tagged with no tag", () => {
-    const draft = setAnchor(loaded, "phase-3-pond-barrage", 0);
-    const { frame } = frameAt(draft, 4);
-    expect(frame.projectiles.length).toBeGreaterThan(0);
-    expect(frame.projectiles.every((p) => p.tagIndex === NO_TAG_INDEX)).toBe(true);
-  });
-
-  test("a phase's preview draws nothing from another phase's anchored block (J06)", () => {
-    const draft = setAnchor(loaded, "phase-3-pond-barrage", 0);
-    expect(frameAt(draft, 4, "phase-4-glaive-circle").frame.projectiles).toHaveLength(0);
-  });
-
-  test("another phase's anchor still ends a block with no duration (J06)", () => {
-    const first = blocks.find((entry) => entry.phaseId === "phase-3-pond-barrage")!;
-    const draft = setAnchor(setAnchor(loaded, first.id, 0), "phase-4-glaive-circle", 1);
-    const unbounded = blocks.map((entry) => (entry.id === first.id ? { ...entry, durationSeconds: null } : entry));
-    const at = (time: number) =>
-      draftPreviewAt({ draft, blocks: unbounded, phaseId: first.phaseId, config: queen, timeSeconds: time, videoEndSeconds: 200, playerTiles: player, headingRadians: 0 }).frame;
-    expect(at(0.9).projectiles.length).toBeGreaterThanOrEqual(0);
-    const windows = blockWindows(unbounded, draft.anchors, 200);
-    expect(windows.find((window) => window.blockId === first.id)!.endSeconds).toBe(1);
-    expect(at(60).projectiles).toHaveLength(0);
-  });
-
-  test("shots outlive their block's end", () => {
-    const draft = setAnchor(setAnchor(loaded, "phase-3-pond-barrage", 0), "phase-4-glaive-circle", 4);
-    const before = frameAt(draft, 3.9).frame.projectiles.length;
-    expect(before).toBeGreaterThan(0);
-    const after = frameAt({ ...draft, anchors: { "phase-3-pond-barrage": 0, "phase-4-glaive-circle": 1000 } }, 4.1);
-    expect(after.frame.projectiles.length).toBeGreaterThan(0);
+  test("shots outlive their window's end, and none fire after it", () => {
+    expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 3.9 }).frame.projectiles.length).toBeGreaterThan(0);
+    expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 4.1 }).frame.projectiles.length).toBeGreaterThan(0);
+    expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 60 }).frame.projectiles).toHaveLength(0);
   });
 
   test("per-burst advance changes the bearings between bursts as in resolveBearings", () => {
@@ -220,13 +181,7 @@ describe("draftPreviewAt", () => {
       pattern: { kind: "ring", arms: 1, emitterRadiusTiles: 0, initialPhaseDegrees: 0, clockwiseDegreesPerSecond: 0, perBurstAdvanceDegrees: 30 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
     } as AuthoredAttack;
-    const draft = {
-      anchors: { only: 0 },
-      phases: [{ phaseId: "only", attacks: [authored], subPhases: [] }],
-    };
-    const only = [block("only", 0, null)];
-    const at = (time: number) =>
-      draftPreviewAt({ draft, phaseId: "only", blocks: only, config: queen, timeSeconds: time, videoEndSeconds: 50, playerTiles: player, headingRadians: 0 }).frame.projectiles;
+    const at = (time: number) => fittedOne(authored, queen, { endSeconds: 50, timeSeconds: time }).frame.projectiles;
     const spec = attackSpecFromAuthored(authored);
     const bearing = (burst: number) =>
       resolveBearings(spec.pattern, { enemyPositionTiles: { x: 0, y: 0 }, playerPositionTiles: player, enemyHeadingRadians: 0, ringPhaseRadians: 0, volleyIndexInBurst: 0, burstsFired: burst, secondsSinceEpoch: 0 })[0].bearingRadians;
@@ -247,10 +202,9 @@ describe("draftPreviewAt", () => {
       pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 30, initialDelaySeconds: 0 },
     } as AuthoredAttack;
-    const draft = { anchors: { only: 0 }, phases: [{ phaseId: "only", attacks: [authored], subPhases: [] }] };
     const spec = queen.projectiles[bomb];
     const travel = spec.type === "bomb" ? spec.travelSeconds : 0;
-    const frame = draftPreviewAt({ draft, phaseId: "only", blocks: [block("only", 0, null)], config: queen, timeSeconds: travel + 0.01, videoEndSeconds: 50, playerTiles: { x: 3, y: 2 }, headingRadians: 0 }).frame;
+    const { frame } = fittedOne(authored, queen, { endSeconds: 50, timeSeconds: travel + 0.01, playerTiles: { x: 3, y: 2 } });
     expect(frame.detonations[0].positionTiles).toEqual({ x: 3, y: 2 });
   });
 
@@ -265,14 +219,13 @@ describe("draftPreviewAt", () => {
       pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
     } as AuthoredAttack;
-    const draft = { anchors: { only: 0 }, phases: [{ phaseId: "only", attacks: [authored], subPhases: [] }] };
-    const result = draftPreviewAt({ draft, phaseId: "only", blocks: [block("only", 0, null)], config: worm, timeSeconds: 2, videoEndSeconds: 50, playerTiles: player, headingRadians: 0 });
+    const result = fittedOne(authored, worm, { endSeconds: 50, timeSeconds: 2 });
     expect(result.undrawnAttackIds).toEqual(["blank"]);
     expect(result.frame.projectiles).toHaveLength(0);
   });
 });
 
-describe("draftPreviewAt against the simulation", () => {
+describe("fittedPreviewAt against the simulation", () => {
   test("projectile count matches a real run of one block at sampled times", () => {
     const projectile = Object.keys(queen.projectiles).find(
       (id) => queen.projectiles[id].type === "bullet" && queen.projectiles[id].appearance,
@@ -286,16 +239,131 @@ describe("draftPreviewAt against the simulation", () => {
     } as AuthoredAttack;
     const config = oneAttackConfig(authored);
     const phase = config.archetypes[config.primaryArchetypeId].phases[0];
-    const draft = { anchors: { only: 0 }, phases: [{ phaseId: "only", attacks: [authored], subPhases: [] }] };
-    const only = [{ id: "only", phaseId: "only", subPhaseId: null, label: "only", telegraphSeconds: phase.telegraphSeconds, durationSeconds: null }];
     const state = createSimulation(config, 1);
     setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
     const step = config.simulation.fixedStepSeconds;
     const samples = [3, 5, 8, 11];
     for (const sample of samples) {
       while (state.elapsedSeconds < sample - step / 2) advanceSimulation(state, step, IDLE);
-      const preview = draftPreviewAt({ draft, phaseId: "only", blocks: only, config, timeSeconds: state.elapsedSeconds, videoEndSeconds: 1e6, playerTiles: { x: 0, y: 0 }, headingRadians: 0 });
+      const preview = fittedOne(authored, config, { telegraphSeconds: phase.telegraphSeconds, timeSeconds: state.elapsedSeconds });
       expect(Math.abs(preview.frame.projectiles.length - state.shards.length)).toBeLessThanOrEqual(3);
     }
+  });
+});
+
+describe("the timeline preview (plan V20 step 86.4)", () => {
+  const segments = segmentsOfMonster(archetypeOf(queen, "killer-bee-queen"));
+  const base = emptyStudy({
+    encounterId: "killer-bee-queen",
+    archetypeId: "killer-bee-queen",
+    provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 200 },
+    recordedAt: "2026-11-13T00:00:00.000Z",
+    rawFile: AUTHORED_MONSTER_FILES["killer-bee-queen"],
+  });
+  const index = base.tracks.findIndex((track) => {
+    const projectile = queen.projectiles[track.attack.projectile];
+    return projectile?.appearance !== undefined && projectile.type === "bullet";
+  });
+  const chosen = base.tracks[index];
+  const segmentId = chosen.location.subPhaseId === null
+    ? chosen.location.phaseId
+    : `${chosen.location.phaseId}/${chosen.location.subPhaseId}`;
+  const study: StudyV5 = {
+    ...base,
+    boundaries: [{ timeSeconds: 0, segmentId }],
+    tracks: base.tracks.map((track, at) =>
+      at === index ? { ...track, marks: [{ timeSeconds: 1, kind: "volley" }] } : track,
+    ),
+  };
+  const windows = segmentWindows(study.boundaries, segments, 200);
+  const input = (timeSeconds: number) => ({
+    study,
+    segments,
+    windows,
+    config: queen,
+    timeSeconds,
+    playerTiles: { x: 0, y: 0 },
+    headingRadians: 0,
+  });
+
+  test("windowsFromBoundaries maps a window one-to-one", () => {
+    const window: SegmentWindow = { segmentId: "a", startSeconds: 2, epochSeconds: 3, endSeconds: 9 };
+    expect(windowsFromBoundaries([window])).toEqual([
+      { blockId: "a", anchorSeconds: 2, epochSeconds: 3, endSeconds: 9 },
+    ]);
+  });
+
+  test("observedPreviewAt draws a mark's volley from its own age only", () => {
+    expect(observedPreviewAt(input(0.99)).frame.projectiles).toHaveLength(0);
+    const after = observedPreviewAt(input(1.1)).frame.projectiles;
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((projectile) => projectile.tagIndex === index)).toBe(true);
+    expect(after.some((projectile) => projectile.ghost)).toBe(false);
+  });
+
+  test("fittedPreviewAt marks every entry as a ghost", () => {
+    const { frame } = fittedPreviewAt(input(30));
+    expect(frame.projectiles.length).toBeGreaterThan(0);
+    expect(frame.projectiles.every((projectile) => projectile.ghost === true)).toBe(true);
+    expect(frame.detonations.every((detonation) => detonation.ghost === true)).toBe(true);
+  });
+});
+
+describe("a bomb track's flight-time override (plan V20 step 87.1)", () => {
+  const found = Object.entries(ENCOUNTER_CONFIGS).flatMap(([encounterId, config]) =>
+    Object.keys(config.archetypes)
+      .filter((archetypeId) => AUTHORED_MONSTER_FILES[archetypeId] !== undefined)
+      .map((archetypeId) => ({ encounterId, archetypeId, config })),
+  ).flatMap(({ encounterId, archetypeId, config }) => {
+    const base = emptyStudy({
+      encounterId,
+      archetypeId,
+      provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 200 },
+      recordedAt: "2026-11-13T00:00:00.000Z",
+      rawFile: AUTHORED_MONSTER_FILES[archetypeId],
+    });
+    const index = base.tracks.findIndex((track) => {
+      const projectile = config.projectiles[track.attack.projectile];
+      return projectile?.type === "bomb" && projectile.appearance?.bomb !== undefined;
+    });
+    return index < 0 ? [] : [{ base, index, config, archetypeId }];
+  })[0];
+
+  test("observedPreviewAt detonates at the override's travel time", () => {
+    expect(found).toBeDefined();
+    const { base, index, config, archetypeId } = found!;
+    const segments = segmentsOfMonster(archetypeOf(config, archetypeId));
+    const chosen = base.tracks[index];
+    const projectile = config.projectiles[chosen.attack.projectile]!;
+    const travelSeconds = projectile.type === "bomb" ? projectile.travelSeconds : 0;
+    const override = travelSeconds + 0.5;
+    const studyOf = (projectileOverride?: { travelSeconds: number }): StudyV5 => ({
+      ...base,
+      boundaries: [{ timeSeconds: 0, segmentId: segments[0].id }],
+      tracks: base.tracks.map((track, at) =>
+        at === index
+          ? {
+              ...track,
+              location: segments[0].ref,
+              marks: [{ timeSeconds: 1, kind: "volley" }],
+              ...(projectileOverride ? { projectileOverride } : {}),
+            }
+          : track,
+      ),
+    });
+    const at = (study: StudyV5, timeSeconds: number) =>
+      observedPreviewAt({
+        study,
+        segments,
+        windows: segmentWindows(study.boundaries, segments, 200),
+        config,
+        timeSeconds,
+        playerTiles: { x: 0, y: 0 },
+        headingRadians: 0,
+      }).frame.detonations.filter((detonation) => detonation.tagIndex === index);
+    const probe = 1 + travelSeconds + 0.01;
+    expect(at(studyOf(), probe).length).toBeGreaterThan(0);
+    expect(at(studyOf({ travelSeconds: override }), probe)).toHaveLength(0);
+    expect(at(studyOf({ travelSeconds: override }), 1 + override + 0.01).length).toBeGreaterThan(0);
   });
 });

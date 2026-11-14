@@ -8,6 +8,7 @@ import {
   type StudyState,
   type VideoProvenance,
 } from "./tagging";
+import type { StudyV5 } from "./study";
 
 /**
  * Z19: parses and validates a study file. Throws a readable error for invalid
@@ -17,14 +18,14 @@ import {
 export function parseStudyFile(
   text: string,
   knownEncounterIds: readonly string[],
-): StudyState {
+): StudyState | StudyV5 {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
     throw new Error("The study file is not valid JSON.");
   }
-  let study: StudyState;
+  let study: StudyState | StudyV5;
   try {
     study = studyFromExport(validateObservationExport(parsed));
   } catch (cause) {
@@ -126,7 +127,7 @@ export function currentDuration(
  * and saved attacks. Returns null when the study is consistent.
  */
 export function studyMonsterProblem(
-  study: StudyState,
+  study: StudyState | StudyV5,
   primaryArchetypeId: string,
   monsterIds: readonly string[],
 ): string | null {
@@ -171,19 +172,4 @@ export function observationFileName(
   return archetypeId === primaryArchetypeId
     ? `${encounterId}-observations.json`
     : `${encounterId}-${archetypeId}-observations.json`;
-}
-
-export type StudySections = Readonly<{
-  /** The preview's tuning controls and unmatched-tag notice. */
-  previewTuning: boolean;
-  /** The Draft and Tags switch. */
-  sourceSwitch: boolean;
-}>;
-
-/** V19 J18, J19: every monster shows tagging and the source switch; tuning follows the source. */
-export function studySections(previewSource: "draft" | "tags"): StudySections {
-  return {
-    previewTuning: previewSource === "tags",
-    sourceSwitch: true,
-  };
 }

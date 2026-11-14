@@ -4,20 +4,15 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   archetypeOf,
+  bodyExtentTiles,
   DEFAULT_ENCOUNTER_ID,
   ENCOUNTER_LIST,
   encounterConfigOf,
-  type ProjectileAppearanceSpec,
 } from "../game/config/encounter";
-import {
-  summarizeTags,
-  type TagAim,
-  type TagArmPattern,
-  type TagPattern,
-} from "./tagging";
 import {
   actionForKey,
   clampSeekTarget,
@@ -31,32 +26,6 @@ import {
   type FrameSample,
 } from "./taggingRoute";
 import {
-  appearanceOptions,
-  assembleExport,
-  armPatternAllowed,
-  armPatternTakesArc,
-  assignBurst,
-  createTag,
-  DEFAULT_ARM_ARC_DEGREES,
-  DEFAULT_SHOTS_PER_ARM,
-  formatSummaryRow,
-  OFFERABLE_PATTERNS,
-  patternTakesAim,
-  phaseOptions,
-  pixelGridCells,
-  readoutInterval,
-  rotationAllowed,
-  shotsLabel,
-  sortNewestFirst,
-  stickyFromTag,
-  TAG_AIMS,
-  type AppearanceOption,
-  type PhaseOption,
-  type StickySelection,
-  type TagChange,
-  type TypedNumberField,
-} from "./taggingOptions";
-import {
   currentDuration,
   fileNameMismatch,
   loadDecision,
@@ -65,63 +34,75 @@ import {
   parseStudyFile,
   resolveProvenance,
   studyMonsterProblem,
-  studySections,
   videoChoiceDecision,
-  encounterChangeDecision,
 } from "./studyLoad";
 import { GlossaryPanel } from "./GlossaryPanel";
 import { StepGuidePanel } from "./StepGuidePanel";
 import { STEP_GUIDES } from "./stepGuide";
 import { HelpMark } from "./HelpMark";
 import * as help from "./helpText";
-import { DraftPanel } from "./DraftPanel";
 import {
-  blocksOfMonster,
+  changedAttack,
+  monsterFilePath,
   monstersOfEncounter,
-  setAnchor,
-  type MonsterDraft,
+  newAttack,
+  type AttackChange,
 } from "./monsterDraft";
+import { bombVariantOf, monsterFileTextFromStudy, studyExportJson } from "./studyExport";
+import { studyWarnings } from "./studyWarnings";
+import { ReconcilePanel } from "./ReconcilePanel";
 import {
   buildDraft,
-  restoreSticky,
+  isLegacyDraft,
+  markCountOf,
   shouldWriteDraft,
   TaggerSessions,
+  type LegacySessionDraft,
+  type SessionDraft,
   type SessionListEntry,
 } from "./taggerSessions";
+import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import {
-  resolveTags,
-  type SavedAttack,
-  type SavedAttackCadence,
-  type StoredTag,
-  type StudyState,
-} from "./tagging";
-import { PreviewPanel, type TuningProps } from "./PreviewPanel";
-import { applyTuning, tunableValuesFor } from "./tuning";
-import { SavedAttackPanel } from "./SavedAttackPanel";
-import { clearRepeatEnd, endRepeatTarget, setRepeatEnd, volleyTimesOf } from "./repeat";
+  segmentWindows,
+  segmentsOfMonster,
+  windowsForTrack,
+  type AttackTrack,
+  type StudyV5,
+} from "./study";
+import { emptyStudy, studyV5FromLegacy, tracksFromMonsterFile } from "./studyMigrate";
 import {
-  createSavedAttack,
-  deleteSavedAttack,
-  detachTag,
-  editStoredTag,
-  isStickyModified,
-  linkedAttackIdOf,
-  recordStoredTag,
-  renameSavedAttack,
-  stickyFromSavedAttack,
-  updateFromSticky,
-} from "./savedAttacks";
-import {
-  CommitInput,
-  RowTypedFields,
-  StickyTypedFields,
-  rowHasTypedFields,
-} from "./TypedFieldControls";
-import {
-  attackJson,
-  authoredAttackFromTag,
-  FRONT_EXPORT_NOTE,
-} from "./exportAttack";
+  acceptSegmentValue,
+  addBoundary,
+  addMark,
+  addTrack,
+  createTrackFromScratch,
+  duplicateTrack,
+  reloadTracks,
+  removeMarkNear,
+  removeTrack,
+  setBurstGapThreshold,
+  setEndMark,
+  setMeasuredRange,
+  setProjectileOverride,
+  setScale,
+  type ProjectileOverride,
+  setTrackAttack,
+  setTrackLocation,
+  removeBoundary,
+  removeSpan,
+  setBoundarySegment,
+  setTelegraphEnd,
+  toggleInvulnerable,
+  type EditResult,
+} from "./studyEdits";
+import { StructurePanel } from "./StructurePanel";
+import { TrackPanel } from "./TrackPanel";
+import { FitPanel, type CadenceField } from "./FitPanel";
+import { ScalePanel } from "./ScalePanel";
+import { distanceTiles, tileWidthFractionOf, type VideoPoint } from "./scale";
+import { predictedTimesInWindows, type DetonationPair } from "./cadenceFit";
+import type { StudyState } from "./tagging";
+import { PreviewPanel } from "./PreviewPanel";
 import {
   PreviewPreference,
   VIDEO_SIZE_PIXELS,
@@ -129,214 +110,29 @@ import {
   type PreviewSize,
 } from "./previewPreference";
 import { TaggerTimeline } from "./TaggerTimeline";
-import { Segmented, StepNav, type StepItem, type TaggerStep } from "./TaggerControls";
+import { StepNav, type StepItem, type TaggerStep } from "./TaggerControls";
 import {
   nextVolleyTime,
   previousVolleyTime,
+  timelineRows,
   volleyStepTolerance,
 } from "./timelineModel";
-import {
-  highlightedTagIndices,
-  matchesLinearBullet,
-  matchStatusText,
-  selectionAfterDelete,
-  tagMatchStatus,
-} from "./previewModel";
 import styles from "./TaggerRoute.module.css";
-
-const THUMBNAIL_SCALE_PIXELS = 6;
 
 /** Frames kept for the playback frame-rate estimate. */
 const FRAME_SAMPLE_WINDOW = 60;
 
 type FrameMetadata = Readonly<{ mediaTime: number; presentedFrames: number }>;
 
-function AppearanceThumbnail({ spec }: { spec: ProjectileAppearanceSpec }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const element = canvas.current;
-    if (!element) return;
-    const grid = pixelGridCells(spec.pixels);
-    element.width = Math.max(1, grid.width * THUMBNAIL_SCALE_PIXELS);
-    element.height = Math.max(1, grid.height * THUMBNAIL_SCALE_PIXELS);
-    const context = element.getContext("2d");
-    if (!context) return;
-    context.clearRect(0, 0, element.width, element.height);
-    grid.cells.forEach((colour, index) => {
-      if (colour === null) return;
-      context.fillStyle = colour;
-      context.fillRect(
-        (index % grid.width) * THUMBNAIL_SCALE_PIXELS,
-        Math.floor(index / grid.width) * THUMBNAIL_SCALE_PIXELS,
-        THUMBNAIL_SCALE_PIXELS,
-        THUMBNAIL_SCALE_PIXELS,
-      );
-    });
-  }, [spec]);
-  return <canvas ref={canvas} className={styles.thumbnail} aria-hidden="true" />;
-}
-
-function AppearanceChoice({
-  option,
-  selected,
-  onSelect,
-}: {
-  option: AppearanceOption;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`${styles.appearance} ${selected ? styles.selectedAppearance : ""}`}
-      aria-pressed={selected}
-      onClick={onSelect}
-    >
-      {option.isBomb ? (
-        <span
-          className={styles.bombSwatch}
-          style={{ backgroundColor: option.spec.bomb?.bodyColor }}
-          aria-hidden="true"
-        />
-      ) : (
-        <AppearanceThumbnail spec={option.spec} />
-      )}
-      <span className={styles.appearanceId}>{option.id}</span>
-    </button>
-  );
-}
-
 type Confirmation = Readonly<{ message: string; onConfirm: () => void }>;
 
 const KNOWN_ENCOUNTER_IDS = ENCOUNTER_LIST.map((entry) => entry.id);
 
-function RawOrKnownSelect({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: string;
-  options: readonly { value: string; label: string }[];
-  onChange: (value: string) => void;
-  label: string;
-}) {
-  const known = options.some((option) => option.value === value);
-  return (
-    <select
-      className={styles.cellSelect}
-      aria-label={label}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    >
-      {!known && <option value={value}>{value} (unknown)</option>}
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function phaseChoices(phases: readonly PhaseOption[]) {
-  return phases.map((phase) => ({
-    value: String(phase.index),
-    label: `${phase.label} — ${phase.id}`,
-  }));
-}
-
-function ExportBox({
-  tagNumber,
-  result,
-  statusText,
-  linked,
-  note,
-  onCopy,
-  onClose,
-}: {
-  tagNumber: number;
-  result: ReturnType<typeof authoredAttackFromTag>;
-  /** The same sentence the Tag panel and row badge show (S18). */
-  statusText: string;
-  /** The tag links to a saved attack, so its cadence is typed (S45). */
-  linked: boolean;
-  note: string | null;
-  onCopy: (text: string) => void;
-  onClose: () => void;
-}) {
-  if (!result)
-    return (
-      <div className={styles.exportBox} role="status">
-        <p>
-          Tag {tagNumber} cannot export. {statusText}. Its cadence and
-          projectile have nothing to come from until it previews.
-        </p>
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
-      </div>
-    );
-  const text = attackJson(result.attack);
-  const variantText = result.projectileVariant
-    ? JSON.stringify({ [result.projectileVariant.id]: result.projectileVariant.entry }, null, 2)
-    : null;
-  return (
-    <div className={styles.exportBox}>
-      <label className={styles.field}>
-        <span>Attack JSON for tag {tagNumber}</span>
-        <textarea
-          readOnly
-          rows={14}
-          value={text}
-          aria-label={`Attack JSON for tag ${tagNumber}`}
-          onFocus={(event) => event.currentTarget.select()}
-        />
-      </label>
-      <p className={styles.note}>
-        Paste this into the archetype&apos;s attacks in its file under game/data/enemies/ by hand;
-        nothing is written for you. Rotation phase is taken at the first tag
-        of its group.{" "}
-        {linked
-          ? "The cadence is typed in the saved attack, not measured, and the phase is at its first volley (a repeat counts once, at its first volley)."
-          : "The cadence is copied from the matched attack."}
-      </p>
-      {result.aimsFront && <p className={styles.note}>{FRONT_EXPORT_NOTE}</p>}
-      <button type="button" onClick={() => onCopy(text)}>
-        Copy JSON
-      </button>{" "}
-      {variantText !== null && (
-        <>
-          <label className={styles.field}>
-            <span>Projectile JSON for tag {tagNumber}</span>
-            <textarea
-              readOnly
-              rows={12}
-              value={variantText}
-              aria-label={`Projectile JSON for tag ${tagNumber}`}
-              onFocus={(event) => event.currentTarget.select()}
-            />
-          </label>
-          <p className={styles.note}>
-            Paste this under <code>projectiles</code> in projectiles.json by
-            hand, beside the attack that references it. Its values are typed
-            estimates, and no speed is calculated or written for a bomb.
-          </p>
-          <button type="button" onClick={() => onCopy(variantText)}>
-            Copy projectile JSON
-          </button>{" "}
-        </>
-      )}
-      <button type="button" onClick={onClose}>
-        Close
-      </button>
-      {note && <span role="status"> {note}</span>}
-    </div>
-  );
-}
+/** Shown once after a study or session from before the timeline converts (E02). */
+const LEGACY_CONVERSION_NOTICE =
+  "This study was recorded before the timeline and was converted: its tags are now marks on attack tracks. Check its boundaries in the Structure step.";
 
 export function TaggerRoute() {
-  const appearances = appearanceOptions();
   const initialEncounter = ENCOUNTER_LIST.some(
     (entry) => entry.id === DEFAULT_ENCOUNTER_ID,
   )
@@ -348,20 +144,10 @@ export function TaggerRoute() {
   const [archetypeId, setArchetypeId] = useState(
     () => encounterConfigOf(initialEncounter).primaryArchetypeId,
   );
-  const [monsterDraft, setMonsterDraft] = useState<MonsterDraft | null>(null);
-  // View state only (L15): not saved, and moves to the draft when one loads.
-  const [previewSource, setPreviewSource] = useState<"draft" | "tags">("tags");
-  const sections = studySections(previewSource);
+  // Plan V20 E02: one v5 study and the selected attack track; null before a video or monster.
+  const [study, setStudy] = useState<StudyV5 | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const monsterIds = monstersOfEncounter(config);
-  const draftBlocks = blocksOfMonster(archetypeOf(config, archetypeId));
-  const phases = phaseOptions(config, archetypeId);
-  const [sticky, setSticky] = useState<StickySelection>({
-    phaseIndex: 0,
-    spriteId: appearances[0].id,
-    pattern: "rotating-arm",
-    aim: "player",
-    shots: 1,
-  });
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const [durationSeconds, setDurationSeconds] = useState(0);
@@ -371,13 +157,11 @@ export function TaggerRoute() {
   // Z26: the presented rate has no default; it must be typed.
   const [frameRateText, setFrameRateText] = useState("");
   const [sourceUrlText, setSourceUrlText] = useState("");
-  // V16 S29: the study stores tags as written; every reader gets them resolved.
-  const [storedTags, setTags] = useState<readonly StoredTag[]>([]);
-  const [savedAttacks, setSavedAttacks] = useState<readonly SavedAttack[]>([]);
-  const tags = useMemo(
-    () => resolveTags(storedTags, savedAttacks),
-    [storedTags, savedAttacks],
+  const segments = useMemo(
+    () => segmentsOfMonster(archetypeOf(config, archetypeId)),
+    [config, archetypeId],
   );
+  const markCount = study ? markCountOf(study) : 0;
   const [layoutPreference] = useState(
     () => new PreviewPreference(() => window.localStorage),
   );
@@ -388,10 +172,6 @@ export function TaggerRoute() {
     layoutPreference.set(next);
     setLayout(next);
   };
-  const [selectedTagIndex, setSelectedTagIndex] = useState<number | null>(null);
-  // N41: the row whose attack JSON is shown in the export box; nothing is written to disk.
-  const [exportIndex, setExportIndex] = useState<number | null>(null);
-  const [copyNote, setCopyNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // The loaded or restored study's file name and duration (Z14, Z16).
@@ -399,7 +179,7 @@ export function TaggerRoute() {
     fileName: string;
     durationSeconds: number;
   }> | null>(null);
-  // Z15: the first video chosen after a load or restore keeps the tags.
+  // Z15: the first video chosen after a load or restore keeps the study.
   const [keepTagsOnNextVideo, setKeepTagsOnNextVideo] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   // Z30: a slot is written only after a first tag or edit in this session.
@@ -415,10 +195,6 @@ export function TaggerRoute() {
   // mounted, so switching steps never loses a half-typed value.
   const [step, setStep] = useState<TaggerStep>("setup");
   const video = useRef<HTMLVideoElement>(null);
-  const highlighted = useMemo(
-    () => highlightedTagIndices(tags, selectedTagIndex),
-    [tags, selectedTagIndex],
-  );
   // A seek has not yet produced a presented frame, so `mediaTime` still names
   // the previous frame. Recording waits for the callback rather than reading
   // the seek target (T19). The timeout is a safety net for a seek that lands
@@ -432,17 +208,10 @@ export function TaggerRoute() {
     if (frameRateText !== "") return;
     setFrameRateText(String(rate));
     setRateDetected(true);
-    if (tags.length > 0) setDirty(true);
+    if (markCount > 0) setDirty(true);
   };
 
   const frameRate = parseFrameRate(frameRateText);
-  const selectedPhase = phases[sticky.phaseIndex] ?? phases[0];
-  const linkedAttackId = linkedAttackIdOf(sticky, savedAttacks);
-  const chosenAttack =
-    savedAttacks.find((entry) => entry.id === sticky.savedAttackId) ?? null;
-  const interval = readoutInterval(tags, sticky, linkedAttackId);
-  const phaseName = (index: number) => phases[index]?.label ?? `phase ${index + 1}`;
-  const stickyShowsBullet = matchesLinearBullet(createTag(0, sticky), config, archetypeId);
   const duration = currentDuration(
     durationSeconds,
     studyMeta?.durationSeconds ?? null,
@@ -450,9 +219,6 @@ export function TaggerRoute() {
   const mismatch = fileNameMismatch(
     studyMeta?.fileName ?? null,
     videoUrl ? fileName : null,
-  );
-  const summaryRows = summarizeTags(tags).map((summary) =>
-    formatSummaryRow(summary, phases, savedAttacks),
   );
 
   const refreshSessions = () => {
@@ -472,54 +238,52 @@ export function TaggerRoute() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Z28/Z30: autosave once the session is dirty and holds a tag. The slot is
-  // keyed by the file name in use now, so an accepted mismatched video writes
-  // to its own slot and leaves the old one (Z16).
-  useEffect(() => {
-    if (
-      !shouldWriteDraft({
-        dirty,
-        tagCount: tags.length,
-        hasDraft: monsterDraft !== null,
-      })
-    )
-      return;
-    const source = videoUrl
-      ? { fileName, durationSeconds }
-      : studyMeta;
-    if (!source || source.fileName.trim().length === 0 || !(source.durationSeconds > 0))
-      return;
+  /** The study as the autosave and export write it: provenance from the video in use now. */
+  const currentStudy = (): StudyV5 | null => {
+    const source = videoUrl ? { fileName, durationSeconds } : studyMeta;
+    if (!study || !source || source.fileName.trim().length === 0 || !(source.durationSeconds > 0))
+      return null;
     const trimmed = sourceUrlText.trim();
-    const study: StudyState = {
-      encounterId,
-      archetypeId,
-      monsterDraft,
+    return {
+      ...study,
       provenance: {
         sourceUrl: trimmed.length === 0 ? null : trimmed,
         fileName: source.fileName.trim(),
         frameRate,
         durationSeconds: source.durationSeconds,
       },
-      savedAttacks,
-      tags: storedTags,
     };
+  };
+
+  // Z28/Z30, amended by E14: autosave once the session is dirty and the study
+  // holds a mark or a boundary. The slot is keyed by the file name in use now,
+  // so an accepted mismatched video writes to its own slot and leaves the old
+  // one (Z16).
+  useEffect(() => {
+    if (
+      !shouldWriteDraft({
+        dirty,
+        markCount,
+        boundaryCount: study?.boundaries.length ?? 0,
+      })
+    )
+      return;
+    const saved = currentStudy();
+    if (!saved) return;
     const result = sessions.write(
-      buildDraft({ study, sticky, savedAt: new Date().toISOString() }),
+      buildDraft({ study: saved, selectedTrackId, savedAt: new Date().toISOString() }),
       config.primaryArchetypeId,
     );
     setAutosaveError(result.ok ? null : result.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    archetypeId,
-    monsterDraft,
+    study,
+    selectedTrackId,
     config.primaryArchetypeId,
     dirty,
-    tags.length,
-    storedTags,
-    savedAttacks,
-    sticky,
+    markCount,
     sourceUrlText,
     frameRate,
-    encounterId,
     videoUrl,
     fileName,
     durationSeconds,
@@ -641,17 +405,18 @@ export function TaggerRoute() {
 
   const jumpBy = (seconds: number) => seekBy(seconds);
 
-  /** Every volley's time, for the timeline markers and `[` / `]` (V16 S16, S17). */
-  const volleyTimes = useMemo(
-    () =>
-      tags.flatMap((entry) =>
-        volleyTimesOf(
-          entry,
-          savedAttacks.find((attack) => attack.id === entry.savedAttackId)?.cadence,
-        ),
-      ),
-    [tags, savedAttacks],
-  );
+  /**
+   * The marks `[` and `]` step between (V16 S17, step 86.2): the selected
+   * track's, or every mark of every track and scratch with none selected.
+   */
+  const volleyTimes = useMemo(() => {
+    if (!study) return [];
+    const chosen = study.tracks.find((track) => track.id === selectedTrackId);
+    const marks = chosen
+      ? chosen.marks
+      : [...study.tracks.flatMap((track) => track.marks), ...study.scratch];
+    return marks.map((mark) => mark.timeSeconds);
+  }, [study, selectedTrackId]);
 
   /** Seeks to the previous or next volley from the presented frame; a no-op at the ends. */
   const stepVolley = (direction: -1 | 1) => {
@@ -663,41 +428,279 @@ export function TaggerRoute() {
     if (target !== null && videoUrl) seekTo(target);
   };
 
-  const recordTag = (mode: "standalone" | "new-burst" | "continue-burst") => {
-    if (!videoUrl) {
-      setError("Load a video before recording a tag.");
-      return;
+  /**
+   * The guard every mark at the presented frame passes (T19): a video, a frame
+   * rate, and no seek still waiting for its frame.
+   */
+  const presentedFrameProblem = (what: string): string | null => {
+    if (!videoUrl) return `Load a video before ${what}.`;
+    if (frameRate === null) return `Enter the video's presented frame rate before ${what}.`;
+    if (seekPendingRef.current) return `Wait for the seeked frame to appear before ${what}.`;
+    return null;
+  };
+
+  /** Every study edit goes through `studyEdits.ts`; the route only applies the result. */
+  const applyStudyEdit = (edit: (current: StudyV5) => EditResult<StudyV5>): boolean => {
+    if (!study) {
+      setError("Choose the monster or open a video before editing the study.");
+      return false;
     }
-    if (frameRate === null) {
-      setError("Enter the video's presented frame rate before recording.");
-      return;
-    }
-    if (seekPendingRef.current) {
-      setError("Wait for the seeked frame to appear before recording.");
-      return;
-    }
-    let burstId: number | undefined;
-    if (mode !== "standalone") {
-      const assigned = assignBurst(
-        tags,
-        sticky,
-        mode === "new-burst" ? "new" : "continue",
-        linkedAttackId,
-      );
-      if (assigned === null) {
-        setError(
-          "No earlier burst matches this phase, sprite, pattern and aim. Press B to start one.",
-        );
-        return;
-      }
-      burstId = assigned;
+    const result = edit(study);
+    if (!result.ok) {
+      setError(result.error);
+      return false;
     }
     setError(null);
+    setStudy(result.value);
     setDirty(true);
-    setTags((current) => [
-      ...current,
-      recordStoredTag(mediaTime, sticky, savedAttacks, burstId),
-    ]);
+    return true;
+  };
+
+  const markAtFrame = (
+    what: string,
+    edit: (current: StudyV5, timeSeconds: number) => EditResult<StudyV5>,
+  ) => {
+    const problem = presentedFrameProblem(what);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    applyStudyEdit((current) => edit(current, mediaTime));
+  };
+
+  const segmentStartsHere = () =>
+    markAtFrame("marking a boundary", (current, time) => addBoundary(current, time, segments));
+  const telegraphEndsHere = () =>
+    markAtFrame("marking a telegraph end", setTelegraphEnd);
+  const invulnerableHere = () =>
+    markAtFrame("marking an invulnerable span", toggleInvulnerable);
+
+  const selectedTrack = study?.tracks.find((track) => track.id === selectedTrackId) ?? null;
+  const isBombTrack = (trackId: string) => {
+    const track = study?.tracks.find((entry) => entry.id === trackId);
+    return track !== undefined && config.projectiles[track.attack.projectile]?.type === "bomb";
+  };
+
+  /** E08: E adds a detonation mark on the selected bomb track; elsewhere the edit refuses. */
+  const recordDetonation = () =>
+    markAtFrame("adding a detonation mark", (current, time) =>
+      addMark(current, selectedTrackId, { timeSeconds: time, kind: "detonation" }, isBombTrack),
+    );
+
+  /**
+   * E09: what the next pointer gesture on the video overlay records. The
+   * overlay is mounted only while this is not null, so the video's own
+   * controls work otherwise.
+   */
+  const [overlayArm, setOverlayArm] = useState<
+    | null
+    | Readonly<{ kind: "scale" }>
+    | Readonly<{ kind: "range-throw"; trackId: string; pairIndex: number; pair: DetonationPair }>
+    | Readonly<{
+        kind: "range-detonation";
+        trackId: string;
+        pairIndex: number;
+        from: VideoPoint;
+      }>
+  >(null);
+  const dragStartRef = useRef<VideoPoint | null>(null);
+
+  const overlayPoint = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      point: {
+        xFraction: (event.clientX - rect.left) / rect.width,
+        yFraction: (event.clientY - rect.top) / rect.height,
+      },
+      aspectRatio: rect.height / rect.width,
+    };
+  };
+
+  const onOverlayPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    dragStartRef.current = overlayPoint(event).point;
+  };
+
+  const onOverlayPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const arm = overlayArm;
+    const start = dragStartRef.current;
+    dragStartRef.current = null;
+    if (!arm) return;
+    const { point, aspectRatio } = overlayPoint(event);
+    const measure = (compute: () => number): number | null => {
+      try {
+        return compute();
+      } catch (problem) {
+        setError(problem instanceof Error ? problem.message : String(problem));
+        return null;
+      }
+    };
+    if (arm.kind === "scale") {
+      if (!study || !start) return;
+      const fraction = measure(() =>
+        tileWidthFractionOf(
+          start,
+          point,
+          // The authored `body.widthTiles`: `bodyVertices` scales the outline to it.
+          bodyExtentTiles(archetypeOf(config, study.archetypeId).verticesTiles, "x"),
+          aspectRatio,
+        ),
+      );
+      setOverlayArm(null);
+      if (fraction !== null) applyStudyEdit((current) => setScale(current, fraction));
+      return;
+    }
+    if (arm.kind === "range-throw") {
+      setOverlayArm({ kind: "range-detonation", trackId: arm.trackId, pairIndex: arm.pairIndex, from: point });
+      seekTo(arm.pair.detonationSeconds);
+      return;
+    }
+    const scale = study?.scale?.tileWidthFraction;
+    setOverlayArm(null);
+    if (scale === undefined) return;
+    const tiles = measure(() => distanceTiles(arm.from, point, scale, aspectRatio));
+    if (tiles !== null)
+      applyStudyEdit((current) => setMeasuredRange(current, arm.trackId, arm.pairIndex, tiles));
+  };
+
+  const overlayPrompt =
+    overlayArm === null
+      ? null
+      : overlayArm.kind === "scale"
+        ? "Drag across the monster's body."
+        : overlayArm.kind === "range-throw"
+          ? "Click the monster's centre at this throw frame."
+          : "Click the explosion's centre at this detonation frame.";
+
+  const acceptOverride = (fields: ProjectileOverride) => {
+    if (!selectedTrack) return;
+    applyStudyEdit((current) =>
+      setProjectileOverride(current, selectedTrack.id, {
+        ...selectedTrack.projectileOverride,
+        ...fields,
+      }),
+    );
+  };
+
+  const selectedBomb = (() => {
+    if (!selectedTrack) return undefined;
+    const projectile = config.projectiles[selectedTrack.attack.projectile];
+    return projectile?.type === "bomb"
+      ? { travelSeconds: projectile.travelSeconds, rangeTiles: projectile.rangeTiles }
+      : undefined;
+  })();
+
+  /** E10: Enter adds a volley mark on the selected track, or on scratch with none (E16). */
+  const recordVolley = () =>
+    markAtFrame("adding a mark", (current, time) =>
+      addMark(current, selectedTrackId, { timeSeconds: time, kind: "volley" }, isBombTrack),
+    );
+  /** E07: X sets the selected track's end mark at the presented frame. */
+  const endMarkHere = () => {
+    if (selectedTrackId === null) {
+      setError("Select an attack track before setting its end mark.");
+      return;
+    }
+    markAtFrame("setting an end mark", (current, time) =>
+      setEndMark(current, selectedTrackId, time),
+    );
+  };
+  /** E10: Delete removes the selected track's mark within one frame of the playhead. */
+  const removeMarkHere = () =>
+    markAtFrame("removing a mark", (current, time) =>
+      removeMarkNear(current, selectedTrackId, time, 2 * volleyStepTolerance(frameRate)),
+    );
+  /** E10: 1-9 select the track at that position, 0 the scratch track. */
+  const selectTrackAt = (position: number) => {
+    if (position === 0) setSelectedTrackId(null);
+    else {
+      const track = study?.tracks[position - 1];
+      if (track) setSelectedTrackId(track.id);
+    }
+  };
+
+  /** A track with the new-attack conveniences, at a segment's attack list (step 86.1). */
+  const newTrack = (current: StudyV5, id: string, segmentId: string): AttackTrack | string => {
+    const segment = segments.find((entry) => entry.id === segmentId);
+    if (!segment) return "Choose the segment the attack belongs to.";
+    if (id.length === 0) return "An attack track needs a name.";
+    const attack = newAttack(id, current.tracks.map((track) => track.id), config);
+    if (!attack.ok) return attack.error;
+    return { id, location: segment.ref, attack: attack.value, cadenceSource: "typed", marks: [] };
+  };
+  const addAttackTrack = (id: string, segmentId: string): boolean => {
+    const added = applyStudyEdit((current) => {
+      const track = newTrack(current, id, segmentId);
+      return typeof track === "string" ? { ok: false, error: track } : addTrack(current, track);
+    });
+    if (added) setSelectedTrackId(id);
+    return added;
+  };
+  const createFromScratch = (
+    markIndices: readonly number[],
+    id: string,
+    segmentId: string,
+  ): boolean => {
+    const created = applyStudyEdit((current) => {
+      const track = newTrack(current, id, segmentId);
+      return typeof track === "string"
+        ? { ok: false, error: track }
+        : createTrackFromScratch(current, markIndices, track);
+    });
+    if (created) setSelectedTrackId(id);
+    return created;
+  };
+  /** Step 86.1: tracks with marks stay; every other track comes back from the file. */
+  const reloadFromGame = () => {
+    if (!study) return;
+    const { study: next, keptCount } = reloadTracks(
+      study,
+      tracksFromMonsterFile(AUTHORED_MONSTER_FILES[study.archetypeId]),
+    );
+    setStudy(next);
+    setDirty(true);
+    setError(null);
+    if (!next.tracks.some((track) => track.id === selectedTrackId)) setSelectedTrackId(null);
+    setNotice(
+      `Reloaded the attacks from the game; kept ${keptCount} track${keptCount === 1 ? "" : "s"} with marks.`,
+    );
+  };
+  /** E06: a typed cadence field makes the cadence typed; any other edit keeps its source. */
+  const editSelectedAttack = (change: AttackChange): boolean => {
+    if (!selectedTrack) return false;
+    const result = changedAttack(
+      selectedTrack.attack,
+      change,
+      study!.tracks.filter((track) => track !== selectedTrack).map((track) => track.attack.id),
+      config,
+    );
+    if (!result.ok) {
+      setError(result.error);
+      return false;
+    }
+    if (result.value.removed.length > 0)
+      setNotice(
+        `Removed fields that do not apply to the new kind: ${result.value.removed.join(", ")}.`,
+      );
+    return applyStudyEdit((current) =>
+      setTrackAttack(
+        current,
+        selectedTrack.id,
+        result.value.attack,
+        change.field === "cadence" ? "typed" : selectedTrack.cadenceSource,
+      ),
+    );
+  };
+  /** E06: accepting fitted values writes them into the cadence as fitted. */
+  const acceptFit = (values: Partial<Record<CadenceField, number>>) => {
+    if (!selectedTrack) return;
+    applyStudyEdit((current) =>
+      setTrackAttack(
+        current,
+        selectedTrack.id,
+        { ...selectedTrack.attack, cadence: { ...selectedTrack.attack.cadence, ...values } },
+        "fitted",
+      ),
+    );
   };
 
   useEffect(() => {
@@ -711,8 +714,14 @@ export function TaggerRoute() {
         event.repeat &&
         (event.key === " " ||
           event.key === "Enter" ||
-          event.key === "b" ||
-          event.key === "B")
+          event.key === "x" ||
+          event.key === "X" ||
+          event.key === "s" ||
+          event.key === "S" ||
+          event.key === "t" ||
+          event.key === "T" ||
+          event.key === "i" ||
+          event.key === "I")
       )
         return;
       let action: ReturnType<typeof actionForKey>;
@@ -729,63 +738,19 @@ export function TaggerRoute() {
       else if (action.kind === "frame-step")
         stepFrame(action.direction, action.deltaSeconds);
       else if (action.kind === "play-pause") togglePlayback();
-      else if (action.kind === "record") recordTag(action.mode);
       else if (action.kind === "step-volley") stepVolley(action.direction);
-      else
-        setSticky((current) => ({ ...current, shots: action.shots }));
+      else if (action.kind === "boundary") segmentStartsHere();
+      else if (action.kind === "telegraph-end") telegraphEndsHere();
+      else if (action.kind === "invulnerable") invulnerableHere();
+      else if (action.kind === "record") recordVolley();
+      else if (action.kind === "end-mark") endMarkHere();
+      else if (action.kind === "remove-mark") removeMarkHere();
+      else if (action.kind === "select-track") selectTrackAt(action.position);
+      else if (action.kind === "detonation") recordDetonation();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
-
-  /** Chooses the sticky arm pattern with the starting values a typed estimate needs. */
-  const setStickyArmPattern = (armPattern: TagArmPattern | null) =>
-    setSticky((current) => {
-      const { armPattern: _removed, ...rest } = current;
-      if (armPattern === null) return rest;
-      return {
-        ...rest,
-        armPattern,
-        shotsPerArm: current.shotsPerArm ?? DEFAULT_SHOTS_PER_ARM,
-        ...(armPatternTakesArc(armPattern)
-          ? { armArcDegrees: current.armArcDegrees ?? DEFAULT_ARM_ARC_DEGREES }
-          : {}),
-      };
-    });
-
-  /** A blank field removes a sticky typed value; anything else must be a finite number. */
-  const setStickyNumber = (
-    field:
-      | "shotsPerArm"
-      | "armArcDegrees"
-      | "clockwiseDegreesPerSecond"
-      | "initialPhaseDegrees",
-    text: string,
-  ) =>
-    setSticky((current) => {
-      const { [field]: _removed, ...rest } = current;
-      if (text.trim() === "") return rest;
-      const value = Number(text);
-      if (!Number.isFinite(value)) return current;
-      if (field === "shotsPerArm") return { ...rest, shotsPerArm: Math.max(1, Math.round(value)) };
-      if (field === "armArcDegrees") return { ...rest, armArcDegrees: Math.max(0, value) };
-      return { ...rest, [field]: value };
-    });
-
-  /** A blank field removes a sticky typed estimate; anything else must be a finite number. */
-  const setStickyTyped = (field: TypedNumberField, text: string) =>
-    setSticky((current) => {
-      const { [field]: _removed, ...rest } = current;
-      if (text.trim() === "") return rest;
-      const value = Number(text);
-      return Number.isFinite(value) ? { ...rest, [field]: value } : current;
-    });
-
-  const setStickyTarget = (targeted: boolean) =>
-    setSticky((current) => {
-      const { target: _removed, ...rest } = current;
-      return targeted ? { ...rest, target: "player" } : rest;
-    });
 
   const resetSeek = () => {
     clearSeekTimeout();
@@ -793,57 +758,110 @@ export function TaggerRoute() {
     setSeekPending(false);
   };
 
-  const applyVideo = (file: File, keepTags: boolean) => {
+  /** A new study of a monster, its tracks loaded from the monster's file (E03). */
+  const freshStudy = (
+    nextEncounterId: string,
+    nextArchetypeId: string,
+    provenance: StudyV5["provenance"],
+  ): StudyV5 =>
+    emptyStudy({
+      encounterId: nextEncounterId,
+      archetypeId: nextArchetypeId,
+      provenance,
+      recordedAt: new Date().toISOString(),
+      rawFile: AUTHORED_MONSTER_FILES[nextArchetypeId],
+    });
+
+  /** The provenance of the video in use now, for a new study. */
+  const provenanceNow = (
+    source: Readonly<{ fileName: string; durationSeconds: number }>,
+  ): StudyV5["provenance"] => {
+    const trimmed = sourceUrlText.trim();
+    return {
+      sourceUrl: trimmed.length === 0 ? null : trimmed,
+      fileName: source.fileName,
+      frameRate,
+      durationSeconds: source.durationSeconds,
+    };
+  };
+
+  /** E02: a legacy study converts in memory; each notice is shown once. */
+  const v5Of = (
+    loaded: StudyState | StudyV5,
+  ): Readonly<{ study: StudyV5; notices: readonly string[] }> => {
+    if ("schemaVersion" in loaded) return { study: loaded, notices: [] };
+    const loadedConfig = encounterConfigOf(loaded.encounterId);
+    const id = loaded.archetypeId ?? loadedConfig.primaryArchetypeId;
+    const converted = studyV5FromLegacy({
+      legacy: loaded,
+      config: loadedConfig,
+      archetypeId: id,
+      rawFile: AUTHORED_MONSTER_FILES[id],
+      recordedAt: new Date().toISOString(),
+    });
+    return {
+      study: converted.study,
+      notices: [LEGACY_CONVERSION_NOTICE, ...converted.notices],
+    };
+  };
+
+  const v5OfDraft = (draft: SessionDraft | LegacySessionDraft) =>
+    isLegacyDraft(draft)
+      ? { ...v5Of(draft.study), selectedTrackId: null }
+      : { study: draft.study, notices: [], selectedTrackId: draft.selectedTrackId };
+
+  const applyVideo = (file: File, keepStudy: boolean) => {
     setError(null);
     setFileName(file.name);
     setDurationSeconds(0);
     setMediaTime(0);
     resetSeek();
-    if (keepTags) {
-      // Z15: tags, sourceUrl and frameRate carry over from the load.
+    if (keepStudy) {
+      // Z15: the study, sourceUrl and frameRate carry over from the load.
       setKeepTagsOnNextVideo(false);
     } else {
       setSourceUrlText("");
       setFrameRateText("");
       setRateDetected(false);
-      setTags([]);
-      setSavedAttacks([]);
-      setMonsterDraft(null);
-      setSelectedTagIndex(null);
+      setStudy(
+        freshStudy(encounterId, archetypeId, {
+          sourceUrl: null,
+          fileName: file.name,
+          frameRate: null,
+          durationSeconds: 0,
+        }),
+      );
+      setSelectedTrackId(null);
       setStudyMeta(null);
       setDirty(false);
     }
     setVideoUrl(URL.createObjectURL(file));
   };
 
+  const studyHasWork = markCount > 0 || (study?.boundaries.length ?? 0) > 0;
+  const workText = `${markCount} mark(s) and ${study?.boundaries.length ?? 0} boundary(ies)`;
+
   const chooseFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     const decision = videoChoiceDecision({
-      tagCount: tags.length,
+      tagCount: markCount + (study?.boundaries.length ?? 0),
       keepTagsOnNextVideo,
-      hasDraft: monsterDraft !== null,
     });
     if (decision === "confirm-reset")
       setConfirmation({
-        message: `Choosing "${file.name}" clears the ${tags.length} tag(s)${monsterDraft ? " and the monster draft" : ""} in this session. Saved sessions are not affected.`,
+        message: `Choosing "${file.name}" clears the ${workText} in this study. Saved sessions are not affected.`,
         onConfirm: () => applyVideo(file, false),
       });
-    else applyVideo(file, decision === "keep");
+    else applyVideo(file, decision === "keep" && study !== null);
   };
 
   const chooseEncounter = (id: string) => {
     if (id === encounterId) return;
-    if (
-      encounterChangeDecision({
-        tagCount: tags.length,
-        savedAttackCount: savedAttacks.length,
-        hasDraft: monsterDraft !== null,
-      }) === "confirm"
-    ) {
+    if (studyHasWork) {
       setConfirmation({
-        message: `Changing encounter clears the ${tags.length} tag(s)${monsterDraft ? ", the monster draft" : ""} and ${savedAttacks.length} saved attack(s) in this session. Saved sessions are not affected.`,
+        message: `Changing encounter clears the ${workText} in this study. Saved sessions are not affected.`,
         onConfirm: () => applyEncounter(id),
       });
       return;
@@ -852,49 +870,45 @@ export function TaggerRoute() {
   };
 
   const applyEncounter = (id: string) => {
+    const primary = encounterConfigOf(id).primaryArchetypeId;
     setEncounterId(id);
-    setArchetypeId(encounterConfigOf(id).primaryArchetypeId);
-    setMonsterDraft(null);
-    setPreviewSource("tags");
-    // One video is one fight (T16): tags recorded under the previous encounter
-    // cannot be relabelled by a later selector change.
-    setTags([]);
-    setSavedAttacks([]);
-    setSelectedTagIndex(null);
+    setArchetypeId(primary);
+    // One video is one fight (T16): marks recorded under the previous
+    // encounter cannot be relabelled by a later selector change.
+    setStudy(
+      freshStudy(id, primary, provenanceNow(videoUrl ? { fileName, durationSeconds } : {
+        fileName: studyMeta?.fileName ?? "",
+        durationSeconds: studyMeta?.durationSeconds ?? 0,
+      })),
+    );
+    setSelectedTrackId(null);
     setStudyMeta(null);
     setKeepTagsOnNextVideo(false);
     setDirty(false);
     resetSeek();
     setError(null);
-    setSticky((current) => ({ ...current, phaseIndex: 0 }));
   };
 
   /** Shared by loading a study file and restoring a saved session. */
   const applyStudy = (
-    study: StudyState,
-    nextSticky: StickySelection | null,
+    next: StudyV5,
+    nextSelectedTrackId: string | null,
     notices: readonly string[],
   ) => {
-    setEncounterId(study.encounterId);
-    setArchetypeId(
-      study.archetypeId ?? encounterConfigOf(study.encounterId).primaryArchetypeId,
-    );
-    setMonsterDraft(study.monsterDraft);
-    setPreviewSource(study.monsterDraft ? "draft" : "tags");
-    setSourceUrlText(study.provenance.sourceUrl ?? "");
+    setEncounterId(next.encounterId);
+    setArchetypeId(next.archetypeId);
+    setSourceUrlText(next.provenance.sourceUrl ?? "");
     setFrameRateText(
-      study.provenance.frameRate === null ? "" : String(study.provenance.frameRate),
+      next.provenance.frameRate === null ? "" : String(next.provenance.frameRate),
     );
-    setTags(study.tags);
-    setSavedAttacks(study.savedAttacks);
-    setSelectedTagIndex(null);
+    setStudy(next);
+    setSelectedTrackId(
+      next.tracks.some((track) => track.id === nextSelectedTrackId) ? nextSelectedTrackId : null,
+    );
     setStudyMeta({
-      fileName: study.provenance.fileName,
-      durationSeconds: study.provenance.durationSeconds,
+      fileName: next.provenance.fileName,
+      durationSeconds: next.provenance.durationSeconds,
     });
-    setSticky((current) =>
-      nextSticky ? nextSticky : { ...current, phaseIndex: 0 },
-    );
     setKeepTagsOnNextVideo(true);
     setDirty(false);
     setError(null);
@@ -902,7 +916,7 @@ export function TaggerRoute() {
   };
 
   const requestApply = (message: string, apply: () => void) => {
-    if (loadDecision(tags.length, monsterDraft !== null) === "confirm")
+    if (loadDecision(markCount + (study?.boundaries.length ?? 0)) === "confirm")
       setConfirmation({ message, onConfirm: apply });
     else apply();
   };
@@ -913,25 +927,26 @@ export function TaggerRoute() {
     if (!file) return;
     void file.text().then(
       (text) => {
-        let study: StudyState;
+        let loaded: ReturnType<typeof v5Of>;
         try {
-          study = parseStudyFile(text, KNOWN_ENCOUNTER_IDS);
+          const parsed = parseStudyFile(text, KNOWN_ENCOUNTER_IDS);
+          const problem = studyMonsterProblem(
+            parsed,
+            encounterConfigOf(parsed.encounterId).primaryArchetypeId,
+            monstersOfEncounter(encounterConfigOf(parsed.encounterId)),
+          );
+          if (problem) {
+            setError(problem);
+            return;
+          }
+          loaded = v5Of(parsed);
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : String(cause));
           return;
         }
-        const problem = studyMonsterProblem(
-          study,
-          encounterConfigOf(study.encounterId).primaryArchetypeId,
-          monstersOfEncounter(encounterConfigOf(study.encounterId)),
-        );
-        if (problem) {
-          setError(problem);
-          return;
-        }
         requestApply(
-          `Loading "${file.name}" replaces the ${tags.length} tag(s) in this session.`,
-          () => applyStudy(study, null, []),
+          `Loading "${file.name}" replaces the ${workText} in this study.`,
+          () => applyStudy(loaded.study, null, loaded.notices),
         );
       },
       () => setError("The study file could not be read."),
@@ -958,23 +973,16 @@ export function TaggerRoute() {
       setError(problem);
       return;
     }
-    const restored = restoreSticky(
-      draft.sticky,
-      encounterConfigOf(draft.study.encounterId),
-      draft.study.archetypeId ??
-        encounterConfigOf(draft.study.encounterId).primaryArchetypeId,
-      draft.study.savedAttacks,
-    );
-    const notices = restored.notices.map((entry) =>
-      entry === "sprite-missing"
-        ? "The saved sprite no longer exists; the default sprite is selected."
-        : entry === "attack-missing"
-          ? "The saved attack no longer exists; no attack is selected."
-          : "The saved phase no longer exists; the first phase is selected.",
-    );
+    let restored: ReturnType<typeof v5OfDraft>;
+    try {
+      restored = v5OfDraft(draft);
+    } catch (cause) {
+      setError(`The saved session could not be restored: ${cause instanceof Error ? cause.message : String(cause)}`);
+      return;
+    }
     requestApply(
-      `Restoring "${draft.study.provenance.fileName}" replaces the ${tags.length} tag(s) in this session.`,
-      () => applyStudy(draft.study, restored.sticky, notices),
+      `Restoring "${draft.study.provenance.fileName}" replaces the ${workText} in this study.`,
+      () => applyStudy(restored.study, restored.selectedTrackId, restored.notices),
     );
   };
 
@@ -989,199 +997,19 @@ export function TaggerRoute() {
     });
   };
 
-  const applyEdit = (index: number, change: TagChange) => {
-    const result = editStoredTag(storedTags[index], tags[index], change, duration);
-    if (!result.ok) {
-      setError(result.error);
-      return false;
-    }
-    setError(null);
-    setDirty(true);
-    setTags((current) =>
-      current.map((entry, at) => (at === index ? result.tag : entry)),
-    );
-    return true;
-  };
-
-  /** S32: choosing an attack copies its values into the sticky controls. */
-  const chooseAttack = (id: string | null) => {
-    const attack = savedAttacks.find((entry) => entry.id === id);
-    setSticky((current) => {
-      if (!attack) {
-        const { savedAttackId: _removed, ...rest } = current;
-        return rest;
-      }
-      return stickyFromSavedAttack(attack, current);
-    });
-  };
-
-  const saveAttack = (name: string, cadence: SavedAttackCadence) => {
-    const result = createSavedAttack(name, sticky, cadence, savedAttacks);
-    if (!result.ok) {
-      setError(result.error);
-      return false;
-    }
-    setError(null);
-    setDirty(true);
-    setSavedAttacks((current) => [...current, result.value]);
-    setSticky((current) => ({ ...current, savedAttackId: result.value.id }));
-    return true;
-  };
-
-  const updateAttack = () => {
-    if (!chosenAttack) return;
-    setError(null);
-    setDirty(true);
-    setSavedAttacks((current) =>
-      current.map((entry) =>
-        entry.id === chosenAttack.id ? updateFromSticky(entry, sticky) : entry,
-      ),
-    );
-  };
-
-  const renameAttack = (name: string) => {
-    if (!chosenAttack) return false;
-    const result = renameSavedAttack(chosenAttack.id, name, savedAttacks);
-    if (!result.ok) {
-      setError(result.error);
-      return false;
-    }
-    setError(null);
-    setDirty(true);
-    setSavedAttacks(result.value);
-    return true;
-  };
-
-  const deleteAttack = () => {
-    if (!chosenAttack) return;
-    const result = deleteSavedAttack(chosenAttack.id, savedAttacks, storedTags);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setError(null);
-    setDirty(true);
-    setSavedAttacks(result.value);
-    setSticky((current) => {
-      const { savedAttackId: _removed, ...rest } = current;
-      return rest;
-    });
-  };
-
-  const detachRow = (index: number) => {
-    const stored = storedTags[index];
-    const attack =
-      "savedAttackId" in stored
-        ? savedAttacks.find((entry) => entry.id === stored.savedAttackId)
-        : undefined;
-    if (!attack) return;
-    const result = detachTag(stored, attack);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    setError(null);
-    setDirty(true);
-    setTags((current) =>
-      current.map((entry, at) => (at === index ? result.value : entry)),
-    );
-  };
-
-  /** Applies a repeat-end change to a stored row; every refusal reports through `error`. */
-  const applyRepeatEnd = (
-    index: number,
-    next: (stored: StoredTag) => ReturnType<typeof setRepeatEnd> | StoredTag,
-  ) => {
-    const result = next(storedTags[index]);
-    const tag = "ok" in result ? (result.ok ? result.tag : null) : result;
-    if (tag === null) {
-      setError("ok" in result && !result.ok ? result.error : null);
-      return false;
-    }
-    setError(null);
-    setDirty(true);
-    setTags((current) => current.map((entry, at) => (at === index ? tag : entry)));
-    return true;
-  };
-
-  /** S40: ends a repeat at the presented frame, with no key. */
-  const endRepeatHere = () => {
-    if (!videoUrl) {
-      setError("Load a video before ending a repeat.");
-      return;
-    }
-    if (frameRate === null) {
-      setError("Enter the video's presented frame rate before ending a repeat.");
-      return;
-    }
-    if (seekPendingRef.current) {
-      setError("Wait for the seeked frame to appear before ending a repeat.");
-      return;
-    }
-    const target = endRepeatTarget(
-      storedTags,
-      selectedTagIndex,
-      sticky.savedAttackId ?? null,
-      mediaTime,
-    );
-    if (target === null) {
-      setError(
-        "No repeat to end: select a linked tag, or choose its saved attack and move past its first tag.",
-      );
-      return;
-    }
-    applyRepeatEnd(target, (stored) => setRepeatEnd(stored, mediaTime, "frame"));
-  };
-
-  /** V16 S48: the selected row tunes its saved attack when linked, otherwise only itself. */
-  const selectedTag = selectedTagIndex === null ? undefined : tags[selectedTagIndex];
-  const selectedAttack = savedAttacks.find(
-    (entry) => entry.id === selectedTag?.savedAttackId,
-  );
-  const tuning: TuningProps = {
-    target:
-      selectedTag === undefined
-        ? null
-        : selectedAttack
-          ? `Tuning saved attack "${selectedAttack.name}": ${
-              tags.filter((entry) => entry.savedAttackId === selectedAttack.id).length
-            } tag(s)`
-          : "Tuning this tag only",
-    values: selectedTag ? tunableValuesFor(selectedTag, selectedAttack) : [],
-    onChange: (change) => {
-      if (selectedTagIndex === null) return false;
-      const result = applyTuning({ tags: storedTags, savedAttacks }, selectedTagIndex, change);
-      if (!result.ok) {
-        setError(result.error);
-        return false;
-      }
-      setError(null);
-      setDirty(true);
-      setTags(result.study.tags);
-      setSavedAttacks(result.study.savedAttacks);
-      return true;
-    },
-  };
-
-  const exportTags = () => {
+  /** E02: the export writes the v5 study with `recordedAt` refreshed. */
+  const exportStudy = () => {
     setError(null);
     try {
+      if (!study) throw new Error("Load a video or a study before exporting.");
       const provenance = resolveProvenance({
         video: videoUrl ? { fileName, durationSeconds } : null,
         study: studyMeta,
         sourceUrlText,
         frameRate,
       });
-      const exported = assembleExport({
-        encounterId,
-        archetypeId,
-        provenance,
-        savedAttacks,
-        tags: storedTags,
-        monsterDraft,
-        recordedAt: new Date().toISOString(),
-      });
-      const blob = new Blob([JSON.stringify(exported, null, 2)], {
+      const text = studyExportJson({ ...study, provenance }, new Date().toISOString());
+      const blob = new Blob([text], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);
@@ -1203,75 +1031,45 @@ export function TaggerRoute() {
     }
   };
 
-  /** The study as the autosave would write it, or null with no source yet. */
-  const currentStudy = (): StudyState | null => {
-    const source = videoUrl ? { fileName, durationSeconds } : studyMeta;
-    if (!source || source.fileName.trim().length === 0 || !(source.durationSeconds > 0))
-      return null;
-    const trimmed = sourceUrlText.trim();
-    return {
-      encounterId,
-      archetypeId,
-      monsterDraft,
-      provenance: {
-        sourceUrl: trimmed.length === 0 ? null : trimmed,
-        fileName: source.fileName.trim(),
-        frameRate,
-        durationSeconds: source.durationSeconds,
-      },
-      savedAttacks,
-      tags: storedTags,
-    };
-  };
-
   /** L08: switching monsters keeps the video and its time and swaps the study. */
   const applyMonsterSwitch = (
     id: string,
     plan: ReturnType<typeof monsterSwitchPlan>,
   ) => {
-    const study = currentStudy();
-    if (plan.writeCurrent && study) {
+    const saved = currentStudy();
+    if (plan.writeCurrent && saved) {
       const result = sessions.write(
-        buildDraft({ study, sticky, savedAt: new Date().toISOString() }),
+        buildDraft({ study: saved, selectedTrackId, savedAt: new Date().toISOString() }),
         config.primaryArchetypeId,
       );
       setAutosaveError(result.ok ? null : result.error);
     }
+    const source = videoUrl
+      ? { fileName: fileName.trim(), durationSeconds }
+      : { fileName: studyMeta?.fileName.trim() ?? "", durationSeconds: studyMeta?.durationSeconds ?? 0 };
     const slot =
-      plan.open === "slot" && study
+      plan.open === "slot" && source.fileName.length > 0
         ? sessions.read(
-            TaggerSessions.keyFor(
-              study.provenance.fileName,
-              id === config.primaryArchetypeId ? null : id,
-            ),
+            TaggerSessions.keyFor(source.fileName, id === config.primaryArchetypeId ? null : id),
           )
         : null;
     setArchetypeId(id);
-    setSelectedTagIndex(null);
-    setExportIndex(null);
     setDirty(false);
     setError(null);
     if (slot?.ok) {
-      const restored = restoreSticky(
-        slot.value.sticky,
-        config,
-        id,
-        slot.value.study.savedAttacks,
-      );
-      setTags(slot.value.study.tags);
-      setSavedAttacks(slot.value.study.savedAttacks);
-      setMonsterDraft(slot.value.study.monsterDraft);
-      setPreviewSource(slot.value.study.monsterDraft ? "draft" : "tags");
-      setSticky(restored.sticky);
-      setNotice(null);
-      return;
+      try {
+        const restored = v5OfDraft(slot.value);
+        setStudy(restored.study);
+        setSelectedTrackId(restored.selectedTrackId);
+        setNotice(restored.notices.length > 0 ? restored.notices.join(" ") : null);
+        return;
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
     }
     // An empty study keeps sourceUrl and frameRate, and never the video.
-    setTags([]);
-    setSavedAttacks([]);
-    setMonsterDraft(null);
-    setPreviewSource("tags");
-    setSticky((current) => ({ ...current, phaseIndex: 0 }));
+    setStudy(freshStudy(encounterId, id, provenanceNow(source)));
+    setSelectedTrackId(null);
     setNotice(null);
   };
 
@@ -1291,34 +1089,12 @@ export function TaggerRoute() {
     });
     if (plan.confirmFirst) {
       setConfirmation({
-        message: `Autosave is failing, so switching monster would lose the unsaved ${tags.length} tag(s)${monsterDraft ? " and monster draft" : ""} of this study. Export first, or confirm to switch anyway.`,
+        message: `Autosave is failing, so switching monster would lose the unsaved ${workText} of this study. Export first, or confirm to switch anyway.`,
         onConfirm: () => applyMonsterSwitch(id, { ...plan, writeCurrent: false }),
       });
       return;
     }
     applyMonsterSwitch(id, plan);
-  };
-
-  /** L17: records the presented frame's time for a block, guarded like a tag (T19). */
-  const startBlockHere = (blockId: string) => {
-    if (!videoUrl) {
-      setError("Load a video before anchoring a block.");
-      return;
-    }
-    if (seekPendingRef.current) {
-      setError("Wait for the seeked frame to appear before anchoring a block.");
-      return;
-    }
-    if (!monsterDraft) return;
-    setError(null);
-    setDirty(true);
-    setMonsterDraft(setAnchor(monsterDraft, blockId, mediaTime));
-  };
-
-  const changeDraft = (next: MonsterDraft) => {
-    setMonsterDraft(next);
-    setDirty(true);
-    if (monsterDraft === null) setPreviewSource("draft");
   };
 
   const messages = (
@@ -1342,17 +1118,54 @@ export function TaggerRoute() {
     </>
   );
 
-  const rows = sortNewestFirst(tags);
   const showSessions =
     !sessionsDismissed &&
     ((sessionList !== null && sessionList.length > 0) || sessionListError);
   const encounterName =
     ENCOUNTER_LIST.find((entry) => entry.id === encounterId)?.displayName ?? encounterId;
-  const stickyStatus = tagMatchStatus(createTag(0, sticky), config, archetypeId);
-  const phaseBlocks = draftBlocks.filter((block) => block.phaseId === selectedPhase?.id);
-  const anchoredCount = monsterDraft
-    ? phaseBlocks.filter((block) => monsterDraft.anchors[block.id] !== undefined).length
-    : 0;
+  const boundaryCount = study?.boundaries.length ?? 0;
+  const tracksWithMarks = study?.tracks.filter((track) => track.marks.length > 0).length ?? 0;
+  const windows = study ? segmentWindows(study.boundaries, segments, duration) : [];
+  // Step 86.3: each track's predicted volleys are the timeline's faint ticks.
+  const predicted = study
+    ? Object.fromEntries(
+        study.tracks.map((track) => [
+          track.id,
+          predictedTimesInWindows(windowsForTrack(windows, track.location), track.attack.cadence),
+        ]),
+      )
+    : {};
+  const rowsOfTimeline = study
+    ? timelineRows({ study, segments, durationSeconds: duration, predicted })
+    : [];
+  // Step 88.1: the Reconcile step's warnings and export, derived on render.
+  const warnings = study
+    ? studyWarnings({
+        study,
+        segments,
+        videoEndSeconds: duration,
+        frameToleranceSeconds: volleyStepTolerance(frameRate),
+      })
+    : [];
+  const fileText = study
+    ? monsterFileTextFromStudy({
+        archetypeId,
+        study,
+        currentRawFile: AUTHORED_MONSTER_FILES[archetypeId],
+        config,
+      })
+    : null;
+  const variants = study
+    ? study.tracks.flatMap((track) => {
+        const variant = bombVariantOf(track);
+        return variant ? [variant] : [];
+      })
+    : [];
+  /** E20: a track row selects its track, the scratch row selects scratch (null). */
+  const selectRow = (id: string) => {
+    if (id === "scratch") setSelectedTrackId(null);
+    else if (study?.tracks.some((track) => track.id === id)) setSelectedTrackId(id);
+  };
   const steps: readonly StepItem[] = [
     {
       id: "setup",
@@ -1367,21 +1180,19 @@ export function TaggerRoute() {
       done: videoUrl !== null && frameRate !== null,
     },
     {
-      id: "tag",
-      name: STEP_GUIDES.tag.name,
-      status: tags.length === 1 ? "1 tag" : `${tags.length} tags`,
+      id: "structure",
+      name: STEP_GUIDES.structure.name,
+      status: boundaryCount === 1 ? "1 boundary" : `${boundaryCount} boundaries`,
     },
     {
-      id: "review",
-      name: STEP_GUIDES.review.name,
-      status: tags.length === 0 ? "Nothing yet" : "Check, edit, export",
+      id: "attacks",
+      name: STEP_GUIDES.attacks.name,
+      status: `${markCount} marks on ${tracksWithMarks} tracks`,
     },
     {
-      id: "draft",
-      name: STEP_GUIDES.draft.name,
-      status: monsterDraft
-        ? `${anchoredCount} of ${phaseBlocks.length} blocks anchored`
-        : "Optional",
+      id: "reconcile",
+      name: STEP_GUIDES.reconcile.name,
+      status: study ? (warnings.length === 1 ? "1 warning" : `${warnings.length} warnings`) : "not yet checked",
     },
   ];
   const canRecord = videoUrl !== null && !seekPending;
@@ -1396,28 +1207,8 @@ export function TaggerRoute() {
             video never leaves this computer.
           </p>
         </div>
-        <label className={styles.phaseControl}>
-          <span>Phase</span>
-          <HelpMark text={help.HELP_DRAFT_PHASE} />
-          <select
-            aria-label="Phase"
-            value={sticky.phaseIndex}
-            onChange={(event) =>
-              setSticky((current) => ({
-                ...current,
-                phaseIndex: Number(event.target.value),
-              }))
-            }
-          >
-            {phases.map((phase) => (
-              <option key={phase.id} value={phase.index}>
-                {phase.label}
-              </option>
-            ))}
-          </select>
-        </label>
         <div className={styles.headerActions}>
-          <button type="button" onClick={exportTags}>
+          <button type="button" onClick={exportStudy}>
             Export study JSON
           </button>
           <StepGuidePanel step={step} />
@@ -1467,7 +1258,7 @@ export function TaggerRoute() {
                 <tr>
                   <th scope="col">File</th>
                   <th scope="col">Monster</th>
-                  <th scope="col">Tags</th>
+                  <th scope="col">Marks</th>
                   <th scope="col">Last saved</th>
                   <th scope="col">
                     <span className={styles.visuallyHidden}>Actions</span>
@@ -1480,7 +1271,7 @@ export function TaggerRoute() {
                     <tr key={entry.key}>
                       <td>{entry.fileName}</td>
                       <td>{entry.archetypeId ?? "primary"}</td>
-                      <td>{entry.tagCount}</td>
+                      <td>{entry.markCount}</td>
                       <td>{new Date(entry.savedAt).toLocaleString()}</td>
                       <td>
                         <button type="button" onClick={() => restoreSession(entry.key)}>
@@ -1566,7 +1357,7 @@ export function TaggerRoute() {
                     onChange={(event) => {
                       setFrameRateText(event.target.value);
                       setRateDetected(false);
-                      if (tags.length > 0) setDirty(true);
+                      if (studyHasWork) setDirty(true);
                     }}
                   />
                 </label>
@@ -1577,14 +1368,14 @@ export function TaggerRoute() {
                     value={sourceUrlText}
                     onChange={(event) => {
                       setSourceUrlText(event.target.value);
-                      if (tags.length > 0) setDirty(true);
+                      if (studyHasWork) setDirty(true);
                     }}
                     placeholder="https://..."
                   />
                 </label>
               </div>
               <p className={styles.note}>
-                Frame steps and tag times need the rate. Leave it blank and
+                Frame steps and mark times need the rate. Leave it blank and
                 press Play: playback fills it in.
               </p>
             </div>
@@ -1622,8 +1413,8 @@ export function TaggerRoute() {
                 </label>
               </div>
               <p className={styles.note}>
-                One study covers one monster. Pick the phase at the top of
-                the page.
+                One study covers one monster. Its attacks load as attack
+                tracks automatically.
               </p>
             </div>
           </li>
@@ -1652,9 +1443,9 @@ export function TaggerRoute() {
           <button
             type="button"
             className={styles.primary}
-            onClick={() => setStep("tag")}
+            onClick={() => setStep("structure")}
           >
-            Start tagging
+            Start the structure
           </button>
         </div>
       </section>
@@ -1686,6 +1477,7 @@ export function TaggerRoute() {
                 </span>
               </div>
         {videoUrl && (
+          <div className={styles.videoFrame}>
           <video
             ref={video}
             className={styles.video}
@@ -1703,6 +1495,28 @@ export function TaggerRoute() {
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
           />
+          {overlayArm && (
+            <div
+              className={styles.videoOverlay}
+              role="application"
+              aria-label={overlayPrompt ?? undefined}
+              data-testid="video-overlay"
+              onPointerDown={onOverlayPointerDown}
+              onPointerUp={onOverlayPointerUp}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setOverlayArm(null);
+              }}
+            />
+          )}
+          </div>
+        )}
+        {overlayPrompt && (
+          <p className={styles.note} role="status">
+            {overlayPrompt}{" "}
+            <button type="button" onClick={() => setOverlayArm(null)}>
+              Cancel
+            </button>
+          </p>
         )}
         {!videoUrl && (
           <div className={styles.videoEmpty}>
@@ -1781,48 +1595,12 @@ export function TaggerRoute() {
         <TaggerTimeline
           durationSeconds={duration}
           mediaTime={mediaTime}
-          volleyTimes={volleyTimes}
+          rows={rowsOfTimeline}
+          selectedRowId={selectedTrackId ?? "scratch"}
+          onSelectRow={selectRow}
           enabled={videoUrl !== null}
           onSeek={seekTo}
         />
-        {step === "tag" && (
-          <div className={styles.recordBar}>
-            <button
-              type="button"
-              className={styles.record}
-              onClick={() => recordTag("standalone")}
-              disabled={!canRecord}
-            >
-              <span className={styles.recordDot} aria-hidden="true" />
-              Record tag
-              <kbd aria-hidden="true">Enter</kbd>
-            </button>
-            <button
-              type="button"
-              onClick={() => recordTag("new-burst")}
-              disabled={!canRecord}
-            >
-              Start burst (B)
-            </button>
-            <button
-              type="button"
-              onClick={() => recordTag("continue-burst")}
-              disabled={!canRecord}
-            >
-              Add to burst (Shift+Enter)
-            </button>
-            <button type="button" onClick={endRepeatHere} disabled={!canRecord}>
-              End repeat here
-            </button>
-            <output className={styles.readout} aria-label="Interval since previous tag">
-              {seekPending
-                ? "Waiting for the seeked frame"
-                : interval === null
-                  ? "No previous tag in this group"
-                  : `${interval.toFixed(3)} s since previous`}
-            </output>
-          </div>
-        )}
         <details className={styles.shortcuts}>
           <summary>Keyboard shortcuts</summary>
           <dl>
@@ -1831,758 +1609,159 @@ export function TaggerRoute() {
             <div><dt><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt><dd>Jump {FINE_JUMP_SECONDS} s</dd></div>
             <div><dt><kbd>PageUp</kbd> <kbd>PageDown</kbd></dt><dd>Jump {COARSE_JUMP_SECONDS} s</dd></div>
             <div><dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Previous or next volley</dd></div>
-            <div><dt><kbd>Enter</kbd></dt><dd>Record a standalone tag</dd></div>
-            <div><dt><kbd>B</kbd></dt><dd>Record a volley that starts a new burst</dd></div>
-            <div><dt><kbd>Shift</kbd> + <kbd>Enter</kbd></dt><dd>Add a volley to the latest matching burst</dd></div>
-            <div><dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd>Set the shot count</dd></div>
+            <div><dt><kbd>S</kbd></dt><dd>Segment starts here</dd></div>
+            <div><dt><kbd>T</kbd></dt><dd>Telegraph ends here</dd></div>
+            <div><dt><kbd>I</kbd></dt><dd>Invulnerable starts here, or ends here</dd></div>
+            <div><dt><kbd>Enter</kbd></dt><dd>Add a volley mark to the selected attack</dd></div>
+            <div><dt><kbd>X</kbd></dt><dd>Set the selected attack&apos;s end mark</dd></div>
+            <div><dt><kbd>Delete</kbd></dt><dd>Remove the selected attack&apos;s mark at this frame</dd></div>
+            <div><dt><kbd>1</kbd>-<kbd>9</kbd> <kbd>0</kbd></dt><dd>Select an attack track, or scratch</dd></div>
           </dl>
         </details>
             </div>
           <PreviewPanel
             key={encounterId}
-            draftSource={
-              monsterDraft && previewSource === "draft"
-                ? {
-                    draft: monsterDraft,
-                    blocks: draftBlocks,
-                    phaseId: selectedPhase?.id ?? "",
-                    videoEndSeconds: duration > 0 ? duration : Infinity,
-                  }
-                : null
-            }
-            sourceSwitch={
-              sections.sourceSwitch
-                ? { value: previewSource, onChange: setPreviewSource }
-                : undefined
-            }
-            showTuning={sections.previewTuning}
-            tags={tags}
-            savedAttacks={savedAttacks}
+            study={study}
+            segments={segments}
+            windows={windows}
             mediaTime={mediaTime}
             hasVideo={videoUrl !== null}
             config={config}
-            archetypeId={archetypeId}
-            highlightedTagIndices={highlighted}
-            tuning={tuning}
+            selectedTrackIndex={
+              selectedTrack && study ? study.tracks.indexOf(selectedTrack) : null
+            }
             layout={layout}
             onLayoutChange={changeLayout}
           />
           </div>
         </div>
 
-        <div className={styles.inspector} hidden={step === "review"}>
-      <section
-        className={styles.inspectorPanel}
-        aria-labelledby="tag-title"
-        hidden={step !== "tag"}
-      >
-        <div className={styles.headingRow}>
-          <h2 id="tag-title">Next tag</h2>
-          <HelpMark text={help.HELP_SECTION_TAG} />
-        </div>
-        <div className={styles.nextTag} aria-live="polite">
-          <p className={styles.nextTagChips}>
-            <span className={styles.visuallyHidden}>Recording: </span>
-            {chosenAttack && <span className={styles.chip}>{chosenAttack.name}</span>}
-            <span className={styles.chip}>{sticky.spriteId}</span>
-            <span className={styles.chip}>{sticky.pattern}</span>
-            {patternTakesAim(sticky.pattern) && (
-              <span className={styles.chip}>aim {sticky.aim}</span>
-            )}
-            <span className={styles.chip}>
-              {sticky.shots} {shotsLabel(sticky.pattern)}
-            </span>
-            {armPatternAllowed(sticky.pattern) && sticky.armPattern && (
-              <span className={styles.chip}>
-                each arm {sticky.armPattern}
-                {sticky.shotsPerArm !== undefined && <> ×{sticky.shotsPerArm}</>}
-              </span>
-            )}
-          </p>
-          <p
-            className={styles.matchStatus}
-            data-kind={stickyStatus.kind}
-            role="status"
-            aria-label="Match status"
-          >
-            {matchStatusText(stickyStatus, phaseName)}
-          </p>
-        </div>
-
-        <fieldset className={styles.formRow}>
-          <legend className={styles.formLabel}>
-            Sprite
-            <HelpMark text={help.HELP_SECTION_SPRITE} />
-          </legend>
-          <div className={styles.appearanceGrid}>
-            {appearances.map((option) => (
-              <AppearanceChoice
-                key={option.id}
-                option={option}
-                selected={sticky.spriteId === option.id}
-                onSelect={() =>
-                  setSticky((current) => ({ ...current, spriteId: option.id }))
-                }
-              />
-            ))}
-          </div>
-        </fieldset>
-
-        <Segmented
-          legend="Pattern"
-          name="pattern"
-          options={OFFERABLE_PATTERNS}
-          value={sticky.pattern}
-          onChange={(pattern) => setSticky((current) => ({ ...current, pattern }))}
-        />
-        {patternTakesAim(sticky.pattern) && (
-          <Segmented
-            legend="Aim"
-            name="aim"
-            options={TAG_AIMS}
-            value={sticky.aim}
-            onChange={(aim) => setSticky((current) => ({ ...current, aim }))}
+        <div className={styles.inspector} hidden={step === "reconcile"}>
+      <div hidden={step !== "structure"}>
+        {study ? (
+          <StructurePanel
+            study={study}
+            segments={segments}
+            windows={windows}
+            mediaTime={mediaTime}
+            frameRate={frameRate}
+            hasVideo={canRecord}
+            onSegmentStartsHere={segmentStartsHere}
+            onTelegraphEndsHere={telegraphEndsHere}
+            onToggleInvulnerable={invulnerableHere}
+            onSetBoundarySegment={(index, segmentId) =>
+              applyStudyEdit((current) => setBoundarySegment(current, index, segmentId))
+            }
+            onRemoveBoundary={(index) => applyStudyEdit((current) => removeBoundary(current, index))}
+            onRemoveSpan={(index) => applyStudyEdit((current) => removeSpan(current, index))}
+            onSeek={(time) => {
+              if (videoUrl) seekTo(time);
+            }}
+          />
+        ) : (
+          <p className={styles.note}>Open a video or choose the monster to start a study.</p>
+        )}
+        {study && (
+          <ScalePanel
+            tileWidthFraction={study.scale?.tileWidthFraction ?? null}
+            armed={overlayArm?.kind === "scale"}
+            hasVideo={Boolean(videoUrl)}
+            onCalibrate={() => {
+              video.current?.pause();
+              setOverlayArm({ kind: "scale" });
+            }}
+            onClear={() => applyStudyEdit((current) => setScale(current, undefined))}
           />
         )}
-        <label className={styles.formRow}>
-          <span className={styles.formLabel}>
-            {sticky.pattern === "rotating-arm" || sticky.pattern === "fixed-ring"
-              ? "Arms"
-              : "Shots"}
-          </span>
-          <span className={styles.inlineInput}>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={sticky.shots}
-              onChange={(event) => {
-                const shots = Number(event.target.value);
-                setSticky((current) => ({
-                  ...current,
-                  shots: Number.isFinite(shots)
-                    ? Math.max(1, Math.round(shots))
-                    : 1,
-                }));
-              }}
-            />
-            <small className={styles.note}>
-              Or press <kbd>1</kbd>–<kbd>9</kbd>.
-            </small>
-          </span>
-        </label>
-        {armPatternAllowed(sticky.pattern) && (
-          <div className={styles.formGroup}>
-            <Segmented
-              legend="Each arm fires"
-              name="arm-pattern"
-              options={["single", "spread", "scatter", "ring"] as const}
-              value={sticky.armPattern ?? "single"}
-              label={(choice) => (choice === "single" ? "single shot" : choice)}
-              onChange={(choice) =>
-                setStickyArmPattern(choice === "single" ? null : choice)
+      </div>
+      <div hidden={step !== "attacks"}>
+        {study ? (
+          <>
+            <TrackPanel
+              study={study}
+              segments={segments}
+              config={config}
+              selectedTrackId={selectedTrackId}
+              onSelect={setSelectedTrackId}
+              onAdd={addAttackTrack}
+              onDuplicate={(newId) =>
+                selectedTrackId !== null &&
+                applyStudyEdit((current) => duplicateTrack(current, selectedTrackId, newId))
               }
+              onDelete={() => {
+                if (selectedTrackId === null) return;
+                if (applyStudyEdit((current) => removeTrack(current, selectedTrackId)))
+                  setSelectedTrackId(null);
+              }}
+              onReload={reloadFromGame}
+              onEditAttack={editSelectedAttack}
+              onSetLocation={(segmentId) => {
+                const segment = segments.find((entry) => entry.id === segmentId);
+                if (selectedTrackId !== null && segment)
+                  applyStudyEdit((current) => setTrackLocation(current, selectedTrackId, segment.ref));
+              }}
+              onSeek={(time) => {
+                if (videoUrl) seekTo(time);
+              }}
+              onRemoveMark={(time) =>
+                applyStudyEdit((current) => removeMarkNear(current, selectedTrackId, time, 0))
+              }
+              onCreateFromScratch={createFromScratch}
             />
-            {sticky.armPattern && (
-              <div className={styles.fieldGrid}>
-                <label className={styles.field}>
-                  <span>Shots per arm</span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    aria-label="Shots per arm"
-                    value={sticky.shotsPerArm ?? ""}
-                    onChange={(event) =>
-                      setStickyNumber("shotsPerArm", event.target.value)
-                    }
-                  />
-                </label>
-                {armPatternTakesArc(sticky.armPattern) && (
-                  <label className={styles.field}>
-                    <span>Cone width, degrees</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      aria-label="Cone width in degrees"
-                      value={sticky.armArcDegrees ?? ""}
-                      onChange={(event) =>
-                        setStickyNumber("armArcDegrees", event.target.value)
-                      }
-                    />
-                  </label>
-                )}
-              </div>
+            {selectedTrack && (
+              <FitPanel
+                track={selectedTrack}
+                windows={windows}
+                frameRate={frameRate}
+                onAccept={(field, value) => acceptFit({ [field]: value })}
+                onAcceptAll={acceptFit}
+                onSetThreshold={(seconds) =>
+                  applyStudyEdit((current) =>
+                    setBurstGapThreshold(current, selectedTrack.id, seconds),
+                  )
+                }
+                bomb={selectedBomb}
+                tileWidthFraction={study.scale?.tileWidthFraction ?? null}
+                onAcceptOverride={acceptOverride}
+                onMeasurePair={(pairIndex, pair) => {
+                  if (!videoUrl) {
+                    setError("Load a video before measuring a range.");
+                    return;
+                  }
+                  seekTo(pair.throwSeconds);
+                  setOverlayArm({ kind: "range-throw", trackId: selectedTrack.id, pairIndex, pair });
+                }}
+              />
             )}
-            <small className={styles.note}>
-              One level of nesting only. The cone is a typed estimate, not
-              measured from the video.
-            </small>
-          </div>
+          </>
+        ) : (
+          <p className={styles.note}>Open a video or choose the monster to start a study.</p>
         )}
-        {rotationAllowed(sticky.pattern) && (
-          <fieldset className={styles.formGroup}>
-            <legend className={styles.formLabel}>Rotation (typed estimates)</legend>
-            <div className={styles.fieldGrid}>
-              <label className={styles.field}>
-                <span>Clockwise degrees per second</span>
-                <input
-                  type="number"
-                  step="any"
-                  aria-label="Clockwise degrees per second"
-                  value={sticky.clockwiseDegreesPerSecond ?? ""}
-                  onChange={(event) =>
-                    setStickyNumber("clockwiseDegreesPerSecond", event.target.value)
-                  }
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Initial phase, degrees</span>
-                <input
-                  type="number"
-                  step="any"
-                  aria-label="Initial phase in degrees"
-                  value={sticky.initialPhaseDegrees ?? ""}
-                  onChange={(event) =>
-                    setStickyNumber("initialPhaseDegrees", event.target.value)
-                  }
-                />
-              </label>
-            </div>
-            <small className={styles.note}>
-              Blank keeps the matched attack&apos;s authored value. Negative
-              rates turn counter-clockwise.
-            </small>
-          </fieldset>
-        )}
-        <StickyTypedFields
-          sticky={sticky}
-          showBullet={stickyShowsBullet}
-          onNumber={setStickyTyped}
-          onTarget={setStickyTarget}
-        />
-        <SavedAttackPanel
-          savedAttacks={savedAttacks}
-          chosen={chosenAttack}
-          modified={chosenAttack !== null && isStickyModified(sticky, chosenAttack)}
-          onChoose={chooseAttack}
-          onSave={saveAttack}
-          onUpdate={updateAttack}
-          onRename={renameAttack}
-          onDelete={deleteAttack}
-        />
-      </section>
-
-      <div hidden={step !== "draft"}>
-        <DraftPanel
-          key={archetypeId}
-          archetypeId={archetypeId}
-          config={config}
-          draft={monsterDraft}
-          blocks={draftBlocks}
-          hasVideo={videoUrl !== null}
-          phases={phases}
-          phaseIndex={sticky.phaseIndex}
-          onStartsHere={startBlockHere}
-          onChange={changeDraft}
-        />
       </div>
         </div>
 
-      <div className={styles.review} hidden={step !== "review"}>
-      <section className={styles.card} aria-labelledby="tags-title">
-        <div className={styles.cardHead}>
-          <div className={styles.headingRow}>
-            <h2 id="tags-title">Tags ({tags.length})</h2>
-            <HelpMark text={help.HELP_SECTION_TAGS} />
-          </div>
-          <p className={styles.note}>
-            Newest footage first. Click a row to jump there and tune it in the
-            preview. Edits apply at once; there is no undo.
-          </p>
-        </div>
-        {tags.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>No tags recorded yet.</p>
-            <button type="button" onClick={() => setStep("tag")}>
-              Tag volleys
-            </button>
-          </div>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={`${styles.table} ${styles.compactTable}`}>
-              <thead>
-                <tr>
-                  <th scope="col">Time (s)</th>
-                  <th scope="col">Sprite</th>
-                  <th scope="col">Phase</th>
-                  <th scope="col">Attack</th>
-                  <th scope="col">Pattern</th>
-                  <th scope="col">Aim</th>
-                  <th scope="col">Shots / arms</th>
-                  <th scope="col">Geometry (typed)</th>
-                  <th scope="col">Burst</th>
-                  <th scope="col">Repeat end (s)</th>
-                  <th scope="col">Preview</th>
-                  <th scope="col" className={styles.stickyActions}>
-                    <span className={styles.visuallyHidden}>Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ tag, index }) => {
-                  const stored = storedTags[index];
-                  const linked = "savedAttackId" in stored;
-                  const repeats = linked && stored.repeatEndSeconds !== undefined;
-                  return (
-                  <tr
-                    key={index}
-                    className={
-                      selectedTagIndex === index ? styles.selectedRow : undefined
-                    }
-                    onClick={(event) => {
-                      if (
-                        (event.target as HTMLElement).closest(
-                          "input, select, button, textarea",
-                        )
-                      )
-                        return;
-                      setSelectedTagIndex((current) =>
-                        current === index ? null : index,
-                      );
-                      if (videoUrl) seekTo(tag.timeSeconds);
-                    }}
-                  >
-                    <td>
-                      <CommitInput
-                        label={`Time of tag ${index + 1}`}
-                        value={tag.timeSeconds.toFixed(3)}
-                        step="0.001"
-                        onCommit={(text) =>
-                          text.trim() !== "" &&
-                          applyEdit(index, {
-                            field: "timeSeconds",
-                            value: Number(text),
-                          })
-                        }
-                      />
-                      {tag.timeSource === "typed" && (
-                        <small className={styles.note}> typed</small>
-                      )}
-                    </td>
-                    <td>
-<fieldset disabled={linked} className={styles.cellFieldset}>
-                      <RawOrKnownSelect
-                        label={`Sprite of tag ${index + 1}`}
-                        value={tag.spriteId}
-                        options={appearances.map((option) => ({
-                          value: option.id,
-                          label: option.id,
-                        }))}
-                        onChange={(value) =>
-                          applyEdit(index, { field: "spriteId", value })
-                        }
-                      />
-                    </fieldset>
-</td>
-                    <td>
-                      <RawOrKnownSelect
-                        label={`Phase of tag ${index + 1}`}
-                        value={String(tag.phaseIndex)}
-                        options={phaseChoices(phases)}
-                        onChange={(value) =>
-                          applyEdit(index, {
-                            field: "phaseIndex",
-                            value: Number(value),
-                          })
-                        }
-                      />
-                    </td>
-                    <td>
-                      {linked
-                        ? (savedAttacks.find((entry) => entry.id === stored.savedAttackId)?.name ?? stored.savedAttackId)
-                        : "—"}
-                    </td>
-                    <td>
-<fieldset disabled={linked} className={styles.cellFieldset}>
-                      <RawOrKnownSelect
-                        label={`Pattern of tag ${index + 1}`}
-                        value={tag.pattern}
-                        options={OFFERABLE_PATTERNS.map((pattern) => ({
-                          value: pattern,
-                          label: pattern,
-                        }))}
-                        onChange={(value) =>
-                          applyEdit(index, {
-                            field: "pattern",
-                            value: value as TagPattern,
-                          })
-                        }
-                      />
-                    </fieldset>
-</td>
-                    <td>
-<fieldset disabled={linked} className={styles.cellFieldset}>
-                      {tag.aim === undefined ? (
-                        "—"
-                      ) : (
-                        <select
-                          className={styles.cellSelect}
-                          aria-label={`Aim of tag ${index + 1}`}
-                          value={tag.aim}
-                          onChange={(event) =>
-                            applyEdit(index, {
-                              field: "aim",
-                              value: event.target.value as TagAim,
-                            })
-                          }
-                        >
-                          {TAG_AIMS.map((aim) => (
-                            <option key={aim} value={aim}>
-                              {aim}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </fieldset>
-</td>
-                    <td>
-<fieldset disabled={linked} className={styles.cellFieldset}>
-                      <CommitInput
-                        label={`Shots of tag ${index + 1}`}
-                        value={String(tag.shots)}
-                        onCommit={(text) =>
-                          text.trim() !== "" &&
-                          applyEdit(index, { field: "shots", value: Number(text) })
-                        }
-                      />
-                    </fieldset>
-</td>
-                    <td>
-<fieldset disabled={linked} className={styles.cellFieldset}>
-                      {!armPatternAllowed(tag.pattern) &&
-                      !rotationAllowed(tag.pattern) &&
-                      !rowHasTypedFields(tag, matchesLinearBullet(tag, config, archetypeId)) ? (
-                        "—"
-                      ) : (
-                        <>
-                          <RowTypedFields
-                            tag={tag}
-                            index={index}
-                            showBullet={matchesLinearBullet(tag, config, archetypeId)}
-                            onEdit={(change) => applyEdit(index, change)}
-                          />
-                          {armPatternAllowed(tag.pattern) && (
-                            <>
-                              <small className={styles.cellCaptionText}>Arm</small>
-                              <select
-                                className={styles.cellSelect}
-                                aria-label={`Arm pattern of tag ${index + 1}`}
-                                value={tag.armPattern ?? ""}
-                                onChange={(event) =>
-                                  applyEdit(index, {
-                                    field: "armPattern",
-                                    value:
-                                      event.target.value === ""
-                                        ? null
-                                        : (event.target.value as TagArmPattern),
-                                    ...(event.target.value !== "" &&
-                                    event.target.value !== "ring" &&
-                                    tag.armArcDegrees === undefined
-                                      ? { armArcDegrees: DEFAULT_ARM_ARC_DEGREES }
-                                      : {}),
-                                  })
-                                }
-                              >
-                                <option value="">single</option>
-                                <option value="spread">spread</option>
-                                <option value="scatter">scatter</option>
-                                <option value="ring">ring</option>
-                              </select>
-                              {tag.armPattern && (
-                                <CommitInput
-                                  label={`Shots per arm of tag ${index + 1}`}
-                                  caption="Per arm"
-                                  value={String(tag.shotsPerArm ?? "")}
-                                  onCommit={(text) =>
-                                    text.trim() !== "" &&
-                                    applyEdit(index, {
-                                      field: "shotsPerArm",
-                                      value: Number(text),
-                                    })
-                                  }
-                                />
-                              )}
-                              {tag.armPattern && armPatternTakesArc(tag.armPattern) && (
-                                <CommitInput
-                                  label={`Cone width of tag ${index + 1}`}
-                                  caption="Cone °"
-                                  value={String(tag.armArcDegrees ?? "")}
-                                  step="any"
-                                  onCommit={(text) =>
-                                    text.trim() !== "" &&
-                                    applyEdit(index, {
-                                      field: "armArcDegrees",
-                                      value: Number(text),
-                                    })
-                                  }
-                                />
-                              )}
-                            </>
-                          )}
-                          {rotationAllowed(tag.pattern) && (
-                            <>
-                              <CommitInput
-                                label={`Rotation rate of tag ${index + 1}`}
-                                  caption="Rate °/s"
-                                value={
-                                  tag.clockwiseDegreesPerSecond === undefined
-                                    ? ""
-                                    : String(tag.clockwiseDegreesPerSecond)
-                                }
-                                step="any"
-                                blankAllowed
-                                onCommit={(text) =>
-                                  applyEdit(index, {
-                                    field: "clockwiseDegreesPerSecond",
-                                    value: text.trim() === "" ? null : Number(text),
-                                  })
-                                }
-                              />
-                              <CommitInput
-                                label={`Initial phase of tag ${index + 1}`}
-                                  caption="Phase °"
-                                value={
-                                  tag.initialPhaseDegrees === undefined
-                                    ? ""
-                                    : String(tag.initialPhaseDegrees)
-                                }
-                                step="any"
-                                blankAllowed
-                                onCommit={(text) =>
-                                  applyEdit(index, {
-                                    field: "initialPhaseDegrees",
-                                    value: text.trim() === "" ? null : Number(text),
-                                  })
-                                }
-                              />
-                            </>
-                          )}
-                        </>
-                      )}
-                    </fieldset>
-</td>
-                    <td>
-                      <fieldset disabled={repeats} className={styles.cellFieldset}>
-                      <CommitInput
-                        label={`Burst of tag ${index + 1}`}
-                        value={tag.burstId === undefined ? "" : String(tag.burstId)}
-                        blankAllowed
-                        onCommit={(text) =>
-                          applyEdit(index, {
-                            field: "burstId",
-                            value: text.trim() === "" ? null : Number(text),
-                          })
-                        }
-                      />
-                    </fieldset>
-                    </td>
-                    <td>
-                      {linked ? (
-                        <fieldset
-                          disabled={stored.burstId !== undefined}
-                          className={styles.cellFieldset}
-                        >
-                          <CommitInput
-                            label={`Repeat end of tag ${index + 1}`}
-                            value={
-                              stored.repeatEndSeconds === undefined
-                                ? ""
-                                : stored.repeatEndSeconds.toFixed(3)
-                            }
-                            step="0.001"
-                            blankAllowed
-                            onCommit={(text) =>
-                              applyRepeatEnd(index, (current) =>
-                                text.trim() === ""
-                                  ? clearRepeatEnd(current)
-                                  : setRepeatEnd(current, Number(text), "typed"),
-                              )
-                            }
-                          />
-                          {stored.repeatEndSource === "typed" && (
-                            <small className={styles.note}> typed</small>
-                          )}
-                        </fieldset>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      {(() => {
-                        const status = tagMatchStatus(tag, config, archetypeId);
-                        return (
-                          <span className={styles.rowStatus} data-kind={status.kind}>
-                            {matchStatusText(status, phaseName)}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className={styles.stickyActions}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSticky((current) => stickyFromTag(tag, current));
-                          setSelectedTagIndex(index);
-                        }}
-                        aria-label={`Use the settings of tag ${index + 1}`}
-                      >
-                        Use these settings
-                      </button>{" "}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCopyNote(null);
-                          setExportIndex((current) =>
-                            current === index ? null : index,
-                          );
-                        }}
-                        aria-label={`Export tag at ${tag.timeSeconds.toFixed(3)} seconds as an attack`}
-                      >
-                        Export as attack
-                      </button>{" "}
-                      <button
-                        type="button"
-                        onClick={() => seekTo(tag.timeSeconds)}
-                        disabled={!videoUrl}
-                        aria-label={`Go to tag at ${tag.timeSeconds.toFixed(3)} seconds`}
-                      >
-                        Go to
-                      </button>{" "}
-                      {linked && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => detachRow(index)}
-                            disabled={repeats}
-                            title={repeats ? "Clear the repeat end or delete the row first." : undefined}
-                            aria-label={`Detach tag ${index + 1} from its saved attack`}
-                          >
-                            Detach
-                          </button>{" "}
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDirty(true);
-                          setSelectedTagIndex((current) =>
-                            selectionAfterDelete(current, index),
-                          );
-                          setExportIndex((current) =>
-                            selectionAfterDelete(current, index),
-                          );
-                          setTags((current) =>
-                            current.filter((_entry, at) => at !== index),
-                          );
-                        }}
-                        aria-label={`Delete tag at ${tag.timeSeconds.toFixed(3)} seconds`}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {exportIndex !== null && tags[exportIndex] && (
-          <ExportBox
-            tagNumber={exportIndex + 1}
-            result={authoredAttackFromTag(
-              tags[exportIndex],
-              config,
-              archetypeId,
-              savedAttacks.find((entry) => entry.id === tags[exportIndex].savedAttackId),
-            )}
-            linked={tags[exportIndex].savedAttackId !== undefined}
-            statusText={matchStatusText(tagMatchStatus(tags[exportIndex], config, archetypeId), phaseName)}
-            note={copyNote}
-            onCopy={(text) => {
-              // N41: a failing clipboard only leaves the box for manual copying.
-              const clipboard = navigator.clipboard;
-              if (!clipboard) {
-                setCopyNote("Copy the text above by hand.");
-                return;
-              }
-              clipboard.writeText(text).then(
-                () => setCopyNote("Copied."),
-                () => setCopyNote("Copy the text above by hand."),
-              );
+      <div className={styles.review} hidden={step !== "reconcile"}>
+        {study && fileText ? (
+          <ReconcilePanel
+            study={study}
+            segments={segments}
+            videoEndSeconds={duration}
+            frameSeconds={2 * volleyStepTolerance(frameRate)}
+            warnings={warnings}
+            fileText={fileText}
+            fileName={monsterFilePath(archetypeId)}
+            variants={variants}
+            onAccept={(segmentId, field, value) =>
+              applyStudyEdit((current) => acceptSegmentValue(current, segmentId, field, value))
+            }
+            onSeek={(time) => {
+              if (videoUrl) seekTo(time);
             }}
-            onClose={() => setExportIndex(null)}
+            onExportStudy={exportStudy}
           />
-        )}
-      </section>
-
-      <section className={styles.card} aria-labelledby="summary-title">
-        <div className={styles.cardHead}>
-          <div className={styles.headingRow}>
-            <h2 id="summary-title">Summary</h2>
-            <HelpMark text={help.HELP_SECTION_SUMMARY} />
-          </div>
-          <p className={styles.note}>
-            A repeat counts once, at its first volley. Intervals between rows
-            come from video times; a saved attack&apos;s cadence is typed and
-            is never measured here.
-          </p>
-        </div>
-        {summaryRows.length === 0 ? (
-          <p className={styles.empty}>No tags to summarise yet.</p>
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th scope="col">Phase</th>
-                  <th scope="col">Sprite</th>
-                  <th scope="col">Pattern</th>
-                  <th scope="col">Aim</th>
-                  <th scope="col">Arm pattern</th>
-                  <th scope="col">Target</th>
-                  <th scope="col">Attack</th>
-                  <th scope="col">Scope</th>
-                  <th scope="col">Samples</th>
-                  <th scope="col">Mean</th>
-                  <th scope="col">Deviation</th>
-                  <th scope="col">Intervals</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summaryRows.map((row) => (
-                  <tr key={`${row.phase}|${row.sprite}|${row.pattern}|${row.aim}|${row.armPattern}|${row.target}|${row.attack}|${row.scope}`}>
-                    <td>{row.phase}</td>
-                    <td>{row.sprite}</td>
-                    <td>{row.pattern}</td>
-                    <td>{row.aim}</td>
-                    <td>{row.armPattern}</td>
-                    <td>{row.target}</td>
-                    <td>{row.attack}</td>
-                    <td>{row.scope}</td>
-                    <td>{row.sampleCount}</td>
-                    <td>{row.mean}</td>
-                    <td>{row.deviation}</td>
-                    <td className={styles.intervals}>{row.intervals}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className={styles.note}>Open a video or choose the monster to start a study.</p>
         )}
-      </section>
       </div>
       </div>
     </main>
