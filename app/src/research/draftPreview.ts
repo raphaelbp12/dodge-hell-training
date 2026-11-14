@@ -1,5 +1,5 @@
 /**
- * Pure draft preview for the dev-only tagger (plan V18 phase 75): the window
+ * Pure draft preview for the tagger (plan V18 phase 75): the window
  * each anchored block runs in, the volleys of a cadence inside that window, and
  * one preview frame of a monster's draft. It runs no simulation and owns no
  * clock; the video's `mediaTime` is the only time it reads (M01, L32).

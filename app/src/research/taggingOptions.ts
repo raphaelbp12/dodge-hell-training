@@ -1,5 +1,5 @@
 /**
- * Pure option, tag and export builders for the dev-only tagger (plan V8
+ * Pure option, tag and export builders for the tagger (plan V8
  * phase 34.3). Everything here reads `game/config/` one way (T13) and stays
  * independent of React, the DOM and the video APIs.
  */

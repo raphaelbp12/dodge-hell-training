@@ -22,7 +22,7 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 - Ask before changing gameplay scope, rules or tuning. Record approved deviations and comparison-breaking rules versions.
 - Gameplay values use named constants and typed configuration with units and a documented source or user approval. Never invent ROTMG fidelity claims.
 - [The deferred register](docs/deferred-work.md) lists recognised, postponed, **unapproved** work. Do not implement anything listed there without an explicit user decision promoting it.
-- Out of scope: a backend, accounts, player attacks, seal activation, touch controls, shrinking arenas and a tuning UI. A development-only tagger control that edits only a study's typed estimates and never game data is not a tuning UI (plan V16 S47). A development-only tagger editor that produces monster JSON for a person to apply, and that the running game never reads, is not a tuning UI (plan V18 L01).
+- Out of scope: a backend, accounts, player attacks, seal activation, touch controls, shrinking arenas and a tuning UI. A tagger control that edits only a study's typed estimates and never game data is not a tuning UI (plan V16 S47). A tagger editor that produces monster JSON for a person to apply, and that the running game never reads, is not a tuning UI (plan V18 L01).
 - `WebFetch` returns an empty document for RealmEye wiki pages. Fetch them with `curl` and a desktop user agent, then strip script/style tags and parse the rendered markup.
 
 ## Architecture

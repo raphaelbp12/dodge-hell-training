@@ -1,5 +1,5 @@
 /**
- * Pure monster draft for the dev-only tagger (plan V18 phase 74): the monsters
+ * Pure monster draft for the tagger (plan V18 phase 74): the monsters
  * an encounter reaches, a monster's blocks, a lossless copy of its authored
  * attacks, edits to them, and the text of its whole data file. No React, DOM,
  * storage or simulation here, and nothing is written anywhere (L02, L23).
