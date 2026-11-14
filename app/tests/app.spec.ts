@@ -1097,6 +1097,7 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     id: 1,
     archetypeId: "crystal-worm-child-head",
     positionTiles: reset.enemies[0].positionTiles,
+    headingRadians: 0,
     spawnedAtSeconds: 0,
     attackClocks: [
       {
