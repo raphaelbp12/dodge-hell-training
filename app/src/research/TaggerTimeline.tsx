@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { TIMELINE_ROW_HEIGHT_PX, type TimelineRow } from "./timelineModel";
+import {
+  FULL_WINDOW,
+  followPlayhead,
+  isFullWindow,
+  visibleFraction,
+  zoomWindow,
+  type TimelineWindow,
+} from "./timelineZoom";
 import styles from "./TaggerRoute.module.css";
 
 /** Canvas width used until the element reports its own layout width. */
@@ -17,17 +25,26 @@ const TICK_WIDTH_PX = 2;
 const LABEL_FONT = "10px sans-serif";
 const LABEL_INSET_PX = 4;
 const BOUNDARY_LABEL_GAP_PX = 3;
+/** One zoom step halves (in) or doubles (out) the visible time span. */
+const ZOOM_IN_FACTOR = 0.5;
+const ZOOM_OUT_FACTOR = 2;
+/** The narrowest visible span, so a zoomed row still shows a few frames either side. */
+const MIN_VISIBLE_SECONDS = 1;
+/** Window ends are fractions, so a span at the minimum can differ from it by rounding. */
+const SPAN_TOLERANCE = 1e-9;
 
 function drawRows(
   element: HTMLCanvasElement,
   rows: readonly TimelineRow[],
   selectedRowId: string | null,
   playheadFraction: number | null,
+  window: TimelineWindow,
 ) {
   const context = element.getContext("2d");
   if (!context) return;
   const { width } = element;
   const span = width - TICK_WIDTH_PX;
+  const xOf = (fraction: number) => Math.round(visibleFraction(fraction, window) * span);
   context.clearRect(0, 0, width, element.height);
   context.font = LABEL_FONT;
   context.textBaseline = "middle";
@@ -42,11 +59,11 @@ function drawRows(
     context.fillRect(0, top + TIMELINE_ROW_HEIGHT_PX - 1, width, 1);
     context.fillStyle = BAR_COLOR;
     for (const bar of row.bars) {
-      const from = Math.round(bar.fromFraction * span);
-      context.fillRect(from, top + 2, Math.max(1, Math.round(bar.toFraction * span) - from), TIMELINE_ROW_HEIGHT_PX - 4);
+      const from = xOf(bar.fromFraction);
+      context.fillRect(from, top + 2, Math.max(1, xOf(bar.toFraction) - from), TIMELINE_ROW_HEIGHT_PX - 4);
     }
     for (const tick of row.ticks) {
-      const x = Math.round(tick.fraction * span);
+      const x = xOf(tick.fraction);
       if (tick.style === "boundary") {
         context.fillStyle = BOUNDARY_COLOR;
         context.fillRect(x, 0, TICK_WIDTH_PX, element.height);
@@ -63,13 +80,13 @@ function drawRows(
     }
     context.fillStyle = BOUNDARY_COLOR;
     for (const label of row.labels)
-      context.fillText(label.text, Math.round(label.fraction * span) + TICK_WIDTH_PX + BOUNDARY_LABEL_GAP_PX, middle);
+      context.fillText(label.text, xOf(label.fraction) + TICK_WIDTH_PX + BOUNDARY_LABEL_GAP_PX, middle);
     context.fillStyle = LABEL_COLOR;
     context.fillText(row.label, LABEL_INSET_PX, middle);
   });
   if (playheadFraction !== null) {
     context.fillStyle = PLAYHEAD_COLOR;
-    context.fillRect(Math.round(playheadFraction * span), 0, 1, element.height);
+    context.fillRect(xOf(playheadFraction), 0, 1, element.height);
   }
 }
 
@@ -115,10 +132,22 @@ export function TaggerTimeline({
 
   const playheadFraction =
     durationSeconds > 0 ? Math.min(1, Math.max(0, mediaTime / durationSeconds)) : null;
+  const [zoom, setZoom] = useState<TimelineWindow>(FULL_WINDOW);
+  const view = playheadFraction === null ? zoom : followPlayhead(zoom, playheadFraction);
+  useEffect(() => {
+    if (view !== zoom) setZoom(view);
+  }, [view, zoom]);
+  const minSpan = durationSeconds > 0 ? Math.min(1, MIN_VISIBLE_SECONDS / durationSeconds) : 1;
+  const zoomBy = (factor: number) =>
+    setZoom(zoomWindow(view, factor, playheadFraction ?? (view.start + view.end) / 2, minSpan));
+  const canZoomIn =
+    hasRows && durationSeconds > 0 && view.end - view.start - minSpan > SPAN_TOLERANCE;
+  const zoomed = !isFullWindow(view);
+
   useEffect(() => {
     const element = canvas.current;
-    if (element) drawRows(element, rows, selectedRowId, playheadFraction);
-  }, [rows, selectedRowId, playheadFraction, layoutWidth, heightPx]);
+    if (element) drawRows(element, rows, selectedRowId, playheadFraction, view);
+  }, [rows, selectedRowId, playheadFraction, layoutWidth, heightPx, view]);
 
   const selectAt = (event: MouseEvent<HTMLCanvasElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
@@ -149,6 +178,23 @@ export function TaggerTimeline({
           data-selected-row={selectedRowId ?? undefined}
           onClick={selectAt}
         />
+      )}
+      {hasRows && (
+        <div className={styles.timelineZoom}>
+          <button type="button" disabled={!canZoomIn} onClick={() => zoomBy(ZOOM_IN_FACTOR)}>
+            Zoom in
+          </button>
+          <button type="button" disabled={!zoomed} onClick={() => zoomBy(ZOOM_OUT_FACTOR)}>
+            Zoom out
+          </button>
+          <button type="button" disabled={!zoomed} onClick={() => setZoom(FULL_WINDOW)}>
+            Reset zoom
+          </button>
+          <small>
+            Showing {(view.start * durationSeconds).toFixed(3)}-
+            {(view.end * durationSeconds).toFixed(3)} s
+          </small>
+        </div>
       )}
       <div className={styles.timelineBar}>
         <input

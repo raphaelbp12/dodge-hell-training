@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { loadTestClip } from "./tagger-clip.ts";
 import { hexToNumber, palette } from "../src/game/config/palette.ts";
 import appearanceData from "../src/game/data/projectile-appearances.json" with { type: "json" };
@@ -2819,6 +2820,34 @@ test("the tagger preview panel shows, resizes and persists without a video", asy
   await expect(canvas).toHaveCount(0);
   await page.getByRole("button", { name: "Show preview" }).click();
   await expect.poll(side).toEqual([720, 720]);
+});
+
+test("the attack editor edits a track whose attack id repeats in another phase", async ({
+  page,
+}) => {
+  // The committed study's phase 1 track "blue-bomb-ring" shares its attack id
+  // with the phase 2 track "blue-bomb-ring-2". The game only requires attack
+  // ids to be unique within one phase, so the edit must be accepted.
+  await page.goto("./?tagger=1");
+  const dismiss = page.getByRole("button", { name: "Dismiss list" });
+  if (await dismiss.isVisible()) await dismiss.click();
+  await page
+    .locator('input[type="file"][accept*="json"]')
+    .setInputFiles(
+      fileURLToPath(new URL("../../docs/killer-bee-queen-study-TFclwuPtC94.json", import.meta.url)),
+    );
+  await page.getByRole("button", { name: /^Attacks/ }).click();
+  await page
+    .getByRole("list", { name: "Attack tracks" })
+    .getByRole("button", { name: /^1 .*blue-bomb-ring phase-1/ })
+    .click();
+  const editor = page.getByRole("group", { name: "Editing blue-bomb-ring" });
+  const arms = editor.getByLabel("Arms of blue-bomb-ring");
+  await expect(arms).toHaveValue("8");
+  await arms.fill("6");
+  await arms.press("Enter");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(arms).toHaveValue("6");
 });
 
 test("the structure step marks a boundary, a telegraph end and an invulnerable span by key", async ({

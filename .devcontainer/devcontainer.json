@@ -12,6 +12,7 @@
   "mounts": [
     "source=claude-config-${devcontainerId},target=/home/node/.claude,type=volume",
     "source=user-config-${devcontainerId},target=/home/node/.config,type=volume",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh,target=/home/node/.config/gh,type=bind",
     "source=app-node-modules-${devcontainerId},target=/workspaces/${localWorkspaceFolderBasename}/app/node_modules,type=volume",
     "source=codegraph-data-${devcontainerId},target=/workspaces/${localWorkspaceFolderBasename}/.codegraph-container,type=volume"
   ],
