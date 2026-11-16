@@ -63,6 +63,7 @@ import {
 } from "./taggerSessions";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import {
+  attackIdsInPhaseOf,
   segmentWindows,
   segmentsOfMonster,
   windowsForTrack,
@@ -670,7 +671,7 @@ export function TaggerRoute() {
     const result = changedAttack(
       selectedTrack.attack,
       change,
-      study!.tracks.filter((track) => track !== selectedTrack).map((track) => track.attack.id),
+      attackIdsInPhaseOf(study!, selectedTrack),
       config,
     );
     if (!result.ok) {

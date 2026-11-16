@@ -75,10 +75,19 @@ jobs:
           retention-days: 1
 
   browser:
-    name: Browser Tests
+    # The serial single-worker suite took about 10 minutes, a third of it in
+    # three 60-second real-time soak tests. Playwright shards are contiguous
+    # slices, so the @soak tests run as their own group, one per job, beside
+    # three shards of everything else.
+    name: Browser Tests (${{ matrix.group }} ${{ matrix.shard }}/3)
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [main, soak]
+        shard: [1, 2, 3]
     env:
       CI: "true"
     steps:
@@ -102,12 +111,15 @@ jobs:
       - name: Install Chromium and system dependencies
         run: npx playwright install --with-deps chromium
       - name: Browser loops and production-path smoke
-        run: npm run test:e2e
+        run: >-
+          npm run test:e2e --
+          ${{ matrix.group == 'soak' && '--grep @soak' || '--grep-invert @soak' }}
+          --shard=${{ matrix.shard }}/3
       - name: Retain browser evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: browser-results-${{ github.run_id }}-${{ github.run_attempt }}
+          name: browser-results-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}-${{ matrix.shard }}
           path: app/test-results/
           if-no-files-found: ignore
           retention-days: 7

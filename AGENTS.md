@@ -39,7 +39,8 @@ Checks cost time and tokens, so run them at the end of a unit of work, not after
 - Delegate verification runs (`npm run verify`, targeted Playwright) to the `verifier` subagent (Haiku, `.claude/agents/verifier.md`). It may apply only `oxlint --fix` and single-file typecheck fixes and reports everything else. Draft commit messages, when asked to commit, with the `commit-drafter` subagent and review the draft before committing.
 - Run `npm run verify` from `app/` once when a plan phase or a set of code edits under `app/` is finished, before reporting. It runs `lint`, `typecheck`, `test` and `build`, prints one line per gate, and puts full logs in `app/test-results/verification/<gate>.log`. Read a log only when the printed excerpt is not enough. Do not run the four gates separately.
 - Skip `npm run verify` when only documentation, plans or agent instruction files changed.
-- Playwright is not routine; CI runs the full suite on every push. When adding or changing a Playwright test, run only that test: `npm run test:e2e -- --grep "<pattern>"`. Run the full suite only to reproduce a CI failure or when the user asks for an acceptance run.
+- Playwright is not routine; CI runs the full suite on every push.
+- The three 60-second `@soak` tests (real-time frame timing and runtime bounds) run locally only with `PLAYWRIGHT_SOAK=1`, or when `CI` is set. CI always runs them and keeps their frame-timing JSON in the `browser-results-*-soak-*` artifact. Set `PLAYWRIGHT_SOAK=1` for any step that measures or compares frame timing, because CI-runner timings are not comparable with the recorded local baseline. When adding or changing a Playwright test, run only that test: `npm run test:e2e -- --grep "<pattern>"`. Run the full suite only to reproduce a CI failure or when the user asks for an acceptance run.
 - Report the checks you actually ran and any blockers. Never claim a check passed when it did not run.
 
 ## Git and deployment

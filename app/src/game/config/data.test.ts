@@ -670,6 +670,14 @@ test("validateAttack accepts the authored spiral-shards attack", () => {
   ).not.toThrow();
 });
 
+test("validateAttack names the phase as the scope of a repeated attack id", () => {
+  // validatePhase keeps one id set per phase (sub-phases included), so the
+  // message must not claim archetype-wide uniqueness.
+  expect(() =>
+    validateAttack(VALID_ATTACK, "attacks[1]", CATALOG_IDS, new Set([VALID_ATTACK.id])),
+  ).toThrow("Authored data attacks[1].id must be unique within the phase");
+});
+
 test("validateAttack accepts the video-observation tuning source", () => {
   const attack = validateAttack(
     { ...VALID_ATTACK, tuningSource: "video-observation" },

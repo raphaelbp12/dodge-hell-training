@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { archetypeOf, encounterConfigOf } from "../game/config/encounter";
 import { blocksOfMonster } from "./monsterDraft";
 import {
+  attackIdsInPhaseOf,
   nextSegmentId,
   segmentIdOf,
   segmentWindows,
@@ -9,6 +10,7 @@ import {
   validateStudyV5,
   windowAt,
   windowsForTrack,
+  type AttackTrack,
   type Segment,
   type StudyV5,
 } from "./study";
@@ -134,6 +136,38 @@ describe("windows", () => {
     expect(windowsForTrack(windows, { phaseId: "b", subPhaseId: "x" })).toHaveLength(2);
     expect(windowAt(windows, 1)?.segmentId).toBe("a");
     expect(windowAt(segmentWindows([{ timeSeconds: 3, segmentId: "a" }], list, 9), 1)).toBeNull();
+  });
+});
+
+describe("attackIdsInPhaseOf", () => {
+  const track = (id: string, attackId: string, phaseId: string, subPhaseId: string | null = null) =>
+    ({
+      id,
+      location: { phaseId, subPhaseId },
+      attack: { id: attackId } as AttackTrack["attack"],
+      cadenceSource: "authored",
+      marks: [],
+    }) satisfies AttackTrack;
+
+  test("returns the other attack ids of the same top-level phase, sub-phases included", () => {
+    const selected = track("a", "ring", "phase-1");
+    const study = minimalStudy({
+      tracks: [
+        selected,
+        track("b", "spiral", "phase-1"),
+        track("c", "burst", "phase-1", "sub-a"),
+        track("d", "ring", "phase-2"),
+      ],
+    });
+    expect(attackIdsInPhaseOf(study, selected)).toEqual(["spiral", "burst"]);
+  });
+
+  test("a sub-phase track shares its parent phase's scope", () => {
+    const selected = track("c", "burst", "phase-1", "sub-a");
+    const study = minimalStudy({
+      tracks: [track("a", "ring", "phase-1"), selected, track("d", "ring", "phase-2")],
+    });
+    expect(attackIdsInPhaseOf(study, selected)).toEqual(["ring"]);
   });
 });
 

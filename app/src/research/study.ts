@@ -85,6 +85,20 @@ export function segmentIdOf(ref: SegmentRef): string {
   return ref.subPhaseId === null ? ref.phaseId : `${ref.phaseId}/${ref.subPhaseId}`;
 }
 
+/**
+ * The attack ids `track`'s attack must not repeat: every other track's in the
+ * same top-level phase, its sub-phases included. This is the game's own scope
+ * (`validatePhase` in data.ts keeps one id set per phase and shares it with the
+ * phase's sub-phases), so an id may repeat in another phase.
+ */
+export function attackIdsInPhaseOf(study: StudyV5, track: AttackTrack): readonly string[] {
+  return study.tracks
+    .filter(
+      (other) => other !== track && other.location.phaseId === track.location.phaseId,
+    )
+    .map((other) => other.attack.id);
+}
+
 /** One segment per phase without sub-phases and one per sub-phase, in authored order. */
 export function segmentsOfMonster(archetype: EnemyArchetype): readonly Segment[] {
   return archetype.phases.flatMap((phase): Segment[] => {

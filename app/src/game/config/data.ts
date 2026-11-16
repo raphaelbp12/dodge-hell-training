@@ -1242,7 +1242,7 @@ export function validateAttack(
 ): AuthoredAttack {
   const attack = record(value, path);
   const id = text(attack.id, `${path}.id`);
-  if (seenIds.has(id)) reject(`${path}.id`, "must be unique within the archetype");
+  if (seenIds.has(id)) reject(`${path}.id`, "must be unique within the phase");
   seenIds.add(id);
   const projectile = text(attack.projectile, `${path}.projectile`);
   if (!projectileIds.has(projectile))

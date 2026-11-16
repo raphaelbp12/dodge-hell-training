@@ -10,6 +10,10 @@
 //   added to the models (honeyContactSeconds in 7b45835, headingRadians in
 //   ebc21db, eight red pushes). `satisfies <Type>` makes `tsc` report the
 //   missing or extra field locally.
+// - no-clock-step-in-poll: stepping the fake clock inside `expect.poll` bounds
+//   a simulated wait by wall time, so a slow CI runner gave up before the
+//   first hit landed ("real hit feedback stays readable", two red runs).
+//   Step a bounded number of simulated frames instead (`stepUntil`).
 //
 // JS plugins are alpha in oxlint and not covered by semver; the lockfile pins
 // the oxlint version this plugin was written against.
@@ -77,10 +81,66 @@ const typedExactExpectation = {
   },
 };
 
+const CLOCK_STEPS = new Set(["runFor", "fastForward"]);
+
+const isMember = (node, property) =>
+  node?.type === "MemberExpression" &&
+  node.property.type === "Identifier" &&
+  node.property.name === property;
+
+/** `expect.poll(...)`. */
+const isPoll = (node) => isMember(node.callee, "poll");
+
+/** `<anything>.clock.runFor(...)` or `.clock.fastForward(...)`. */
+const isClockStep = (node) =>
+  node.type === "CallExpression" &&
+  node.callee.type === "MemberExpression" &&
+  node.callee.property.type === "Identifier" &&
+  CLOCK_STEPS.has(node.callee.property.name) &&
+  isMember(node.callee.object, "clock");
+
+/** Visits every descendant node of `node`, skipping parent links. */
+function walk(node, visit) {
+  if (node === null || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const child of node) walk(child, visit);
+    return;
+  }
+  if (typeof node.type === "string") visit(node);
+  for (const [key, child] of Object.entries(node))
+    if (key !== "parent") walk(child, visit);
+}
+
+const noClockStepInPoll = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "Disallow stepping the fake clock inside expect.poll; bound simulated waits by frames.",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (!isPoll(node)) return;
+        walk(node.arguments[0], (inner) => {
+          if (isClockStep(inner))
+            context.report({
+              node: inner,
+              message:
+                "Fake-clock step inside expect.poll: the poll's wall-time timeout bounds simulated time. Step a bounded number of frames with stepUntil instead.",
+            });
+        });
+      },
+    };
+  },
+};
+
 export default {
   meta: { name: "test-drift" },
   rules: {
     "no-hardcoded-rules-version": noHardcodedRulesVersion,
     "typed-exact-expectation": typedExactExpectation,
+    "no-clock-step-in-poll": noClockStepInPoll,
   },
 };

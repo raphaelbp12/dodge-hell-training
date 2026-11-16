@@ -191,6 +191,32 @@ async function finishCountdown(page: Page, resumeClock = true) {
   if (resumeClock) await page.clock.resume();
 }
 
+/**
+ * Steps the installed fake clock one frame at a time, reading after each step,
+ * until `done` accepts the value or `maxFrames` frames have run. The wait is
+ * bounded in simulated frames, never wall time (lint rule
+ * test-drift/no-clock-step-in-poll): a real-time poll timeout let a slow CI
+ * runner stop before the awaited event. Returns the last value for the
+ * caller's assertion. Each call's `maxFrames` is about five times the frames
+ * the wait took in a local run (minimum 20), noted beside it.
+ */
+async function stepUntil<T>(
+  page: Page,
+  read: () => Promise<T>,
+  done: (value: T) => boolean,
+  maxFrames: number,
+  frameMilliseconds = controlledFrameMilliseconds,
+): Promise<T> {
+  let value: T;
+  let frames = 0;
+  do {
+    await page.clock.runFor(frameMilliseconds);
+    value = await read();
+    frames++;
+  } while (!done(value) && frames < maxFrames);
+  return value;
+}
+
 async function launch(page: Page, resumeClock = true) {
   await page.goto(seededUrl());
   await page.getByRole("button", { name: "Start", exact: true }).click();
@@ -737,15 +763,14 @@ for (const width of [1440, 390]) {
     if (width === 1440) {
       await page.keyboard.press("o");
       await page.keyboard.press("o");
-      await expect
-        .poll(
-          async () => {
-            await page.clock.runFor(controlledFrameMilliseconds);
-            return (await renderedPixels(page)).enemy;
-          },
-          { intervals: [0] },
-        )
-        .toBeGreaterThan(10);
+      expect(
+        await stepUntil(
+          page,
+          async () => (await renderedPixels(page)).enemy,
+          (enemy) => enemy > 10,
+          20, // measured: 1 frame
+        ),
+      ).toBeGreaterThan(10);
       for (const [key, axis, direction] of [
         ["w", "enemyY", 1],
         ["d", "enemyX", -1],
@@ -756,44 +781,43 @@ for (const width of [1440, 390]) {
         expect(before.enemy).toBeGreaterThan(10);
         await page.keyboard.down(key);
         try {
-          await expect
-            .poll(
+          expect(
+            await stepUntil(
+              page,
               async () => {
-                await page.clock.runFor(controlledFrameMilliseconds);
                 const position = (await renderedPixels(page))[axis];
                 return position === null
                   ? 0
                   : (position - before[axis]!) * direction;
               },
-              { intervals: [0] },
-            )
-            .toBeGreaterThan(8);
+              (moved) => moved > 8,
+              20, // measured: 1 frame
+            ),
+          ).toBeGreaterThan(8);
         } finally {
           await page.keyboard.up(key);
         }
       }
       const beforeZoom = await renderedPixels(page);
       await page.keyboard.press("p");
-      await expect
-        .poll(
-          async () => {
-            await page.clock.runFor(controlledFrameMilliseconds);
-            return (await renderedPixels(page)).player;
-          },
-          { intervals: [0] },
-        )
-        .toBeGreaterThan(beforeZoom.player);
+      expect(
+        await stepUntil(
+          page,
+          async () => (await renderedPixels(page)).player,
+          (player) => player > beforeZoom.player,
+          20, // measured: 1 frame
+        ),
+      ).toBeGreaterThan(beforeZoom.player);
       const zoomed = await renderedPixels(page);
       await page.keyboard.press("o");
-      await expect
-        .poll(
-          async () => {
-            await page.clock.runFor(controlledFrameMilliseconds);
-            return (await renderedPixels(page)).player;
-          },
-          { intervals: [0] },
-        )
-        .toBeLessThan(zoomed.player);
+      expect(
+        await stepUntil(
+          page,
+          async () => (await renderedPixels(page)).player,
+          (player) => player < zoomed.player,
+          20, // measured: 1 frame
+        ),
+      ).toBeLessThan(zoomed.player);
     } else {
       await page.keyboard.press("o");
       await page.keyboard.press("o");
@@ -811,10 +835,10 @@ for (const width of [1440, 390]) {
       "value",
       "775",
     );
-    await expect
-      .poll(
+    expect(
+      await stepUntil(
+        page,
         async () => {
-          await page.clock.runFor(controlledFrameMilliseconds);
           const snapshot = await renderedPixels(page);
           return (
             snapshot.survivalSeconds >= 1 &&
@@ -822,18 +846,18 @@ for (const width of [1440, 390]) {
             snapshot.shards === 0
           );
         },
-        { intervals: [0] },
-      )
-      .toBe(true);
-    await expect
-      .poll(
-        async () => {
-          await page.clock.runFor(controlledFrameMilliseconds);
-          return (await renderedPixels(page)).shards;
-        },
-        { timeout: 6000, intervals: [0] },
-      )
-      .toBeGreaterThan(5);
+        (quietSecond) => quietSecond,
+        25, // measured: 5 frames
+      ),
+    ).toBe(true);
+    expect(
+      await stepUntil(
+        page,
+        async () => (await renderedPixels(page)).shards,
+        (shards) => shards > 5,
+        20, // measured: 4 frames
+      ),
+    ).toBeGreaterThan(5);
     const pixels = await renderedPixels(page);
     expect(pixels.player).toBeGreaterThan(10);
     expect(pixels.healthBar).toBeGreaterThan(150);
@@ -860,19 +884,19 @@ for (const width of [1440, 390]) {
       path: testInfo.outputPath(`release-encounter-${width}.png`),
       fullPage: true,
     });
-    await expect
-      .poll(
-        async () => {
-          await page.clock.runFor(controlledFrameMilliseconds);
-          return Number(
+    expect(
+      await stepUntil(
+        page,
+        async () =>
+          Number(
             await page
               .getByRole("meter", { name: "Health" })
               .getAttribute("value"),
-          );
-        },
-        { timeout: 15000, intervals: [0] },
-      )
-      .toBeLessThan(775);
+          ),
+        (health) => health < 775,
+        25, // measured: 5 frames
+      ),
+    ).toBeLessThan(775);
     await expect
       .poll(async () => (await renderedPixels(page)).missingHealth)
       .toBeGreaterThan(5);
@@ -888,15 +912,10 @@ for (const width of [1440, 390]) {
     const results = page.getByRole("region", { name: "Attempt complete" });
     const completed = [];
     for (let attempt = 1; attempt <= 2; attempt++) {
-      await expect
-        .poll(
-          async () => {
-            await page.clock.runFor(controlledFrameMilliseconds);
-            return results.isVisible();
-          },
-          { timeout: 70000, intervals: [0] },
-        )
-        .toBe(true);
+      expect(
+        // measured: 34-48 frames
+        await stepUntil(page, () => results.isVisible(), (shown) => shown, 250),
+      ).toBe(true);
       await expect(
         results.getByRole("group", { name: "Final hit amounts" }),
       ).toContainText("-128");
@@ -1242,7 +1261,9 @@ for (const width of [1440, 390]) {
   }, testInfo) => {
     test.setTimeout(90_000);
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
-    await launch(page);
+    // Keep the fake clock paused so the death wait steps simulated frames
+    // instead of playing ~15 real seconds; it resumes once the attempt ends.
+    await launch(page, false);
     await page.keyboard.press("p");
     const canvas = await page.locator("canvas").elementHandle();
     const originalBox = await page
@@ -1251,9 +1272,15 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByRole("button", { name: "Resume", exact: true }),
     ).toBeDisabled();
-    await expect
-      .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
-      .toBe("ended");
+    expect(
+      await stepUntil(
+        page,
+        async () => (await inspect(page)).sessionPhase,
+        (phase) => phase === "ended",
+        250, // measured: 34-48 frames for this seeded death elsewhere
+      ),
+    ).toBe("ended");
+    await page.clock.resume();
     const ended = await inspect(page);
     const saved = await savedAttempts(page);
     expect(saved.schemaVersion).toBe(1);
@@ -1457,10 +1484,17 @@ for (const failure of ["corrupt", "blocked", "quota"] as const) {
           throw new Error("QuotaExceededError");
         };
     }, failure);
-    await launch(page);
-    await expect
-      .poll(async () => (await inspect(page)).sessionPhase, { timeout: 70_000 })
-      .toBe("ended");
+    // Step simulated frames to the death instead of playing it in real time.
+    await launch(page, false);
+    expect(
+      await stepUntil(
+        page,
+        async () => (await inspect(page)).sessionPhase,
+        (phase) => phase === "ended",
+        250, // measured: 34-48 frames for this seeded death elsewhere
+      ),
+    ).toBe("ended");
+    await page.clock.resume();
     await expect(
       page.getByText(/Results are kept for this visit only/),
     ).toBeVisible();
@@ -1484,7 +1518,10 @@ for (const failure of ["corrupt", "blocked", "quota"] as const) {
   });
 }
 
-test("sustained play for 60 seconds and 25 retries retain bounded runtime resources", async ({
+// @soak: a real-time 60-second run. CI gives each soak test its own job
+// (.github/workflows/pages.yml), because Playwright shards are contiguous
+// slices and these three would otherwise share one shard.
+test("sustained play for 60 seconds and 25 retries retain bounded runtime resources", { tag: "@soak" }, async ({
   page,
 }, testInfo) => {
   const browserSeconds = 60;
@@ -1661,7 +1698,7 @@ for (const [phaseIndex, label, phaseLabel, phaseId] of [
   [2, "phase-3", "Phase 3 - Pond Barrage", "phase-3-pond-barrage"],
   [5, "phase-6", "Phase 6 - Nests", "phase-6-nests"],
 ] as const) {
-  test(`Queen ${label} drilled for 60 seconds stays within the derived shard bound and reports frame timing`, async ({
+  test(`Queen ${label} drilled for 60 seconds stays within the derived shard bound and reports frame timing`, { tag: "@soak" }, async ({
     page,
   }, testInfo) => {
     const browserSeconds = 60;
@@ -2013,32 +2050,41 @@ for (const mode of ["muted", "unavailable"] as const) {
           value: undefined,
         });
       });
-    await launch(page);
+    // Step simulated frames to the first hit and the death instead of
+    // playing them in real time.
+    await launch(page, false);
     if (mode === "muted") {
       await page.getByRole("checkbox", { name: "Mute hit audio" }).check();
       await page.getByRole("button", { name: "Resume", exact: true }).click();
     }
-    await expect
-      .poll(async () => (await inspect(page)).hitNumbers.length, {
-        timeout: 10000,
-        intervals: [50],
-      })
-      .toBeGreaterThan(0);
+    expect(
+      await stepUntil(
+        page,
+        async () => (await inspect(page)).hitNumbers.length,
+        (hits) => hits > 0,
+        80, // measured: 14-15 frames to the first seeded hit elsewhere
+      ),
+    ).toBeGreaterThan(0);
     const silent = await inspect(page);
     expect(silent.audio.requests).toBe(silent.hitsTaken);
     expect(silent.audio.played).toBe(0);
     if (mode === "muted") {
       await page.getByRole("checkbox", { name: "Mute hit audio" }).uncheck();
       await page.getByRole("button", { name: "Resume", exact: true }).click();
-      await expect
-        .poll(async () => (await inspect(page)).audio.played, {
-          timeout: 10000,
-        })
-        .toBeGreaterThan(0);
+      expect(
+        await stepUntil(
+          page,
+          async () => (await inspect(page)).audio.played,
+          (played) => played > 0,
+          80, // a hit every few frames once firing
+        ),
+      ).toBeGreaterThan(0);
     }
-    await expect(
-      page.getByRole("region", { name: "Attempt complete" }),
-    ).toBeVisible({ timeout: 15000 });
+    const results = page.getByRole("region", { name: "Attempt complete" });
+    expect(
+      await stepUntil(page, () => results.isVisible(), (shown) => shown, 250),
+    ).toBe(true);
+    await page.clock.resume();
     const ended = await inspect(page);
     expect(ended.audio.requests).toBe(ended.hitsTaken);
     expect(ended.audio.activeVoices).toBeLessThanOrEqual(4);
@@ -2206,15 +2252,14 @@ for (const width of [1440, 390]) {
       )
         await page.keyboard.press(zoom < current ? "o" : "p");
       await retrySnapshot(page);
-      await expect
-        .poll(
-          async () => {
-            await page.clock.runFor(controlledFrameMilliseconds);
-            return (await inspect(page)).hitNumbers.length;
-          },
-          { timeout: 10000, intervals: [0] },
-        )
-        .toBeGreaterThan(0);
+      expect(
+        await stepUntil(
+          page,
+          async () => (await inspect(page)).hitNumbers.length,
+          (hits) => hits > 0,
+          80, // measured: 14-15 frames
+        ),
+      ).toBeGreaterThan(0);
       await page.keyboard.press("Escape");
       const state = await inspect(page);
       expect(state.zoom).toBe(zoom);
@@ -2621,15 +2666,15 @@ test("the live phase panel pauses, applies, resumes, and handles result/retry/ho
     .toBe(false);
   await expect(panel).not.toBeVisible();
 
-  await expect
-    .poll(
-      async () => {
-        await page.clock.runFor(1000);
-        return (await inspect(page)).sessionPhase;
-      },
-      { timeout: 70_000 },
-    )
-    .toBe("ended");
+  expect(
+    await stepUntil(
+      page,
+      async () => (await inspect(page)).sessionPhase,
+      (phase) => phase === "ended",
+      20, // measured: 3 one-second frames
+      1000,
+    ),
+  ).toBe("ended");
   const results = page.getByRole("region", { name: "Attempt complete" });
   await expect(results).toBeVisible();
 
@@ -2685,15 +2730,14 @@ test("the Killer Bee Queen renders per-family pixel-art shards", async ({
   );
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page, false);
-  await expect
-    .poll(
-      async () => {
-        await page.clock.runFor(controlledFrameMilliseconds);
-        return (await renderedPixels(page)).shards;
-      },
-      { timeout: 10000, intervals: [0] },
-    )
-    .toBeGreaterThan(10);
+  expect(
+    await stepUntil(
+      page,
+      async () => (await renderedPixels(page)).shards,
+      (shards) => shards > 10,
+      50, // measured: 10 frames
+    ),
+  ).toBeGreaterThan(10);
   const pixels = await renderedPixels(page);
   expect(pixels.shardColoursSeen.length).toBeGreaterThan(2);
   const pixelState = await inspect(page);
@@ -2731,16 +2775,18 @@ test("the Killer Bee Queen plays a bomb detonation effect", async ({
   await page.getByRole("radio", { name: "Killer Bee Queen" }).check();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page, false);
-  await expect
-    .poll(
+  expect(
+    await stepUntil(
+      page,
       async () => {
-        await page.clock.runFor(50);
         const state = await inspect(page);
         return state.bombsDetonated > 0 && state.bombExplosionsActive > 0;
       },
-      { timeout: 20000, intervals: [0] },
-    )
-    .toBe(true);
+      (exploding) => exploding,
+      220, // measured: 44 50-millisecond frames
+      50,
+    ),
+  ).toBe(true);
   expect((await inspect(page)).bombExplosionFramesDrawn).toBeGreaterThan(0);
   await page.screenshot({
     path: testInfo.outputPath("queen-bomb-detonation.png"),

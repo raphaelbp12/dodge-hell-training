@@ -21,6 +21,7 @@ function lint(source: string): string[] {
       rules: {
         "test-drift/no-hardcoded-rules-version": "error",
         "test-drift/typed-exact-expectation": "error",
+        "test-drift/no-clock-step-in-poll": "error",
       },
     }),
   );
@@ -66,6 +67,41 @@ describe("no-hardcoded-rules-version", () => {
           "const a = `${base}-drill-p0-once`;",
           'const b = "phase-3-pond-barrage";',
           'const c = "v7";',
+        ].join("\n"),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("no-clock-step-in-poll", () => {
+  const prelude = [
+    "declare const expect: any;",
+    "declare const page: any;",
+  ];
+
+  it("flags fake-clock stepping inside an expect.poll callback", () => {
+    expect(
+      lint(
+        [
+          ...prelude,
+          "await expect.poll(async () => {",
+          "  await page.clock.runFor(250);",
+          "  return 1;",
+          "}).toBe(1);",
+          "await expect.poll(async () => { await page.clock.fastForward(10); return 1; }).toBe(1);",
+        ].join("\n"),
+      ),
+    ).toEqual(["no-clock-step-in-poll:4", "no-clock-step-in-poll:7"]);
+  });
+
+  it("allows clock stepping outside a poll and polls that only read", () => {
+    expect(
+      lint(
+        [
+          ...prelude,
+          "await page.clock.runFor(250);",
+          "await expect.poll(async () => page.title()).toBe('x');",
+          "for (let frame = 0; frame < 10; frame++) await page.clock.runFor(250);",
         ].join("\n"),
       ),
     ).toEqual([]);

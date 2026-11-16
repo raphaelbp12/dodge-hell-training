@@ -11,6 +11,10 @@ const previewURL = new URL(
   `http://127.0.0.1:${previewPort}`,
 ).href;
 const liveURL = process.env.PLAYWRIGHT_LIVE_URL;
+// The three 60-second @soak tests (real-time frame timing and runtime bounds)
+// run in CI, which keeps their JSON reports as an artifact. Locally they are
+// opt-in with PLAYWRIGHT_SOAK=1, for measurement steps that need them.
+const runSoak = !!process.env.CI || process.env.PLAYWRIGHT_SOAK === "1";
 
 export default defineConfig({
   testDir: "./tests",
@@ -35,7 +39,9 @@ export default defineConfig({
     : [
         {
           name: "chromium",
-          grepInvert: /production assets/,
+          grepInvert: runSoak
+            ? /production assets/
+            : [/production assets/, /@soak/],
           use: { ...devices["Desktop Chrome"] },
         },
         {

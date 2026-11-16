@@ -11,7 +11,8 @@
       "files": ["tests/**/*.ts"],
       "rules": {
         "test-drift/no-hardcoded-rules-version": "error",
-        "test-drift/typed-exact-expectation": "error"
+        "test-drift/typed-exact-expectation": "error",
+        "test-drift/no-clock-step-in-poll": "error"
       }
     }
   ]
