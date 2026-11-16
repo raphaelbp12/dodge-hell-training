@@ -6,8 +6,12 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
-    "module": "nodenext",
+    /* Bundler mode: the specs import app types (lint rule
+       test-drift/typed-exact-expectation), and app source uses
+       extensionless imports, which nodenext rejects. */
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
@@ -23,6 +27,7 @@
     "vite.config.ts",
     "vitest.config.ts",
     "playwright.config.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "lint/**/*.ts"
   ]
 }

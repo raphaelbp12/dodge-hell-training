@@ -11,7 +11,7 @@ export default mergeConfig(
           test: {
             name: "node",
             environment: "node",
-            include: ["src/**/*.test.ts"],
+            include: ["src/**/*.test.ts", "lint/**/*.test.ts"],
             // The Queen's full-fight simulations now test compound hitboxes
             // with up to 58 parts per projectile. The longest case is the
             // four-rate determinism run at about 20 seconds; 60 seconds leaves

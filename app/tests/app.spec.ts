@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadTestClip } from "./tagger-clip.ts";
 import { hexToNumber, palette } from "../src/game/config/palette.ts";
 import appearanceData from "../src/game/data/projectile-appearances.json" with { type: "json" };
+import encounterData from "../src/game/data/encounter.json" with { type: "json" };
 import projectileData from "../src/game/data/projectiles.json" with { type: "json" };
 import type {
   EnemyState,
@@ -12,6 +13,21 @@ import type {
   ShardState,
   Vector2,
 } from "../src/game/models.ts";
+import type { AttemptResult } from "../src/game/session/session.ts";
+import type { AttemptRecord } from "../src/storage/attempts.ts";
+
+/**
+ * `T` whose fields may also hold a Playwright asymmetric matcher such as
+ * `expect.any(Number)`. Used with `satisfies` on exact expectations, it still
+ * makes tsc report a field the model gains or drops.
+ */
+type Matching<T> = { [Key in keyof T]: T[Key] | ReturnType<typeof expect.any> };
+
+// Derived from the authored data so a rulesVersion bump cannot leave a copy
+// behind (lint rule test-drift/no-hardcoded-rules-version).
+const WORM_RULES_VERSION = encounterData.encounters["crystal-worm"].rulesVersion;
+const QUEEN_RULES_VERSION =
+  encounterData.encounters["killer-bee-queen"].rulesVersion;
 
 const groundColourValue = hexToNumber(palette.arena.ground);
 
@@ -100,9 +116,8 @@ test.beforeEach(async ({ page }) => {
   await session.send("Emulation.setCPUThrottlingRate", { rate });
 });
 
-// Shape of the diagnostic payload returned by inspectEncounter. Described from
-// model primitives rather than importing SimulationState, because this spec is
-// type-checked under tsconfig.node.json's nodenext resolution.
+// Shape of the diagnostic payload returned by inspectEncounter, described from
+// model primitives rather than importing SimulationState.
 type Inspection = {
   rulesVersion: string;
   phase: "playing" | "ended";
@@ -123,11 +138,7 @@ type Inspection = {
   sessionPhase: SessionPhase;
   countdownRemainingSeconds: number;
   attemptId: number;
-  result: {
-    attemptId: number;
-    elapsedSeconds: number;
-    hitsTaken: number;
-  } | null;
+  result: AttemptResult | null;
   paused: boolean;
   zoom: number;
   camera: Vector2;
@@ -290,7 +301,7 @@ test("selected values are the scored defaults without opening Debug", async ({
 }) => {
   await launch(page);
   const state = await inspect(page);
-  expect(state.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v7");
+  expect(state.rulesVersion).toBe(WORM_RULES_VERSION);
   expect(state.debugSettings).toMatchObject({
     headWidth: 1.25,
     headHeight: 1.25,
@@ -314,9 +325,7 @@ test("selected values are the scored defaults without opening Debug", async ({
   });
   await page.getByRole("button", { name: "Debug", exact: true }).click();
   await page.getByRole("button", { name: "Load selected values" }).click();
-  expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v7",
-  );
+  expect((await inspect(page)).rulesVersion).toBe(WORM_RULES_VERSION);
   await expect(page.getByText("Debug attempt / not saved")).toHaveCount(0);
 });
 
@@ -327,16 +336,14 @@ test("the ?phase= drill URL parameter starts the named phase as a one-shot and s
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   const drilled = await inspect(page);
-  expect(drilled.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v7-drill-p0-once",
-  );
+  expect(drilled.rulesVersion).toBe(`${WORM_RULES_VERSION}-drill-p0-once`);
   expect(drilled.enemies[0]?.phaseIndex).toBe(0);
 
   await page.goto(`${seededUrl()}&phase=99`);
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
   const ignored = await inspect(page);
-  expect(ignored.rulesVersion).toBe("crystal-worm-child-swarm-paladin-v7");
+  expect(ignored.rulesVersion).toBe(WORM_RULES_VERSION);
 });
 
 test("the Home encounter list defaults to the Killer Bee Queen, is keyboard operable, and ?encounter= selects a known id", async ({
@@ -352,17 +359,13 @@ test("the Home encounter list defaults to the Killer Bee Queen, is keyboard oper
   await expect(wormRadio).toBeChecked();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
-  expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v7",
-  );
+  expect((await inspect(page)).rulesVersion).toBe(WORM_RULES_VERSION);
 
   await page.goto(seededUrl());
   await expect(wormRadio).toBeChecked();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page);
-  expect((await inspect(page)).rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v7",
-  );
+  expect((await inspect(page)).rulesVersion).toBe(WORM_RULES_VERSION);
 });
 
 for (const width of [1440, 390]) {
@@ -544,7 +547,10 @@ for (const width of [1440, 390]) {
     expect(protectedState.player.healthHp).toBe(775);
     expect(protectedState.audio.requests).toBe(0);
     expect(protectedState.shards.length).toBeGreaterThan(0);
-    expect(protectedState.enemies[0].positionTiles).toEqual({ x: 0, y: 0 });
+    expect(protectedState.enemies[0].positionTiles).toEqual({
+      x: 0,
+      y: 0,
+    } satisfies Vector2);
     const debugPixels = await renderedPixels(page);
     expect(debugPixels.player).toBeGreaterThan(0);
     expect(debugPixels.shards).toBeGreaterThan(0);
@@ -567,9 +573,7 @@ for (const width of [1440, 390]) {
     ).toBeVisible();
     await page.getByRole("button", { name: "Reset defaults" }).click();
     await page.getByRole("button", { name: "Retry", exact: true }).click();
-    expect((await inspect(page)).rulesVersion).toBe(
-      "crystal-worm-child-swarm-paladin-v7",
-    );
+    expect((await inspect(page)).rulesVersion).toBe(WORM_RULES_VERSION);
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     await page
       .getByRole("button", { name: "Close debug", exact: true })
@@ -911,11 +915,11 @@ for (const width of [1440, 390]) {
       const record = saved.records[0];
       expect(record).toEqual({
         id: expect.any(String),
-        rulesVersion: "crystal-worm-child-swarm-paladin-v7",
+        rulesVersion: WORM_RULES_VERSION,
         outcome: "death",
         elapsedSeconds: expect.any(Number),
         hitsTaken: expect.any(Number),
-      });
+      } satisfies Matching<AttemptRecord>);
       expect(record.elapsedSeconds).toBeGreaterThan(0);
       expect(record.hitsTaken).toBeGreaterThan(0);
       await expect(results.locator("dd").nth(0)).toHaveText(
@@ -1036,7 +1040,7 @@ test("Start countdown freezes world, focus pause preserves it, and R skips count
   expect(await inspect(page)).toEqual(paused);
   expect(paused.elapsedSeconds).toBe(0);
   expect(paused.volleysFired).toBe(0);
-  expect(paused.player.positionTiles).toEqual({ x: 0, y: 0 });
+  expect(paused.player.positionTiles).toEqual({ x: 0, y: 0 } satisfies Vector2);
   expect(centreDistance(paused.enemies[0].positionTiles)).toBeCloseTo(
     SPAWN_RING_TILES,
     9,
@@ -1053,7 +1057,10 @@ test("Start countdown freezes world, focus pause preserves it, and R skips count
   await expect
     .poll(async () => (await inspect(page)).elapsedSeconds)
     .toBeGreaterThan(0);
-  expect((await inspect(page)).player.positionTiles).toEqual({ x: 0, y: 0 });
+  expect((await inspect(page)).player.positionTiles).toEqual({
+    x: 0,
+    y: 0,
+  } satisfies Vector2);
   await page.keyboard.up("d");
 });
 
@@ -1092,7 +1099,7 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
       unstable: 0,
       weak: 0,
     },
-  });
+  } satisfies PlayerState);
   expect(reset.enemies).toHaveLength(1);
   expect(reset.enemies[0]).toEqual({
     id: 1,
@@ -1125,7 +1132,7 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
     subPhaseEnteredAtSeconds: 0,
     spawnedByEnemyId: null,
     despawnOnExit: false,
-  });
+  } satisfies EnemyState);
   // A retry re-randomises the opening bearing, so pin the ring distance.
   expect(centreDistance(reset.enemies[0].positionTiles)).toBeCloseTo(
     SPAWN_RING_TILES,
@@ -1139,7 +1146,10 @@ test("held R restarts once, burst retry fully resets, and Escape resumes without
   expect(reset.result).toBeNull();
   expect(reset.zoom).toBe(1.125);
   await page.waitForTimeout(150);
-  expect((await inspect(page)).player.positionTiles).toEqual({ x: 0, y: 0 });
+  expect((await inspect(page)).player.positionTiles).toEqual({
+    x: 0,
+    y: 0,
+  } satisfies Vector2);
   await page.keyboard.up("d");
   await page.keyboard.down("r");
   await expect.poll(async () => (await inspect(page)).attemptId).toBe(3);
@@ -1254,7 +1264,7 @@ for (const width of [1440, 390]) {
       outcome: "death",
       elapsedSeconds: ended.elapsedSeconds,
       hitsTaken: ended.hitsTaken,
-    });
+    } satisfies Matching<AttemptRecord>);
     const results = page.getByRole("region", { name: "Attempt complete" });
     await expect(results).toBeVisible();
     await expect(results.getByLabel("Retained personal best")).toHaveText(
@@ -1306,7 +1316,7 @@ for (const width of [1440, 390]) {
       withinViewport: true,
       overflow: false,
       clippedText: false,
-    });
+    } satisfies typeof resultLayout);
     await page.screenshot({
       path: testInfo.outputPath(`results-${width}.png`),
       fullPage: true,
@@ -1317,7 +1327,7 @@ for (const width of [1440, 390]) {
       outcome: "death",
       elapsedSeconds: ended.elapsedSeconds,
       hitsTaken: ended.hitsTaken,
-    });
+    } satisfies AttemptResult);
     await page.waitForTimeout(200);
     expect(await inspect(page)).toEqual(ended);
     const reset = await retrySnapshot(page, width === 1440 ? "button" : "key");
@@ -1385,6 +1395,8 @@ test("loaded history compares only compatible retained records", async ({
         records: [
           {
             id: "other",
+            // A deliberately retired version: the record must stay "Other rules".
+            // oxlint-disable-next-line test-drift/no-hardcoded-rules-version
             rulesVersion: "crystal-worm-child-head-paladin-v1",
             outcome: "death",
             elapsedSeconds: 999,
@@ -1414,11 +1426,13 @@ test("loaded history compares only compatible retained records", async ({
   expect((await savedAttempts(page)).records).toHaveLength(2);
   expect((await savedAttempts(page)).records[0]).toEqual({
     id: "other",
+    // The retired version seeded above.
+    // oxlint-disable-next-line test-drift/no-hardcoded-rules-version
     rulesVersion: "crystal-worm-child-head-paladin-v1",
     outcome: "death",
     elapsedSeconds: 999,
     hitsTaken: 1,
-  });
+  } satisfies AttemptRecord);
 });
 
 for (const failure of ["corrupt", "blocked", "quota"] as const) {
@@ -2133,7 +2147,7 @@ test("captures only unmodified gameplay keys while focused and removes capture o
     movement: true,
     unrelated: false,
     browserShortcut: false,
-  });
+  } satisfies Awaited<ReturnType<typeof dispatch>>);
   await page.getByRole("button", { name: "Home", exact: true }).focus();
   expect((await dispatch()).movement).toBe(false);
   await page.getByRole("button", { name: "Home", exact: true }).click();
@@ -2424,7 +2438,10 @@ test("a Queen phase-3 drill spawns her at the arena centre; the pond damages an 
   await finishCountdown(page, false);
 
   const spawned = await inspect(page);
-  expect(spawned.enemies[0].positionTiles).toEqual({ x: 0, y: 0 });
+  expect(spawned.enemies[0].positionTiles).toEqual({
+    x: 0,
+    y: 0,
+  } satisfies Vector2);
 
   // Idle in the pond (the player also spawns at the arena centre): health
   // falls by exactly HONEY_DAMAGE_HP on each 1.0s tick, in step with hitsTaken.
@@ -2509,9 +2526,7 @@ test("the Home phase panel starts a two-phase one-shot drill at the first select
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await finishCountdown(page, false);
   const state = await inspect(page);
-  expect(state.rulesVersion).toBe(
-    "killer-bee-queen-nest-paladin-v12-drill-p2-4-once",
-  );
+  expect(state.rulesVersion).toBe(`${QUEEN_RULES_VERSION}-drill-p2-4-once`);
   expect(state.enemyPhaseIds[0]).toBe("phase-3-pond-barrage");
 });
 
