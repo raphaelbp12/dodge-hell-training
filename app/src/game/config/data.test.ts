@@ -1,4 +1,6 @@
 import { expect, test } from "vitest";
+import arenaData from "../data/arena.json";
+import encounterData from "../data/encounter.json";
 import {
   AUTHORED_APPEARANCES,
   AUTHORED_ARCHETYPES,
@@ -17,6 +19,7 @@ import {
   wavyDeviationTiles,
   loadOutline,
   validateEncounterData,
+  validateMovement,
 } from "./data";
 
 const CATALOG_IDS = new Set(["crystal-worm-child-shard"]);
@@ -1230,4 +1233,210 @@ test("every authored monster has one file named for its id, in canonical text", 
     );
     expect(AUTHORED_ARCHETYPES[id]).toBeDefined();
   }
+});
+
+// Survivor-driven tests (plan V22 step 94.2). Each case breaks exactly one field
+// of the shipped data and names the exact rejection, so a removed or loosened
+// guard cannot hide behind a later, unrelated RangeError.
+type Json = Record<string, any>;
+const clone = <T>(value: T): T => structuredClone(value) as T;
+const rejection = (path: string, reason: string) => `Authored data ${path} ${reason}`;
+
+function encounterWith(edit: (data: Json) => void) {
+  const data = clone(encounterData) as Json;
+  edit(data);
+  return () => validateEncounterData(data);
+}
+
+function arenasWith(edit: (nest: Json) => void) {
+  const data = clone(arenaData) as Json;
+  edit(data.arenas["nest-boss-room"]);
+  return () => validateArenaMap(data);
+}
+
+function archetypesWith(edit: (files: Json) => void) {
+  const files = clone(AUTHORED_MONSTER_FILES) as Json;
+  edit(files);
+  return () =>
+    validateArchetypes({ archetypes: files }, new Set(Object.keys(AUTHORED_PROJECTILES)), 12);
+}
+
+const NEST = "enemies.archetypes.killer-bee-nest-red";
+const QUEEN = "enemies.archetypes.killer-bee-queen";
+
+test.each([
+  [
+    "a default zoom above the maximum",
+    encounterWith((d) => (d.camera.defaultZoom = 3.5)),
+    rejection("encounter.camera.defaultZoom", "must be within ordered zoom bounds"),
+  ],
+  [
+    "a default zoom below the minimum",
+    encounterWith((d) => (d.camera.defaultZoom = 0.2)),
+    rejection("encounter.camera.defaultZoom", "must be within ordered zoom bounds"),
+  ],
+  [
+    "no encounters",
+    encounterWith((d) => (d.encounters = {})),
+    rejection("encounter.encounters", "must define at least one encounter"),
+  ],
+  [
+    "an unknown default encounter",
+    encounterWith((d) => (d.defaultEncounter = "no-such-encounter")),
+    rejection("encounter.defaultEncounter", "must name an encounter defined in encounter.encounters"),
+  ],
+  [
+    "a spawn ring on the arena wall",
+    encounterWith((d) => (d.encounters["crystal-worm"].spawns.placement.ringRadiusFraction = 1)),
+    rejection("encounter.encounters.crystal-worm.spawns.placement.ringRadiusFraction", "must be inside the arena, below 1"),
+  ],
+  [
+    "a non-object arena map",
+    () => validateArenaMap({ arenas: [] }),
+    rejection("arena.arenas", "must be an object of named arenas"),
+  ],
+  [
+    "a non-object arena",
+    () => validateArenaMap({ arenas: { x: 3 } }),
+    rejection("arena.arenas.x", "must be an object"),
+  ],
+  [
+    "an unknown arena kind",
+    arenasWith((nest) => (nest.kind = "square")),
+    rejection("arena.arenas.nest-boss-room.kind", 'must be "circle" or "octagon"'),
+  ],
+  [
+    "a zero-width octagon",
+    arenasWith((nest) => (nest.flatHalfWidthTiles = 0)),
+    rejection("arena.arenas.nest-boss-room.flatHalfWidthTiles", "must be a positive number of tiles"),
+  ],
+  [
+    "hazards that are not an array",
+    arenasWith((nest) => (nest.hazards = {})),
+    rejection("arena.arenas.nest-boss-room.hazards", "must be an array of hazards"),
+  ],
+  [
+    "a hazard that is not honey",
+    arenasWith((nest) => (nest.hazards[0].kind = "lava")),
+    rejection("arena.arenas.nest-boss-room.hazards[0].kind", 'must be "honey"'),
+  ],
+  [
+    "an unknown hazard region shape",
+    arenasWith((nest) => (nest.hazards[0].region.shape = "square")),
+    rejection("arena.arenas.nest-boss-room.hazards[0].region.shape", 'must be "diamond" or "annulus"'),
+  ],
+  [
+    "a negative annulus inner radius",
+    arenasWith((nest) => (nest.hazards[1].region.innerRadiusTiles = -1)),
+    rejection("arena.arenas.nest-boss-room.hazards[1].region.innerRadiusTiles", "must be nonnegative"),
+  ],
+  [
+    // Corner-limited octagon: its inradius is cornerSum / sqrt 2 = 8.49 tiles,
+    // below the 9.5-tile flats, so a 9-tile annulus leaves the floor.
+    "an annulus wider than a corner-limited octagon's inradius",
+    arenasWith((nest) => {
+      nest.cornerSumTiles = 12;
+      nest.hazards[1].region.outerRadiusTiles = 9;
+    }),
+    rejection("arena.arenas.nest-boss-room.hazards[1].region.outerRadiusTiles", "must not exceed the arena's own inradius"),
+  ],
+  [
+    "more spawned minions than the encounter allows",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns[0].count = 13)),
+    rejection(`${NEST}.phases[0].spawns[0].count`, "must not exceed encounter.maxConcurrentMinions"),
+  ],
+  [
+    "an unknown spawn placement",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns[0].placement.kind = "corner")),
+    rejection(`${NEST}.phases[0].spawns[0].placement.kind`, 'must be "ring-around-owner" or "arena-ring"'),
+  ],
+  [
+    "an arena-ring spawn on the wall",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns[0].placement = { kind: "arena-ring", ringRadiusFraction: 1 })),
+    rejection(`${NEST}.phases[0].spawns[0].placement.ringRadiusFraction`, "must be inside the arena, below 1"),
+  ],
+  [
+    "spawns that are not an array",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns = {})),
+    rejection(`${NEST}.phases[0].spawns`, "must be an array of spawns"),
+  ],
+  [
+    "an empty spawn list",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns = [])),
+    rejection(`${NEST}.phases[0].spawns`, "must define at least one spawn"),
+  ],
+  [
+    "a spawn of an unknown archetype",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns[0].archetype = "no-such-bee")),
+    rejection(`${NEST}.phases[0].spawns`, "archetype must name an archetype defined in game/data/enemies/"),
+  ],
+  [
+    "a spawn starting past the spawned archetype's phases",
+    archetypesWith((f) => (f["killer-bee-nest-red"].phases[0].spawns[0].startPhaseIndex = 5)),
+    rejection(`${NEST}.phases[0].spawns`, "startPhaseIndex must be within the spawned archetype's phase count"),
+  ],
+  [
+    "phase attacks that are not an array",
+    archetypesWith((f) => (f["killer-bee-queen"].phases[0].attacks = {})),
+    rejection(`${QUEEN}.phases[0].attacks`, "must be an array of attacks"),
+  ],
+  [
+    "a phase entering above full health",
+    archetypesWith((f) => (f["killer-bee-queen"].phases[0].enterAtHpFraction = 1.5)),
+    rejection(`${QUEEN}.phases[0].enterAtHpFraction`, "must be in the range (0, 1]"),
+  ],
+  [
+    "a phase entering at zero health",
+    archetypesWith((f) => (f["killer-bee-queen"].phases[1].enterAtHpFraction = 0)),
+    rejection(`${QUEEN}.phases[1].enterAtHpFraction`, "must be in the range (0, 1]"),
+  ],
+  [
+    "phases that are not an array",
+    archetypesWith((f) => (f["killer-bee-queen"].phases = {})),
+    rejection(`${QUEEN}.phases`, "must be an array of phases"),
+  ],
+  [
+    "sub-phases that are not an array",
+    archetypesWith((f) => (f["killer-bee-queen"].phases[0].subPhases = {})),
+    rejection(`${QUEEN}.phases[0].subPhases`, "must be an array of sub-phases"),
+  ],
+  [
+    "an empty sub-phase list",
+    archetypesWith((f) => (f["killer-bee-queen"].phases[0].subPhases = [])),
+    rejection(`${QUEEN}.phases[0].subPhases`, "must define at least one sub-phase"),
+  ],
+  [
+    "sub-phase attacks that are not an array",
+    archetypesWith((f) => (f["killer-bee-queen"].phases[0].subPhases[0].attacks = {})),
+    rejection(`${QUEEN}.phases[0].subPhases[0].attacks`, "must be an array of attacks"),
+  ],
+  [
+    "no archetypes",
+    () => validateArchetypes({ archetypes: {} }, new Set(), 12),
+    rejection("enemies.archetypes", "must define at least one archetype"),
+  ],
+] as const)("rejects %s with its exact message", (_name, load, message) => {
+  expect(load).toThrow(message);
+});
+
+test.each([
+  [{ kind: "move-to-point", target: "player", speedTilesPerSecond: 1 }, "m.target", 'must be "arena-center"'],
+  [{ kind: "orbit", radiusTiles: 8, degreesPerSecond: 20, direction: "up", approachSpeedTilesPerSecond: 3 }, "m.direction", 'must be "cw" or "ccw"'],
+  [{ kind: "orbit", radiusTiles: 8, degreesPerSecond: 200, direction: "cw", approachSpeedTilesPerSecond: 3 }, "m", "orbit tangential speed must stay below the Paladin's"],
+  [{ kind: "teleport" }, "m.kind", 'must be "chase", "stationary", "move-to-point", "orbit" or "wander"'],
+] as const)("validateMovement rejects %o at %s", (movement, path, reason) => {
+  expect(() => validateMovement(movement, "m")).toThrow(rejection(path, reason));
+});
+
+test("validateMovement keeps each kind's authored values", () => {
+  expect(validateMovement({ kind: "stationary" }, "m")).toEqual({ kind: "stationary" });
+  expect(
+    validateMovement({ kind: "orbit", radiusTiles: 8, degreesPerSecond: 20, direction: "ccw", approachSpeedTilesPerSecond: 3 }, "m"),
+  ).toEqual({ kind: "orbit", radiusTiles: 8, degreesPerSecond: 20, direction: "ccw", approachSpeedTilesPerSecond: 3 });
+  expect(validateMovement({ kind: "wander", speedTilesPerSecond: 2, retargetSeconds: 1.5, radiusTiles: 4 }, "m")).toEqual({
+    kind: "wander",
+    speedTilesPerSecond: 2,
+    retargetSeconds: 1.5,
+    radiusTiles: 4,
+  });
 });

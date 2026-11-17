@@ -1,0 +1,10 @@
+{
+  "crystal-worm": {
+    "rulesVersion": "crystal-worm-child-swarm-paladin-v7",
+    "sha256": "88b130ebc87956bf932c2daa8a1ca6c7b6bd06eb103e472a2e120672865dbe96"
+  },
+  "killer-bee-queen": {
+    "rulesVersion": "killer-bee-queen-nest-paladin-v12",
+    "sha256": "82d9be5ece17670dbe66311ccd87d08b0e73bd6f064d66f6138a9dd4723355d5"
+  }
+}

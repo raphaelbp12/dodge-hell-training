@@ -1,16 +1,22 @@
 name: Validate And Deploy Pages
 
+# A change to Markdown or agent instruction files alone cannot change the site
+# or a test result (the tests read only JSON under docs/), so it starts no run.
 on:
   pull_request:
+    paths-ignore: ["**/*.md", ".claude/**"]
   push:
     branches: [main]
+    paths-ignore: ["**/*.md", ".claude/**"]
 
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run of the commit it replaces. A run
+# on main is never cancelled, so a deployment always finishes.
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -29,6 +35,8 @@ jobs:
             script: typecheck
           - name: Unit Tests
             script: test
+          - name: Simulated Soak
+            script: test:soak:sim
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -46,6 +54,113 @@ jobs:
         run: npm ci
       - name: Run check
         run: npm run ${{ matrix.script }}
+
+  audit:
+    # Plan V22 A05. Its own job, outside `deploy`'s needs: a new upstream
+    # advisory says nothing about the change under test, and blocking the
+    # deployment would leave the live site on the same dependency anyway. A
+    # finding still fails this job, so it shows on the pull request and on main.
+    name: Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Audit production dependencies
+        run: npm run audit
+
+  bench:
+    # Plan V22 A24: compares this pull request's benchmarks with its merge base
+    # on the same runner, alternating base and head so runner noise hits both.
+    # It runs on pull requests only, so it never gates `deploy`.
+    name: Benchmark Gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Provisional until the threshold is measured over three base-against-base
+    # runs (see BENCH_REGRESSION_THRESHOLD in app/scripts/bench-gate.mjs); remove
+    # this flag in the same change that records the measurements.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: .
+    env:
+      # Runs per side. Each side keeps its best run, and more runs bring the two
+      # bests closer on an unchanged commit: locally on 2026-11-17 the worst
+      # base-against-base difference was 4.5 percent over two runs and 1.7 over
+      # five. A run takes about seven seconds. bench-calibrate.yml uses the
+      # same number, so its measurements describe this gate.
+      BENCH_ROUNDS: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: head
+      # The benchmarks time the simulation core, which imports nothing outside
+      # src/game. A pull request that leaves it, the toolchain and the gate
+      # alone cannot change a timing, so comparing it would only risk a failure
+      # from runner noise.
+      - name: Check out the merge base
+        id: base
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base="$(git -C head merge-base "origin/$BASE_REF" HEAD)"
+          if git -C head diff --quiet "$base" HEAD -- \
+            app/src/game app/package.json app/package-lock.json app/vite.config.ts \
+            app/vitest.config.ts app/scripts/bench-gate.mjs .node-version .github/workflows/pages.yml
+          then
+            echo "Not run: this pull request changes no benchmarked code." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            git -C head worktree add ../base "$base"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v7
+        if: steps.base.outputs.run == 'true'
+        with:
+          node-version-file: head/.node-version
+          cache: npm
+          cache-dependency-path: head/app/package-lock.json
+      - name: Select pinned npm
+        if: steps.base.outputs.run == 'true'
+        run: npm install --global npm@12.2.1
+      - name: Install dependencies
+        if: steps.base.outputs.run == 'true'
+        run: |
+          npm ci --prefix head/app
+          npm ci --prefix base/app
+      - name: Run benchmarks alternately
+        if: steps.base.outputs.run == 'true'
+        run: |
+          for round in $(seq "$BENCH_ROUNDS"); do
+            rm -rf base/app/reports/bench head/app/reports/bench
+            npm run bench --prefix base/app || echo "base has no benchmarks"
+            cp -r base/app/reports/bench "$RUNNER_TEMP/base-$round" || echo "base produced no results"
+            npm run bench --prefix head/app
+            cp -r head/app/reports/bench "$RUNNER_TEMP/head-$round"
+          done
+      # The table goes to the job summary too: while the job is
+      # `continue-on-error`, a failure does not turn the run red, and the
+      # summary is where the comparison is seen.
+      - name: Compare
+        if: steps.base.outputs.run == 'true'
+        run: |
+          status=0
+          node head/app/scripts/bench-gate.mjs \
+            --base "$RUNNER_TEMP"/base-* --head "$RUNNER_TEMP"/head-* > "$RUNNER_TEMP/bench-gate.txt" || status=$?
+          cat "$RUNNER_TEMP/bench-gate.txt"
+          { echo '### Benchmark gate'; echo '```'; cat "$RUNNER_TEMP/bench-gate.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
   build:
     name: Build
@@ -77,17 +192,22 @@ jobs:
   browser:
     # The serial single-worker suite took about 10 minutes, a third of it in
     # three 60-second real-time soak tests. Playwright shards are contiguous
-    # slices, so the @soak tests run as their own group, one per job, beside
-    # three shards of everything else.
-    name: Browser Tests (${{ matrix.group }} ${{ matrix.shard }}/3)
+    # slices, so the @soak tests run as their own group beside three shards of
+    # everything else. The three soaks share one job: run one after another on
+    # the single worker they take about as long as one main shard (about four
+    # minutes), so a job each bought no time and cost two more runner setups.
+    name: Browser Tests (${{ matrix.group }} ${{ matrix.shard }})
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        group: [main, soak]
-        shard: [1, 2, 3]
+        include:
+          - { group: main, shard: "1/3", select: "--grep-invert @soak" }
+          - { group: main, shard: "2/3", select: "--grep-invert @soak" }
+          - { group: main, shard: "3/3", select: "--grep-invert @soak" }
+          - { group: soak, shard: "1/1", select: "--grep @soak" }
     env:
       CI: "true"
     steps:
@@ -111,15 +231,12 @@ jobs:
       - name: Install Chromium and system dependencies
         run: npx playwright install --with-deps chromium
       - name: Browser loops and production-path smoke
-        run: >-
-          npm run test:e2e --
-          ${{ matrix.group == 'soak' && '--grep @soak' || '--grep-invert @soak' }}
-          --shard=${{ matrix.shard }}/3
+        run: npm run test:e2e -- ${{ matrix.select }} --shard=${{ matrix.shard }}
       - name: Retain browser evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: browser-results-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}-${{ matrix.shard }}
+          name: browser-results-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}-${{ strategy.job-index }}
           path: app/test-results/
           if-no-files-found: ignore
           retention-days: 7

@@ -1,0 +1,64 @@
+name: Mutation Tests (Pull Request)
+
+# Plan V22 A17: mutates the modules a pull request changes and reports the
+# undetected mutants in the job summary and as annotations on the changed
+# lines. It has no break value, so a finding never fails it; it fails only when
+# Stryker itself cannot run, which would otherwise go unnoticed. The full
+# scheduled run is .github/workflows/mutation.yml.
+
+on:
+  pull_request:
+    paths:
+      - app/**
+      - .github/workflows/mutation-diff.yml
+
+permissions:
+  contents: read
+
+# A new push makes the run of the previous commit worthless.
+concurrency:
+  group: mutation-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  diff:
+    name: Mutation Of Changed Files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Install dependencies
+        run: npm ci
+      - name: Run mutation tests on changed files
+        run: npm run test:mutation:diff
+      # The incremental file stands in for the report when the run was
+      # interrupted at its time budget (DIFF_BUDGET_MINUTES).
+      - name: Summarize
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/mutation-summary.mjs
+          reports/mutation/mutation.json
+          reports/mutation/stryker-incremental.json
+          --changed reports/mutation/changed-lines.json
+      - name: Upload mutation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-diff
+          path: app/reports/mutation/
+          if-no-files-found: ignore
+          retention-days: 7

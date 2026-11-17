@@ -364,7 +364,7 @@ class EncounterScene extends Phaser.Scene {
     this.publishView();
   }
 
-  update(_time: number, delta: number): void {
+  override update(_time: number, delta: number): void {
     if (
       this.disposed ||
       !this.keys ||

@@ -38,5 +38,6 @@ export function unitFromSeed(seed: number): number {
 
 /** A seed derived from the host, for attempts that do not pin one. */
 export function arbitrarySeed(): number {
+  // oxlint-disable-next-line determinism/no-ambient-entropy -- host seed for attempts that do not pin one (G13)
   return assertSeed(Math.random() * unitScale);
 }

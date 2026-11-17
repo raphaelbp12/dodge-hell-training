@@ -1,0 +1,55 @@
+name: Benchmark Calibration
+
+# Plan V22 A24: measures runner noise for BENCH_REGRESSION_THRESHOLD in
+# app/scripts/bench-gate.mjs. It benches one commit against itself, alternating
+# as the pull-request Benchmark Gate does, and prints the worst difference and
+# the threshold it implies. Run it three times by hand and record the three
+# results in that constant's comment and in docs/quality-gates.md. It is kept
+# as the documented way to remeasure; it never deploys, never fails on the
+# comparison and never writes to the repository.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    name: Base Against Base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    env:
+      # The same number of runs per side as the Benchmark Gate in pages.yml;
+      # a measurement taken with another number does not describe that gate.
+      BENCH_ROUNDS: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Install dependencies
+        run: npm ci
+      - name: Run benchmarks alternately
+        run: |
+          for round in $(seq "$BENCH_ROUNDS"); do
+            for side in base head; do
+              rm -rf reports/bench
+              npm run bench
+              cp -r reports/bench "$RUNNER_TEMP/$side-$round"
+            done
+          done
+      - name: Calibrate
+        run: |
+          node scripts/bench-gate.mjs --calibrate \
+            --base "$RUNNER_TEMP"/base-* --head "$RUNNER_TEMP"/head-* > "$RUNNER_TEMP/bench-gate.txt"
+          cat "$RUNNER_TEMP/bench-gate.txt"
+          { echo '### Benchmark calibration'; echo '```'; cat "$RUNNER_TEMP/bench-gate.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

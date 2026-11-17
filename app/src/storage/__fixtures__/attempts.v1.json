@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "attempt-1",
+      "rulesVersion": "crystal-worm-child-swarm-paladin-v7",
+      "elapsedSeconds": 120.25,
+      "hitsTaken": 3,
+      "outcome": "cleared"
+    },
+    {
+      "id": "attempt-2",
+      "rulesVersion": "killer-bee-queen-nest-paladin-v12",
+      "elapsedSeconds": 41.5,
+      "hitsTaken": 9,
+      "outcome": "death"
+    }
+  ]
+}

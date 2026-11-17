@@ -1,0 +1,80 @@
+{
+  "draftVersion": 4,
+  "savedAt": "2026-11-10T01:00:00.000Z",
+  "study": {
+    "schemaVersion": 5,
+    "encounterId": "crystal-worm",
+    "archetypeId": "crystal-worm-child-head",
+    "recordedAt": "2026-11-10T00:00:00.000Z",
+    "provenance": {
+      "sourceUrl": null,
+      "fileName": "worm-fixture.mp4",
+      "frameRate": 30,
+      "durationSeconds": 90
+    },
+    "boundaries": [
+      {
+        "timeSeconds": 3,
+        "segmentId": "sole",
+        "telegraphEndSeconds": 3.5
+      }
+    ],
+    "statusSpans": [
+      {
+        "kind": "invulnerable",
+        "inSeconds": 3,
+        "outSeconds": 4
+      }
+    ],
+    "tracks": [
+      {
+        "id": "spiral-shards",
+        "location": {
+          "phaseId": "sole",
+          "subPhaseId": null
+        },
+        "attack": {
+          "id": "spiral-shards",
+          "projectile": "crystal-worm-child-shard",
+          "tuningSource": "approved-v3",
+          "pattern": {
+            "kind": "ring",
+            "arms": 6,
+            "emitterRadiusTiles": 0.35,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": 45
+          },
+          "cadence": {
+            "shotsPerBurst": 11,
+            "shotIntervalSeconds": 0.19,
+            "cooldownAfterLastShotSeconds": 3,
+            "initialDelaySeconds": 2
+          }
+        },
+        "cadenceSource": "typed",
+        "marks": [
+          {
+            "timeSeconds": 5,
+            "kind": "volley"
+          },
+          {
+            "timeSeconds": 6.5,
+            "kind": "volley"
+          },
+          {
+            "timeSeconds": 8,
+            "kind": "volley"
+          }
+        ]
+      }
+    ],
+    "scratch": [
+      {
+        "timeSeconds": 9,
+        "kind": "volley"
+      }
+    ],
+    "acceptedSegmentValues": {}
+  },
+  "selectedTrackId": "spiral-shards"
+}

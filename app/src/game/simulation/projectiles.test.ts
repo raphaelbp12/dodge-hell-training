@@ -1,5 +1,14 @@
 import { expect, test } from "vitest";
-import { createShard, advanceShard, type ShardCollisionContext } from "./projectiles";
+import {
+  advanceShard,
+  createShard,
+  curvedShardOrientationAtAge,
+  curvedShardPositionAtAge,
+  interpolatePosition,
+  shardOverlapsPlayer,
+  type CurvedProjectileMotion,
+  type ShardCollisionContext,
+} from "./projectiles";
 import { ENCOUNTER_CONFIG, type BulletSpec } from "../config/encounter";
 
 const stepSeconds = 1 / 60;
@@ -207,4 +216,80 @@ test("turning and wavy shards agree at shared step boundaries across 30/60/120 H
       expect(position.y).toBeCloseTo(positions[0].y, 9);
     }
   }
+});
+
+// Survivor-driven tests (plan V22 step 94.2). A spawn away from the origin and
+// a heading off the axes make every sign and operator in the closed forms matter.
+const SPAWN = { x: 2, y: 3 };
+const SPAWN_HEADING = Math.PI / 6;
+
+test("a turning shard leaves along its spawn heading and, after half a turn, sits one diameter to its +90 degree side", () => {
+  const motion: CurvedProjectileMotion = { kind: "turning", rangeTiles: 16, turnRateDegreesPerSecond: 70 };
+  const turnRate = (70 * Math.PI) / 180;
+  const diameterTiles = (2 * 8) / turnRate;
+  const halfTurnSeconds = Math.PI / turnRate;
+  const end = curvedShardPositionAtAge(motion, 8, SPAWN, SPAWN_HEADING, halfTurnSeconds);
+  expect(end.x).toBeCloseTo(SPAWN.x - diameterTiles * Math.sin(SPAWN_HEADING), 9);
+  expect(end.y).toBeCloseTo(SPAWN.y + diameterTiles * Math.cos(SPAWN_HEADING), 9);
+  const dt = 1e-6;
+  const early = curvedShardPositionAtAge(motion, 8, SPAWN, SPAWN_HEADING, dt);
+  expect((early.x - SPAWN.x) / dt).toBeCloseTo(8 * Math.cos(SPAWN_HEADING), 4);
+  expect((early.y - SPAWN.y) / dt).toBeCloseTo(8 * Math.sin(SPAWN_HEADING), 4);
+  expect(curvedShardOrientationAtAge(motion, 8, SPAWN_HEADING, halfTurnSeconds)).toBeCloseTo(
+    SPAWN_HEADING + Math.PI,
+    9,
+  );
+});
+
+// 2 Hz, so a frequency that divides instead of multiplies shows.
+const WAVY_2HZ: CurvedProjectileMotion = { kind: "wavy", rangeTiles: 16, amplitudeTiles: 0.8, frequencyHz: 2 };
+const QUARTER_PERIOD_SECONDS = 1 / 8;
+
+test("at a quarter period a wavy shard is speed times age ahead and one amplitude to its left", () => {
+  const position = curvedShardPositionAtAge(WAVY_2HZ, 8, SPAWN, SPAWN_HEADING, QUARTER_PERIOD_SECONDS);
+  const forwardTiles = 8 * QUARTER_PERIOD_SECONDS;
+  expect(position.x).toBeCloseTo(SPAWN.x + forwardTiles * Math.cos(SPAWN_HEADING) - 0.8 * Math.sin(SPAWN_HEADING), 9);
+  expect(position.y).toBeCloseTo(SPAWN.y + forwardTiles * Math.sin(SPAWN_HEADING) + 0.8 * Math.cos(SPAWN_HEADING), 9);
+});
+
+test("a wavy shard faces along its velocity: tilted left at spawn, along the spawn heading at a quarter period", () => {
+  const angularFrequency = 2 * Math.PI * 2;
+  const tiltAt = (ageSeconds: number) =>
+    Math.atan2(0.8 * angularFrequency * Math.cos(angularFrequency * ageSeconds), 8);
+  for (const ageSeconds of [0, QUARTER_PERIOD_SECONDS / 2, QUARTER_PERIOD_SECONDS])
+    expect(curvedShardOrientationAtAge(WAVY_2HZ, 8, SPAWN_HEADING, ageSeconds)).toBeCloseTo(
+      SPAWN_HEADING + tiltAt(ageSeconds),
+      9,
+    );
+  // At a quarter period the lateral velocity is zero, so the shard faces its spawn heading.
+  expect(curvedShardOrientationAtAge(WAVY_2HZ, 8, SPAWN_HEADING, QUARTER_PERIOD_SECONDS)).toBeCloseTo(SPAWN_HEADING, 9);
+});
+
+test("interpolatePosition moves the given fraction of the way from start to end", () => {
+  expect(interpolatePosition({ x: 2, y: 3 }, { x: 6, y: 11 }, 0.25)).toEqual({ x: 3, y: 5 });
+});
+
+test.each([
+  ["x", (value: number) => ({ x: value, y: 0 })],
+  ["y", (value: number) => ({ x: 0, y: value })],
+] as const)(
+  "a shard that passes through a moving player along %s hits it, judged by relative motion",
+  (_axis, along) => {
+    // The player runs from -50 to 50 while the shard runs from -45 to 45, so the
+    // shard starts 5 tiles ahead and ends 5 tiles behind: it passes through.
+    const shard = createShard(LINEAR_PROJECTILE, 1, along(-45), 0);
+    expect(shardOverlapsPlayer(context, along(-45), along(45), along(-50), along(50), shard)).toBe(true);
+    // Moving together, never meeting.
+    expect(shardOverlapsPlayer(context, along(-45), along(55), along(-50), along(50), shard)).toBe(false);
+  },
+);
+
+test("a boomerang reversing mid-step still hits a player crossing its path during that step", () => {
+  // Reversal at 1.5 s, 12 tiles out. The player crosses the shard's path at
+  // x = 12 exactly halfway through a 0.2 s step that spans the reversal.
+  const shard = createShard(BOOMERANG_PROJECTILE, 1, { x: 0, y: 0 }, 0);
+  advanceShard(context, shard, 1.4, far, far);
+  const result = advanceShard(context, shard, 0.2, { x: 12, y: 10 }, { x: 12, y: -10 });
+  expect(result.hitPlayer).toBe(true);
+  expect(shard.hasReversed).toBe(true);
 });

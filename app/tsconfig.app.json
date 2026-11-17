@@ -8,6 +8,8 @@
     "allowArbitraryExtensions": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
+    "strict": true,
+    "noImplicitOverride": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",

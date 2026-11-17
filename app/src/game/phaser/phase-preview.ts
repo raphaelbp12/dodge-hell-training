@@ -60,7 +60,7 @@ class PhasePreviewScene extends Phaser.Scene {
     this.arenaRenderer?.clearExplosions();
   }
 
-  update(_time: number, delta: number): void {
+  override update(_time: number, delta: number): void {
     if (!this.arenaRenderer) return;
     if (this.previewState.phase !== "playing")
       this.previewState = createPreviewState(this.encounterConfig, this.phaseIndex);

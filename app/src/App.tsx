@@ -62,7 +62,10 @@ export default function App() {
   const selectedConfig = encounterConfigOf(selectedEncounterId);
   const isDebugTunable = selectedEncounterId === DEBUG_TUNABLE_ENCOUNTER_ID;
   const [drill, setDrill] = useState<DrillSelection | null>(() =>
-    parseDrillFromLocation(encounterConfigOf(selectedEncounterId)),
+    parseDrillFromLocation(
+      encounterConfigOf(selectedEncounterId),
+      window.location.search,
+    ),
   );
   const [previewPhase, setPreviewPhase] = useState<number | null>(null);
   const phases = primaryArchetype(selectedConfig).phases.map((phase, index) => ({
