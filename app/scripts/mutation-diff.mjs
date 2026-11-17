@@ -36,6 +36,26 @@ export function selectMutatedFiles(changedFiles, globs = MUTATE_GLOBS, exists = 
     .sort();
 }
 
+/**
+ * Most modules one pull-request run mutates. Two core modules take about ten
+ * to twenty minutes on a hosted runner and the job allows thirty, so a larger
+ * selection would only time out; the weekly sharded run covers it instead.
+ */
+export const DIFF_MODULE_LIMIT = 4;
+
+/** Whether to run Stryker on `files`, and the line to print either way. */
+export function diffPlan(files, limit = DIFF_MODULE_LIMIT) {
+  if (files.length === 0) return { run: false, message: "no mutated modules changed" };
+  if (files.length > limit)
+    return {
+      run: false,
+      message:
+        `${files.length} mutated modules changed, above the diff limit of ${limit}; ` +
+        `skipping. The weekly sharded run (.github/workflows/mutation.yml) covers them:\n  ${files.join("\n  ")}`,
+    };
+  return { run: true, message: `Mutating ${files.length} changed file(s):\n  ${files.join("\n  ")}` };
+}
+
 function gitLines(args) {
   const result = spawnSync("git", args, { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
@@ -55,11 +75,9 @@ function changedFilesAgainstMain() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const files = selectMutatedFiles(changedFilesAgainstMain());
-  if (files.length === 0) {
-    console.log("no mutated modules changed");
-    process.exit(0);
-  }
-  console.log(`Mutating ${files.length} changed file(s):\n  ${files.join("\n  ")}`);
+  const plan = diffPlan(files);
+  console.log(plan.message);
+  if (!plan.run) process.exit(0);
   const result = spawnSync(
     process.execPath,
     [

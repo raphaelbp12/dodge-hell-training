@@ -1,5 +1,22 @@
 import { expect, test } from "vitest";
-import { selectMutatedFiles } from "./mutation-diff.mjs";
+import { DIFF_MODULE_LIMIT, diffPlan, selectMutatedFiles } from "./mutation-diff.mjs";
+
+test("no selected module skips the run", () => {
+  expect(diffPlan([])).toEqual({ run: false, message: "no mutated modules changed" });
+});
+
+test("up to the limit, the run mutates every selected module", () => {
+  const files = Array.from({ length: DIFF_MODULE_LIMIT }, (_, index) => `src/storage/m${index}.ts`);
+  expect(diffPlan(files)).toEqual({ run: true, message: expect.stringContaining(`Mutating ${DIFF_MODULE_LIMIT} changed file(s)`) });
+});
+
+test("above the limit, the run is skipped and says the weekly sharded run covers it", () => {
+  const files = Array.from({ length: DIFF_MODULE_LIMIT + 1 }, (_, index) => `src/storage/m${index}.ts`);
+  const plan = diffPlan(files);
+  expect(plan.run).toBe(false);
+  expect(plan.message).toContain(`${DIFF_MODULE_LIMIT + 1} mutated modules changed, above the diff limit of ${DIFF_MODULE_LIMIT}`);
+  expect(plan.message).toContain("weekly sharded run");
+});
 
 test("selects changed files that match a mutate glob", () => {
   expect(
