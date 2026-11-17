@@ -36,13 +36,26 @@ const BREAK_THRESHOLD = 77;
 const THRESHOLDS = { high: 80, low: 60 };
 
 /**
- * The weekly CI run is split into these shards, one job each, because a cold
- * whole-set run takes hours and Stryker saves its incremental file only when a
- * run finishes: a single job cut off by its timeout would never save one and
- * would start cold every week. Each shard has its own incremental file and its
- * own break, floor(score) - 5 from the 2026-11-17 ratchet scores in
- * docs/quality-gates.md (A18): config 82.1, simulation 94.7, research 75.7,
- * session plus storage 88.6 (225 of 254).
+ * The diff run (`scripts/mutation-diff.mjs` sets MUTATION_DIFF) has no break
+ * value. The score of a few changed modules is not comparable with a baseline
+ * taken over the whole set, so breaking on it would fail a change to a weak
+ * module and pass one to a strong module whatever the change did. The run
+ * reports its undetected mutants instead, and exits nonzero only when Stryker
+ * itself fails.
+ */
+const WHOLE_SET_BREAK = process.env.MUTATION_DIFF === "1" ? null : BREAK_THRESHOLD;
+
+/**
+ * The scheduled CI run is split into these shards, one job each, so that a
+ * cold whole-set run of several hours is spread over parallel jobs. Each shard
+ * has its own incremental file and its own break, floor(score) - 5 from the
+ * 2026-11-17 ratchet scores in docs/quality-gates.md (A18): config 82.1,
+ * simulation 94.7, research 75.7, session plus storage 88.6 (225 of 254).
+ *
+ * Stryker writes the incremental file when a run finishes and also when it is
+ * interrupted by SIGINT or SIGTERM (a partial file holding the mutants tested
+ * so far). The workflow interrupts a shard before the job limit for that
+ * reason, so a shard too slow for one job still makes progress every run.
  */
 export const MUTATION_SHARDS = {
   config: { directories: ["src/game/config/"], break: 77 },
@@ -99,7 +112,7 @@ export default {
   reporters: ["html", "json", "clear-text", "progress"],
   htmlReporter: { fileName: "reports/mutation/mutation.html" },
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
-  thresholds: { ...THRESHOLDS, break: BREAK_THRESHOLD },
+  thresholds: { ...THRESHOLDS, break: WHOLE_SET_BREAK },
   // The node project's slowest test takes about 20 seconds and allows 60;
   // a mutant that loops forever is killed after this many milliseconds plus
   // the factor times the unmutated run time.

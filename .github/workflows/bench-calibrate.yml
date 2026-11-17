@@ -21,6 +21,10 @@ jobs:
     defaults:
       run:
         working-directory: app
+    env:
+      # The same number of runs per side as the Benchmark Gate in pages.yml;
+      # a measurement taken with another number does not describe that gate.
+      BENCH_ROUNDS: 5
     steps:
       - uses: actions/checkout@v7
         with:
@@ -36,7 +40,7 @@ jobs:
         run: npm ci
       - name: Run benchmarks alternately
         run: |
-          for round in 1 2; do
+          for round in $(seq "$BENCH_ROUNDS"); do
             for side in base head; do
               rm -rf reports/bench
               npm run bench
@@ -46,5 +50,6 @@ jobs:
       - name: Calibrate
         run: |
           node scripts/bench-gate.mjs --calibrate \
-            --base "$RUNNER_TEMP/base-1" "$RUNNER_TEMP/base-2" \
-            --head "$RUNNER_TEMP/head-1" "$RUNNER_TEMP/head-2"
+            --base "$RUNNER_TEMP"/base-* --head "$RUNNER_TEMP"/head-* > "$RUNNER_TEMP/bench-gate.txt"
+          cat "$RUNNER_TEMP/bench-gate.txt"
+          { echo '### Benchmark calibration'; echo '```'; cat "$RUNNER_TEMP/bench-gate.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

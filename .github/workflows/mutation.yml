@@ -1,16 +1,30 @@
 name: Mutation Tests
 
-# Plan V22 A17. The full run is weekly and on demand; the diff run reports the
-# mutants of changed modules on pull requests and never blocks a merge.
+# Plan V22 A17: the full run, on a schedule and on demand. The pull-request run
+# of changed modules is .github/workflows/mutation-diff.yml.
 
 on:
   schedule:
-    - cron: "0 6 * * 1"
+    # Monday and Thursday. GitHub evicts a cache entry that no run has read for
+    # seven days, so a weekly run would restore its incremental file within
+    # minutes of that limit and start cold whenever the schedule ran late. Off
+    # the hour, because runs scheduled on the hour are the ones GitHub delays.
+    - cron: "17 5 * * 1,4"
   workflow_dispatch:
-  pull_request:
+    inputs:
+      force:
+        description: Re-test every mutant instead of reusing the incremental file
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+
+# Two runs of one branch would restore the same incremental file and the later
+# save would discard the earlier run's progress.
+concurrency:
+  group: mutation-full-${{ github.ref }}
+  cancel-in-progress: false
 
 defaults:
   run:
@@ -18,12 +32,14 @@ defaults:
 
 jobs:
   full:
-    # One job per shard (MUTATION_SHARDS in app/stryker.config.mjs). Stryker saves
-    # its incremental file only when a run finishes, so each shard must finish
-    # inside the job limit: a cold shard can take hours on a hosted runner, and
-    # later weeks re-test only what changed. 360 minutes is GitHub's job maximum.
+    # One job per shard (MUTATION_SHARDS in app/stryker.config.mjs). A warm
+    # shard re-tests only what changed. A cold shard can take hours on a hosted
+    # runner, so Stryker is interrupted after MUTATION_BUDGET_MINUTES: on SIGINT
+    # it writes a partial incremental file, the job saves it, and the next run
+    # continues from there. Without the interrupt, a shard that outlasts the
+    # job limit (360 minutes is GitHub's maximum) would be killed with nothing
+    # saved and would start cold on every run.
     name: Full Mutation Run (${{ matrix.shard }})
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
@@ -32,6 +48,8 @@ jobs:
         shard: [config, simulation, research, state]
     env:
       MUTATION_SHARD: ${{ matrix.shard }}
+      # Leaves 40 minutes of the job limit for setup, the save and the upload.
+      MUTATION_BUDGET_MINUTES: 320
     steps:
       - uses: actions/checkout@v7
         with:
@@ -46,23 +64,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Restore incremental file
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: app/reports/mutation/stryker-incremental-${{ matrix.shard }}.json
           key: mutation-incremental-${{ matrix.shard }}-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
             mutation-incremental-${{ matrix.shard }}-${{ github.ref_name }}-
+      # Stryker is started directly, not through `npm run test:mutation`, so
+      # that the interrupt reaches it and not a wrapping npm or shell process.
       - name: Run mutation tests
-        run: npm run test:mutation
-      # Saved even when the score breaks the threshold (Stryker still writes the
-      # file), so a failing week does not make the next one start cold. A run cut
-      # off by the timeout writes no file, and there is nothing to save.
+        env:
+          FORCE: ${{ inputs.force && '--force' || '' }}
+        run: |
+          status=0
+          timeout --signal=INT --kill-after=5m "${MUTATION_BUDGET_MINUTES}m" \
+            node node_modules/@stryker-mutator/core/bin/stryker.js run $FORCE || status=$?
+          if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            echo "::error::Shard $MUTATION_SHARD did not finish in $MUTATION_BUDGET_MINUTES minutes. Its progress is saved in the incremental file, and the next run continues from it."
+          fi
+          exit "$status"
+      # Saved whenever Stryker wrote the file: after a finished run, a run that
+      # broke its threshold and an interrupted run alike.
       - name: Save incremental file
         if: always() && hashFiles(format('app/reports/mutation/stryker-incremental-{0}.json', matrix.shard)) != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: app/reports/mutation/stryker-incremental-${{ matrix.shard }}.json
           key: mutation-incremental-${{ matrix.shard }}-${{ github.ref_name }}-${{ github.run_id }}
+      - name: Summarize
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/mutation-summary.mjs
+          "reports/mutation/$MUTATION_SHARD/mutation.json"
+          "reports/mutation/stryker-incremental-$MUTATION_SHARD.json"
       - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@v7
@@ -70,33 +104,3 @@ jobs:
           name: mutation-report-full-${{ matrix.shard }}
           path: app/reports/mutation/
           retention-days: 14
-
-  diff:
-    name: Mutation Of Changed Files
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .node-version
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - name: Select pinned npm
-        run: npm install --global npm@12.2.1
-      - name: Install dependencies
-        run: npm ci
-      - name: Run mutation tests on changed files
-        run: npm run test:mutation:diff
-      - name: Upload mutation report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutation-report-diff
-          path: app/reports/mutation/
-          retention-days: 7

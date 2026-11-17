@@ -16,6 +16,7 @@ export default mergeConfig(
               "lint/**/*.test.ts",
               // Vitest-style script tests; scripts/verify.test.mjs uses node:test and is not listed.
               "scripts/mutation-diff.test.mjs",
+              "scripts/mutation-summary.test.mjs",
               "scripts/bench-gate.test.mjs",
               "scripts/mutation-shards.test.mjs",
             ],
