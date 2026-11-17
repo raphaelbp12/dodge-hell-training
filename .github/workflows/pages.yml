@@ -35,8 +35,6 @@ jobs:
             script: typecheck
           - name: Unit Tests
             script: test
-          - name: Audit
-            script: audit
           - name: Simulated Soak
             script: test:soak:sim
     runs-on: ubuntu-24.04
@@ -56,6 +54,28 @@ jobs:
         run: npm ci
       - name: Run check
         run: npm run ${{ matrix.script }}
+
+  audit:
+    # Plan V22 A05. Its own job, outside `deploy`'s needs: a new upstream
+    # advisory says nothing about the change under test, and blocking the
+    # deployment would leave the live site on the same dependency anyway. A
+    # finding still fails this job, so it shows on the pull request and on main.
+    name: Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Audit production dependencies
+        run: npm run audit
 
   bench:
     # Plan V22 A24: compares this pull request's benchmarks with its merge base

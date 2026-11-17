@@ -34,7 +34,7 @@ One reference for every gate that raises trust in a change before it is committe
 ## Dependency audit (A05)
 
 **Catches:** a high-severity advisory in a production dependency.
-**Run:** `npm run audit` (`npm audit --omit=dev --audit-level=high`). It is not part of `verify` because it needs the network.
+**Run:** `npm run audit` (`npm audit --omit=dev --audit-level=high`). It is not part of `verify` because it needs the network. In CI it is its own `Audit` job, outside the deployment's needs: a finding fails the job on the pull request and on `main`, but does not hold back a deployment, because a new upstream advisory says nothing about the change under test and the live site keeps the same dependency either way. It reads only `package-lock.json`, so the job installs nothing.
 
 ## Property tests (A06-A10)
 
