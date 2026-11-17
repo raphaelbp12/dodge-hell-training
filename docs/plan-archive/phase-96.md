@@ -70,7 +70,7 @@ The template exists, and every gate it names exists.
 
 ### Step 96.3 - Acceptance Run
 
-Status: partial (every gate ran and all four seeded defects were caught; the `implementation-plan.md` row update and the archive wait on phase 95). Dependencies: 96.1, 96.2.
+Status: complete (2026-11-17; the `implementation-plan.md` row and the archive followed phase 95's completion). Dependencies: 96.1, 96.2.
 
 **Implementation prompt**
 

@@ -85,10 +85,8 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # Provisional until the threshold is measured over three base-against-base
-    # runs (see BENCH_REGRESSION_THRESHOLD in app/scripts/bench-gate.mjs); remove
-    # this flag in the same change that records the measurements.
-    continue-on-error: true
+    # Blocking: the threshold is measured (BENCH_REGRESSION_THRESHOLD in
+    # app/scripts/bench-gate.mjs records the three calibration runs).
     defaults:
       run:
         working-directory: .
@@ -149,9 +147,8 @@ jobs:
             npm run bench --prefix head/app
             cp -r head/app/reports/bench "$RUNNER_TEMP/head-$round"
           done
-      # The table goes to the job summary too: while the job is
-      # `continue-on-error`, a failure does not turn the run red, and the
-      # summary is where the comparison is seen.
+      # The table goes to the job summary too, so the comparison is read on the
+      # run page without opening the log.
       - name: Compare
         if: steps.base.outputs.run == 'true'
         run: |

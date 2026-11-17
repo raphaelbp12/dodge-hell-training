@@ -15,13 +15,14 @@ import { fileURLToPath } from "node:url";
  * Largest tolerated slowdown, as a fraction of the base mean (0.20 is 20 percent).
  *
  * Plan V22 A24 sets it to the larger of 0.20 and three times the worst
- * base-against-base difference over three CI runs. That measurement needs the
- * CI runner and has not been taken yet, so this is the plan's floor and the CI
- * job runs with `continue-on-error: true` until the three measurements are
- * recorded here and in docs/quality-gates.md. Take them by running the manual
- * workflow `.github/workflows/bench-calibrate.yml` three times; each run prints
- * its worst difference and implied threshold:
- *   run 1: pending, run 2: pending, run 3: pending.
+ * base-against-base difference over three CI runs. Measured on 2026-11-17 with
+ * the manual workflow `.github/workflows/bench-calibrate.yml` at five rounds a
+ * side, worst difference per run:
+ *   run 1: 0.5% (minion-encounter), run 2: 1.5% (minion-encounter),
+ *   run 3: 3.7% (advance-shard).
+ * Three times 3.7 is 11.1 percent, under the floor, so the floor applies.
+ * Remeasure with the same workflow after a change to the benchmarks or to
+ * BENCH_ROUNDS, and record the new runs here and in docs/quality-gates.md.
  */
 export const BENCH_REGRESSION_THRESHOLD = 0.2;
 

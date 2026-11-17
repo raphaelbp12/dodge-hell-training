@@ -27,7 +27,7 @@ All four benchmarks run, and none mutates shipped configuration.
 
 ### Step 95.2 - Benchmark Gate
 
-Status: partial (the suite, the gate, its tests and the calibration workflow are done; the three CI calibration runs, the measured threshold and removing `continue-on-error` wait on a push). Dependencies: 95.1.
+Status: complete (2026-11-17). Dependencies: 95.1.
 
 **Implementation prompt**
 
@@ -88,7 +88,7 @@ The soak passes, runs in CI, and is not part of `npm test`.
 
 ### Step 95.4 - Phase Gate
 
-Status: partial (verify passes; the Phase Index update and archive wait on 95.2). Dependencies: 95.1-95.3.
+Status: complete (2026-11-17). Dependencies: 95.1-95.3.
 
 **Implementation prompt**
 
@@ -110,4 +110,5 @@ Implemented 2026-11-16 in auto mode.
 - **95.2** `scripts/bench-gate.mjs` (reads result directories) with eight tests, and the `bench` job in `pages.yml`. **Not done:** the three base-against-base CI measurements for `BENCH_REGRESSION_THRESHOLD` need CI runs I cannot make, so the constant is the plan's 20 percent floor, the job keeps `continue-on-error: true`, and the constant's comment says so.
 - **95.3** `runtime-bounds.soak.test.ts` in its own `soak` project, `npm run test:soak:sim`, a `Simulated Soak` matrix entry. `npm test` now runs `--project node --project dom`, which keeps the soak out (the verifier found `vitest run` included it). The soak keeps the player alive by resetting health each step. Runtime 22 s; all eight phases for 10 simulated minutes plus 25 retries pass. The shard bound is `liveShardBoundForEncounter`, already exported from source, so nothing moved. Peaks (shards of 1,571): phase 1 9, 2 28, 3 80, 4 119, 5 47, 6 56, 7 63, 8 117.
 - **95.2 update (2026-11-17)** The base-against-base variant is a separate manual workflow, `.github/workflows/bench-calibrate.yml` (`workflow_dispatch` only, so adding a trigger to `pages.yml` cannot reach its deploy job), kept as the documented way to remeasure. It benches one commit four times, alternating, and runs `scripts/bench-gate.mjs --calibrate`, which prints the table, the worst difference in either direction and the implied threshold (the larger of 0.20 and three times it) and exits 0. `calibration()` has two new tests, written first (ten pass); `action-validator` printed `ok` for the workflow. A local smoke pair gave a worst difference of 13.7 percent on `advance-shard` (implied 41.1 percent); that is not one of the three CI measurements. **Still open:** the three CI runs need a push, after which the threshold, its comment, `docs/quality-gates.md` and the removal of `continue-on-error: true` land in one change.
+- **95.2 completed (2026-11-17)** After plan V22 merged to `main` (pull request 7), with the gate at five rounds a side, three manual `Benchmark Calibration` runs on `main` (Actions runs 44183948084, 44183953428 and 44183958126) measured a worst base-against-base difference of 0.5 percent (`minion-encounter`), 1.5 percent (`minion-encounter`) and 3.7 percent (`advance-shard`). Three times the worst, 11.1 percent, is under the 20 percent floor, so `BENCH_REGRESSION_THRESHOLD` stays 0.20, now as a measured value. `continue-on-error` is removed from the `bench` job, which is now blocking on pull requests.
 - **95.4** `npm run verify`: lint PASS, typecheck PASS, test PASS (114 files before the `test` script change, 1,819 passed and 2 expected failures, 47.6 s), build PASS.
