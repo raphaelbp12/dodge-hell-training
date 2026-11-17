@@ -44,7 +44,8 @@ import * as help from "./helpText";
 import {
   changedAttack,
   monsterFilePath,
-  monstersOfEncounter,
+  taggableMonsters,
+  taggingConfigOf,
   newAttack,
   type AttackChange,
 } from "./monsterDraft";
@@ -140,7 +141,8 @@ export function TaggerRoute() {
     ? DEFAULT_ENCOUNTER_ID
     : ENCOUNTER_LIST[0].id;
   const [encounterId, setEncounterId] = useState(initialEncounter);
-  const config = encounterConfigOf(encounterId);
+  // Any monster is taggable under any encounter, in its arena (user decision 2026-11-17).
+  const config = taggingConfigOf(encounterId);
   // V18 L06/L07: one study per monster; the primary monster is the default.
   const [archetypeId, setArchetypeId] = useState(
     () => encounterConfigOf(initialEncounter).primaryArchetypeId,
@@ -148,7 +150,7 @@ export function TaggerRoute() {
   // Plan V20 E02: one v5 study and the selected attack track; null before a video or monster.
   const [study, setStudy] = useState<StudyV5 | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const monsterIds = monstersOfEncounter(config);
+  const monsterIds = taggableMonsters(config);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const [durationSeconds, setDurationSeconds] = useState(0);
@@ -791,7 +793,7 @@ export function TaggerRoute() {
     loaded: StudyState | StudyV5,
   ): Readonly<{ study: StudyV5; notices: readonly string[] }> => {
     if ("schemaVersion" in loaded) return { study: loaded, notices: [] };
-    const loadedConfig = encounterConfigOf(loaded.encounterId);
+    const loadedConfig = taggingConfigOf(loaded.encounterId);
     const id = loaded.archetypeId ?? loadedConfig.primaryArchetypeId;
     const converted = studyV5FromLegacy({
       legacy: loaded,
@@ -934,7 +936,7 @@ export function TaggerRoute() {
           const problem = studyMonsterProblem(
             parsed,
             encounterConfigOf(parsed.encounterId).primaryArchetypeId,
-            monstersOfEncounter(encounterConfigOf(parsed.encounterId)),
+            taggableMonsters(taggingConfigOf(parsed.encounterId)),
           );
           if (problem) {
             setError(problem);
@@ -968,7 +970,7 @@ export function TaggerRoute() {
     const problem = studyMonsterProblem(
       draft.study,
       encounterConfigOf(draft.study.encounterId).primaryArchetypeId,
-      monstersOfEncounter(encounterConfigOf(draft.study.encounterId)),
+      taggableMonsters(taggingConfigOf(draft.study.encounterId)),
     );
     if (problem) {
       setError(problem);

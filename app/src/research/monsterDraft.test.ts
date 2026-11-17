@@ -8,6 +8,8 @@ import {
   monstersOfEncounter,
   NEW_ATTACK_DEFAULTS,
   newAttack,
+  taggableMonsters,
+  taggingConfigOf,
 } from "./monsterDraft";
 import { tracksFromMonsterFile } from "./studyMigrate";
 
@@ -33,6 +35,29 @@ describe("monsters and blocks", () => {
     expect(ids).toHaveLength(11);
     expect(new Set(ids).size).toBe(11);
     expect(monstersOfEncounter(worm)).toHaveLength(1);
+  });
+
+  test("every monster is taggable under every encounter, the encounter's own first", () => {
+    const all = Object.keys(AUTHORED_MONSTER_FILES);
+    for (const encounterId of ["killer-bee-queen", "crystal-worm"]) {
+      const config = taggingConfigOf(encounterId);
+      const ids = taggableMonsters(config);
+      expect(ids.toSorted()).toEqual(all.toSorted());
+      expect(ids.slice(0, monstersOfEncounter(encounterConfigOf(encounterId)).length)).toEqual(
+        monstersOfEncounter(encounterConfigOf(encounterId)),
+      );
+    }
+  });
+
+  test("a tagging config keeps its encounter's arena, player and own archetypes, and adds every other monster and projectile", () => {
+    const tagging = taggingConfigOf("crystal-worm");
+    expect(tagging.arena).toBe(worm.arena);
+    expect(tagging.player).toBe(worm.player);
+    expect(tagging.primaryArchetypeId).toBe(worm.primaryArchetypeId);
+    expect(tagging.archetypes["crystal-worm-child-head"]).toBe(worm.archetypes["crystal-worm-child-head"]);
+    expect(archetypeOf(tagging, "killer-bee-queen")).toBe(queen.archetypes["killer-bee-queen"]);
+    for (const id of Object.keys(queen.projectiles)) expect(tagging.projectiles[id]).toBeDefined();
+    expect(taggingConfigOf("crystal-worm")).toBe(tagging);
   });
 
   test("the Queen has 15 blocks with telegraph and duration", () => {

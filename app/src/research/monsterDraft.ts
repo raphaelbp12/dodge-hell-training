@@ -8,6 +8,8 @@
 import { validateAttack, type AuthoredAttack } from "../game/config/data";
 import {
   attackSpecFromAuthored,
+  ENCOUNTER_CONFIGS,
+  encounterConfigOf,
   validateAttackSpec,
   type EncounterConfig,
   type EnemyArchetype,
@@ -59,6 +61,35 @@ export function monstersOfEncounter(config: EncounterConfig): readonly string[] 
   };
   visit(config.primaryArchetypeId);
   return seen;
+}
+
+const taggingConfigs = new Map<string, EncounterConfig>();
+
+/**
+ * The config the tagger works under: the encounter's own arena, player, tuning
+ * and archetypes, plus every archetype and projectile any encounter defines,
+ * so any monster can be tagged under any encounter, in its arena (user
+ * decision 2026-11-17). The encounter's own entries win, so the Crystal Worm's
+ * debug-tunable build keeps its values. The game never reads this config.
+ */
+export function taggingConfigOf(encounterId: string): EncounterConfig {
+  const cached = taggingConfigs.get(encounterId);
+  if (cached) return cached;
+  const own = encounterConfigOf(encounterId);
+  const others = Object.values(ENCOUNTER_CONFIGS);
+  const config: EncounterConfig = Object.freeze({
+    ...own,
+    archetypes: Object.freeze(Object.assign({}, ...others.map((other) => other.archetypes), own.archetypes)),
+    projectiles: Object.freeze(Object.assign({}, ...others.map((other) => other.projectiles), own.projectiles)),
+  });
+  taggingConfigs.set(encounterId, config);
+  return config;
+}
+
+/** Every monster in `config`: the encounter's own (primary, then spawned) first, then the rest in authored order. */
+export function taggableMonsters(config: EncounterConfig): readonly string[] {
+  const own = monstersOfEncounter(config);
+  return [...own, ...Object.keys(config.archetypes).filter((id) => !own.includes(id))];
 }
 
 /** L17, L18: one block per phase with no sub-phases, and one per sub-phase. */

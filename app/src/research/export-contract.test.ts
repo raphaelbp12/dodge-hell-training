@@ -10,6 +10,7 @@ import {
 } from "../game/config/data";
 import { ENCOUNTER_CONFIGS, encounterConfigOf } from "../game/config/encounter";
 import { propertyParameters } from "../test/property";
+import { taggingConfigOf } from "./monsterDraft";
 import { segmentIdOf, type StudyV5 } from "./study";
 import {
   bombVariantOf,
@@ -53,20 +54,8 @@ function studyOf(archetypeId: string): StudyV5 {
   });
 }
 
-/**
- * A10 finding (plan V22 step 92.3): `monsterFileTextFromStudy` validates every
- * shipped monster file against the exporting encounter's projectile catalog.
- * The Crystal Worm's catalog lacks the Queen's projectiles, so exporting
- * `crystal-worm-child-head` under its own encounter is refused with "killer-bee-
- * queen ... must name a projectile defined in projectiles.json". The Queen
- * encounter's catalog lacks the worm's shard, so no config exports it. The
- * tagger offers only the Queen's monsters today, so this is recorded, not
- * fixed; it needs a user decision (see phase-92.md execution record).
- */
-const EXPORT_REFUSED_BY_DESIGN: ReadonlySet<string> = new Set(["crystal-worm-child-head"]);
-
 describe("an unedited export reproduces the shipped monster file", () => {
-  test.each(MONSTER_IDS.filter((id) => !EXPORT_REFUSED_BY_DESIGN.has(id)))("%s", (archetypeId) => {
+  test.each(MONSTER_IDS)("%s", (archetypeId) => {
     const result = monsterFileTextFromStudy({
       archetypeId,
       study: studyOf(archetypeId),
@@ -86,15 +75,35 @@ describe("an unedited export reproduces the shipped monster file", () => {
   });
 });
 
-test.fails("A10 finding: the Crystal Worm's child head exports under its own encounter", () => {
+// Former A10 finding (plan V22 step 92.3): the export checked every shipped
+// file against one encounter's catalog, so the Crystal Worm's debug-tunable
+// config refused every monster. The user decided (2026-11-17) that any monster
+// is taggable under any encounter, in any arena.
+test("the Crystal Worm's child head exports under its own encounter", () => {
   const archetypeId = "crystal-worm-child-head";
   const result = monsterFileTextFromStudy({
     archetypeId,
     study: studyOf(archetypeId),
     currentRawFile: AUTHORED_MONSTER_FILES[archetypeId],
-    config: configFor(archetypeId),
+    config: encounterConfigOf("crystal-worm"),
   });
-  expect(result.ok).toBe(true);
+  expect(result).toMatchObject({ ok: true });
+});
+
+describe("any monster exports unedited under any encounter's tagging config", () => {
+  const pairs = Object.keys(ENCOUNTER_CONFIGS).flatMap((encounterId) =>
+    MONSTER_IDS.map((archetypeId) => [encounterId, archetypeId] as const),
+  );
+  test.each(pairs)("%s / %s", (encounterId, archetypeId) => {
+    const result = monsterFileTextFromStudy({
+      archetypeId,
+      study: studyOf(archetypeId),
+      currentRawFile: AUTHORED_MONSTER_FILES[archetypeId],
+      config: taggingConfigOf(encounterId),
+    });
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(JSON.parse(result.value)).toEqual(AUTHORED_MONSTER_FILES[archetypeId]);
+  });
 });
 
 type Edit = Readonly<{
@@ -175,12 +184,8 @@ describe("any export the editor produces is valid game data or is refused", () =
             return variant ? [[variant.id, variant.entry] as const] : [];
           }),
         );
-        for (const [id, entry] of Object.entries(variants)) {
-          // A10 finding: a targeted bomb's variant omits `rangeTiles`, which the
-          // projectile validator requires; see the test.fails case below.
-          if (!("rangeTiles" in entry)) continue;
+        for (const [id, entry] of Object.entries(variants))
           expect(() => validateProjectile(entry, id, STEP_SECONDS, APPEARANCE_IDS)).not.toThrow();
-        }
         expect(() =>
           validateArchetypes(
             { archetypes: { ...AUTHORED_MONSTER_FILES, [archetypeId]: JSON.parse(result.value) } },
@@ -197,7 +202,10 @@ describe("any export the editor produces is valid game data or is refused", () =
   });
 });
 
-test.fails("A10 finding: a targeted bomb's measured variant passes the projectile validator", () => {
+// Former A10 finding: the variant dropped `rangeTiles` for a targeted bomb.
+// The user chose (2026-11-17) to keep the authored range, which a targeted
+// bomb ignores at runtime, so the variant stays valid game data.
+test("a targeted bomb's measured variant passes the projectile validator and keeps the authored range", () => {
   const archetypeId = "killer-bee-queen";
   const study = studyOf(archetypeId);
   const targeted = study.tracks.find((track) => {
@@ -212,4 +220,6 @@ test.fails("A10 finding: a targeted bomb's measured variant passes the projectil
   expect(() =>
     validateProjectile(variant.entry, variant.id, STEP_SECONDS, APPEARANCE_IDS),
   ).not.toThrow();
+  const authored = AUTHORED_PROJECTILES[targeted.attack.projectile] as { rangeTiles?: number };
+  expect(variant.entry.rangeTiles).toBe(authored.rangeTiles);
 });
