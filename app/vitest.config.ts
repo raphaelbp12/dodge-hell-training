@@ -11,12 +11,31 @@ export default mergeConfig(
           test: {
             name: "node",
             environment: "node",
-            include: ["src/**/*.test.ts", "lint/**/*.test.ts"],
+            include: [
+              "src/**/*.test.ts",
+              "lint/**/*.test.ts",
+              // Vitest-style script tests; scripts/verify.test.mjs uses node:test and is not listed.
+              "scripts/mutation-diff.test.mjs",
+              "scripts/bench-gate.test.mjs",
+              "scripts/mutation-shards.test.mjs",
+            ],
+            // The simulated soak runs in its own project (`npm run test:soak:sim`).
+            exclude: ["src/**/*.soak.test.ts", "node_modules/**"],
+            benchmark: { include: ["src/**/*.bench.ts"] },
             // The Queen's full-fight simulations now test compound hitboxes
             // with up to 58 parts per projectile. The longest case is the
             // four-rate determinism run at about 20 seconds; 60 seconds leaves
             // headroom without turning every node test into a two-minute hang.
             testTimeout: 60000,
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: "soak",
+            environment: "node",
+            include: ["src/**/*.soak.test.ts"],
+            testTimeout: 300000,
           },
         },
         {

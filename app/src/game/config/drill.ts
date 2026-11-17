@@ -77,11 +77,11 @@ export function phaseLabel(id: string, index: number): string {
  * looped selection. An absent, empty or invalid list - including a fractional
  * or out-of-range value anywhere in it - falls back to the full fight rather
  * than throwing. The URL only seeds the initial selection; nothing writes it
- * back. The default reads `window.location.search` when one is available.
+ * back. The caller passes the location search string, because the core never reads browser globals (A01).
  */
 export function parseDrillFromLocation(
   config: EncounterConfig,
-  search: string = typeof window === "undefined" ? "" : window.location.search,
+  search: string,
 ): DrillSelection | null {
   const params = new URLSearchParams(search);
   const rawPhases = params.getAll("phase");

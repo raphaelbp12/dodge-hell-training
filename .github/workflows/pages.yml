@@ -29,6 +29,10 @@ jobs:
             script: typecheck
           - name: Unit Tests
             script: test
+          - name: Audit
+            script: audit
+          - name: Simulated Soak
+            script: test:soak:sim
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -46,6 +50,57 @@ jobs:
         run: npm ci
       - name: Run check
         run: npm run ${{ matrix.script }}
+
+  bench:
+    # Plan V22 A24: compares this pull request's benchmarks with its merge base
+    # on the same runner, alternating base and head so runner noise hits both.
+    # It runs on pull requests only, so it never gates `deploy`.
+    name: Benchmark Gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Provisional until the threshold is measured over three base-against-base
+    # runs (see BENCH_REGRESSION_THRESHOLD in app/scripts/bench-gate.mjs); remove
+    # this flag in the same change that records the measurements.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: head
+      - name: Check out the merge base
+        run: |
+          base="$(git -C head merge-base "origin/${{ github.base_ref }}" HEAD)"
+          git -C head worktree add ../base "$base"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: head/.node-version
+          cache: npm
+          cache-dependency-path: head/app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Install dependencies
+        run: |
+          npm ci --prefix head/app
+          npm ci --prefix base/app
+      - name: Run benchmarks alternately
+        run: |
+          for round in 1 2; do
+            rm -rf base/app/reports/bench head/app/reports/bench
+            npm run bench --prefix base/app || echo "base has no benchmarks"
+            cp -r base/app/reports/bench "$RUNNER_TEMP/base-$round" || echo "base produced no results"
+            npm run bench --prefix head/app
+            cp -r head/app/reports/bench "$RUNNER_TEMP/head-$round"
+          done
+      - name: Compare
+        run: |
+          node head/app/scripts/bench-gate.mjs \
+            --base "$RUNNER_TEMP/base-1" "$RUNNER_TEMP/base-2" \
+            --head "$RUNNER_TEMP/head-1" "$RUNNER_TEMP/head-2"
 
   build:
     name: Build

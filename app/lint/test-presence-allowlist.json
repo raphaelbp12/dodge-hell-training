@@ -1,0 +1,16 @@
+{
+  "src/main.tsx": "entry point: mounts the app; covered by Playwright",
+  "src/game/models.ts": "types only",
+  "src/game/config/encounter.ts": "exercised by config.test.ts, arm-pattern.test.ts and the other config tests, which test the whole encounter configuration",
+  "src/game/phaser/arena-renderer.ts": "Phaser drawing; covered by Playwright",
+  "src/game/phaser/encounter.ts": "Phaser runtime integration; covered by Playwright",
+  "src/game/phaser/phase-preview.ts": "Phaser runtime integration; covered by Playwright",
+  "src/game/phaser/presentation.ts": "constants only: presentation values derived from the palette",
+  "src/game/phaser/projectile-textures.ts": "Phaser texture generation; covered by Playwright",
+  "src/game/simulation/test-support.ts": "test support: the projectile catalog for property tests",
+  "src/research/TaggerRoute.tsx": "tested through TaggerRoute.flows.test.tsx, whose name is not a sibling form",
+  "src/research/previewDraw.ts": "canvas drawing; PreviewPanel tests stub it and assert what it receives",
+  "src/research/stepGuide.ts": "static guide copy, exercised by StepGuidePanel.test.tsx",
+  "src/test/encounter-view.ts": "test support: an EncounterView builder",
+  "src/test/setup.ts": "test support: the jsdom setup file"
+}

@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Runs `npm run verify` or a targeted Playwright test from `app/` and reports results. May apply only mechanical lint/format autofixes and small single-file typecheck fixes. Use for every end-of-work verification run.
+description: Runs `npm run verify`, a targeted Playwright test or `npm run test:mutation:diff` from `app/` and reports results. May apply only mechanical lint/format autofixes and small single-file typecheck fixes. Use for every end-of-work verification run.
 model: haiku
 tools: Bash, Read, Edit
 ---
@@ -11,6 +11,7 @@ You run this project's verification gates and report. Work from `/workspaces/dod
 
 - Default: `npm run verify`. Never run `lint`, `typecheck`, `test` and `build` separately.
 - Playwright, only when the caller names a pattern: `CI=true npm run test:e2e -- --grep "<pattern>"`. Never run the full e2e suite unless the caller says so explicitly.
+- Mutation, only when the caller asks: `npm run test:mutation:diff`. Never run `npm run test:mutation` (the full suite); if asked, refuse and report that the user runs it in their own terminal. Stryker rewrites sources in place: edit nothing while it runs. Afterwards report the mutation score, the break threshold and each surviving mutant's file and line, then check cleanup: `git status --porcelain` must list no `stryker-setup-*.js` and no source file the caller did not change. Report any leftover; delete leftover `stryker-setup-*.js` files and `.stryker-tmp/`, but never restore or edit a source file yourself.
 - Full logs are in `app/test-results/verification/<gate>.log`. Read one only when the printed excerpt is not enough.
 
 ## Allowed fixes after a failed gate

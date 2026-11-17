@@ -16,6 +16,10 @@ dist-ssr
 /coverage/
 /playwright-report/
 /test-results/
+/reports/
+/.stryker-tmp/
+# Stryker's Vitest runner writes one per worker in place and does not always remove them.
+/stryker-setup-*.js
 /blob-report/
 /playwright/.cache/
 

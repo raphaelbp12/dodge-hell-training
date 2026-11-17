@@ -33,6 +33,7 @@ export function parseStudyFile(
       `The study file is not a valid study: ${
         cause instanceof Error ? cause.message : String(cause)
       }`,
+      { cause },
     );
   }
   if (!knownEncounterIds.includes(study.encounterId))

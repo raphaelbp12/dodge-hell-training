@@ -5,6 +5,8 @@
     "lib": ["ES2023", "DOM"],
     "types": ["node"],
     "skipLibCheck": true,
+    "strict": true,
+    "noImplicitOverride": true,
 
     /* Bundler mode: the specs import app types (lint rule
        test-drift/typed-exact-expectation), and app source uses
@@ -26,6 +28,7 @@
   "include": [
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.mutation.config.ts",
     "playwright.config.ts",
     "tests/**/*.ts",
     "lint/**/*.ts"

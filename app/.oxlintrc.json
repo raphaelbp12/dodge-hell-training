@@ -1,8 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
-  "jsPlugins": ["./lint/test-drift.js"],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "jsPlugins": ["./lint/test-drift.js", "./lint/determinism.js"],
   "rules": {
+    // The project uses the automatic JSX runtime (tsconfig "jsx": "react-jsx"), so React need not be in scope.
+    "react/react-in-jsx-scope": "off",
+    // Shadowing a short name inside a nested callback is idiomatic here and never changed behaviour; every hit is a style false positive.
+    "no-shadow": "off",
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   },
@@ -13,6 +18,89 @@
         "test-drift/no-hardcoded-rules-version": "error",
         "test-drift/typed-exact-expectation": "error",
         "test-drift/no-clock-step-in-poll": "error"
+      }
+    },
+    {
+      "files": [
+        "src/game/models.ts",
+        "src/game/config/**",
+        "src/game/simulation/**",
+        "src/game/session/**"
+      ],
+      "excludeFiles": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      "rules": {
+        "determinism/no-ambient-entropy": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "A01: the simulation core must stay independent of React (AGENTS.md, Architecture)." },
+              { "name": "react-dom", "message": "A01: the simulation core must stay independent of React (AGENTS.md, Architecture)." },
+              { "name": "phaser", "message": "A01: the simulation core must stay independent of Phaser (AGENTS.md, Architecture)." }
+            ],
+            "patterns": [
+              { "group": ["react-dom/*"], "message": "A01: the simulation core must stay independent of React (AGENTS.md, Architecture)." },
+              { "group": ["*.css"], "message": "A01: the simulation core must not import styles (AGENTS.md, Architecture)." },
+              { "group": ["**/ui", "**/ui/**"], "message": "A01: the simulation core must not import UI modules (AGENTS.md, Architecture)." },
+              { "group": ["**/research", "**/research/**"], "message": "A01: the simulation core must not import research modules (AGENTS.md, Architecture)." },
+              { "group": ["**/phaser/**"], "message": "A01: the simulation core must not import the Phaser layer (AGENTS.md, Architecture)." },
+              { "group": ["**/storage", "**/storage/**"], "message": "A01: the simulation core must not import storage modules (AGENTS.md, Architecture)." }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          { "name": "window", "message": "A01: the simulation core must not read browser globals (AGENTS.md, Architecture)." },
+          { "name": "document", "message": "A01: the simulation core must not read browser globals (AGENTS.md, Architecture)." },
+          { "name": "localStorage", "message": "A01: the simulation core must not read browser globals (AGENTS.md, Architecture)." },
+          { "name": "sessionStorage", "message": "A01: the simulation core must not read browser globals (AGENTS.md, Architecture)." },
+          { "name": "navigator", "message": "A01: the simulation core must not read browser globals (AGENTS.md, Architecture)." },
+          { "name": "requestAnimationFrame", "message": "A01: the simulation core must not read browser globals (AGENTS.md, Architecture)." }
+        ]
+      }
+    },
+    {
+      // React Compiler-style rules: these three components deliberately own an imperative Phaser runtime,
+      // a ref-held handle and derived-state effects that tests pin; restructuring them is a behaviour change.
+      "files": [
+        "src/ui/EncounterScreen.tsx",
+        "src/ui/PhasePreview.tsx",
+        "src/research/TaggerTimeline.tsx"
+      ],
+      "rules": {
+        "react/exhaustive-effect-dependencies": "off",
+        "react/set-state-in-effect": "off",
+        "react/immutability": "off",
+        "react/refs": "off",
+        "react/only-export-components": "off",
+        "react-hooks/exhaustive-deps": "off"
+      }
+    },
+    {
+      "files": ["src/game/phaser/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["**/research", "**/research/**"], "message": "A01/T13: src/game must not import src/research (one-way boundary; AGENTS.md, Architecture)." }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/storage/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "A01: storage adapters must not import React (AGENTS.md, Architecture)." },
+              { "name": "phaser", "message": "A01: storage adapters must not import Phaser (AGENTS.md, Architecture)." }
+            ]
+          }
+        ]
       }
     }
   ]

@@ -41,6 +41,12 @@ Checks cost time and tokens, so run them at the end of a unit of work, not after
 - Skip `npm run verify` when only documentation, plans or agent instruction files changed.
 - Playwright is not routine; CI runs the full suite on every push.
 - The three 60-second `@soak` tests (real-time frame timing and runtime bounds) run locally only with `PLAYWRIGHT_SOAK=1`, or when `CI` is set. CI always runs them and keeps their frame-timing JSON in the `browser-results-*-soak-*` artifact. Set `PLAYWRIGHT_SOAK=1` for any step that measures or compares frame timing, because CI-runner timings are not comparable with the recorded local baseline. When adding or changing a Playwright test, run only that test: `npm run test:e2e -- --grep "<pattern>"`. Run the full suite only to reproduce a CI failure or when the user asks for an acceptance run.
+- A property, contract or mutation test that fails on current code is a finding: record its seed, path and counterexample, keep the test as `test.fails` with a comment citing the record, and stop for a user decision (plan V22 A10). Never weaken it or change simulation behaviour to make it pass.
+- `app/src/game/config/rules-fingerprint.json` must change in the same change as any gameplay data edit and its `rulesVersion` bump (plan V22 A12); the fingerprint test says which of the two is missing.
+- Before reporting a change to a module in the Stryker mutate globs (`app/stryker.config.mjs`), delegate `npm run test:mutation:diff` to the `verifier` subagent; never run a mutation command in the main session. Stryker rewrites sources in place while it runs, so make no edits under `app/` until the verifier reports.
+- Never run the full mutation suite (`npm run test:mutation`, about 3 hours) from an agent session, the verifier included. Give the user the command to run in their own terminal, or leave it to the weekly `mutation.yml` run.
+- Run `npm run bench` against `main` and the benchmark gate before reporting a change to the simulation's hot path: `simulation.ts`, `projectiles.ts`, `bombs.ts` or `geometry.ts`.
+- [The quality-gates reference](docs/quality-gates.md) describes every gate, its command and how to reproduce a failure.
 - Report the checks you actually ran and any blockers. Never claim a check passed when it did not run.
 
 ## Git and deployment

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 4,
+  "encounterId": "killer-bee-queen",
+  "archetypeId": "killer-bee-queen",
+  "provenance": {
+    "sourceUrl": null,
+    "fileName": "killer-bee-queen-fixture.mp4",
+    "frameRate": 30,
+    "durationSeconds": 120
+  },
+  "recordedAt": "2026-11-01T00:00:00.000Z",
+  "savedAttacks": [
+    {
+      "id": "attack-a",
+      "name": "Spread at player",
+      "spriteId": "red-stinger-large",
+      "pattern": "spread",
+      "aim": "player",
+      "shots": 3,
+      "cadence": {
+        "shotsPerBurst": 2,
+        "shotIntervalSeconds": 0.4,
+        "cooldownAfterLastShotSeconds": 2
+      }
+    }
+  ],
+  "tags": [
+    {
+      "timeSeconds": 10.5,
+      "phaseIndex": 0,
+      "savedAttackId": "attack-a"
+    },
+    {
+      "timeSeconds": 10.9,
+      "phaseIndex": 0,
+      "savedAttackId": "attack-a"
+    },
+    {
+      "timeSeconds": 13.5,
+      "phaseIndex": 0,
+      "savedAttackId": "attack-a"
+    }
+  ],
+  "monsterDraft": null
+}

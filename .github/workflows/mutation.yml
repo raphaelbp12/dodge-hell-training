@@ -1,0 +1,102 @@
+name: Mutation Tests
+
+# Plan V22 A17. The full run is weekly and on demand; the diff run reports the
+# mutants of changed modules on pull requests and never blocks a merge.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  full:
+    # One job per shard (MUTATION_SHARDS in app/stryker.config.mjs). Stryker saves
+    # its incremental file only when a run finishes, so each shard must finish
+    # inside the job limit: a cold shard can take hours on a hosted runner, and
+    # later weeks re-test only what changed. 360 minutes is GitHub's job maximum.
+    name: Full Mutation Run (${{ matrix.shard }})
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [config, simulation, research, state]
+    env:
+      MUTATION_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Install dependencies
+        run: npm ci
+      - name: Restore incremental file
+        uses: actions/cache/restore@v4
+        with:
+          path: app/reports/mutation/stryker-incremental-${{ matrix.shard }}.json
+          key: mutation-incremental-${{ matrix.shard }}-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            mutation-incremental-${{ matrix.shard }}-${{ github.ref_name }}-
+      - name: Run mutation tests
+        run: npm run test:mutation
+      # Saved even when the score breaks the threshold (Stryker still writes the
+      # file), so a failing week does not make the next one start cold. A run cut
+      # off by the timeout writes no file, and there is nothing to save.
+      - name: Save incremental file
+        if: always() && hashFiles(format('app/reports/mutation/stryker-incremental-{0}.json', matrix.shard)) != ''
+        uses: actions/cache/save@v4
+        with:
+          path: app/reports/mutation/stryker-incremental-${{ matrix.shard }}.json
+          key: mutation-incremental-${{ matrix.shard }}-${{ github.ref_name }}-${{ github.run_id }}
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-full-${{ matrix.shard }}
+          path: app/reports/mutation/
+          retention-days: 14
+
+  diff:
+    name: Mutation Of Changed Files
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Select pinned npm
+        run: npm install --global npm@12.2.1
+      - name: Install dependencies
+        run: npm ci
+      - name: Run mutation tests on changed files
+        run: npm run test:mutation:diff
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-diff
+          path: app/reports/mutation/
+          retention-days: 7

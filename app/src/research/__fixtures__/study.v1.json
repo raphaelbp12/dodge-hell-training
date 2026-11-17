@@ -1,0 +1,26 @@
+{
+  "encounterId": "killer-bee-queen",
+  "provenance": {
+    "sourceUrl": null,
+    "fileName": "killer-bee-queen-fixture.mp4",
+    "frameRate": 30,
+    "durationSeconds": 120
+  },
+  "recordedAt": "2026-11-01T00:00:00.000Z",
+  "tags": [
+    {
+      "timeSeconds": 10.5,
+      "phaseIndex": 0,
+      "spriteId": "red-stinger-large",
+      "kind": "volley",
+      "shots": 3
+    },
+    {
+      "timeSeconds": 14.2,
+      "phaseIndex": 1,
+      "spriteId": "red-stinger-large",
+      "kind": "rotating-arm",
+      "shots": 4
+    }
+  ]
+}
