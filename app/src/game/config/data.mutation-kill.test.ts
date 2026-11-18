@@ -479,12 +479,15 @@ describe("validateProjectile", () => {
   });
 
   test("returns the exact motion for linear and boomerang", () => {
-    expect(validateProjectile(withBody, "p", 1 / 60).motion).toEqual({
+    // A bomb has no motion, so narrow the validated projectile before reading it.
+    const motionOf = (projectile: ReturnType<typeof validateProjectile>) =>
+      "motion" in projectile ? projectile.motion : undefined;
+    expect(motionOf(validateProjectile(withBody, "p", 1 / 60))).toEqual({
       kind: "linear",
       rangeTiles: 5,
     });
     const boomerang = { kind: "boomerang", reversalAgeSeconds: 1, lifetimeSeconds: 2 };
-    expect(validateProjectile({ ...withBody, motion: boomerang }, "p", 1 / 60).motion).toEqual(
+    expect(motionOf(validateProjectile({ ...withBody, motion: boomerang }, "p", 1 / 60))).toEqual(
       boomerang,
     );
   });

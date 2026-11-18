@@ -68,7 +68,7 @@ const projectiles: Record<string, ProjectileSpec> = {
     damageHp: 10,
     armorPiercing: false,
     conditions: [{ key: keyOne, seconds: 2 }],
-    motion: { kind: "linear" },
+    motion: { kind: "linear", rangeTiles: 5 },
   } as ProjectileSpec,
   pB: {
     ...baseBullet,
