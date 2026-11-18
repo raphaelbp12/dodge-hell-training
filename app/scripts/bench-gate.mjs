@@ -1,6 +1,6 @@
 // Same-runner benchmark gate (plan V22 A24). Takes the result directories of
 // alternating base and head `vitest bench` runs, keeps each benchmark's best
-// (lowest) mean per side and fails when any benchmark present on both sides is
+// (lowest) median per side and fails when any benchmark present on both sides is
 // slower on head by more than the threshold.
 //
 // Each run is a directory of result files (`reports/bench/*.json`, written by
@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * Largest tolerated slowdown, as a fraction of the base mean (0.20 is 20 percent).
+ * Largest tolerated slowdown, as a fraction of the base median (0.20 is 20 percent).
  *
  * Plan V22 A24 sets it to the larger of 0.20 and three times the worst
  * base-against-base difference over three CI runs. Measured on 2026-11-17 with
@@ -21,22 +21,33 @@ import { fileURLToPath } from "node:url";
  *   run 1: 0.5% (minion-encounter), run 2: 1.5% (minion-encounter),
  *   run 3: 3.7% (advance-shard).
  * Three times 3.7 is 11.1 percent, under the floor, so the floor applies.
+ * These runs used the mean. The gate now compares the median, so re-run
+ * `.github/workflows/bench-calibrate.yml` three times and update the figures.
  * Remeasure with the same workflow after a change to the benchmarks or to
  * BENCH_ROUNDS, and record the new runs here and in docs/quality-gates.md.
  */
 export const BENCH_REGRESSION_THRESHOLD = 0.2;
 
-/** The mean latency, in milliseconds, of one benchmark result file written by `bench(..., { writeResult })`. */
-export function meanOf(result) {
-  const mean = result?.latency?.mean;
+/**
+ * The typical latency, in milliseconds, of one benchmark result file written
+ * by `bench(..., { writeResult })`: the median (`latency.p50`), or the mean
+ * when a file has no median. The mean is not used first because a few GC or
+ * scheduler outliers dominate it on a sub-microsecond benchmark. On
+ * 2026-11-18 `advance-shard` (about 0.01 ms) read 36 percent slower on a
+ * change that touched no simulation code, with a maximum of 17 ms against a
+ * 0.0078 ms minimum. The median ignores such outliers.
+ */
+export function typicalOf(result) {
+  const { p50, mean } = result?.latency ?? {};
+  if (typeof p50 === "number") return p50;
   return typeof mean === "number" ? mean : null;
 }
 
-/** One run: result file name (without `.json`) to mean, from `[fileName, parsedJson]` pairs. */
+/** One run: result file name (without `.json`) to typical latency, from `[fileName, parsedJson]` pairs. */
 export function runOf(files) {
   const means = new Map();
   for (const [fileName, result] of files) {
-    const mean = meanOf(result);
+    const mean = typicalOf(result);
     if (mean !== null) means.set(fileName.replace(/\.json$/, ""), mean);
   }
   return means;

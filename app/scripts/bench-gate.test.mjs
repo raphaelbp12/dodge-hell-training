@@ -5,16 +5,17 @@ import {
   calibration,
   compareBenchmarks,
   formatTable,
-  meanOf,
+  typicalOf,
   runOf,
 } from "./bench-gate.mjs";
 
 const run = (entries) =>
-  runOf(Object.entries(entries).map(([name, mean]) => [`${name}.json`, { latency: { mean } }]));
+  runOf(Object.entries(entries).map(([name, mean]) => [`${name}.json`, { latency: { p50: mean, mean: mean * 1000 } }]));
 
-test("reads the mean latency of a result file and ignores a file without one", () => {
-  expect(meanOf({ latency: { mean: 4.5 } })).toBe(4.5);
-  expect(meanOf({})).toBeNull();
+test("reads the median latency of a result file, falls back to the mean and ignores a file without either", () => {
+  expect(typicalOf({ latency: { p50: 4.5, mean: 90 } })).toBe(4.5);
+  expect(typicalOf({ latency: { mean: 4.5 } })).toBe(4.5);
+  expect(typicalOf({})).toBeNull();
   expect([...run({ a: 1, b: 2 })]).toEqual([
     ["a", 1],
     ["b", 2],

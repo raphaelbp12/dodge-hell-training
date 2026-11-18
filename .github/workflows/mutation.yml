@@ -36,7 +36,8 @@ jobs:
     # shard re-tests only what changed. A cold shard can take hours on a hosted
     # runner, so Stryker is interrupted after MUTATION_BUDGET_MINUTES: on SIGINT
     # it writes a partial incremental file, the job saves it, and the next run
-    # continues from there. Without the interrupt, a shard that outlasts the
+    # continues from there. The interrupted step warns and exits 0, so a cold
+    # run is not red; a broken threshold still fails. Without the interrupt, a shard that outlasts the
     # job limit (360 minutes is GitHub's maximum) would be killed with nothing
     # saved and would start cold on every run.
     name: Full Mutation Run (${{ matrix.shard }})
@@ -79,8 +80,12 @@ jobs:
           status=0
           timeout --signal=INT --kill-after=5m "${MUTATION_BUDGET_MINUTES}m" \
             node node_modules/@stryker-mutator/core/bin/stryker.js run $FORCE || status=$?
+          # An interrupted run (124 timeout, 137 killed) is expected on a cold
+          # cache and is not a failure: warn and succeed. Any other nonzero
+          # status, such as a broken threshold (1), still fails the step.
           if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
-            echo "::error::Shard $MUTATION_SHARD did not finish in $MUTATION_BUDGET_MINUTES minutes. Its progress is saved in the incremental file, and the next run continues from it."
+            echo "::warning::Shard $MUTATION_SHARD did not finish in $MUTATION_BUDGET_MINUTES minutes. Its progress is saved in the incremental file, and the next run continues from it."
+            exit 0
           fi
           exit "$status"
       # Saved whenever Stryker wrote the file: after a finished run, a run that
