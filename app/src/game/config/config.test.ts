@@ -2206,7 +2206,8 @@ test("the Killer Bee Queen's full fight is deterministic across frame rates and 
     advanceSimulation(state, burstSeconds, idle),
   );
   expect(burstState).toEqual(reference);
-}, 30_000);
+  // 60 s, not 30 s: v8 coverage instrumentation (npm run test:coverage) slows this run.
+}, 60_000);
 
 // Step 24.1: every fixed step advances alone here, so this cannot exercise
 // the catch-up path; it only proves the densest phases never discard a
