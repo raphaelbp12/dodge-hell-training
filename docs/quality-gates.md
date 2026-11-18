@@ -108,6 +108,8 @@ One reference for every gate that raises trust in a change before it is committe
 
 The three 60-second Playwright `@soak` tests, their tag policy and their CI artifacts are unchanged. Run with `PLAYWRIGHT_SOAK=1`, or `CI=true`.
 
+**Flaky tests (report item 2.9):** in CI Playwright keeps `retries: 2` so a failing test leaves its retry trace, but `failOnFlakyTests` is on, so a test that passes only on retry fails the job. Locally there are no retries. To reproduce, run `npm run test:e2e -- --grep "<pattern>" --repeat-each=10`.
+
 ## Mutation baseline
 
 Dated 2026-11-17, **full run** (finished across two sessions through the incremental file; a single run needs about 3 hours, more than the plan's 90-minute limit, so the scheduled CI run relies on the cached incremental file). Mutants: 5,932 killed, 746 timed out, 1,131 survived, 470 not covered, 1,932 ignored (excluded or static). Score = (killed + timeout) / (killed + timeout + survived + not covered).
