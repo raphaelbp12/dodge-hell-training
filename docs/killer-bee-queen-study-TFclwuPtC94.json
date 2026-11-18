@@ -1,1910 +1,289 @@
 {
-  "schemaVersion": 5,
-  "encounterId": "killer-bee-queen",
-  "archetypeId": "killer-bee-queen",
-  "recordedAt": "2026-11-14T12:34:50.053Z",
-  "provenance": {
-    "sourceUrl": null,
-    "fileName": "killer-bee-queen-solo-nest-TFclwuPtC94.mp4",
-    "frameRate": 30,
-    "durationSeconds": 565.7
-  },
-  "boundaries": [
-    {
-      "timeSeconds": 301.133333,
-      "segmentId": "phase-1-honey-pond/circle-room",
-      "telegraphEndSeconds": 301.166667
-    },
-    {
-      "timeSeconds": 314.533333,
-      "segmentId": "phase-2-color-chase/yellow",
-      "telegraphEndSeconds": 316.3
-    },
-    {
-      "timeSeconds": 324.5,
-      "segmentId": "phase-2-color-chase/red",
-      "telegraphEndSeconds": 326.3
-    },
-    {
-      "timeSeconds": 334.366667,
-      "segmentId": "phase-2-color-chase/yellow",
-      "telegraphEndSeconds": 336.2
-    },
-    {
-      "timeSeconds": 340.833333,
-      "segmentId": "phase-3-pond-barrage",
-      "telegraphEndSeconds": 342.3
-    },
-    {
-      "timeSeconds": 358.833333,
-      "segmentId": "phase-4-glaive-circle",
-      "telegraphEndSeconds": 361.9
-    },
-    {
-      "timeSeconds": 370.366667,
-      "segmentId": "phase-5-color-return/red",
-      "telegraphEndSeconds": 375.6
-    },
-    {
-      "timeSeconds": 386.7,
-      "segmentId": "phase-5-color-return/yellow",
-      "telegraphEndSeconds": 388.933333
-    },
-    {
-      "timeSeconds": 395.433333,
-      "segmentId": "phase-6-nests",
-      "telegraphEndSeconds": 399.5
-    },
-    {
-      "timeSeconds": 428.566667,
-      "segmentId": "phase-7-beehemoths/blue",
-      "telegraphEndSeconds": 433.566667
-    },
-    {
-      "timeSeconds": 450.933333,
-      "segmentId": "phase-7-beehemoths/red",
-      "telegraphEndSeconds": 454.166667
-    },
-    {
-      "timeSeconds": 471.166667,
-      "segmentId": "phase-7-beehemoths/blue",
-      "telegraphEndSeconds": 474.433333
-    },
-    {
-      "timeSeconds": 491.4,
-      "segmentId": "phase-7-beehemoths/yellow",
-      "telegraphEndSeconds": 495.933333
-    },
-    {
-      "timeSeconds": 498.666667,
-      "segmentId": "phase-8-final",
-      "telegraphEndSeconds": 499.7
-    }
-  ],
-  "statusSpans": [
-    {
-      "kind": "invulnerable",
-      "inSeconds": 301.133333,
-      "outSeconds": 305.2
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 314.533333,
-      "outSeconds": 317.733333
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 324.5,
-      "outSeconds": 327.666667
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 334.366667,
-      "outSeconds": 337.566667
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 340.833333,
-      "outSeconds": 345.7
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 358.833333,
-      "outSeconds": 361.266667
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 370.366667,
-      "outSeconds": 376.633333
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 386.7,
-      "outSeconds": 388.933333
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 395.433333,
-      "outSeconds": 435.566667
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 450.933333,
-      "outSeconds": 455.933333
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 471.166667,
-      "outSeconds": 476.2
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 491.4,
-      "outSeconds": 497.866667
-    },
-    {
-      "kind": "invulnerable",
-      "inSeconds": 498.666667,
-      "outSeconds": 500.733333
-    }
-  ],
-  "tracks": [
-    {
-      "id": "blue-bomb-ring",
-      "location": {
-        "phaseId": "phase-1-honey-pond",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "blue-bomb-ring",
-        "projectile": "blue-bomb",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": [
-        {
-          "timeSeconds": 301.2,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 302,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 302.8,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 303.633333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 304.466667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 305.266667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 306.1,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 306.9,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 307.7,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 308.5,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 309.233333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 310.1,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 310.9,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 311.733333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 312.533333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 313.333333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 314.2,
-          "kind": "volley"
-        }
-      ]
-    },
-    {
-      "id": "white-bomb-targeted",
-      "location": {
-        "phaseId": "phase-1-honey-pond",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "white-bomb-targeted",
-        "projectile": "white-bomb-v1",
-        "tuningSource": "trainer-authored",
-        "target": "player",
-        "pattern": {
-          "kind": "spread",
-          "shots": 1,
-          "arcDegrees": 0,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.1,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": [
-        {
-          "timeSeconds": 301.2,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 304.266667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 307.166667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 310.3,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 313.366667,
-          "kind": "volley"
-        }
-      ]
-    },
-    {
-      "id": "red-stinger-spread",
-      "location": {
-        "phaseId": "phase-1-honey-pond",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "red-stinger-spread",
-        "projectile": "red-stinger-large-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 30,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.75,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": [
-        {
-          "timeSeconds": 301.166667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 305.233333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 307.266667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 309.233333,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 311.266667,
-          "kind": "volley"
-        },
-        {
-          "timeSeconds": 313.333333,
-          "kind": "volley"
-        }
-      ]
-    },
-    {
-      "id": "blue-stinger-spread",
-      "location": {
-        "phaseId": "phase-1-honey-pond",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "blue-stinger-spread",
-        "projectile": "blue-stinger-large",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 30,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.75,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-stinger-spread",
-      "location": {
-        "phaseId": "phase-1-honey-pond",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "yellow-stinger-spread",
-        "projectile": "yellow-stinger-small-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 30,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.75,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-stinger-spread-2",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-stinger-spread",
-        "projectile": "red-stinger-small",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 40,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.7,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-stinger-large-directed",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-stinger-large-directed",
-        "projectile": "red-stinger-large-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 1,
-          "arcDegrees": 0,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-bomb-ring",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-bomb-ring",
-        "projectile": "red-bomb-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 3.4,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-stinger-large-directed",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-stinger-large-directed",
-        "projectile": "blue-stinger-large",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 1,
-          "arcDegrees": 0,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-stinger-spiral",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-stinger-spiral",
-        "projectile": "blue-stinger-small-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 2,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 60
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.85,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-ball-scatter",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-ball-scatter",
-        "projectile": "blue-ball-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "scatter",
-          "shots": 10,
-          "coneDegrees": 360,
-          "aim": "fixed",
-          "fixedBearingDegrees": 0,
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.7,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-bomb-ring-2",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-bomb-ring",
-        "projectile": "blue-bomb",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 3.4,
-          "initialDelaySeconds": 2.12
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-stinger-spread-2",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-stinger-spread",
-        "projectile": "yellow-stinger-large",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 40,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.7,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-ball-spiral",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-ball-spiral",
-        "projectile": "yellow-ball-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 3,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": -50
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "white-bomb-ring",
-      "location": {
-        "phaseId": "phase-2-color-chase",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "white-bomb-ring",
-        "projectile": "white-bomb-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 12,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 3.4,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-ball-spiral-cw",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "blue-ball-spiral-cw",
-        "projectile": "blue-ball-v2",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 3,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 37.5
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.4,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-ball-spiral-ccw",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "blue-ball-spiral-ccw",
-        "projectile": "blue-ball-v2",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 3,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 60,
-          "clockwiseDegreesPerSecond": -37.5
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.4,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-ball-spiral-cw",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "red-ball-spiral-cw",
-        "projectile": "red-ball",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 2,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 40
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.4,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-ball-ring-frequent",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "yellow-ball-ring-frequent",
-        "projectile": "yellow-ball-v1",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.5,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "bee-shot-burst-occasional",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "bee-shot-burst-occasional",
-        "projectile": "bee-shot",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 3.04,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "white-bomb-compass-ring",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "white-bomb-compass-ring",
-        "projectile": "white-bomb-v1",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 3.23,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-glaive-wave",
-      "location": {
-        "phaseId": "phase-3-pond-barrage",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "red-glaive-wave",
-        "projectile": "red-glaive-v1",
-        "tuningSource": "video-observation",
-        "pattern": {
-          "kind": "ring",
-          "arms": 60,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 6.02,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-glaive-spread-ring",
-      "location": {
-        "phaseId": "phase-4-glaive-circle",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "yellow-glaive-spread-ring",
-        "projectile": "yellow-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0,
-          "perBurstAdvanceDegrees": 7
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.3,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-glaive-spread-ring",
-      "location": {
-        "phaseId": "phase-4-glaive-circle",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "red-glaive-spread-ring",
-        "projectile": "red-glaive-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 30,
-          "clockwiseDegreesPerSecond": 0,
-          "perBurstAdvanceDegrees": 11
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.3,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-glaive-spread-ring",
-      "location": {
-        "phaseId": "phase-4-glaive-circle",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "blue-glaive-spread-ring",
-        "projectile": "blue-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 60,
-          "clockwiseDegreesPerSecond": 0,
-          "perBurstAdvanceDegrees": 13
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.3,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "hive-spiral-shot-shotgun",
-      "location": {
-        "phaseId": "phase-4-glaive-circle",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "hive-spiral-shot-shotgun",
-        "projectile": "hive-spiral-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 20,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-ball-stream-scatter",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-ball-stream-scatter",
-        "projectile": "red-ball",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "scatter",
-          "shots": 6,
-          "coneDegrees": 150,
-          "aim": "fixed",
-          "fixedBearingDegrees": 0,
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.05,
-          "initialDelaySeconds": 0.42
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-glaive-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-glaive-ring",
-        "projectile": "red-glaive-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-hive-spiral-shotgun",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-hive-spiral-shotgun",
-        "projectile": "hive-spiral-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 20,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-stinger-large-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-stinger-large-ring",
-        "projectile": "red-stinger-large-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 22.5,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 2.55
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-ball-all-directions-scatter",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-ball-all-directions-scatter",
-        "projectile": "blue-ball-v3",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "scatter",
-          "shots": 12,
-          "coneDegrees": 360,
-          "aim": "fixed",
-          "fixedBearingDegrees": 0,
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.05,
-          "initialDelaySeconds": 0.42
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-glaive-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-glaive-ring",
-        "projectile": "blue-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-stinger-small-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-stinger-small-ring",
-        "projectile": "blue-stinger-small-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.4,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-hive-range-shotgun",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-hive-range-shotgun",
-        "projectile": "hive-range-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 5,
-          "arcDegrees": 60,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 2.55
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-bee-shot-spiral",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-bee-shot-spiral",
-        "projectile": "bee-shot",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 2,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": -40
-        },
-        "cadence": {
-          "shotsPerBurst": 3,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.4,
-          "initialDelaySeconds": 0.42
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-glaive-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-glaive-ring",
-        "projectile": "yellow-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.4,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-stinger-large-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-stinger-large-ring",
-        "projectile": "yellow-stinger-large",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-hive-shot-ring",
-      "location": {
-        "phaseId": "phase-5-color-return",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-hive-shot-ring",
-        "projectile": "hive-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 45,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.8,
-          "initialDelaySeconds": 2.55
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "stinger-machinegun",
-      "location": {
-        "phaseId": "phase-6-nests",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "stinger-machinegun",
-        "projectile": "red-stinger-small",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 2,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 90,
-          "clockwiseDegreesPerSecond": 12,
-          "gapSectorsDegrees": [
-            [
-              90,
-              180
-            ],
-            [
-              270,
-              0
-            ]
-          ],
-          "armSpreadDegreesPerSecond": 15,
-          "maxArmSpreadDegrees": 45
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.1,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "slowing-bee-spiral",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "slowing-bee-spiral",
-        "projectile": "bee-shot",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 1,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 40
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.36,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-ball-spiral-2",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-ball-spiral",
-        "projectile": "yellow-ball-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 1,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 90,
-          "clockwiseDegreesPerSecond": -40
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.36,
-          "initialDelaySeconds": 0.17
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-stinger-burst",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-stinger-burst",
-        "projectile": "yellow-stinger-large",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.7,
-          "initialDelaySeconds": 0.42
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "yellow-blast-burst",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "yellow-blast-burst",
-        "projectile": "hive-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 30,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.7,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "white-bomb-advance",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "yellow"
-      },
-      "attack": {
-        "id": "white-bomb-advance",
-        "projectile": "white-bomb-v2",
-        "tuningSource": "wiki-prose",
-        "pattern": {
-          "kind": "ring",
-          "arms": 4,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0,
-          "perBurstAdvanceDegrees": 15
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.5,
-          "initialDelaySeconds": 1.5
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-ball-ring",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-ball-ring",
-        "projectile": "red-ball",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "hive-spiral-ring",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "hive-spiral-ring",
-        "projectile": "hive-spiral-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 30,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 0.64
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-stinger-wide-spread",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-stinger-wide-spread",
-        "projectile": "red-stinger-large-v3",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 5,
-          "arcDegrees": 90,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "red-bomb-ring-2",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "red"
-      },
-      "attack": {
-        "id": "red-bomb-ring",
-        "projectile": "red-bomb-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 60,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.7,
-          "initialDelaySeconds": 1.91
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-glaive-spiral",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-glaive-spiral",
-        "projectile": "blue-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 2,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 50
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 0.43,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-ball-ring",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-ball-ring",
-        "projectile": "blue-ball-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 8,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 0.42
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-stinger-small-spread",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-stinger-small-spread",
-        "projectile": "blue-stinger-small-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 30,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "blue-stinger-large-spread",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "blue-stinger-large-spread",
-        "projectile": "blue-stinger-large",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "spread",
-          "shots": 3,
-          "arcDegrees": 30,
-          "aim": "player",
-          "emitterRadiusTiles": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 1.28,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "hive-range-ring",
-      "location": {
-        "phaseId": "phase-7-beehemoths",
-        "subPhaseId": "blue"
-      },
-      "attack": {
-        "id": "hive-range-ring",
-        "projectile": "hive-range-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 12,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.12,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-red-stinger-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-red-stinger-burst",
-        "projectile": "red-stinger-large-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 0,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 0
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-yellow-stinger-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-yellow-stinger-burst",
-        "projectile": "yellow-stinger-small-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 30,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 0.42
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-blue-ball-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-blue-ball-burst",
-        "projectile": "blue-ball-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 60,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 0.85
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-hive-range-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-hive-range-burst",
-        "projectile": "hive-range-shot-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 90,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 1.27
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-yellow-glaive-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-yellow-glaive-burst",
-        "projectile": "yellow-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 120,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 1.7
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-red-glaive-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-red-glaive-burst",
-        "projectile": "red-glaive-v2",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 150,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 2.12
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    },
-    {
-      "id": "final-blue-glaive-burst",
-      "location": {
-        "phaseId": "phase-8-final",
-        "subPhaseId": null
-      },
-      "attack": {
-        "id": "final-blue-glaive-burst",
-        "projectile": "blue-glaive-v1",
-        "tuningSource": "trainer-authored",
-        "pattern": {
-          "kind": "ring",
-          "arms": 6,
-          "emitterRadiusTiles": 0,
-          "initialPhaseDegrees": 180,
-          "clockwiseDegreesPerSecond": 0
-        },
-        "cadence": {
-          "shotsPerBurst": 1,
-          "shotIntervalSeconds": 0.1,
-          "cooldownAfterLastShotSeconds": 2.55,
-          "initialDelaySeconds": 2.55
-        }
-      },
-      "cadenceSource": "authored",
-      "marks": []
-    }
-  ],
-  "scratch": [],
-  "acceptedSegmentValues": {}
+"schemaVersion": 5, "encounterId": "killer-bee-queen", "archetypeId": "killer-bee-queen", "recordedAt": "2026-11-14T20:45:16.536Z",
+"provenance": {"sourceUrl": null, "fileName": "killer-bee-queen-solo-nest-TFclwuPtC94.mp4", "frameRate": 30, "durationSeconds": 565.7},
+"boundaries": [
+{"timeSeconds": 301.133333, "segmentId": "phase-1-honey-pond/circle-room", "telegraphEndSeconds": 301.166667},
+{"timeSeconds": 314.533333, "segmentId": "phase-2-color-chase/yellow", "telegraphEndSeconds": 316.3},
+{"timeSeconds": 324.5, "segmentId": "phase-2-color-chase/red", "telegraphEndSeconds": 326.3},
+{"timeSeconds": 334.366667, "segmentId": "phase-2-color-chase/yellow", "telegraphEndSeconds": 336.2},
+{"timeSeconds": 340.833333, "segmentId": "phase-3-pond-barrage", "telegraphEndSeconds": 342.3},
+{"timeSeconds": 358.833333, "segmentId": "phase-4-glaive-circle", "telegraphEndSeconds": 361.9},
+{"timeSeconds": 370.366667, "segmentId": "phase-5-color-return/red", "telegraphEndSeconds": 375.6},
+{"timeSeconds": 386.7, "segmentId": "phase-5-color-return/yellow", "telegraphEndSeconds": 388.933333},
+{"timeSeconds": 395.433333, "segmentId": "phase-6-nests", "telegraphEndSeconds": 399.5},
+{"timeSeconds": 428.566667, "segmentId": "phase-7-beehemoths/blue", "telegraphEndSeconds": 433.566667},
+{"timeSeconds": 450.933333, "segmentId": "phase-7-beehemoths/red", "telegraphEndSeconds": 454.166667},
+{"timeSeconds": 471.166667, "segmentId": "phase-7-beehemoths/blue", "telegraphEndSeconds": 474.433333},
+{"timeSeconds": 491.4, "segmentId": "phase-7-beehemoths/yellow", "telegraphEndSeconds": 495.933333},
+{"timeSeconds": 498.666667, "segmentId": "phase-8-final", "telegraphEndSeconds": 499.7}
+],
+"statusSpans": [
+{"kind": "invulnerable", "inSeconds": 301.133333, "outSeconds": 305.2},
+{"kind": "invulnerable", "inSeconds": 314.533333, "outSeconds": 317.733333},
+{"kind": "invulnerable", "inSeconds": 324.5, "outSeconds": 327.666667},
+{"kind": "invulnerable", "inSeconds": 334.366667, "outSeconds": 337.566667},
+{"kind": "invulnerable", "inSeconds": 340.833333, "outSeconds": 345.7},
+{"kind": "invulnerable", "inSeconds": 358.833333, "outSeconds": 361.266667},
+{"kind": "invulnerable", "inSeconds": 370.366667, "outSeconds": 376.633333},
+{"kind": "invulnerable", "inSeconds": 386.7, "outSeconds": 388.933333},
+{"kind": "invulnerable", "inSeconds": 395.433333, "outSeconds": 435.566667},
+{"kind": "invulnerable", "inSeconds": 450.933333, "outSeconds": 455.933333},
+{"kind": "invulnerable", "inSeconds": 471.166667, "outSeconds": 476.2},
+{"kind": "invulnerable", "inSeconds": 491.4, "outSeconds": 497.866667},
+{"kind": "invulnerable", "inSeconds": 498.666667, "outSeconds": 500.733333}
+],
+"tracks": [
+{"id": "blue-bomb-ring", "location": {"phaseId": "phase-1-honey-pond", "subPhaseId": null},
+ "attack": {"id": "blue-bomb-ring", "projectile": "blue-bomb", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 301.2, "kind": "volley"}, {"timeSeconds": 302, "kind": "volley"}, {"timeSeconds": 302.8, "kind": "volley"}, {"timeSeconds": 303.633333, "kind": "volley"}, {"timeSeconds": 304.466667, "kind": "volley"}, {"timeSeconds": 305.266667, "kind": "volley"}, {"timeSeconds": 306.1, "kind": "volley"}, {"timeSeconds": 306.9, "kind": "volley"}, {"timeSeconds": 307.7, "kind": "volley"}, {"timeSeconds": 308.5, "kind": "volley"}, {"timeSeconds": 309.233333, "kind": "volley"}, {"timeSeconds": 310.1, "kind": "volley"}, {"timeSeconds": 310.9, "kind": "volley"}, {"timeSeconds": 311.733333, "kind": "volley"}, {"timeSeconds": 312.533333, "kind": "volley"}, {"timeSeconds": 313.333333, "kind": "volley"}, {"timeSeconds": 314.2, "kind": "volley"}]},
+{"id": "white-bomb-targeted", "location": {"phaseId": "phase-1-honey-pond", "subPhaseId": null},
+ "attack": {"id": "white-bomb-targeted", "projectile": "white-bomb-v1", "tuningSource": "trainer-authored", "target": "player", "pattern": {"kind": "spread", "shots": 1, "arcDegrees": 0, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.1, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 301.2, "kind": "volley"}, {"timeSeconds": 304.266667, "kind": "volley"}, {"timeSeconds": 307.166667, "kind": "volley"}, {"timeSeconds": 310.3, "kind": "volley"}, {"timeSeconds": 313.366667, "kind": "volley"}]},
+{"id": "red-stinger-spread", "location": {"phaseId": "phase-1-honey-pond", "subPhaseId": null},
+ "attack": {"id": "red-stinger-spread", "projectile": "red-stinger-large-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 30, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.75, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 301.166667, "kind": "volley"}, {"timeSeconds": 305.233333, "kind": "volley"}, {"timeSeconds": 307.266667, "kind": "volley"}, {"timeSeconds": 309.233333, "kind": "volley"}, {"timeSeconds": 309.233333, "kind": "volley"}, {"timeSeconds": 311.266667, "kind": "volley"}, {"timeSeconds": 313.333333, "kind": "volley"}]},
+{"id": "blue-stinger-spread", "location": {"phaseId": "phase-1-honey-pond", "subPhaseId": null},
+ "attack": {"id": "blue-stinger-spread", "projectile": "blue-stinger-large", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 30, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.75, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 301.166667, "kind": "volley"}, {"timeSeconds": 301.166667, "kind": "volley"}, {"timeSeconds": 305.233333, "kind": "volley"}, {"timeSeconds": 307.266667, "kind": "volley"}, {"timeSeconds": 309.233333, "kind": "volley"}, {"timeSeconds": 311.266667, "kind": "volley"}, {"timeSeconds": 313.333333, "kind": "volley"}]},
+{"id": "yellow-stinger-spread", "location": {"phaseId": "phase-1-honey-pond", "subPhaseId": null},
+ "attack": {"id": "yellow-stinger-spread", "projectile": "yellow-stinger-small-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 30, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.75, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 301.166667, "kind": "volley"}, {"timeSeconds": 305.233333, "kind": "volley"}, {"timeSeconds": 307.266667, "kind": "volley"}, {"timeSeconds": 309.233333, "kind": "volley"}, {"timeSeconds": 311.266667, "kind": "volley"}, {"timeSeconds": 313.333333, "kind": "volley"}]},
+{"id": "red-stinger-spread-2", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "red"},
+ "attack": {"id": "red-stinger-spread", "projectile": "red-stinger-small", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 40, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.7, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 326.333333, "kind": "volley"}, {"timeSeconds": 327.3, "kind": "volley"}, {"timeSeconds": 328.3, "kind": "volley"}, {"timeSeconds": 329.333333, "kind": "volley"}, {"timeSeconds": 330.366667, "kind": "volley"}, {"timeSeconds": 331.3, "kind": "volley"}, {"timeSeconds": 332.333333, "kind": "volley"}, {"timeSeconds": 333.366667, "kind": "volley"}, {"timeSeconds": 334.4, "kind": "volley"}]},
+{"id": "red-stinger-large-directed", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "red"},
+ "attack": {"id": "red-stinger-large-directed", "projectile": "red-stinger-large-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 1, "arcDegrees": 0, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 326.3, "kind": "volley"}, {"timeSeconds": 327.3, "kind": "volley"}, {"timeSeconds": 328.3, "kind": "volley"}, {"timeSeconds": 329.333333, "kind": "volley"}, {"timeSeconds": 330.366667, "kind": "volley"}, {"timeSeconds": 331.3, "kind": "volley"}, {"timeSeconds": 332.333333, "kind": "volley"}, {"timeSeconds": 333.366667, "kind": "volley"}, {"timeSeconds": 334.4, "kind": "volley"}]},
+{"id": "red-bomb-ring", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "red"},
+ "attack": {"id": "red-bomb-ring", "projectile": "red-bomb-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 3.4, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 326.3, "kind": "volley"}, {"timeSeconds": 327.133333, "kind": "volley"}, {"timeSeconds": 327.933333, "kind": "volley"}, {"timeSeconds": 328.766667, "kind": "volley"}, {"timeSeconds": 329.566667, "kind": "volley"}, {"timeSeconds": 330.4, "kind": "volley"}, {"timeSeconds": 331.133333, "kind": "volley"}, {"timeSeconds": 331.966667, "kind": "volley"}, {"timeSeconds": 332.8, "kind": "volley"}, {"timeSeconds": 333.633333, "kind": "volley"}, {"timeSeconds": 334.433333, "kind": "volley"}]},
+{"id": "blue-stinger-large-directed", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "blue"},
+ "attack": {"id": "blue-stinger-large-directed", "projectile": "blue-stinger-large", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 1, "arcDegrees": 0, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "blue-stinger-spiral", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "blue"},
+ "attack": {"id": "blue-stinger-spiral", "projectile": "blue-stinger-small-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 60}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.85, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "blue-ball-scatter", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "blue"},
+ "attack": {"id": "blue-ball-scatter", "projectile": "blue-ball-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "scatter", "shots": 10, "coneDegrees": 360, "aim": "fixed", "fixedBearingDegrees": 0, "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.7, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "blue-bomb-ring-2", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "blue"},
+ "attack": {"id": "blue-bomb-ring", "projectile": "blue-bomb", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 3.4, "initialDelaySeconds": 2.12}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "yellow-stinger-spread-2", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-stinger-spread", "projectile": "yellow-stinger-large", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 40, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.7, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 318.366667, "kind": "volley"}, {"timeSeconds": 320.4, "kind": "volley"}, {"timeSeconds": 322.466667, "kind": "volley"}, {"timeSeconds": 324.5, "kind": "volley"}]},
+{"id": "yellow-ball-spiral", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-ball-spiral", "projectile": "yellow-ball-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 3, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": -50}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 316.733333, "kind": "volley"}, {"timeSeconds": 317.133333, "kind": "volley"}, {"timeSeconds": 317.566667, "kind": "volley"}, {"timeSeconds": 317.966667, "kind": "volley"}, {"timeSeconds": 318.366667, "kind": "volley"}, {"timeSeconds": 318.766667, "kind": "volley"}, {"timeSeconds": 319.2, "kind": "volley"}, {"timeSeconds": 319.6, "kind": "volley"}, {"timeSeconds": 320, "kind": "volley"}, {"timeSeconds": 320.4, "kind": "volley"}, {"timeSeconds": 320.833333, "kind": "volley"}, {"timeSeconds": 321.233333, "kind": "volley"}, {"timeSeconds": 321.666667, "kind": "volley"}, {"timeSeconds": 322.066667, "kind": "volley"}, {"timeSeconds": 322.466667, "kind": "volley"}, {"timeSeconds": 322.866667, "kind": "volley"}, {"timeSeconds": 323.266667, "kind": "volley"}, {"timeSeconds": 323.7, "kind": "volley"}, {"timeSeconds": 324.1, "kind": "volley"}, {"timeSeconds": 324.5, "kind": "volley"}]},
+{"id": "white-bomb-ring", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "yellow"},
+ "attack": {"id": "white-bomb-ring", "projectile": "white-bomb-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 1, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 3.4, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 317.166667, "kind": "volley"}, {"timeSeconds": 318, "kind": "volley"}, {"timeSeconds": 318.766667, "kind": "volley"}, {"timeSeconds": 319.633333, "kind": "volley"}, {"timeSeconds": 320.433333, "kind": "volley"}, {"timeSeconds": 321.266667, "kind": "volley"}, {"timeSeconds": 322.1, "kind": "volley"}, {"timeSeconds": 322.9, "kind": "volley"}, {"timeSeconds": 323.733333, "kind": "volley"}, {"timeSeconds": 324.5, "kind": "volley"}]},
+{"id": "blue-ball-spiral-cw", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "blue-ball-spiral-cw", "projectile": "blue-ball-v2", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 3, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 37.5}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.4, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 344.666667, "kind": "volley"}, {"timeSeconds": 345.066667, "kind": "volley"}, {"timeSeconds": 345.5, "kind": "volley"}, {"timeSeconds": 345.9, "kind": "volley"}, {"timeSeconds": 346.3, "kind": "volley"}, {"timeSeconds": 346.733333, "kind": "volley"}, {"timeSeconds": 347.133333, "kind": "volley"}, {"timeSeconds": 347.533333, "kind": "volley"}, {"timeSeconds": 347.933333, "kind": "volley"}, {"timeSeconds": 348.366667, "kind": "volley"}, {"timeSeconds": 348.766667, "kind": "volley"}, {"timeSeconds": 349.166667, "kind": "volley"}, {"timeSeconds": 349.566667, "kind": "volley"}, {"timeSeconds": 349.966667, "kind": "volley"}, {"timeSeconds": 350.366667, "kind": "volley"}, {"timeSeconds": 350.766667, "kind": "volley"}, {"timeSeconds": 351.2, "kind": "volley"}, {"timeSeconds": 351.6, "kind": "volley"}, {"timeSeconds": 352, "kind": "volley"}, {"timeSeconds": 352.4, "kind": "volley"}, {"timeSeconds": 352.8, "kind": "volley"}, {"timeSeconds": 353.233333, "kind": "volley"}, {"timeSeconds": 353.633333, "kind": "volley"}, {"timeSeconds": 354.033333, "kind": "volley"}, {"timeSeconds": 354.433333, "kind": "volley"}, {"timeSeconds": 354.766667, "kind": "volley"}, {"timeSeconds": 355.166667, "kind": "volley"}, {"timeSeconds": 355.566667, "kind": "volley"}, {"timeSeconds": 356, "kind": "volley"}, {"timeSeconds": 356.4, "kind": "volley"}, {"timeSeconds": 356.833333, "kind": "volley"}, {"timeSeconds": 357.233333, "kind": "volley"}, {"timeSeconds": 357.633333, "kind": "volley"}, {"timeSeconds": 358.033333, "kind": "volley"}, {"timeSeconds": 358.433333, "kind": "volley"}, {"timeSeconds": 358.833333, "kind": "volley"}]},
+{"id": "blue-ball-spiral-ccw", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "blue-ball-spiral-ccw", "projectile": "blue-ball-v2", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 3, "emitterRadiusTiles": 0, "initialPhaseDegrees": 60, "clockwiseDegreesPerSecond": -37.5}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.4, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 344.666667, "kind": "volley"}, {"timeSeconds": 345.066667, "kind": "volley"}, {"timeSeconds": 345.5, "kind": "volley"}, {"timeSeconds": 345.9, "kind": "volley"}, {"timeSeconds": 346.3, "kind": "volley"}, {"timeSeconds": 346.733333, "kind": "volley"}, {"timeSeconds": 347.133333, "kind": "volley"}, {"timeSeconds": 347.533333, "kind": "volley"}, {"timeSeconds": 347.933333, "kind": "volley"}, {"timeSeconds": 348.366667, "kind": "volley"}, {"timeSeconds": 348.766667, "kind": "volley"}, {"timeSeconds": 349.166667, "kind": "volley"}, {"timeSeconds": 349.566667, "kind": "volley"}, {"timeSeconds": 349.966667, "kind": "volley"}, {"timeSeconds": 350.366667, "kind": "volley"}, {"timeSeconds": 350.766667, "kind": "volley"}, {"timeSeconds": 351.2, "kind": "volley"}, {"timeSeconds": 351.6, "kind": "volley"}, {"timeSeconds": 352, "kind": "volley"}, {"timeSeconds": 352.4, "kind": "volley"}, {"timeSeconds": 352.8, "kind": "volley"}, {"timeSeconds": 353.233333, "kind": "volley"}, {"timeSeconds": 353.633333, "kind": "volley"}, {"timeSeconds": 354.033333, "kind": "volley"}, {"timeSeconds": 354.433333, "kind": "volley"}, {"timeSeconds": 354.766667, "kind": "volley"}, {"timeSeconds": 355.166667, "kind": "volley"}, {"timeSeconds": 355.566667, "kind": "volley"}, {"timeSeconds": 356, "kind": "volley"}, {"timeSeconds": 356.4, "kind": "volley"}, {"timeSeconds": 356.833333, "kind": "volley"}, {"timeSeconds": 357.233333, "kind": "volley"}, {"timeSeconds": 357.633333, "kind": "volley"}, {"timeSeconds": 358.033333, "kind": "volley"}, {"timeSeconds": 358.433333, "kind": "volley"}, {"timeSeconds": 358.833333, "kind": "volley"}]},
+{"id": "red-ball-spiral-cw", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "red-ball-spiral-cw", "projectile": "red-ball", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 40}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.4, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 344.666667, "kind": "volley"}, {"timeSeconds": 345.066667, "kind": "volley"}, {"timeSeconds": 345.5, "kind": "volley"}, {"timeSeconds": 345.9, "kind": "volley"}, {"timeSeconds": 346.3, "kind": "volley"}, {"timeSeconds": 346.733333, "kind": "volley"}, {"timeSeconds": 347.133333, "kind": "volley"}, {"timeSeconds": 347.533333, "kind": "volley"}, {"timeSeconds": 347.933333, "kind": "volley"}, {"timeSeconds": 348.366667, "kind": "volley"}, {"timeSeconds": 348.766667, "kind": "volley"}, {"timeSeconds": 349.166667, "kind": "volley"}, {"timeSeconds": 349.566667, "kind": "volley"}, {"timeSeconds": 349.966667, "kind": "volley"}, {"timeSeconds": 350.366667, "kind": "volley"}, {"timeSeconds": 350.766667, "kind": "volley"}, {"timeSeconds": 351.2, "kind": "volley"}, {"timeSeconds": 351.6, "kind": "volley"}, {"timeSeconds": 352, "kind": "volley"}, {"timeSeconds": 352.4, "kind": "volley"}, {"timeSeconds": 352.8, "kind": "volley"}, {"timeSeconds": 353.233333, "kind": "volley"}, {"timeSeconds": 353.633333, "kind": "volley"}, {"timeSeconds": 354.033333, "kind": "volley"}, {"timeSeconds": 354.433333, "kind": "volley"}, {"timeSeconds": 354.766667, "kind": "volley"}, {"timeSeconds": 355.166667, "kind": "volley"}, {"timeSeconds": 355.566667, "kind": "volley"}, {"timeSeconds": 356, "kind": "volley"}, {"timeSeconds": 356.4, "kind": "volley"}, {"timeSeconds": 356.833333, "kind": "volley"}, {"timeSeconds": 357.233333, "kind": "volley"}, {"timeSeconds": 357.633333, "kind": "volley"}, {"timeSeconds": 358.033333, "kind": "volley"}, {"timeSeconds": 358.433333, "kind": "volley"}, {"timeSeconds": 358.833333, "kind": "volley"}]},
+{"id": "yellow-ball-ring-frequent", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "yellow-ball-ring-frequent", "projectile": "yellow-ball-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.5, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 344.666667, "kind": "volley"}, {"timeSeconds": 347.333333, "kind": "volley"}, {"timeSeconds": 349.8, "kind": "volley"}, {"timeSeconds": 352.4, "kind": "volley"}, {"timeSeconds": 354.766667, "kind": "volley"}, {"timeSeconds": 357.233333, "kind": "volley"}]},
+{"id": "bee-shot-burst-occasional", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "bee-shot-burst-occasional", "projectile": "bee-shot", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 3.04, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 344.666667, "kind": "volley"}, {"timeSeconds": 347.733333, "kind": "volley"}, {"timeSeconds": 350.766667, "kind": "volley"}, {"timeSeconds": 353.833333, "kind": "volley"}, {"timeSeconds": 356.833333, "kind": "volley"}]},
+{"id": "white-bomb-compass-ring", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "white-bomb-compass-ring", "projectile": "white-bomb-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 3.23, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 342.3, "kind": "volley"}, {"timeSeconds": 344.666667, "kind": "volley"}, {"timeSeconds": 347.966667, "kind": "volley"}, {"timeSeconds": 351.233333, "kind": "volley"}, {"timeSeconds": 354.466667, "kind": "volley"}, {"timeSeconds": 357.566667, "kind": "volley"}]},
+{"id": "red-glaive-wave", "location": {"phaseId": "phase-3-pond-barrage", "subPhaseId": null},
+ "attack": {"id": "red-glaive-wave", "projectile": "red-glaive-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 60, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 6.02, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 343.733333, "kind": "volley"}, {"timeSeconds": 349.766667, "kind": "volley"}, {"timeSeconds": 355.8, "kind": "volley"}]},
+{"id": "yellow-glaive-spread-ring", "location": {"phaseId": "phase-4-glaive-circle", "subPhaseId": null},
+ "attack": {"id": "yellow-glaive-spread-ring", "projectile": "yellow-glaive-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0, "perBurstAdvanceDegrees": 7}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.3, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 361.9, "kind": "volley"}, {"timeSeconds": 363.3, "kind": "volley"}, {"timeSeconds": 364.733333, "kind": "volley"}, {"timeSeconds": 366.333333, "kind": "volley"}, {"timeSeconds": 367.766667, "kind": "volley"}, {"timeSeconds": 369.166667, "kind": "volley"}]},
+{"id": "red-glaive-spread-ring", "location": {"phaseId": "phase-4-glaive-circle", "subPhaseId": null},
+ "attack": {"id": "red-glaive-spread-ring", "projectile": "red-glaive-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 30, "clockwiseDegreesPerSecond": 0, "perBurstAdvanceDegrees": 11}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.3, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 361.9, "kind": "volley"}, {"timeSeconds": 363.3, "kind": "volley"}, {"timeSeconds": 364.733333, "kind": "volley"}, {"timeSeconds": 366.333333, "kind": "volley"}, {"timeSeconds": 367.766667, "kind": "volley"}, {"timeSeconds": 369.166667, "kind": "volley"}]},
+{"id": "blue-glaive-spread-ring", "location": {"phaseId": "phase-4-glaive-circle", "subPhaseId": null},
+ "attack": {"id": "blue-glaive-spread-ring", "projectile": "blue-glaive-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 60, "clockwiseDegreesPerSecond": 0, "perBurstAdvanceDegrees": 13}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.3, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 361.9, "kind": "volley"}, {"timeSeconds": 363.3, "kind": "volley"}, {"timeSeconds": 364.733333, "kind": "volley"}, {"timeSeconds": 366.333333, "kind": "volley"}, {"timeSeconds": 367.766667, "kind": "volley"}, {"timeSeconds": 369.166667, "kind": "volley"}]},
+{"id": "hive-spiral-shot-shotgun", "location": {"phaseId": "phase-4-glaive-circle", "subPhaseId": null},
+ "attack": {"id": "hive-spiral-shot-shotgun", "projectile": "hive-spiral-shot-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 20, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "red-ball-stream-scatter", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "red"},
+ "attack": {"id": "red-ball-stream-scatter", "projectile": "red-ball", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 40, "clockwiseDegreesPerSecond": 25}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.05, "initialDelaySeconds": 0.42}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 376.833333, "kind": "volley"}, {"timeSeconds": 377.033333, "kind": "volley"}, {"timeSeconds": 377.266667, "kind": "volley"}, {"timeSeconds": 377.466667, "kind": "volley"}, {"timeSeconds": 377.666667, "kind": "volley"}, {"timeSeconds": 377.866667, "kind": "volley"}, {"timeSeconds": 378.066667, "kind": "volley"}, {"timeSeconds": 378.266667, "kind": "volley"}, {"timeSeconds": 378.466667, "kind": "volley"}, {"timeSeconds": 380.3, "kind": "volley"}, {"timeSeconds": 380.5, "kind": "volley"}, {"timeSeconds": 380.7, "kind": "volley"}, {"timeSeconds": 380.9, "kind": "volley"}, {"timeSeconds": 381.1, "kind": "volley"}, {"timeSeconds": 381.3, "kind": "volley"}, {"timeSeconds": 381.5, "kind": "volley"}, {"timeSeconds": 381.766667, "kind": "volley"}, {"timeSeconds": 383.133333, "kind": "volley"}, {"timeSeconds": 383.333333, "kind": "volley"}, {"timeSeconds": 383.533333, "kind": "volley"}, {"timeSeconds": 383.733333, "kind": "volley"}, {"timeSeconds": 384, "kind": "volley"}, {"timeSeconds": 384.266667, "kind": "volley"}, {"timeSeconds": 385.5, "kind": "volley"}, {"timeSeconds": 385.7, "kind": "volley"}, {"timeSeconds": 385.9, "kind": "volley"}, {"timeSeconds": 386.1, "kind": "volley"}, {"timeSeconds": 386.3, "kind": "volley"}, {"timeSeconds": 386.5, "kind": "volley"}, {"timeSeconds": 386.7, "kind": "volley"}]},
+{"id": "red-glaive-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "red"},
+ "attack": {"id": "red-glaive-ring", "projectile": "red-glaive-v2", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 15, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 375.633333, "kind": "volley"}, {"timeSeconds": 380.9, "kind": "volley"}, {"timeSeconds": 386.1, "kind": "volley"}]},
+{"id": "red-hive-spiral-shotgun", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "red"},
+ "attack": {"id": "red-hive-spiral-shotgun", "projectile": "hive-spiral-shot-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 3, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "spread", "shots": 3, "arcDegrees": 30}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 376.833333, "kind": "volley"}, {"timeSeconds": 379.9, "kind": "volley"}, {"timeSeconds": 385.9, "kind": "volley"}]},
+{"id": "red-stinger-large-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "red"},
+ "attack": {"id": "red-stinger-large-ring", "projectile": "red-stinger-large-v2", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 3, "emitterRadiusTiles": 0, "initialPhaseDegrees": 22.5, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "spread", "shots": 2, "arcDegrees": 30}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 2.55}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 376.833333, "kind": "volley"}, {"timeSeconds": 380.9, "kind": "volley"}, {"timeSeconds": 384.866667, "kind": "volley"}]},
+{"id": "blue-ball-all-directions-scatter", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "blue"},
+ "attack": {"id": "blue-ball-all-directions-scatter", "projectile": "blue-ball-v3", "tuningSource": "trainer-authored", "pattern": {"kind": "scatter", "shots": 12, "coneDegrees": 360, "aim": "fixed", "fixedBearingDegrees": 0, "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.05, "initialDelaySeconds": 0.42}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "blue-glaive-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "blue"},
+ "attack": {"id": "blue-glaive-ring", "projectile": "blue-glaive-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "blue-stinger-small-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "blue"},
+ "attack": {"id": "blue-stinger-small-ring", "projectile": "blue-stinger-small-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.4, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "blue-hive-range-shotgun", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "blue"},
+ "attack": {"id": "blue-hive-range-shotgun", "projectile": "hive-range-shot-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 5, "arcDegrees": 60, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 2.55}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "yellow-bee-shot-spiral", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-bee-shot-spiral", "projectile": "bee-shot", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": -40}, "cadence": {"shotsPerBurst": 3, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.4, "initialDelaySeconds": 0.42}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 388.933333, "kind": "volley"}, {"timeSeconds": 389.166667, "kind": "volley"}, {"timeSeconds": 389.366667, "kind": "volley"}, {"timeSeconds": 389.566667, "kind": "volley"}, {"timeSeconds": 389.766667, "kind": "volley"}, {"timeSeconds": 390.8, "kind": "volley"}, {"timeSeconds": 391, "kind": "volley"}, {"timeSeconds": 391.2, "kind": "volley"}, {"timeSeconds": 391.4, "kind": "volley"}, {"timeSeconds": 391.6, "kind": "volley"}, {"timeSeconds": 391.8, "kind": "volley"}, {"timeSeconds": 392, "kind": "volley"}, {"timeSeconds": 392.2, "kind": "volley"}, {"timeSeconds": 392.4, "kind": "volley"}, {"timeSeconds": 393.433333, "kind": "volley"}, {"timeSeconds": 393.633333, "kind": "volley"}, {"timeSeconds": 393.833333, "kind": "volley"}, {"timeSeconds": 394.033333, "kind": "volley"}, {"timeSeconds": 394.233333, "kind": "volley"}, {"timeSeconds": 394.433333, "kind": "volley"}, {"timeSeconds": 394.666667, "kind": "volley"}, {"timeSeconds": 394.833333, "kind": "volley"}, {"timeSeconds": 395.033333, "kind": "volley"}]},
+{"id": "yellow-glaive-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-glaive-ring", "projectile": "yellow-glaive-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "scatter", "shots": 4, "coneDegrees": 30}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.4, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 388.933333, "kind": "volley"}, {"timeSeconds": 391.6, "kind": "volley"}, {"timeSeconds": 394.233333, "kind": "volley"}]},
+{"id": "yellow-stinger-large-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-stinger-large-ring", "projectile": "yellow-stinger-large", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 388.933333, "kind": "volley"}, {"timeSeconds": 393.033333, "kind": "volley"}]},
+{"id": "yellow-hive-shot-ring", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-hive-shot-ring", "projectile": "hive-shot-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 45, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.8, "initialDelaySeconds": 2.55}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 388.933333, "kind": "volley"}, {"timeSeconds": 391.6, "kind": "volley"}, {"timeSeconds": 395.033333, "kind": "volley"}]},
+{"id": "stinger-machinegun", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "stinger-machinegun", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": -15, "gapSectorsDegrees": [[90, 180], [270, 0]], "armSpreadDegreesPerSecond": 15, "maxArmSpreadDegrees": 45}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.1, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "slowing-bee-spiral", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "yellow"},
+ "attack": {"id": "slowing-bee-spiral", "projectile": "bee-shot", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 1, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 40}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.36, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "yellow-ball-spiral-2", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-ball-spiral", "projectile": "yellow-ball-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 1, "emitterRadiusTiles": 0, "initialPhaseDegrees": 90, "clockwiseDegreesPerSecond": -40}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.36, "initialDelaySeconds": 0.17}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "yellow-stinger-burst", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-stinger-burst", "projectile": "yellow-stinger-large", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.7, "initialDelaySeconds": 0.42}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "yellow-blast-burst", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "yellow"},
+ "attack": {"id": "yellow-blast-burst", "projectile": "hive-shot-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 30, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.7, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "white-bomb-advance", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "yellow"},
+ "attack": {"id": "white-bomb-advance", "projectile": "white-bomb-v2", "tuningSource": "wiki-prose", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0, "perBurstAdvanceDegrees": 15}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.5, "initialDelaySeconds": 1.5}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "red-ball-ring", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "red"},
+ "attack": {"id": "red-ball-ring", "projectile": "red-ball", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 454.6, "kind": "volley"}, {"timeSeconds": 455.333333, "kind": "volley"}, {"timeSeconds": 456.133333, "kind": "volley"}, {"timeSeconds": 457.166667, "kind": "volley"}, {"timeSeconds": 458.2, "kind": "volley"}]},
+{"id": "hive-spiral-ring", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "red"},
+ "attack": {"id": "hive-spiral-ring", "projectile": "hive-spiral-shot-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 30, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 0.64}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 454.2, "kind": "volley"}, {"timeSeconds": 454.933333, "kind": "volley"}, {"timeSeconds": 455.733333, "kind": "volley"}, {"timeSeconds": 457.8, "kind": "volley"}, {"timeSeconds": 458.6, "kind": "volley"}]},
+{"id": "red-stinger-wide-spread", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "red"},
+ "attack": {"id": "red-stinger-wide-spread", "projectile": "red-stinger-large-v3", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 10, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 454.133333, "kind": "volley"}, {"timeSeconds": 456.566667, "kind": "volley"}, {"timeSeconds": 458.4, "kind": "volley"}]},
+{"id": "red-bomb-ring-2", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "red"},
+ "attack": {"id": "red-bomb-ring", "projectile": "red-bomb-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 60, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.7, "initialDelaySeconds": 1.91}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 454.133333, "kind": "volley"}, {"timeSeconds": 456.366667, "kind": "volley"}, {"timeSeconds": 457.2, "kind": "volley"}]},
+{"id": "blue-glaive-spiral", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "blue"},
+ "attack": {"id": "blue-glaive-spiral", "projectile": "blue-glaive-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 3, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 50}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 0.43, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 433.566667, "kind": "volley"}, {"timeSeconds": 434.166667, "kind": "volley"}, {"timeSeconds": 434.566667, "kind": "volley"}, {"timeSeconds": 434.966667, "kind": "volley"}, {"timeSeconds": 435.4, "kind": "volley"}, {"timeSeconds": 435.8, "kind": "volley"}, {"timeSeconds": 436.2, "kind": "volley"}, {"timeSeconds": 436.6, "kind": "volley"}, {"timeSeconds": 437, "kind": "volley"}, {"timeSeconds": 437.4, "kind": "volley"}, {"timeSeconds": 437.8, "kind": "volley"}, {"timeSeconds": 438.2, "kind": "volley"}, {"timeSeconds": 438.6, "kind": "volley"}, {"timeSeconds": 439.033333, "kind": "volley"}, {"timeSeconds": 439.433333, "kind": "volley"}, {"timeSeconds": 439.833333, "kind": "volley"}, {"timeSeconds": 440.233333, "kind": "volley"}, {"timeSeconds": 440.633333, "kind": "volley"}, {"timeSeconds": 441.033333, "kind": "volley"}, {"timeSeconds": 441.466667, "kind": "volley"}, {"timeSeconds": 441.866667, "kind": "volley"}, {"timeSeconds": 442.266667, "kind": "volley"}, {"timeSeconds": 442.7, "kind": "volley"}, {"timeSeconds": 443.1, "kind": "volley"}, {"timeSeconds": 443.5, "kind": "volley"}, {"timeSeconds": 443.9, "kind": "volley"}, {"timeSeconds": 444.2, "kind": "volley"}, {"timeSeconds": 444.633333, "kind": "volley"}, {"timeSeconds": 445.033333, "kind": "volley"}, {"timeSeconds": 445.433333, "kind": "volley"}, {"timeSeconds": 445.833333, "kind": "volley"}, {"timeSeconds": 446.233333, "kind": "volley"}, {"timeSeconds": 446.666667, "kind": "volley"}, {"timeSeconds": 447.066667, "kind": "volley"}, {"timeSeconds": 447.466667, "kind": "volley"}, {"timeSeconds": 447.866667, "kind": "volley"}, {"timeSeconds": 448.266667, "kind": "volley"}, {"timeSeconds": 448.7, "kind": "volley"}, {"timeSeconds": 449.1, "kind": "volley"}, {"timeSeconds": 449.533333, "kind": "volley"}, {"timeSeconds": 449.933333, "kind": "volley"}, {"timeSeconds": 450.333333, "kind": "volley"}, {"timeSeconds": 450.733333, "kind": "volley"}]},
+{"id": "blue-ball-ring", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "blue"},
+ "attack": {"id": "blue-ball-ring", "projectile": "blue-ball-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 25}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 0.42}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 433.566667, "kind": "volley"}, {"timeSeconds": 434.166667, "kind": "volley"}, {"timeSeconds": 434.566667, "kind": "volley"}, {"timeSeconds": 434.966667, "kind": "volley"}, {"timeSeconds": 435.4, "kind": "volley"}, {"timeSeconds": 435.8, "kind": "volley"}, {"timeSeconds": 436.2, "kind": "volley"}, {"timeSeconds": 436.6, "kind": "volley"}, {"timeSeconds": 437, "kind": "volley"}, {"timeSeconds": 437.4, "kind": "volley"}, {"timeSeconds": 437.8, "kind": "volley"}, {"timeSeconds": 438.2, "kind": "volley"}, {"timeSeconds": 438.6, "kind": "volley"}, {"timeSeconds": 439.033333, "kind": "volley"}, {"timeSeconds": 439.433333, "kind": "volley"}, {"timeSeconds": 439.833333, "kind": "volley"}, {"timeSeconds": 440.233333, "kind": "volley"}, {"timeSeconds": 440.633333, "kind": "volley"}, {"timeSeconds": 441.033333, "kind": "volley"}, {"timeSeconds": 441.466667, "kind": "volley"}, {"timeSeconds": 441.866667, "kind": "volley"}, {"timeSeconds": 442.266667, "kind": "volley"}, {"timeSeconds": 442.7, "kind": "volley"}, {"timeSeconds": 443.1, "kind": "volley"}, {"timeSeconds": 443.5, "kind": "volley"}, {"timeSeconds": 443.9, "kind": "volley"}, {"timeSeconds": 444.2, "kind": "volley"}, {"timeSeconds": 444.633333, "kind": "volley"}, {"timeSeconds": 445.033333, "kind": "volley"}, {"timeSeconds": 445.433333, "kind": "volley"}, {"timeSeconds": 445.833333, "kind": "volley"}, {"timeSeconds": 446.233333, "kind": "volley"}, {"timeSeconds": 446.666667, "kind": "volley"}, {"timeSeconds": 447.066667, "kind": "volley"}, {"timeSeconds": 447.466667, "kind": "volley"}, {"timeSeconds": 447.866667, "kind": "volley"}, {"timeSeconds": 448.266667, "kind": "volley"}, {"timeSeconds": 448.7, "kind": "volley"}, {"timeSeconds": 449.1, "kind": "volley"}, {"timeSeconds": 449.533333, "kind": "volley"}, {"timeSeconds": 449.933333, "kind": "volley"}, {"timeSeconds": 450.333333, "kind": "volley"}, {"timeSeconds": 450.733333, "kind": "volley"}]},
+{"id": "blue-stinger-small-spread", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "blue"},
+ "attack": {"id": "blue-stinger-small-spread", "projectile": "blue-stinger-small-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "spread", "shots": 3, "arcDegrees": 30, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 437.4, "kind": "volley"}, {"timeSeconds": 441.666667, "kind": "volley"}, {"timeSeconds": 445.633333, "kind": "volley"}]},
+{"id": "blue-stinger-large-spread", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "blue"},
+ "attack": {"id": "blue-stinger-large-spread", "projectile": "blue-stinger-large", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 8, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1.28, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 437.4, "kind": "volley"}, {"timeSeconds": 441.666667, "kind": "volley"}, {"timeSeconds": 445.633333, "kind": "volley"}]},
+{"id": "hive-range-ring", "location": {"phaseId": "phase-7-beehemoths", "subPhaseId": "blue"},
+ "attack": {"id": "hive-range-ring", "projectile": "hive-range-shot-v1", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 16, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.12, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored",
+ "marks": [{"timeSeconds": 433.566667, "kind": "volley"}, {"timeSeconds": 441.666667, "kind": "volley"}, {"timeSeconds": 449.7, "kind": "volley"}]},
+{"id": "final-red-stinger-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-red-stinger-burst", "projectile": "red-stinger-large-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 0}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "final-yellow-stinger-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-yellow-stinger-burst", "projectile": "yellow-stinger-small-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 30, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 0.42}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "final-blue-ball-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-blue-ball-burst", "projectile": "blue-ball-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 60, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 0.85}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "final-hive-range-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-hive-range-burst", "projectile": "hive-range-shot-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 90, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 1.27}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "final-yellow-glaive-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-yellow-glaive-burst", "projectile": "yellow-glaive-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 120, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 1.7}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "final-red-glaive-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-red-glaive-burst", "projectile": "red-glaive-v2", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 150, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 2.12}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "final-blue-glaive-burst", "location": {"phaseId": "phase-8-final", "subPhaseId": null},
+ "attack": {"id": "final-blue-glaive-burst", "projectile": "blue-glaive-v1", "tuningSource": "trainer-authored", "pattern": {"kind": "ring", "arms": 6, "emitterRadiusTiles": 0, "initialPhaseDegrees": 180, "clockwiseDegreesPerSecond": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 2.55, "initialDelaySeconds": 2.55}},
+ "cadenceSource": "authored", "marks": []},
+{"id": "target-white-bomb", "location": {"phaseId": "phase-2-color-chase", "subPhaseId": "yellow"},
+ "attack": {"id": "target-white-bomb", "projectile": "white-bomb-v1", "tuningSource": "video-observation", "pattern": {"kind": "spread", "shots": 1, "arcDegrees": 0, "aim": "player", "emitterRadiusTiles": 0}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}, "target": "player"},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 316.333333, "kind": "volley"}, {"timeSeconds": 322.6, "kind": "volley"}]},
+{"id": "ccw-red-ball-stream-scatter", "location": {"phaseId": "phase-5-color-return", "subPhaseId": "red"},
+ "attack": {"id": "ccw-red-ball-stream-scatter", "projectile": "red-ball", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 4, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": -25}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 378.666667, "kind": "volley"}, {"timeSeconds": 378.866667, "kind": "volley"}, {"timeSeconds": 379.066667, "kind": "volley"}, {"timeSeconds": 379.3, "kind": "volley"}, {"timeSeconds": 379.5, "kind": "volley"}, {"timeSeconds": 379.7, "kind": "volley"}, {"timeSeconds": 379.9, "kind": "volley"}, {"timeSeconds": 380.1, "kind": "volley"}, {"timeSeconds": 381.966667, "kind": "volley"}, {"timeSeconds": 382.166667, "kind": "volley"}, {"timeSeconds": 382.333333, "kind": "volley"}, {"timeSeconds": 382.533333, "kind": "volley"}, {"timeSeconds": 382.733333, "kind": "volley"}, {"timeSeconds": 382.933333, "kind": "volley"}, {"timeSeconds": 384.466667, "kind": "volley"}, {"timeSeconds": 384.666667, "kind": "volley"}, {"timeSeconds": 384.866667, "kind": "volley"}, {"timeSeconds": 385.066667, "kind": "volley"}, {"timeSeconds": 385.3, "kind": "volley"}]},
+{"id": "machine-gun", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "machine-gun", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "scatter", "shots": 1, "coneDegrees": 30}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 399.5, "kind": "volley"}, {"timeSeconds": 399.7, "kind": "volley"}]},
+{"id": "machine-gun-9-shots", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "machine-gun-9-shots", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 10, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "scatter", "shots": 3, "coneDegrees": 30}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 399.9, "kind": "volley"}, {"timeSeconds": 400.1, "kind": "volley"}, {"timeSeconds": 400.1, "kind": "volley"}]},
+{"id": "machine-gun-5-shots", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "machine-gun-5-shots", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 20, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "scatter", "shots": 5, "coneDegrees": 50}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 400.3, "kind": "volley"}, {"timeSeconds": 400.5, "kind": "volley"}]},
+{"id": "machine-gun-7-shots", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "machine-gun-7-shots", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 30, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "scatter", "shots": 7, "coneDegrees": 70}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 400.7, "kind": "volley"}, {"timeSeconds": 400.9, "kind": "volley"}]},
+{"id": "machine-gun-9true-shots", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "machine-gun-9true-shots", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 40, "clockwiseDegreesPerSecond": 0, "armPattern": {"kind": "scatter", "shots": 9, "coneDegrees": 90}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 401.1, "kind": "volley"}, {"timeSeconds": 401.3, "kind": "volley"}]},
+{"id": "machine-gun-10-shots", "location": {"phaseId": "phase-6-nests", "subPhaseId": null},
+ "attack": {"id": "machine-gun-10-shots", "projectile": "red-stinger-small", "tuningSource": "video-observation", "pattern": {"kind": "ring", "arms": 2, "emitterRadiusTiles": 0, "initialPhaseDegrees": 0, "clockwiseDegreesPerSecond": 30, "armPattern": {"kind": "scatter", "shots": 10, "coneDegrees": 100}}, "cadence": {"shotsPerBurst": 1, "shotIntervalSeconds": 0.1, "cooldownAfterLastShotSeconds": 1, "initialDelaySeconds": 0}},
+ "cadenceSource": "typed",
+ "marks": [{"timeSeconds": 401.5, "kind": "volley"}, {"timeSeconds": 401.7, "kind": "volley"}, {"timeSeconds": 401.9, "kind": "volley"}, {"timeSeconds": 402.1, "kind": "volley"}, {"timeSeconds": 402.3, "kind": "volley"}, {"timeSeconds": 402.5, "kind": "volley"}, {"timeSeconds": 402.7, "kind": "volley"}, {"timeSeconds": 402.933333, "kind": "volley"}, {"timeSeconds": 403.033333, "kind": "volley"}, {"timeSeconds": 403.233333, "kind": "volley"}, {"timeSeconds": 403.433333, "kind": "volley"}, {"timeSeconds": 403.633333, "kind": "volley"}, {"timeSeconds": 403.866667, "kind": "volley"}, {"timeSeconds": 404.066667, "kind": "volley"}, {"timeSeconds": 404.266667, "kind": "volley"}, {"timeSeconds": 404.466667, "kind": "volley"}, {"timeSeconds": 404.666667, "kind": "volley"}, {"timeSeconds": 404.866667, "kind": "volley"}, {"timeSeconds": 405.066667, "kind": "volley"}, {"timeSeconds": 405.266667, "kind": "volley"}, {"timeSeconds": 405.5, "kind": "volley"}, {"timeSeconds": 405.7, "kind": "volley"}, {"timeSeconds": 405.9, "kind": "volley"}, {"timeSeconds": 406.1, "kind": "volley"}, {"timeSeconds": 406.3, "kind": "volley"}, {"timeSeconds": 406.5, "kind": "volley"}, {"timeSeconds": 406.7, "kind": "volley"}, {"timeSeconds": 406.9, "kind": "volley"}, {"timeSeconds": 407.1, "kind": "volley"}, {"timeSeconds": 407.333333, "kind": "volley"}, {"timeSeconds": 407.533333, "kind": "volley"}, {"timeSeconds": 407.733333, "kind": "volley"}, {"timeSeconds": 407.933333, "kind": "volley"}, {"timeSeconds": 408.133333, "kind": "volley"}, {"timeSeconds": 408.333333, "kind": "volley"}, {"timeSeconds": 408.566667, "kind": "volley"}, {"timeSeconds": 408.766667, "kind": "volley"}, {"timeSeconds": 408.966667, "kind": "volley"}, {"timeSeconds": 409.166667, "kind": "volley"}, {"timeSeconds": 409.366667, "kind": "volley"}, {"timeSeconds": 409.566667, "kind": "volley"}, {"timeSeconds": 409.766667, "kind": "volley"}, {"timeSeconds": 409.966667, "kind": "volley"}, {"timeSeconds": 410.166667, "kind": "volley"}, {"timeSeconds": 410.366667, "kind": "volley"}, {"timeSeconds": 410.6, "kind": "volley"}, {"timeSeconds": 410.8, "kind": "volley"}, {"timeSeconds": 411, "kind": "volley"}, {"timeSeconds": 411.2, "kind": "volley"}, {"timeSeconds": 411.4, "kind": "volley"}, {"timeSeconds": 411.6, "kind": "volley"}, {"timeSeconds": 411.8, "kind": "volley"}, {"timeSeconds": 412, "kind": "volley"}, {"timeSeconds": 412.2, "kind": "volley"}, {"timeSeconds": 412.433333, "kind": "volley"}, {"timeSeconds": 412.633333, "kind": "volley"}, {"timeSeconds": 412.833333, "kind": "volley"}, {"timeSeconds": 413.033333, "kind": "volley"}, {"timeSeconds": 413.233333, "kind": "volley"}, {"timeSeconds": 413.433333, "kind": "volley"}, {"timeSeconds": 413.633333, "kind": "volley"}, {"timeSeconds": 413.833333, "kind": "volley"}, {"timeSeconds": 414.033333, "kind": "volley"}, {"timeSeconds": 414.166667, "kind": "volley"}, {"timeSeconds": 414.366667, "kind": "volley"}, {"timeSeconds": 414.566667, "kind": "volley"}, {"timeSeconds": 414.766667, "kind": "volley"}, {"timeSeconds": 414.966667, "kind": "volley"}, {"timeSeconds": 415.166667, "kind": "volley"}, {"timeSeconds": 415.366667, "kind": "volley"}, {"timeSeconds": 415.566667, "kind": "volley"}, {"timeSeconds": 415.866667, "kind": "volley"}, {"timeSeconds": 416.066667, "kind": "volley"}, {"timeSeconds": 416.266667, "kind": "volley"}, {"timeSeconds": 416.466667, "kind": "volley"}, {"timeSeconds": 416.666667, "kind": "volley"}, {"timeSeconds": 416.866667, "kind": "volley"}, {"timeSeconds": 417.066667, "kind": "volley"}, {"timeSeconds": 417.266667, "kind": "volley"}, {"timeSeconds": 417.366667, "kind": "volley"}, {"timeSeconds": 417.566667, "kind": "volley"}, {"timeSeconds": 417.766667, "kind": "volley"}, {"timeSeconds": 417.966667, "kind": "volley"}, {"timeSeconds": 418.2, "kind": "volley"}, {"timeSeconds": 418.4, "kind": "volley"}, {"timeSeconds": 418.6, "kind": "volley"}, {"timeSeconds": 418.8, "kind": "volley"}, {"timeSeconds": 419, "kind": "volley"}, {"timeSeconds": 419.633333, "kind": "volley"}, {"timeSeconds": 419.833333, "kind": "volley"}, {"timeSeconds": 420.033333, "kind": "volley"}, {"timeSeconds": 420.233333, "kind": "volley"}, {"timeSeconds": 420.433333, "kind": "volley"}, {"timeSeconds": 420.633333, "kind": "volley"}, {"timeSeconds": 420.833333, "kind": "volley"}, {"timeSeconds": 421.033333, "kind": "volley"}, {"timeSeconds": 421.233333, "kind": "volley"}, {"timeSeconds": 421.433333, "kind": "volley"}, {"timeSeconds": 421.633333, "kind": "volley"}, {"timeSeconds": 421.833333, "kind": "volley"}, {"timeSeconds": 422.033333, "kind": "volley"}, {"timeSeconds": 422.266667, "kind": "volley"}, {"timeSeconds": 422.466667, "kind": "volley"}, {"timeSeconds": 422.666667, "kind": "volley"}, {"timeSeconds": 422.866667, "kind": "volley"}, {"timeSeconds": 423.066667, "kind": "volley"}, {"timeSeconds": 423.266667, "kind": "volley"}, {"timeSeconds": 423.466667, "kind": "volley"}, {"timeSeconds": 423.666667, "kind": "volley"}, {"timeSeconds": 423.9, "kind": "volley"}, {"timeSeconds": 424.1, "kind": "volley"}, {"timeSeconds": 424.3, "kind": "volley"}, {"timeSeconds": 424.5, "kind": "volley"}, {"timeSeconds": 424.7, "kind": "volley"}, {"timeSeconds": 424.9, "kind": "volley"}, {"timeSeconds": 425.1, "kind": "volley"}, {"timeSeconds": 425.3, "kind": "volley"}, {"timeSeconds": 425.5, "kind": "volley"}, {"timeSeconds": 425.7, "kind": "volley"}, {"timeSeconds": 425.9, "kind": "volley"}, {"timeSeconds": 426.133333, "kind": "volley"}, {"timeSeconds": 426.333333, "kind": "volley"}, {"timeSeconds": 426.533333, "kind": "volley"}, {"timeSeconds": 426.733333, "kind": "volley"}, {"timeSeconds": 426.933333, "kind": "volley"}, {"timeSeconds": 427.133333, "kind": "volley"}, {"timeSeconds": 427.333333, "kind": "volley"}, {"timeSeconds": 427.533333, "kind": "volley"}, {"timeSeconds": 427.733333, "kind": "volley"}, {"timeSeconds": 427.933333, "kind": "volley"}, {"timeSeconds": 428.133333, "kind": "volley"}, {"timeSeconds": 428.366667, "kind": "volley"}, {"timeSeconds": 428.566667, "kind": "volley"}]}
+],
+"scratch": [],
+"acceptedSegmentValues": {}
 }

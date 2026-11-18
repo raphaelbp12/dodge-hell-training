@@ -120,23 +120,23 @@
  },
  {
   "second": 18,
-  "digest": "c0266de9",
+  "digest": "71e5af90",
   "hits": 0,
   "detonations": 20,
-  "live": 23
- },
- {
-  "second": 19,
-  "digest": "5071d7dc",
-  "hits": 0,
-  "detonations": 26,
   "live": 28
  },
  {
-  "second": 20,
-  "digest": "c11934ca",
+  "second": 19,
+  "digest": "d40f41bd",
   "hits": 0,
   "detonations": 26,
-  "live": 34
+  "live": 38
+ },
+ {
+  "second": 20,
+  "digest": "d195b9a7",
+  "hits": 0,
+  "detonations": 26,
+  "live": 44
  }
 ]

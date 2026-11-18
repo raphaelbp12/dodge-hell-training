@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import { encounterConfigOf } from "../game/config/encounter";
@@ -37,6 +38,20 @@ const exported = (archetypeId: string, study: StudyV5) =>
       }),
     ),
   );
+
+// The user approved the committed solo-nest study as correct on 2026-11-18 and
+// asked for it in the game, so the Queen's shipped file is that study's export.
+test("the committed Killer Bee Queen study exports to the shipped Queen file unchanged", () => {
+  const committed = JSON.parse(
+    readFileSync(
+      new URL("../../../docs/killer-bee-queen-study-TFclwuPtC94.json", import.meta.url),
+      "utf8",
+    ),
+  ) as StudyV5;
+  expect(exported("killer-bee-queen", committed)).toEqual(
+    AUTHORED_MONSTER_FILES["killer-bee-queen"],
+  );
+});
 
 type RawSegment = { id: string; telegraphSeconds: number; durationSeconds?: number; attacks: { id: string; projectile: string }[] };
 type Raw = { phases: (RawSegment & { subPhases?: RawSegment[] | null })[] };
