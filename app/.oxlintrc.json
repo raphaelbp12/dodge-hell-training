@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
   "categories": { "correctness": "error", "suspicious": "error" },
-  "jsPlugins": ["./lint/test-drift.js", "./lint/determinism.js"],
+  "jsPlugins": ["./lint/test-drift.js", "./lint/determinism.js", "./lint/test-strictness.js"],
   "rules": {
     // The project uses the automatic JSX runtime (tsconfig "jsx": "react-jsx"), so React need not be in scope.
     "react/react-in-jsx-scope": "off",
@@ -12,6 +12,13 @@
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   },
   "overrides": [
+    {
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      "rules": {
+        "test-strictness/no-bare-to-throw": "error",
+        "typescript/consistent-type-assertions": ["error", { "assertionStyle": "as", "objectLiteralTypeAssertions": "never" }]
+      }
+    },
     {
       "files": ["tests/**/*.ts"],
       "rules": {

@@ -1,5 +1,14 @@
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import {
+  BENCH_MAX_RME_PERCENT,
+  noisyBenchmarks,
+  rmesOf,
+  worstRmes,
   BENCH_REGRESSION_THRESHOLD,
   bestMeans,
   calibration,
@@ -71,6 +80,37 @@ test("calibration takes the worst difference in either direction and triples it,
 
 test("calibration of an empty comparison has no difference and keeps the floor", () => {
   expect(calibration(compareBenchmarks(bestMeans([]), bestMeans([])))).toEqual({ worstDifference: 0, threshold: 0.2 });
+});
+
+test("reads rme per benchmark, keeps the worst across runs and lists those above the limit", () => {
+  const a = rmesOf([["x.json", { latency: { rme: 1 } }], ["y.json", { latency: { rme: 9 } }], ["z.json", {}]]);
+  expect([...a]).toEqual([["x", 1], ["y", 9]]);
+  const worst = worstRmes([a, rmesOf([["x.json", { latency: { rme: 6 } }]])]);
+  expect(worst.get("x")).toBe(6);
+  expect(noisyBenchmarks(worst)).toEqual(["x", "y"]);
+  expect(noisyBenchmarks(new Map([["ok", BENCH_MAX_RME_PERCENT]]))).toEqual([]);
+});
+
+test("the table shows rme and warns on a noisy benchmark without failing it", () => {
+  const result = compareBenchmarks(bestMeans([run({ a: 10 })]), bestMeans([run({ a: 10 })]));
+  const table = formatTable(result, BENCH_REGRESSION_THRESHOLD, new Map([["a", 7.25]]));
+  expect(table).toContain("| 7.3%");
+  expect(table).toContain("warning: a rme 7.3% is above 5%");
+  expect(result.regressions).toEqual([]);
+});
+
+test("calibrate mode exits nonzero and names a noisy benchmark; gate mode only warns", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bench-"));
+  const write = (name, rme) => writeFileSync(join(dir, `${name}.json`), JSON.stringify({ latency: { p50: 1, rme } }));
+  write("quiet", 1);
+  write("loud", 12);
+  const script = fileURLToPath(new URL("./bench-gate.mjs", import.meta.url));
+  const calibrate = spawnSync("node", [script, "--calibrate", "--base", dir, "--head", dir], { encoding: "utf8" });
+  expect(calibrate.status).toBe(1);
+  expect(calibrate.stdout).toContain("loud");
+  const gate = spawnSync("node", [script, "--base", dir, "--head", dir], { encoding: "utf8" });
+  expect(gate.status).toBe(0);
+  expect(gate.stdout).toContain("warning: loud");
 });
 
 test("the threshold is at least the plan's 20 percent floor", () => {

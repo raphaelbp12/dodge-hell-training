@@ -165,7 +165,7 @@ describe("fittedPreviewAt on one track", () => {
       tuningSource: "video-observation",
       pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: cooldown, initialDelaySeconds: 0 },
-    }) as AuthoredAttack;
+    }) satisfies AuthoredAttack;
 
   test("shots outlive their window's end, and none fire after it", () => {
     expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 3.9 }).frame.projectiles.length).toBeGreaterThan(0);
@@ -174,13 +174,13 @@ describe("fittedPreviewAt on one track", () => {
   });
 
   test("per-burst advance changes the bearings between bursts as in resolveBearings", () => {
-    const authored = {
+    const authored: AuthoredAttack = {
       id: "adv",
       projectile: Object.keys(queen.projectiles).find((id) => queen.projectiles[id].appearance && queen.projectiles[id].type === "bullet")!,
       tuningSource: "video-observation",
       pattern: { kind: "ring", arms: 1, emitterRadiusTiles: 0, initialPhaseDegrees: 0, clockwiseDegreesPerSecond: 0, perBurstAdvanceDegrees: 30 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
-    } as AuthoredAttack;
+    };
     const at = (time: number) => fittedOne(authored, queen, { endSeconds: 50, timeSeconds: time }).frame.projectiles;
     const spec = attackSpecFromAuthored(authored);
     const bearing = (burst: number) =>
@@ -194,14 +194,14 @@ describe("fittedPreviewAt on one track", () => {
 
   test("a targeted bomb lands at the player point", () => {
     const bomb = Object.keys(queen.projectiles).find((id) => queen.projectiles[id].type === "bomb" && queen.projectiles[id].appearance)!;
-    const authored = {
+    const authored: AuthoredAttack = {
       id: "bomb",
       projectile: bomb,
       tuningSource: "video-observation",
       target: "player",
       pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 30, initialDelaySeconds: 0 },
-    } as AuthoredAttack;
+    };
     const spec = queen.projectiles[bomb];
     const travel = spec.type === "bomb" ? spec.travelSeconds : 0;
     const { frame } = fittedOne(authored, queen, { endSeconds: 50, timeSeconds: travel + 0.01, playerTiles: { x: 3, y: 2 } });
@@ -212,13 +212,13 @@ describe("fittedPreviewAt on one track", () => {
     const worm = encounterConfigOf("crystal-worm");
     const noSprite = Object.keys(worm.projectiles).find((id) => !worm.projectiles[id].appearance);
     expect(noSprite).toBeDefined();
-    const authored = {
+    const authored: AuthoredAttack = {
       id: "blank",
-      projectile: noSprite,
+      projectile: noSprite!,
       tuningSource: "video-observation",
       pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
       cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
-    } as AuthoredAttack;
+    };
     const result = fittedOne(authored, worm, { endSeconds: 50, timeSeconds: 2 });
     expect(result.undrawnAttackIds).toEqual(["blank"]);
     expect(result.frame.projectiles).toHaveLength(0);
@@ -230,13 +230,13 @@ describe("fittedPreviewAt against the simulation", () => {
     const projectile = Object.keys(queen.projectiles).find(
       (id) => queen.projectiles[id].type === "bullet" && queen.projectiles[id].appearance,
     )!;
-    const authored = {
+    const authored: AuthoredAttack = {
       id: "probe",
       projectile,
       tuningSource: "video-observation",
       pattern: { kind: "ring", arms: 3, emitterRadiusTiles: 0.2, initialPhaseDegrees: 10, clockwiseDegreesPerSecond: 20 },
       cadence: { shotsPerBurst: 2, shotIntervalSeconds: 0.2, cooldownAfterLastShotSeconds: 0.9, initialDelaySeconds: 0.3 },
-    } as AuthoredAttack;
+    };
     const config = oneAttackConfig(authored);
     const phase = config.archetypes[config.primaryArchetypeId].phases[0];
     const state = createSimulation(config, 1);

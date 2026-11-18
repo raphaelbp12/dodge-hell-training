@@ -893,6 +893,44 @@ describe("pointOnRing", () => {
   });
 });
 
+describe("clockwise winding parity", () => {
+  const ccw = rect(-1, 3, -1, 1);
+  const cw = [...ccw].reverse();
+  const other = square(0.5, 5, 0.2);
+
+  test("contact distance matches", () => {
+    const direction = { x: 2, y: 1 };
+    expect(convexContactDistance(cw, square(0.5), direction)).toBeCloseTo(
+      convexContactDistance(ccw, square(0.5), direction),
+      12,
+    );
+    expect(convexContactDistance(square(0.5), cw, direction)).toBeCloseTo(
+      convexContactDistance(square(0.5), ccw, direction),
+      12,
+    );
+  });
+
+  test("swept overlap matches", () => {
+    const move = { x: 3, y: 0 };
+    expect(sweptConvexOverlap(cw, move, other, zero)).toBe(true);
+    expect(sweptConvexOverlap(ccw, move, other, zero)).toBe(true);
+    expect(sweptConvexOverlap(cw, zero, other, zero)).toBe(false);
+  });
+
+  test("arena fit and constraint match", () => {
+    expect(convexBodyFitsOctagon(cw, octagon())).toBe(
+      convexBodyFitsOctagon(ccw, octagon()),
+    );
+    const target = { x: 50, y: 3 };
+    for (const shape of [octagon(), circle(10)]) {
+      const arena = { shape, hazards: [] };
+      expect(constrainBodyToArena(cw, target, arena)).toEqual(
+        constrainBodyToArena(ccw, target, arena),
+      );
+    }
+  });
+});
+
 describe("constrainBodyToArena", () => {
   const body = square(1);
 
@@ -1138,12 +1176,19 @@ describe("convexBodyOverlapsCircle", () => {
     expect(convexBodyOverlapsCircle(clockwise, { x: 1.5, y: 0 }, 0.6)).toBe(true);
   });
 
-  // FINDING: pointInsideConvexBody assumes counter-clockwise winding, but
-  // validatedAxes accepts clockwise bodies, whose axes point outward. A circle
-  // centred inside a clockwise body then reports no overlap.
-  test.fails("clockwise body: centre inside overlaps (known winding bug)", () => {
+  // Fix from the user's 2026-11-18 decision: clockwise bodies are supported.
+  test("clockwise body: centre inside overlaps", () => {
     const clockwise = [...body].reverse();
     expect(convexBodyOverlapsCircle(clockwise, zero, 0.001)).toBe(true);
+  });
+
+  test("clockwise body: containment matches counter-clockwise off-centre", () => {
+    const ccw = rect(-1, 3, -1, 1);
+    const cw = [...ccw].reverse();
+    for (const shape of [ccw, cw]) {
+      expect(convexBodyOverlapsCircle(shape, { x: 1, y: 0.3 }, 0.01)).toBe(true);
+      expect(convexBodyOverlapsCircle(shape, { x: 4, y: 0 }, 0.5)).toBe(false);
+    }
   });
 
   test("validates inputs", () => {

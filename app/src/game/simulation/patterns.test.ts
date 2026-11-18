@@ -52,11 +52,11 @@ test("resolveBearings is pure: it does not mutate its inputs", () => {
 });
 
 test("a ring advances by perBurstAdvanceDegrees per completed burst, not per shot", () => {
-  const advancing = {
+  const advancing: RingPattern = {
     ...RING,
     clockwiseDegreesPerSecond: 0,
     perBurstAdvanceDegrees: 15,
-  } as RingPattern;
+  };
   const context: PatternContext = {
     ...baseContext,
     ringPhaseRadians: 0,
@@ -86,12 +86,12 @@ test("a ring advances by perBurstAdvanceDegrees per completed burst, not per sho
 });
 
 test("a gap sector suppresses exactly the arms inside it and no others", () => {
-  const gapped = {
+  const gapped: RingPattern = {
     ...RING,
     arms: 4,
     clockwiseDegreesPerSecond: 0,
     gapSectorsDegrees: [[0, 200]],
-  } as RingPattern;
+  };
   const bearings = resolveBearings(gapped, {
     ...baseContext,
     ringPhaseRadians: 0,
@@ -101,13 +101,13 @@ test("a gap sector suppresses exactly the arms inside it and no others", () => {
 });
 
 test("the same arm is suppressed and then fires as the ring phase sweeps it past a gap", () => {
-  const gapped = {
+  const gapped: RingPattern = {
     ...RING,
     arms: 2,
     initialPhaseRadians: 0,
     clockwiseDegreesPerSecond: 0,
     gapSectorsDegrees: [[0, 90]],
-  } as RingPattern;
+  };
   const atEpoch = resolveBearings(gapped, {
     ...baseContext,
     ringPhaseRadians: 0,
@@ -128,17 +128,17 @@ test("the same arm is suppressed and then fires as the ring phase sweeps it past
 
 test("a gap sector travels with the pattern's authored initial phase", () => {
   const gaps = [[0, 10]] as const;
-  const rotated = {
+  const rotated: RingPattern = {
     ...RING,
     arms: 2,
     initialPhaseRadians: degrees(90),
     clockwiseDegreesPerSecond: 0,
     gapSectorsDegrees: gaps,
-  } as RingPattern;
-  const unrotated = {
+  };
+  const unrotated: RingPattern = {
     ...rotated,
     initialPhaseRadians: 0,
-  } as RingPattern;
+  };
   const context: PatternContext = {
     ...baseContext,
     ringPhaseRadians: degrees(90),
@@ -154,13 +154,13 @@ test("a gap sector travels with the pattern's authored initial phase", () => {
 });
 
 test("a gap sector wraps across zero degrees", () => {
-  const gapped = {
+  const gapped: RingPattern = {
     ...RING,
     arms: 4,
     initialPhaseRadians: 0,
     clockwiseDegreesPerSecond: 0,
     gapSectorsDegrees: [[350, 10]],
-  } as RingPattern;
+  };
   const bearings = resolveBearings(gapped, {
     ...baseContext,
     ringPhaseRadians: 0,
@@ -175,14 +175,14 @@ test("a gap sector wraps across zero degrees", () => {
 });
 
 test("arm spread grows linearly from zero with the attack clock's elapsed seconds and clamps at the maximum", () => {
-  const spreading = {
+  const spreading: RingPattern = {
     ...RING,
     arms: 2,
     initialPhaseRadians: 0,
     clockwiseDegreesPerSecond: 0,
     armSpreadDegreesPerSecond: 10,
     maxArmSpreadDegrees: 45,
-  } as RingPattern;
+  };
   const at = (secondsSinceEpoch: number) =>
     resolveBearings(spreading, {
       ...baseContext,
@@ -232,13 +232,13 @@ test("a ring with all three options absent is byte-identical to step 20.1", () =
     expect(resolveBearings(RING, context)).toEqual(reference);
   }
 
-  const explicitlyZeroed = {
+  const explicitlyZeroed: RingPattern = {
     ...RING,
     perBurstAdvanceDegrees: 0,
     gapSectorsDegrees: [],
     armSpreadDegreesPerSecond: 0,
     maxArmSpreadDegrees: 0,
-  } as RingPattern;
+  };
   expect(
     resolveBearings(explicitlyZeroed, {
       ...baseContext,

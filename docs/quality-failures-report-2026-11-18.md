@@ -19,6 +19,29 @@ This report lists everything that failed, was flaky or was left untested while P
 | 11 | Mutation scores drifted below the ratchet with no warning | Process gap | Recorded |
 | 12 | The PR #8 branch was stacked on an unmerged branch and went stale | Process gap | Fixed: merged after re-verify |
 
+## 1a. Resolution (second pass, 2026-11-18)
+
+The user asked for every item to be fixed and decided that clockwise bodies must be supported.
+
+| # | Resolution |
+| - | ---------- |
+| 1 | `advance-shard` and `swept-overlap` now run 1,000 calls per iteration under new names (`advance-shard-x1000`, `swept-overlap-x1000`). The gate prints each benchmark's rme and warns above `BENCH_MAX_RME_PERCENT` (5); `--calibrate` fails above it. Still to do: re-run `.github/workflows/bench-calibrate.yml` (dispatching it from the agent session was refused). |
+| 2, 7, 11 | `npm test` runs with `@vitest/coverage-v8` over `MUTATE_GLOBS`, with per-directory branch and statement floors (floor(measured) - 2). New lint rule `test-strictness/no-bare-to-throw`. The config shard's new mutation score is still unmeasured: running Stryker from the agent session was refused. Run `cd app && MUTATION_SHARD=config npx stryker run`. |
+| 3 | The `simulation` shard is split into `simulation-core`, `simulation-main` and `simulation-rules`, each estimated to finish cold in about 175 minutes or less. |
+| 4 | Done in the first pass. |
+| 5 | Fixed: `pointInsideConvexBody` multiplies by the body's winding sign. Both shipped outlines are counter-clockwise, so no rules version changes. |
+| 6 | `typescript/consistent-type-assertions` forbids object-literal `as` in tests (41 fixed; one more incomplete fixture found). `AGENTS.md` asks for `npx tsc -b` after a focused test run. |
+| 8 | Heavy tests have measured timeouts, and `scripts/slow-test-reporter.mjs` fails a node run when any test uses more than half of its timeout. |
+| 9 | `failOnFlakyTests` is on in CI. The original failing test is still unknown, because its log is unreachable from here. |
+| 10 | Already fixed. |
+| 12 | Needs a repository setting, which the agent session was refused permission to change. Run the command below once. It makes `main` require these checks on an up-to-date branch. Admins can still merge with `gh pr merge --admin`. |
+
+```sh
+gh api -X PUT repos/raphaelbp12/dodge-hell-training/branches/main/protection --input - <<'EOF'
+{"required_status_checks":{"strict":true,"contexts":["Lint","Typecheck","Unit Tests","Build"]},"enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null}
+EOF
+```
+
 ## 2. Details
 
 ### 2.1 Benchmark Gate false failure (PR #8, run 44031083080)

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../../test/fixture";
 import {
   DEBUG_GROUPS,
   DEBUG_PARAMETERS,
@@ -57,17 +58,17 @@ describe("validateDebugSettings", () => {
   test("rejects a parameter outside its bounds, with the key in the message", () => {
     const parameter = DEBUG_PARAMETERS[0];
     expect(() =>
-      validateDebugSettings({ ...DEFAULT_DEBUG_SETTINGS, [parameter.key]: parameter.max + 1 } as DebugSettings),
+      validateDebugSettings(unsafeFixture<DebugSettings>({ ...DEFAULT_DEBUG_SETTINGS, [parameter.key]: parameter.max + 1 })),
     ).toThrow(new RegExp(parameter.key));
     expect(() =>
-      validateDebugSettings({ ...DEFAULT_DEBUG_SETTINGS, [parameter.key]: parameter.min - 1 } as DebugSettings),
+      validateDebugSettings(unsafeFixture<DebugSettings>({ ...DEFAULT_DEBUG_SETTINGS, [parameter.key]: parameter.min - 1 })),
     ).toThrow(RangeError);
   });
 
   test("rejects a non-finite parameter", () => {
     const parameter = DEBUG_PARAMETERS[0];
     expect(() =>
-      validateDebugSettings({ ...DEFAULT_DEBUG_SETTINGS, [parameter.key]: Number.NaN } as DebugSettings),
+      validateDebugSettings(unsafeFixture<DebugSettings>({ ...DEFAULT_DEBUG_SETTINGS, [parameter.key]: Number.NaN })),
     ).toThrow(RangeError);
   });
 
@@ -75,7 +76,7 @@ describe("validateDebugSettings", () => {
     const whole = DEBUG_PARAMETERS.find((parameter) => parameter.step === 1);
     if (!whole) return;
     expect(() =>
-      validateDebugSettings({ ...DEFAULT_DEBUG_SETTINGS, [whole.key]: whole.min + 0.5 } as DebugSettings),
+      validateDebugSettings(unsafeFixture<DebugSettings>({ ...DEFAULT_DEBUG_SETTINGS, [whole.key]: whole.min + 0.5 })),
     ).toThrow(RangeError);
   });
 

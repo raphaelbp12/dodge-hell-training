@@ -23,6 +23,9 @@ import { fileURLToPath } from "node:url";
  * Three times 3.7 is 11.1 percent, under the floor, so the floor applies.
  * These runs used the mean. The gate now compares the median, so re-run
  * `.github/workflows/bench-calibrate.yml` three times and update the figures.
+ * The calibration must also be re-run after the 2026-11-18 change that batched
+ * `advance-shard` and `swept-overlap` into `advance-shard-x1000` and
+ * `swept-overlap-x1000` and added the rme check (BENCH_MAX_RME_PERCENT).
  * Remeasure with the same workflow after a change to the benchmarks or to
  * BENCH_ROUNDS, and record the new runs here and in docs/quality-gates.md.
  */
@@ -41,6 +44,36 @@ export function typicalOf(result) {
   const { p50, mean } = result?.latency ?? {};
   if (typeof p50 === "number") return p50;
   return typeof mean === "number" ? mean : null;
+}
+
+/**
+ * Largest tolerated relative margin of error (`latency.rme`, percent) of a
+ * benchmark. A noisy benchmark fails calibration (`--calibrate`) and only
+ * warns in the gate, so it is fixed in the benchmark, not on a pull request.
+ */
+export const BENCH_MAX_RME_PERCENT = 5;
+
+/** Benchmark name to `latency.rme` (percent), from `[fileName, parsedJson]` pairs; files without one are left out. */
+export function rmesOf(files) {
+  const rmes = new Map();
+  for (const [fileName, result] of files) {
+    const rme = result?.latency?.rme;
+    if (typeof rme === "number") rmes.set(fileName.replace(/\.json$/, ""), rme);
+  }
+  return rmes;
+}
+
+/** Per benchmark, the highest rme across the given runs. */
+export function worstRmes(rmeRuns) {
+  const worst = new Map();
+  for (const run of rmeRuns)
+    for (const [name, rme] of run) if (!worst.has(name) || rme > worst.get(name)) worst.set(name, rme);
+  return worst;
+}
+
+/** Names of the benchmarks whose rme is above the limit. */
+export function noisyBenchmarks(rmes, limit = BENCH_MAX_RME_PERCENT) {
+  return [...rmes].filter(([, rme]) => rme > limit).map(([name]) => name);
 }
 
 /** One run: result file name (without `.json`) to typical latency, from `[fileName, parsedJson]` pairs. */
@@ -104,15 +137,17 @@ export function calibration(result) {
 }
 
 /** The table printed to the log, one benchmark per line. */
-export function formatTable(result, threshold = BENCH_REGRESSION_THRESHOLD) {
+export function formatTable(result, threshold = BENCH_REGRESSION_THRESHOLD, rmes = new Map()) {
   if (result.message) return result.message;
-  const lines = ["benchmark | base ms | head ms | change"];
+  const lines = ["benchmark | base ms | head ms | change | rme"];
   for (const row of result.rows) {
     const flag = row.change > threshold ? "  SLOWER" : "";
     lines.push(
-      `${row.name} | ${row.base.toFixed(4)} | ${row.head.toFixed(4)} | ${(row.change * 100).toFixed(1)}%${flag}`,
+      `${row.name} | ${row.base.toFixed(4)} | ${row.head.toFixed(4)} | ${(row.change * 100).toFixed(1)}% | ${rmes.has(row.name) ? `${rmes.get(row.name).toFixed(1)}%` : "n/a"}${flag}`,
     );
   }
+  for (const name of noisyBenchmarks(rmes))
+    lines.push(`warning: ${name} rme ${rmes.get(name).toFixed(1)}% is above ${BENCH_MAX_RME_PERCENT}%`);
   for (const entry of result.skipped) lines.push(`skipped: ${entry}`);
   lines.push(`threshold: ${(threshold * 100).toFixed(0)}% slower than base`);
   return lines.join("\n");
@@ -131,31 +166,42 @@ function parseArguments(argv) {
 
 function readRuns(directories) {
   const runs = [];
+  const rmeRuns = [];
   for (const directory of directories) {
     try {
       const files = readdirSync(directory)
         .filter((name) => name.endsWith(".json"))
         .map((name) => [name, JSON.parse(readFileSync(join(directory, name), "utf8"))]);
       runs.push(runOf(files));
+      rmeRuns.push(rmesOf(files));
     } catch {
       // A missing directory means that run produced no benchmarks.
     }
   }
-  return runs;
+  return { runs, rmes: worstRmes(rmeRuns) };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { "--base": basePaths, "--head": headPaths } = parseArguments(process.argv.slice(2));
-  const base = bestMeans(readRuns(basePaths));
-  const head = bestMeans(readRuns(headPaths));
+  const baseRuns = readRuns(basePaths);
+  const headRuns = readRuns(headPaths);
+  const base = bestMeans(baseRuns.runs);
+  const head = bestMeans(headRuns.runs);
+  const rmes = worstRmes([baseRuns.rmes, headRuns.rmes]);
   const result = compareBenchmarks(base, head);
-  console.log(formatTable(result));
+  console.log(formatTable(result, BENCH_REGRESSION_THRESHOLD, rmes));
   if (process.argv.includes("--calibrate")) {
-    // Base-against-base run (.github/workflows/bench-calibrate.yml): report, never fail.
+    // Base-against-base run (.github/workflows/bench-calibrate.yml): report the
+    // threshold, but fail when a benchmark is too noisy to gate on.
     const { worstDifference, threshold } = calibration(result);
     console.log(
       `calibration: worst difference ${(worstDifference * 100).toFixed(1)}%, implied threshold ${(threshold * 100).toFixed(1)}%`,
     );
+    const noisy = noisyBenchmarks(rmes);
+    if (noisy.length > 0) {
+      console.log(`calibration failed: rme above ${BENCH_MAX_RME_PERCENT}% in ${noisy.join(", ")}`);
+      process.exit(1);
+    }
     process.exit(0);
   }
   process.exit(result.regressions.length > 0 ? 1 : 0);

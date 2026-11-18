@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import type { AuthoredAttack } from "../game/config/data";
 import type { Segment, StudyV5 } from "./study";
 import {
@@ -81,7 +82,7 @@ describe("timelineRows (plan V20 E20)", () => {
       {
         id: "bee",
         location: { phaseId: "a", subPhaseId: null },
-        attack: { id: "bee" } as AuthoredAttack,
+        attack: unsafeFixture<AuthoredAttack>({ id: "bee" }),
         cadenceSource: "authored",
         marks: [
           { timeSeconds: 25, kind: "volley" },

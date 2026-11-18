@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import {
   resolveTags,
   studyFromExport,
@@ -462,7 +463,7 @@ describe("validateObservationExport v3", () => {
     ["blank attack name", observation3([], [savedAttack({ name: " " })]), /savedAttacks\[0\]\.name/],
     [
       "a cadence with no cooldown",
-      observation3([], [savedAttack({ cadence: { shotsPerBurst: 1 } as never })]),
+      observation3([], [savedAttack({ cadence: unsafeFixture<never>({ shotsPerBurst: 1 }) })]),
       /cooldownAfterLastShotSeconds/,
     ],
     [

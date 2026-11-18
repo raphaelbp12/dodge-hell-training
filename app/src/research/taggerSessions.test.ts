@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import { ENCOUNTER_CONFIG, encounterConfigOf } from "../game/config/encounter";
 import {
   buildDraft,
@@ -82,7 +83,7 @@ function studyV5(fileName = "a.mp4", archetypeId = "killer-bee-queen"): StudyV5 
       {
         id: "bee",
         location: { phaseId: "p1", subPhaseId: null },
-        attack: { id: "bee" } as StudyV5["tracks"][number]["attack"],
+        attack: unsafeFixture<StudyV5["tracks"][number]["attack"]>({ id: "bee" }),
         cadenceSource: "authored",
         marks: [{ timeSeconds: 2, kind: "volley" }, { timeSeconds: 3, kind: "volley" }],
       },
@@ -118,7 +119,7 @@ describe("version 4 drafts (plan V20 E14)", () => {
   test("a version 4 draft with an invalid study or selection is rejected", () => {
     const bad = JSON.parse(JSON.stringify(draftV4()));
     bad.study.boundaries[0].timeSeconds = -1;
-    expect(() => validateSessionDraft(bad)).toThrow();
+    expect(() => validateSessionDraft(bad)).toThrow(/timeSeconds|boundar/i);
     expect(() => validateSessionDraft({ ...draftV4(), selectedTrackId: 3 })).toThrow(/selectedTrackId/);
   });
 

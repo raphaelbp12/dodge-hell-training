@@ -606,9 +606,9 @@ function closestPointOnSegment(
 
 /**
  * Whether a point lies on the inner side of every edge of a convex polygon.
- * `axes[i]`, as `validatedAxes` derives it, is the *inward* normal of the
- * edge starting at `vertices[i]` for this winding, so the inside test is a
- * nonnegative projection against every edge.
+ * `axes[i]`, as `validatedAxes` derives it, is the left normal of the edge
+ * starting at `vertices[i]`: inward for counter-clockwise bodies, outward for
+ * clockwise ones. The winding sign flips it so the test holds for both.
  */
 function pointInsideConvexBody(
   point: Vector2,
@@ -616,12 +616,23 @@ function pointInsideConvexBody(
   axes: readonly Vector2[],
   toleranceTiles: number,
 ): boolean {
+  const interiorSide = windingSign(verticesTiles);
   return verticesTiles.every((vertex, index) => {
     const axis = axes[index];
     const projection =
-      (point.x - vertex.x) * axis.x + (point.y - vertex.y) * axis.y;
+      ((point.x - vertex.x) * axis.x + (point.y - vertex.y) * axis.y) *
+      interiorSide;
     return projection >= -toleranceTiles;
   });
+}
+
+/** +1 for counter-clockwise, -1 for clockwise (validated convex bodies only). */
+function windingSign(verticesTiles: readonly Vector2[]): number {
+  const [first, second, third] = verticesTiles;
+  return Math.sign(
+    (second.x - first.x) * (third.y - second.y) -
+      (second.y - first.y) * (third.x - second.x),
+  );
 }
 
 /**

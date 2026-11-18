@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { unsafeFixture } from "../../test/fixture";
 import { validateAttack } from "./data";
 import {
   ENCOUNTER_CONFIG,
@@ -107,10 +108,10 @@ test.each(["phase", "sub-phase"] as const)(
 );
 
 test("a runtime spread with a nonfinite front offset is rejected", () => {
-  const bad = {
+  const bad = unsafeFixture<AttackSpec>({
     ...FRONT_ATTACK,
     pattern: { ...FRONT_ATTACK.pattern, offsetDegrees: Number.NaN },
-  } as AttackSpec;
+  });
   expect(() => validateEncounterConfig(configWith(bad, "phase", 0))).toThrow(RangeError);
 });
 

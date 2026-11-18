@@ -21,6 +21,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // Quality report item 2.9: a test that passes only on retry must fail the CI
+  // job. Retries stay so the flaky test still leaves its retry trace as evidence.
+  failOnFlakyTests: !!process.env.CI,
   workers: process.env.CI ? 1 : 2,
   reporter: "list",
   use: {
