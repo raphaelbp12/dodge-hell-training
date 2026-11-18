@@ -63,6 +63,22 @@ async function goToStep(user: ReturnType<typeof userEvent.setup>, step: keyof ty
   await user.click(within(nav).getByRole("button", { name: new RegExp(STEP_GUIDES[step].name) }));
 }
 
+test("every monster can be chosen under every encounter", async () => {
+  const user = userEvent.setup();
+  render(<TaggerRoute />);
+  const all = Object.keys(AUTHORED_MONSTER_FILES).toSorted();
+  const encounterSelect = screen.getByRole("combobox", { name: "Encounter" });
+  for (const option of within(encounterSelect).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)) {
+    await user.selectOptions(encounterSelect, option);
+    const monsters = within(screen.getByRole("combobox", { name: "Monster" }))
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(monsters.toSorted()).toEqual(all);
+  }
+  await user.selectOptions(screen.getByRole("combobox", { name: "Monster" }), "crystal-worm-child-head");
+  expect(screen.getByRole("combobox", { name: "Monster" })).toHaveValue("crystal-worm-child-head");
+});
+
 test("flow 1: a saved session is listed and restoring it loads the study", async () => {
   const user = userEvent.setup();
   render(<TaggerRoute />);

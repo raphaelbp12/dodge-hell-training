@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AUTHORED_MONSTER_FILES } from "../game/config/data";
+import { AUTHORED_MONSTER_FILES, AUTHORED_PROJECTILES } from "../game/config/data";
 import { encounterConfigOf } from "../game/config/encounter";
 import type { StudyV5 } from "./study";
 import { emptyStudy } from "./studyMigrate";
@@ -122,6 +122,21 @@ describe("monsterFileTextFromStudy", () => {
       "blue-bomb-ring-measured",
     );
   });
+
+  test("a measured variant the projectile validator rejects is refused, not exported", () => {
+    const study = studyOf("killer-bee-queen");
+    const tracks = study.tracks.map((track) =>
+      track.id === "blue-bomb-ring" ? { ...track, projectileOverride: { travelSeconds: -1 } } : track,
+    );
+    const result = monsterFileTextFromStudy({
+      archetypeId: "killer-bee-queen",
+      study: { ...study, tracks },
+      currentRawFile: AUTHORED_MONSTER_FILES["killer-bee-queen"],
+      config,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("blue-bomb-ring-measured");
+  });
 });
 
 describe("bombVariantOf", () => {
@@ -144,10 +159,16 @@ describe("bombVariantOf", () => {
     expect(variant?.entry).not.toHaveProperty("id");
   });
 
-  test("a targeted bomb's variant has no rangeTiles", () => {
-    const variant = bombVariantOf({ ...track("white-bomb-targeted"), projectileOverride: { travelSeconds: 0.7 } });
+  test("a targeted bomb's variant keeps the authored rangeTiles, even when an override names one", () => {
+    // The game ignores a targeted bomb's range, but every bomb entry must carry one (user decision 2026-11-17).
+    const targeted = track("white-bomb-targeted");
+    const authoredRange = (AUTHORED_PROJECTILES[targeted.attack.projectile] as { rangeTiles: number }).rangeTiles;
+    const variant = bombVariantOf({
+      ...targeted,
+      projectileOverride: { travelSeconds: 0.7, rangeTiles: authoredRange + 3 },
+    });
     expect(variant?.entry.travelSeconds).toBe(0.7);
-    expect(variant?.entry).not.toHaveProperty("rangeTiles");
+    expect(variant?.entry.rangeTiles).toBe(authoredRange);
   });
 });
 
