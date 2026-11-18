@@ -102,10 +102,25 @@ test.each([
   ).toThrow(/armPattern/);
 });
 
-test("shipped rings load without an armPattern", () => {
-  for (const phase of queen.archetypes[queen.primaryArchetypeId].phases)
-    for (const attack of phase.attacks)
-      expect(attack.pattern).not.toHaveProperty("armPattern");
+// The solo-nest video study the user approved on 2026-11-18 gave phase 6 six
+// machine-gun rings with a scatter per arm; every other phase-level ring
+// still loads without an armPattern.
+test("only the phase 6 machine-gun rings ship a phase-level armPattern", () => {
+  const withArmPattern = queen.archetypes[queen.primaryArchetypeId].phases.flatMap((phase) =>
+    phase.attacks
+      .filter((attack) => "armPattern" in attack.pattern)
+      .map((attack) => `${phase.id}/${attack.id}`),
+  );
+  expect(withArmPattern).toEqual(
+    [
+      "machine-gun",
+      "machine-gun-9-shots",
+      "machine-gun-5-shots",
+      "machine-gun-7-shots",
+      "machine-gun-9true-shots",
+      "machine-gun-10-shots",
+    ].map((id) => `phase-6-nests/${id}`),
+  );
 });
 
 test("a composite multiplies the worst-case live-shard bound by its shots per arm", async () => {

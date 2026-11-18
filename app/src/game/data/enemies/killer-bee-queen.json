@@ -354,7 +354,7 @@
         },
         {
           "id": "yellow",
-          "comment": "Source (23.4): 3-way spread of Large Yellow Stingers, a rotating spiral of Yellow Balls, and a non-aimed radial ring of White Bombs (Dazed) with a large arm count for 'a large number'. Spawns despawn-on-exit Yellow Killer Bees.",
+          "comment": "Source (23.4): 3-way spread of Large Yellow Stingers, a rotating spiral of Yellow Balls, and White Bombs (Dazed). The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) shows the White Bomb ring is one arm, not the earlier large arm count, and a second, player-targeted White Bomb (target-white-bomb) fires alongside it. Spawns despawn-on-exit Yellow Killer Bees.",
           "durationSeconds": 10,
           "telegraphSeconds": 1,
           "invulnerableOnEnterSeconds": 1,
@@ -399,10 +399,10 @@
             {
               "id": "white-bomb-ring",
               "projectile": "white-bomb-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 12,
+                "arms": 1,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
@@ -413,6 +413,25 @@
                 "cooldownAfterLastShotSeconds": 3.4,
                 "initialDelaySeconds": 1.7
               }
+            },
+            {
+              "id": "target-white-bomb",
+              "projectile": "white-bomb-v1",
+              "tuningSource": "video-observation",
+              "pattern": {
+                "kind": "spread",
+                "shots": 1,
+                "arcDegrees": 0,
+                "aim": "player",
+                "emitterRadiusTiles": 0
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1,
+                "initialDelaySeconds": 0
+              },
+              "target": "player"
             }
           ],
           "spawns": [
@@ -669,7 +688,7 @@
     },
     {
       "id": "phase-5-color-return",
-      "comment": "Source (23.7): at 45% HP the entrance hardens and colour attacks return, denser than phases 2-4. Each sub-phase reuses its colour's Killer Bee from 23.4. Readings: 'streams'/'messy bombardment ... in all directions' are scatter (red narrow-cone, blue full 360, akin to a Djinn's pattern); 'radial bursts' are non-rotating rings; '3-directional'/'wide, directed' shotguns are player-aimed spreads (red's phrasing matches 23.6's own Tips-sourced hive-spiral shotgun reading); '4-directional' of a radial attack (blue's Small Blue Stingers, yellow's Hive Shots) is a 4-arm ring, matching 23.6's reading of 'spreads' of glaives; 'short spiralling bursts' is a small-arm ring with a rotation rate. Fidelity gaps: the hardening entrance tiles acting as walls and the disconnect-on-colour-change mechanic are not modelled (K05, D01); the Queen's Stun vulnerability on colour switch has no effect (D05); the Plagued Nest's green sub-phase is excluded (K07).",
+      "comment": "Source (23.7): at 45% HP the entrance hardens and colour attacks return, denser than phases 2-4. Each sub-phase reuses its colour's Killer Bee from 23.4. Readings: 'streams'/'messy bombardment ... in all directions' are scatter (red narrow-cone, blue full 360, akin to a Djinn's pattern); 'radial bursts' are non-rotating rings; '3-directional'/'wide, directed' shotguns are player-aimed spreads (red's phrasing matches 23.6's own Tips-sourced hive-spiral shotgun reading); '4-directional' of a radial attack (blue's Small Blue Stingers, yellow's Hive Shots) is a 4-arm ring, matching 23.6's reading of 'spreads' of glaives; 'short spiralling bursts' is a small-arm ring with a rotation rate. Fidelity gaps: the hardening entrance tiles acting as walls and the disconnect-on-colour-change mechanic are not modelled (K05, D01); the Queen's Stun vulnerability on colour switch has no effect (D05); the Plagued Nest's green sub-phase is excluded (K07). The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) supersedes several readings above: red's Red Ball stream is two counter-rotating 4-arm rings (red-ball-stream-scatter and ccw-red-ball-stream-scatter), its glaive ring has 15 arms, and its hive-spiral shotgun and Large Red Stingers are 3-arm rings of 3- and 2-shot spreads rather than player-aimed spreads; yellow's Bee Shot spiral has 6 arms and its glaive ring fires a 4-shot scatter per arm.",
       "enterAtHpFraction": 0.45,
       "exitAfterSeconds": null,
       "telegraphSeconds": 2,
@@ -698,14 +717,13 @@
             {
               "id": "red-ball-stream-scatter",
               "projectile": "red-ball",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
-                "kind": "scatter",
-                "shots": 6,
-                "coneDegrees": 150,
-                "aim": "fixed",
-                "fixedBearingDegrees": 0,
-                "emitterRadiusTiles": 0
+                "kind": "ring",
+                "arms": 4,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 40,
+                "clockwiseDegreesPerSecond": 25
               },
               "cadence": {
                 "shotsPerBurst": 1,
@@ -717,10 +735,10 @@
             {
               "id": "red-glaive-ring",
               "projectile": "red-glaive-v2",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 8,
+                "arms": 15,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
@@ -735,13 +753,18 @@
             {
               "id": "red-hive-spiral-shotgun",
               "projectile": "hive-spiral-shot-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
-                "kind": "spread",
-                "shots": 3,
-                "arcDegrees": 20,
-                "aim": "player",
-                "emitterRadiusTiles": 0
+                "kind": "ring",
+                "arms": 3,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0,
+                "armPattern": {
+                  "kind": "spread",
+                  "shots": 3,
+                  "arcDegrees": 30
+                }
               },
               "cadence": {
                 "shotsPerBurst": 1,
@@ -753,19 +776,42 @@
             {
               "id": "red-stinger-large-ring",
               "projectile": "red-stinger-large-v2",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 8,
+                "arms": 3,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 22.5,
-                "clockwiseDegreesPerSecond": 0
+                "clockwiseDegreesPerSecond": 0,
+                "armPattern": {
+                  "kind": "spread",
+                  "shots": 2,
+                  "arcDegrees": 30
+                }
               },
               "cadence": {
                 "shotsPerBurst": 1,
                 "shotIntervalSeconds": 0.1,
                 "cooldownAfterLastShotSeconds": 2.8,
                 "initialDelaySeconds": 2.55
+              }
+            },
+            {
+              "id": "ccw-red-ball-stream-scatter",
+              "projectile": "red-ball",
+              "tuningSource": "video-observation",
+              "pattern": {
+                "kind": "ring",
+                "arms": 4,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": -25
+              },
+              "cadence": {
+                "shotsPerBurst": 1,
+                "shotIntervalSeconds": 0.1,
+                "cooldownAfterLastShotSeconds": 1,
+                "initialDelaySeconds": 0
               }
             }
           ],
@@ -894,10 +940,10 @@
             {
               "id": "yellow-bee-shot-spiral",
               "projectile": "bee-shot",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 2,
+                "arms": 6,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": -40
@@ -912,13 +958,18 @@
             {
               "id": "yellow-glaive-ring",
               "projectile": "yellow-glaive-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
                 "arms": 4,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
-                "clockwiseDegreesPerSecond": 0
+                "clockwiseDegreesPerSecond": 0,
+                "armPattern": {
+                  "kind": "scatter",
+                  "shots": 4,
+                  "coneDegrees": 30
+                }
               },
               "cadence": {
                 "shotsPerBurst": 1,
@@ -981,7 +1032,7 @@
     },
     {
       "id": "phase-6-nests",
-      "comment": "Source: at 25% HP she returns to the centre, flashing red, invulnerable for the sourced 29 seconds while 3 Nests spawn (K08: no health cost, so phase 7 re-enters at the same 25%). Step 23.8: the 2-arm gapped, spreading machinegun of red-stinger-small and the three Nests, one per colour, despawnOnExit false so they survive into phase 7.",
+      "comment": "Source: at 25% HP she returns to the centre, flashing red, invulnerable for the sourced 29 seconds while 3 Nests spawn (K08: no health cost, so phase 7 re-enters at the same 25%). Step 23.8: the 2-arm gapped, spreading machinegun of red-stinger-small and the three Nests, one per colour, despawnOnExit false so they survive into phase 7. The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) retunes the machinegun to start at 0 degrees and turn 15 degrees per second counter-clockwise, and adds six 2-arm machine-gun rings firing 1, 3, 5, 7, 9 and 10 scattered shots per arm. All seven attacks fire for the whole phase, because an authored attack has no start or end time within its phase.",
       "enterAtHpFraction": 0.25,
       "exitAfterSeconds": 29,
       "telegraphSeconds": 2,
@@ -997,13 +1048,13 @@
         {
           "id": "stinger-machinegun",
           "projectile": "red-stinger-small",
-          "tuningSource": "trainer-authored",
+          "tuningSource": "video-observation",
           "pattern": {
             "kind": "ring",
             "arms": 2,
             "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 90,
-            "clockwiseDegreesPerSecond": 12,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": -15,
             "gapSectorsDegrees": [
               [
                 90,
@@ -1021,6 +1072,144 @@
             "shotsPerBurst": 1,
             "shotIntervalSeconds": 0.1,
             "cooldownAfterLastShotSeconds": 0.1,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "machine-gun",
+          "projectile": "red-stinger-small",
+          "tuningSource": "video-observation",
+          "pattern": {
+            "kind": "ring",
+            "arms": 2,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": 0,
+            "armPattern": {
+              "kind": "scatter",
+              "shots": 1,
+              "coneDegrees": 30
+            }
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "machine-gun-9-shots",
+          "projectile": "red-stinger-small",
+          "tuningSource": "video-observation",
+          "pattern": {
+            "kind": "ring",
+            "arms": 2,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 10,
+            "clockwiseDegreesPerSecond": 0,
+            "armPattern": {
+              "kind": "scatter",
+              "shots": 3,
+              "coneDegrees": 30
+            }
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "machine-gun-5-shots",
+          "projectile": "red-stinger-small",
+          "tuningSource": "video-observation",
+          "pattern": {
+            "kind": "ring",
+            "arms": 2,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 20,
+            "clockwiseDegreesPerSecond": 0,
+            "armPattern": {
+              "kind": "scatter",
+              "shots": 5,
+              "coneDegrees": 50
+            }
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "machine-gun-7-shots",
+          "projectile": "red-stinger-small",
+          "tuningSource": "video-observation",
+          "pattern": {
+            "kind": "ring",
+            "arms": 2,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 30,
+            "clockwiseDegreesPerSecond": 0,
+            "armPattern": {
+              "kind": "scatter",
+              "shots": 7,
+              "coneDegrees": 70
+            }
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "machine-gun-9true-shots",
+          "projectile": "red-stinger-small",
+          "tuningSource": "video-observation",
+          "pattern": {
+            "kind": "ring",
+            "arms": 2,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 40,
+            "clockwiseDegreesPerSecond": 0,
+            "armPattern": {
+              "kind": "scatter",
+              "shots": 9,
+              "coneDegrees": 90
+            }
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1,
+            "initialDelaySeconds": 0
+          }
+        },
+        {
+          "id": "machine-gun-10-shots",
+          "projectile": "red-stinger-small",
+          "tuningSource": "video-observation",
+          "pattern": {
+            "kind": "ring",
+            "arms": 2,
+            "emitterRadiusTiles": 0,
+            "initialPhaseDegrees": 0,
+            "clockwiseDegreesPerSecond": 30,
+            "armPattern": {
+              "kind": "scatter",
+              "shots": 10,
+              "coneDegrees": 100
+            }
+          },
+          "cadence": {
+            "shotsPerBurst": 1,
+            "shotIntervalSeconds": 0.1,
+            "cooldownAfterLastShotSeconds": 1,
             "initialDelaySeconds": 0
           }
         }
@@ -1262,13 +1451,13 @@
             {
               "id": "red-stinger-wide-spread",
               "projectile": "red-stinger-large-v3",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
-                "kind": "spread",
-                "shots": 5,
-                "arcDegrees": 90,
-                "aim": "player",
-                "emitterRadiusTiles": 0
+                "kind": "ring",
+                "arms": 10,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
               },
               "cadence": {
                 "shotsPerBurst": 1,
@@ -1310,10 +1499,10 @@
             {
               "id": "blue-glaive-spiral",
               "projectile": "blue-glaive-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 2,
+                "arms": 3,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 50
@@ -1328,13 +1517,13 @@
             {
               "id": "blue-ball-ring",
               "projectile": "blue-ball-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 8,
+                "arms": 6,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
-                "clockwiseDegreesPerSecond": 0
+                "clockwiseDegreesPerSecond": 25
               },
               "cadence": {
                 "shotsPerBurst": 1,
@@ -1364,13 +1553,13 @@
             {
               "id": "blue-stinger-large-spread",
               "projectile": "blue-stinger-large",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
-                "kind": "spread",
-                "shots": 3,
-                "arcDegrees": 30,
-                "aim": "player",
-                "emitterRadiusTiles": 0
+                "kind": "ring",
+                "arms": 8,
+                "emitterRadiusTiles": 0,
+                "initialPhaseDegrees": 0,
+                "clockwiseDegreesPerSecond": 0
               },
               "cadence": {
                 "shotsPerBurst": 1,
@@ -1382,10 +1571,10 @@
             {
               "id": "hive-range-ring",
               "projectile": "hive-range-shot-v1",
-              "tuningSource": "trainer-authored",
+              "tuningSource": "video-observation",
               "pattern": {
                 "kind": "ring",
-                "arms": 12,
+                "arms": 16,
                 "emitterRadiusTiles": 0,
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0

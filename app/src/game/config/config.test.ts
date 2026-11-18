@@ -919,7 +919,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v12");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v13");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -929,11 +929,13 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
 });
 
 // Plan V15 N02: the Queen's rules version advanced to v12 because her targeted
-// white bomb now lands on the player. Older records (v10 and v11) must be
-// retained in storage but excluded from the new rules version's best.
-test("older Killer Bee Queen attempt records are retained but excluded from the v12 best", () => {
+// white bomb now lands on the player. It advanced to v13 on 2026-11-18 when the
+// user-approved solo-nest video study retuned and added attacks in phases 2 and
+// 5-7. Older records (v10 and v11) must be retained in storage but excluded
+// from the new rules version's best.
+test("older Killer Bee Queen attempt records are retained but excluded from the v13 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v12");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v13");
   const records = [
     {
       id: "a",
@@ -1470,8 +1472,10 @@ test("the Killer Bee Queen's phase 4 is damaging when stationary", () => {
   expect(closeState.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
 });
 
-// Step 23.7: the red sub-phase's hive shotgun is the step's own first check -
-// a three-shot player-aimed spread of hive-spiral-shot-v1, reused from 23.6.
+// Step 23.7: the red sub-phase's hive shotgun is the step's own first check.
+// Step 23.7 read it as a three-shot player-aimed spread; the solo-nest video
+// study the user approved on 2026-11-18 shows three fixed arms, each firing a
+// three-shot 30-degree spread of hive-spiral-shot-v1.
 test("the Killer Bee Queen's phase 5 red sub-phase fires the hive spiral shotgun", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
@@ -1481,9 +1485,9 @@ test("the Killer Bee Queen's phase 5 red sub-phase fires the hive spiral shotgun
   const shotgun = redSubPhase.attacks.find(
     (attack) => attack.projectileId === "hive-spiral-shot-v1",
   )!;
-  if (shotgun.pattern.kind !== "spread") throw new Error("expected spread");
-  expect(shotgun.pattern.shots).toBe(3);
-  expect(shotgun.pattern.aim).toBe("player");
+  if (shotgun.pattern.kind !== "ring") throw new Error("expected ring");
+  expect(shotgun.pattern.arms).toBe(3);
+  expect(shotgun.pattern.armPattern).toEqual({ kind: "spread", shots: 3, arcDegrees: 30 });
 });
 
 // Step 23.7: each new projectile matches its cited row.
@@ -1667,37 +1671,16 @@ test("the Killer Bee Queen's phase 6 machinegun starts vertical and spreads to 4
   ).toBeCloseTo(225, 5);
 });
 
-// Step 23.8: a player standing inside one of the two authored gap sectors
-// for the whole 29 seconds takes no hits from the machinegun, while a
-// player standing in the swept beam path is hit hard and quickly. Isolated
-// from the phase's three Nests and their chasing Worker Bees, which are
-// covered by their own dedicated tests below - this test is about the ring
-// pattern itself.
-test("the Killer Bee Queen's phase 6 machinegun is survivable in a gap and lethal in the beam", () => {
+// Step 23.8: a player standing in the swept beam path is hit hard and
+// quickly. Isolated from the phase's three Nests and their chasing Worker
+// Bees, which are covered by their own dedicated tests below - this test is
+// about the ring patterns themselves. Step 23.8 also proved a player safe in
+// a gap sector for the whole phase; the solo-nest video study the user
+// approved on 2026-11-18 added six gapless 2-arm machine-gun rings that fire
+// for the whole phase, so no gap is safe any more and that half was removed.
+test("the Killer Bee Queen's phase 6 machinegun is lethal in the beam", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const idle = { north: false, south: false, east: false, west: false };
-
-  const safe = createSimulation(queenConfig, 1, { startPhaseIndex: 5 });
-  const safeQueen = safe.enemies.find((enemy) => enemy.spawnedByEnemyId === null)!;
-  // The Queen's move-to-point takes a few seconds to reach the centre from
-  // her spawn point; place her there directly so the fixed safe bearing
-  // below holds from the very first shot.
-  safeQueen.positionTiles = { x: 0, y: 0 };
-  safe.enemies = safe.enemies.filter((enemy) => enemy.spawnedByEnemyId === null);
-  // Gap sector [90, 180] in the pattern's own frame (anchored at the 90
-  // degree initial phase) covers world bearing [180, 270] - the room's
-  // north-west quadrant, matching the source's "top-left" safe corner.
-  safe.player.positionTiles = { x: -7, y: -7 };
-  // Step 23.9 gave phase 7 real attacks, so this run must stop at the
-  // phase 6/7 boundary rather than overshoot into it, unlike before.
-  for (
-    let tick = 0;
-    tick < 2900 && safe.phase === "playing" && safeQueen.phaseIndex === 5;
-    tick++
-  )
-    advanceSimulation(safe, queenConfig.simulation.fixedStepSeconds, idle);
-  expect(safe.hitsTaken).toBe(0);
-  expect(safe.player.healthHp).toBe(PALADIN_STATS.healthHp);
 
   const exposed = createSimulation(queenConfig, 1, { startPhaseIndex: 5 });
   const exposedQueen = exposed.enemies.find(
@@ -1707,10 +1690,10 @@ test("the Killer Bee Queen's phase 6 machinegun is survivable in a gap and letha
   exposed.enemies = exposed.enemies.filter(
     (enemy) => enemy.spawnedByEnemyId === null,
   );
-  // Due south of the Queen, well inside the beam's range and outside both
-  // gaps - the arm fixed at the 90 degree initial phase sweeps straight
-  // through it at t = 0.
-  exposed.player.positionTiles = { x: 0, y: 8 };
+  // Due east of the Queen, well inside the beams' range: every machine-gun
+  // ring has an arm starting at or near bearing 0, so it is in the fire
+  // from t = 0.
+  exposed.player.positionTiles = { x: 8, y: 0 };
   for (let tick = 0; tick < 300 && exposed.phase === "playing"; tick++)
     advanceSimulation(exposed, queenConfig.simulation.fixedStepSeconds, idle);
   expect(exposed.hitsTaken).toBeGreaterThan(0);
