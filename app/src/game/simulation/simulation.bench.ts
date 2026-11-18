@@ -17,8 +17,7 @@ import { advanceSimulation, createSimulation, type SimulationState } from "./sim
 const QUEEN = encounterConfigOf("killer-bee-queen");
 const WORM = encounterConfigOf("crystal-worm");
 const SEED = 1;
-const SIMULATED_SECONDS = 10;
-/** Whole seconds each phase runs when its densest point is looked for. */
+const SIMULATED_SECONDS = 10;/** Whole seconds each phase runs when its densest point is looked for. */
 const PROBE_SECONDS = 20;
 
 const strafe: readonly SimulationInput[] = [
@@ -79,6 +78,9 @@ const largest = Object.values(QUEEN.projectiles).reduce((best, projectile) =>
 const playerBody = transformBodyVertices(QUEEN.player.verticesTiles, { x: 1, y: 0 });
 const projectileParts = transformBodyParts(largest.collisionPartsTiles, { x: -1, y: 0 }, 0.3);
 
+/** Calls per measured iteration of the microbenchmarks, so one takes roughly 0.5 to 2 ms and its rme stays low. */
+const REPEATS = 1000;
+
 /** One result file per benchmark; `scripts/bench-gate.mjs` reads the directory. */
 const resultPath = (slug: string) => `reports/bench/${slug}.json`;
 
@@ -104,9 +106,9 @@ test("simulation benchmarks", async ({ bench }) => {
     () => run(wormState, SIMULATED_SECONDS),
   );
   const advance = bench(
-    `advanceShard, one step over ${shardCount} live shards`,
+    `advanceShard, ${REPEATS} steps over ${shardCount} live shards`,
     {
-      writeResult: resultPath("advance-shard"),
+      writeResult: resultPath("advance-shard-x1000"),
       beforeEach: () => {
         shards = Array.from({ length: shardCount }, (_, index) =>
           createShard(shardTemplate, index + 1, { x: 0, y: 0 }, (index / shardCount) * 2 * Math.PI),
@@ -114,14 +116,17 @@ test("simulation benchmarks", async ({ bench }) => {
       },
     },
     () => {
-      for (const shard of shards) advanceShard(shardContext, shard, QUEEN.simulation.fixedStepSeconds, farAway, farAway);
+      for (let repeat = 0; repeat < REPEATS; repeat++)
+        for (const shard of shards)
+          advanceShard(shardContext, shard, QUEEN.simulation.fixedStepSeconds, farAway, farAway);
     },
   );
   const swept = bench(
-    `sweptConvexPartsOverlap, ${largest.id} (${largest.collisionPartsTiles.length} parts) against the player body`,
-    { writeResult: resultPath("swept-overlap") },
+    `sweptConvexPartsOverlap x${REPEATS}, ${largest.id} (${largest.collisionPartsTiles.length} parts) against the player body`,
+    { writeResult: resultPath("swept-overlap-x1000") },
     () => {
-      sweptConvexPartsOverlap(projectileParts, { x: 0.2, y: 0.05 }, playerBody, { x: -0.05, y: 0 });
+      for (let repeat = 0; repeat < REPEATS; repeat++)
+        sweptConvexPartsOverlap(projectileParts, { x: 0.2, y: 0.05 }, playerBody, { x: -0.05, y: 0 });
     },
   );
   await bench.compare(queen, worm, advance, swept);
