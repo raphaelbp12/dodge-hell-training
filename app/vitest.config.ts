@@ -5,6 +5,8 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      // Root-only option. The slow-test reporter checks the node project only.
+      reporters: ["default", "./scripts/slow-test-reporter.mjs"],
       projects: [
         {
           extends: true,
@@ -19,6 +21,7 @@ export default mergeConfig(
               "scripts/mutation-summary.test.mjs",
               "scripts/bench-gate.test.mjs",
               "scripts/mutation-shards.test.mjs",
+              "scripts/slow-test-reporter.test.mjs",
             ],
             // The simulated soak runs in its own project (`npm run test:soak:sim`).
             exclude: ["src/**/*.soak.test.ts", "node_modules/**"],

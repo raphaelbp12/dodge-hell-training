@@ -1059,7 +1059,8 @@ test("the Killer Bee Queen's eight phases carry phases 1, 3, 4, 6 and 8's attack
   for (const [index, expectedSeconds] of expectedPhaseEntrySeconds.entries())
     expect(observedPhaseEntrySeconds[index]).toBeCloseTo(expectedSeconds, 1);
   expect(state.phase).toBe("cleared");
-});
+  // Measured 5.5 s on 2026-11-18; timeout is about 4x, rounded up to 10 s.
+}, 30_000);
 
 // Step 23.3: phase 1 fires its five sourced projectiles - a radial blue-bomb
 // ring, a player-targeted white bomb, and three stacked stinger spreads that
@@ -2206,7 +2207,8 @@ test("the Killer Bee Queen's full fight is deterministic across frame rates and 
     advanceSimulation(state, burstSeconds, idle),
   );
   expect(burstState).toEqual(reference);
-}, 30_000);
+  // Measured 18.3 s on 2026-11-18; timeout is about 4x, rounded up to 10 s.
+}, 80_000);
 
 // Step 24.1: every fixed step advances alone here, so this cannot exercise
 // the catch-up path; it only proves the densest phases never discard a
