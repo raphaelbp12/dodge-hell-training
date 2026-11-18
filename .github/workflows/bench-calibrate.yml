@@ -49,7 +49,11 @@ jobs:
           done
       - name: Calibrate
         run: |
+          # --calibrate exits nonzero when a benchmark's rme is above the limit;
+          # print and summarise first, then fail with that status.
+          status=0
           node scripts/bench-gate.mjs --calibrate \
-            --base "$RUNNER_TEMP"/base-* --head "$RUNNER_TEMP"/head-* > "$RUNNER_TEMP/bench-gate.txt"
+            --base "$RUNNER_TEMP"/base-* --head "$RUNNER_TEMP"/head-* > "$RUNNER_TEMP/bench-gate.txt" || status=$?
           cat "$RUNNER_TEMP/bench-gate.txt"
           { echo '### Benchmark calibration'; echo '```'; cat "$RUNNER_TEMP/bench-gate.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
