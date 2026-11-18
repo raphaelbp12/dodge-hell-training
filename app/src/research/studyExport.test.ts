@@ -122,6 +122,21 @@ describe("monsterFileTextFromStudy", () => {
       "blue-bomb-ring-measured",
     );
   });
+
+  test("a measured variant the projectile validator rejects is refused, not exported", () => {
+    const study = studyOf("killer-bee-queen");
+    const tracks = study.tracks.map((track) =>
+      track.id === "blue-bomb-ring" ? { ...track, projectileOverride: { travelSeconds: -1 } } : track,
+    );
+    const result = monsterFileTextFromStudy({
+      archetypeId: "killer-bee-queen",
+      study: { ...study, tracks },
+      currentRawFile: AUTHORED_MONSTER_FILES["killer-bee-queen"],
+      config,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("blue-bomb-ring-measured");
+  });
 });
 
 describe("bombVariantOf", () => {
