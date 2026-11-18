@@ -5,9 +5,11 @@
  * approved change (L25).
  */
 import {
+  AUTHORED_APPEARANCES,
   AUTHORED_MONSTER_FILES,
   AUTHORED_PROJECTILES,
   validateArchetypes,
+  validateProjectile,
 } from "../game/config/data";
 import {
   attackSpecFromAuthored,
@@ -28,6 +30,8 @@ type RawPhase = RawSegment & { subPhases?: RawSegment[] | null };
 
 const fail = <T>(error: string): DraftResult<T> => ({ ok: false, error });
 
+const APPEARANCE_IDS: ReadonlySet<string> = new Set(Object.keys(AUTHORED_APPEARANCES.appearances));
+
 /** E08, E09: a projectile variant entry for a bomb track with an override, or null without one. */
 export function bombVariantOf(
   track: AttackTrack,
@@ -38,6 +42,9 @@ export function bombVariantOf(
     | undefined;
   if (!override || authored?.type !== "bomb") return null;
   const { id: _id, type, rangeTiles: authoredRange, ...rest } = authored;
+  // A targeted bomb lands on the player and ignores its range at runtime, but
+  // the projectile validator requires one on every bomb, so it keeps the
+  // authored range (user decision 2026-11-17, the former plan V22 A10 finding).
   const targeted = track.attack.target === "player";
   return {
     id: `${track.id}${MEASURED_VARIANT_SUFFIX}`,
@@ -45,7 +52,7 @@ export function bombVariantOf(
       ...rest,
       source: MEASURED_VARIANT_SOURCE,
       type,
-      ...(targeted ? {} : { rangeTiles: override.rangeTiles ?? authoredRange }),
+      rangeTiles: targeted ? authoredRange : (override.rangeTiles ?? authoredRange),
       travelSeconds: override.travelSeconds ?? authored.travelSeconds,
     },
   };
@@ -97,9 +104,20 @@ export function monsterFileTextFromStudy(
     }),
   );
   try {
+    // Each variant is checked as the game would load it from projectiles.json,
+    // so an entry the game would reject is refused here instead.
+    for (const [id, entry] of Object.entries(variants))
+      validateProjectile(entry, id, config.simulation.fixedStepSeconds, APPEARANCE_IDS);
+    // Every shipped file is re-checked with the edited one, so the catalog is
+    // every authored projectile, not one encounter's: any monster is taggable
+    // under any encounter.
     const archetypes = validateArchetypes(
       { archetypes: { ...AUTHORED_MONSTER_FILES, [archetypeId]: result } },
-      new Set([...Object.keys(config.projectiles), ...Object.keys(variants)]),
+      new Set([
+        ...Object.keys(AUTHORED_PROJECTILES),
+        ...Object.keys(config.projectiles),
+        ...Object.keys(variants),
+      ]),
       config.maxConcurrentMinions,
     );
     for (const phase of archetypes[archetypeId].phases)
