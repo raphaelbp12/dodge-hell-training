@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { unsafeFixture } from "../../test/fixture";
 import {
   encounterConfigOf,
   validateAttackSpec,
@@ -48,11 +49,14 @@ test.each([
   ],
 ])("validateAttackSpec rejects target on %s", (_name, override) => {
   expect(() =>
-    validateAttackSpec(queen, {
-      ...targeted,
-      target: "player",
-      ...override,
-    } as AttackSpec),
+    validateAttackSpec(
+      queen,
+      unsafeFixture<AttackSpec>({
+        ...targeted,
+        target: "player",
+        ...override,
+      }),
+    ),
   ).toThrow(/target|bomb/i);
 });
 

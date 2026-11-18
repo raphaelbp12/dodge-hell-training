@@ -69,7 +69,7 @@ const projectiles: Record<string, ProjectileSpec> = {
     armorPiercing: false,
     conditions: [{ key: keyOne, seconds: 2 }],
     motion: { kind: "linear", rangeTiles: 5 },
-  } as ProjectileSpec,
+  },
   pB: {
     ...baseBullet,
     id: "pB",
@@ -79,8 +79,8 @@ const projectiles: Record<string, ProjectileSpec> = {
       { key: keyOne, seconds: 5 },
       { key: keyTwo, seconds: 1 },
     ],
-    motion: { ...baseBullet.motion, kind: "wavy" },
-  } as ProjectileSpec,
+    motion: { kind: "wavy", rangeTiles: 5, amplitudeTiles: 0.5, frequencyHz: 1 },
+  },
   pC: {
     ...baseBomb,
     id: "pC",

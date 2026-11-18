@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { unsafeFixture } from "../../test/fixture";
 import { HitAudio, HIT_AUDIO_POLICY } from "./hit-audio";
 
 function context() {
@@ -90,7 +91,7 @@ test("missing, throwing and closed audio contexts never block practice", () => {
     () => {
       throw Error("unavailable");
     },
-    () => ({ state: "closed" }) as AudioContext,
+    () => unsafeFixture<AudioContext>({ state: "closed" }),
   ]) {
     const audio = new HitAudio(getter);
     expect(() => {

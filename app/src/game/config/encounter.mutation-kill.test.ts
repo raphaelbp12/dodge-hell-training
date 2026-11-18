@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../../test/fixture";
 import {
   ENCOUNTER_CONFIG,
   attackShardBound,
@@ -63,7 +64,7 @@ const cadence = {
   initialDelaySeconds: 0,
 };
 const ringAttack = (pattern: object, over: object = {}): AttackSpec =>
-  ({
+  unsafeFixture<AttackSpec>({
     id: "t",
     projectileId: bulletId,
     tuningSource: "t",
@@ -77,9 +78,9 @@ const ringAttack = (pattern: object, over: object = {}): AttackSpec =>
       ...pattern,
     },
     ...over,
-  }) as AttackSpec;
+  });
 const spreadAttack = (pattern: object, over: object = {}): AttackSpec =>
-  ({
+  unsafeFixture<AttackSpec>({
     id: "t",
     projectileId: bulletId,
     tuningSource: "t",
@@ -93,9 +94,9 @@ const spreadAttack = (pattern: object, over: object = {}): AttackSpec =>
       ...pattern,
     },
     ...over,
-  }) as AttackSpec;
+  });
 const scatterAttack = (pattern: object): AttackSpec =>
-  ({
+  unsafeFixture<AttackSpec>({
     id: "t",
     projectileId: bulletId,
     tuningSource: "t",
@@ -108,7 +109,7 @@ const scatterAttack = (pattern: object): AttackSpec =>
       emitterRadiusTiles: 0,
       ...pattern,
     },
-  }) as AttackSpec;
+  });
 
 const attackRejects = (a: AttackSpec) =>
   expect(() => validateAttackSpec(base, a)).toThrow(RangeError);
@@ -336,7 +337,7 @@ describe("archetype validation", () => {
     rejects((c) => {
       primary(c).health = {
         maxHealthHp: 10,
-        progression: { kind: "bogus" } as never,
+        progression: unsafeFixture<never>({ kind: "bogus" }),
       };
     });
     accepts((c) => {
@@ -431,7 +432,7 @@ describe("phase spec validation", () => {
     rejects((c) => (phase0(c).telegraphColor = "no-such-colour" as never));
   });
   test("progression override", () => {
-    rejects((c) => (phase0(c).progression = { kind: "bogus" } as never));
+    rejects((c) => (phase0(c).progression = unsafeFixture<never>({ kind: "bogus" })));
     rejects(
       (c) =>
         (phase0(c).progression = { kind: "simulated-dps", hpPerSecond: 0 }),
@@ -641,13 +642,13 @@ describe("resolveProgression", () => {
   test("override wins, then archetype health, then none", () => {
     const over: Progression = { kind: "simulated-dps", hpPerSecond: 9 };
     expect(resolveProgression(arch, over)).toBe(over);
-    const withHealth = {
+    const withHealth: typeof arch = {
       ...arch,
       health: {
         maxHealthHp: 5,
         progression: { kind: "simulated-dps", hpPerSecond: 3 },
       },
-    } as typeof arch;
+    };
     expect(resolveProgression(withHealth, null)).toEqual({
       kind: "simulated-dps",
       hpPerSecond: 3,
@@ -656,7 +657,7 @@ describe("resolveProgression", () => {
       kind: "simulated-dps",
       hpPerSecond: 3,
     });
-    const noHealth = { ...arch, health: undefined } as typeof arch;
+    const noHealth = unsafeFixture<typeof arch>({ ...arch, health: undefined });
     expect(resolveProgression(noHealth)).toEqual({ kind: "none" });
     expect(resolveProgression(noHealth, null)).toEqual({ kind: "none" });
     expect(resolveProgression(noHealth, { kind: "none" })).toEqual({
@@ -668,7 +669,7 @@ describe("resolveProgression", () => {
 describe("projectile validation (through attacks)", () => {
   const withProjectile = (over: object) => (c: Cfg) => {
     const id = bulletId;
-    c.projectiles[id] = { ...c.projectiles[id], ...over } as never;
+    c.projectiles[id] = unsafeFixture<never>({ ...c.projectiles[id], ...over });
     phase0(c).attacks = [spreadAttack({}) as never];
   };
   test("damage nonnegative", () => {
@@ -706,7 +707,7 @@ describe("projectile validation (through attacks)", () => {
   });
   test("bomb fields", () => {
     const bomb = (o: object) => (c: Cfg) => {
-      c.projectiles[bombId] = { ...c.projectiles[bombId], ...o } as never;
+      c.projectiles[bombId] = unsafeFixture<never>({ ...c.projectiles[bombId], ...o });
       phase0(c).attacks = [
         spreadAttack({}, { projectileId: bombId }) as never,
       ];
@@ -767,7 +768,7 @@ describe("validateAttackSpec: target", () => {
         ...scatterAttack({ aim: "player" }),
         projectileId: bombId,
         target: "player",
-      } as AttackSpec,
+      },
     );
     attackRejects(
       spreadAttack({ shots: 2 }, { projectileId: bombId, target: "player" }),

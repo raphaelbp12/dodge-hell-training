@@ -12,5 +12,6 @@
   "src/research/previewDraw.ts": "canvas drawing; PreviewPanel tests stub it and assert what it receives",
   "src/research/stepGuide.ts": "static guide copy, exercised by StepGuidePanel.test.tsx",
   "src/test/encounter-view.ts": "test support: an EncounterView builder",
+  "src/test/fixture.ts": "test support: the typed cast for deliberately invalid fixtures",
   "src/test/setup.ts": "test support: the jsdom setup file"
 }
