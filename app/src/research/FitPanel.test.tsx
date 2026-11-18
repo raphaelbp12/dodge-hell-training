@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import { unsafeFixture } from "../test/fixture";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import type { AuthoredAttack } from "../game/config/data";
@@ -29,7 +30,7 @@ const windows: SegmentWindow[] = [
 
 const bombTrack = (target?: "player"): AttackTrack => ({
   ...track,
-  attack: { ...track.attack, ...(target ? { target } : {}) } as AuthoredAttack,
+  attack: unsafeFixture<AuthoredAttack>({ ...track.attack, ...(target ? { target } : {}) }),
   marks: [
     { timeSeconds: 0, kind: "volley" },
     { timeSeconds: 1.5, kind: "detonation" },

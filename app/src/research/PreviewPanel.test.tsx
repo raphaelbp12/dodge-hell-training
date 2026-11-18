@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import { encounterConfigOf, primaryArchetype } from "../game/config/encounter";
 import { HELP_SECTION_PREVIEW } from "./helpText";
@@ -28,7 +29,7 @@ const LAYOUT = { shown: true, size: "medium", videoSize: "medium" } as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(unsafeFixture<CanvasRenderingContext2D>({}));
 });
 
 function renderPanel(props: Partial<Parameters<typeof PreviewPanel>[0]> = {}) {

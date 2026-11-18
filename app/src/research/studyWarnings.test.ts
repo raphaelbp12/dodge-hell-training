@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import type { AuthoredAttack } from "../game/config/data";
 import type { AttackTrack, Mark, Segment, StudyV5 } from "./study";
 import { studyWarnings } from "./studyWarnings";
@@ -12,7 +13,7 @@ const volleys = (...times: number[]): Mark[] => times.map((timeSeconds) => ({ ti
 const track = (overrides: Partial<AttackTrack> = {}): AttackTrack => ({
   id: "bee",
   location: { phaseId: "a", subPhaseId: null },
-  attack: { id: "bee" } as AuthoredAttack,
+  attack: unsafeFixture<AuthoredAttack>({ id: "bee" }),
   cadenceSource: "authored",
   marks: volleys(0, 1, 2),
   ...overrides,

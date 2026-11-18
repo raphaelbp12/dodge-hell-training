@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import { archetypeOf, encounterConfigOf } from "../game/config/encounter";
 import { blocksOfMonster } from "./monsterDraft";
 import {
@@ -144,7 +145,7 @@ describe("attackIdsInPhaseOf", () => {
     ({
       id,
       location: { phaseId, subPhaseId },
-      attack: { id: attackId } as AttackTrack["attack"],
+      attack: unsafeFixture<AttackTrack["attack"]>({ id: attackId }),
       cadenceSource: "authored",
       marks: [],
     }) satisfies AttackTrack;

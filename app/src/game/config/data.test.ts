@@ -1101,10 +1101,10 @@ test("validateProjectile requires exactly one of body or appearance", () => {
   expect(() =>
     validateProjectile(withNeither, "test", TEST_STEP_SECONDS, new Set()),
   ).toThrow(/exactly one/);
-  const missingAppearance = {
+  const missingAppearance: Record<string, unknown> = {
     ...VALID_PROJECTILE,
     appearance: "missing",
-  } as Record<string, unknown>;
+  };
   delete missingAppearance.body;
   expect(() =>
     validateProjectile(

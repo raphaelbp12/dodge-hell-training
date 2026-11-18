@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
+import { unsafeFixture } from "../test/fixture";
 import {
   AUTHORED_APPEARANCES,
   AUTHORED_ENCOUNTER_DATA,
@@ -148,10 +149,10 @@ function apply(study: StudyV5, step: Edit, serial: number): StudyV5 {
         setTrackAttack(
           study,
           track.id,
-          {
+          unsafeFixture<typeof track.attack>({
             ...track.attack,
             pattern: { ...track.attack.pattern, aim: aims[Math.floor(step.value) % aims.length] },
-          } as typeof track.attack,
+          }),
           "typed",
         ),
       );
