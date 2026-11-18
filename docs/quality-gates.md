@@ -12,6 +12,7 @@ One reference for every gate that raises trust in a change before it is committe
 | Test presence, component tests | `npm test` | `verify`, CI `Unit Tests` |
 | Mutation tests | `npm run test:mutation`, `npm run test:mutation:diff` | `mutation.yml`: full run twice a week; `mutation-diff.yml`: informational pull-request run |
 | Benchmarks | `npm run bench` | CI `bench` job on pull requests |
+| Branch coverage floors | `npm test`, `npm run test:coverage` | `verify`, CI `Unit Tests` |
 | Simulated soak | `npm run test:soak:sim` | CI `Simulated Soak` check |
 | Browser soak | `PLAYWRIGHT_SOAK=1 npm run test:e2e -- --grep @soak` | CI Playwright `soak` job |
 
@@ -82,6 +83,14 @@ One reference for every gate that raises trust in a change before it is committe
 **Run:** `npm run bench`. On pull requests the CI `bench` job runs base and head alternately on one runner, `BENCH_ROUNDS` (5) times each, and fails through `scripts/bench-gate.mjs` when a benchmark is slower than `BENCH_REGRESSION_THRESHOLD`. Each side keeps its best run, compared by the median latency (`latency.p50`, the mean only when a file has none), because the mean of a sub-microsecond benchmark such as `advance-shard` is dominated by a few GC or scheduler outliers (a 36 percent false failure on 2026-11-18). The calibration below used the mean and should be re-run with `bench-calibrate.yml`. Locally on 2026-11-17 the worst base-against-base difference was 4.5 percent over two runs a side and 1.7 percent over five. The job compares nothing when the pull request leaves `app/src/game`, the toolchain files and the gate unchanged, because such a change cannot alter a timing and a comparison could only fail from runner noise. The comparison table is written to the job summary.
 **Reproduce:** the gate prints a table of name, base, head and percent change. Run `npm run bench` on `main` and on the branch, alternating, copying `reports/bench/` aside after each run, then `node scripts/bench-gate.mjs --base <dirs> --head <dirs>`. Compare only timings taken on one machine; the browser soak's recorded local baseline is not comparable with CI.
 **Threshold:** `BENCH_REGRESSION_THRESHOLD` in `scripts/bench-gate.mjs` is the larger of 20 percent and three times the worst base-against-base difference over three CI runs (A24). Measure it by running the manual `.github/workflows/bench-calibrate.yml` three times; `--calibrate` prints each run's worst difference and implied threshold and never fails. Three CI runs on 2026-11-17, at five rounds a side, measured a worst difference of 0.5, 1.5 and 3.7 percent; three times 3.7 is 11.1 percent, so the 20 percent floor applies and the `bench` job is blocking. Remeasure after a change to the benchmarks or to `BENCH_ROUNDS`.
+
+## Branch coverage (report 2026-11-18, items 2.2, 2.7, 2.11)
+
+**Catches:** an untested throw or refusal branch in a module Stryker mutates, found on the push instead of by the twice-weekly mutation run. Coverage is measured over `MUTATE_GLOBS` (imported from `app/stryker.config.mjs`, so the two lists cannot drift).
+**Run:** `npm test` runs the node and dom projects with v8 coverage and fails when a directory is below its floor; `npm run test:coverage` runs the node project alone. It prints a text summary and writes `app/reports/coverage/coverage-summary.json`. It runs in `verify` and the CI `Unit Tests` check through `npm test`.
+**Thresholds:** branches and statements per directory in `coverage.thresholds` of `app/vitest.config.ts`, each floor(measured) minus 2, measured 2026-11-18 (branches/statements, percent): `src/game/config` 97.3/98.3, `src/game/session` 100.0/98.5, `src/game/simulation` 97.4/99.0, `src/storage` 97.7/98.4, `src/research` 85.1/92.7. Raise a floor when coverage rises; never lower one to pass.
+**Reproduce:** the failure names the directory and the metric. Run the node project with `--coverage.reporter=text` to see uncovered lines, then add a test for the untested branch.
+**Cost:** coverage roughly doubles the node project's time (about 47 s to 100 s locally).
 
 ## Simulated soak (A25)
 
