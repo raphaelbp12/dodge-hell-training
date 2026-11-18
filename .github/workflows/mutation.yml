@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [config, simulation, research, state]
+        shard: [config, simulation-core, simulation-main, simulation-rules, research, state]
     env:
       MUTATION_SHARD: ${{ matrix.shard }}
       # Leaves 40 minutes of the job limit for setup, the save and the upload.

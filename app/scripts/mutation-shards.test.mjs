@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { expect, test } from "vitest";
 import { MUTATE_GLOBS, MUTATION_SHARDS, shardOptions } from "../stryker.config.mjs";
 
@@ -12,11 +13,27 @@ test("a shard mutates only its own directories and keeps every exclusion", () =>
   expect(mutate.filter((glob) => glob.startsWith("!"))).toEqual(NEGATED);
 });
 
-test("the shards together cover every mutated glob exactly once", () => {
+const SIMULATION_GLOB = "src/game/simulation/**/*.ts";
+
+/** The mutated simulation sources: every non-test .ts file in the directory. */
+function simulationSources() {
+  return readdirSync("src/game/simulation")
+    .filter((file) => file.endsWith(".ts") && !/\.(test|property\.test|soak\.test|bench)\.ts$|^test-support\.ts$/.test(file))
+    .map((file) => `src/game/simulation/${file}`);
+}
+
+test("the shards together cover every mutated glob and simulation file exactly once", () => {
   const positive = Object.keys(MUTATION_SHARDS).flatMap((name) =>
     shardOptions(name).mutate.filter((glob) => !glob.startsWith("!")),
   );
-  expect(positive.toSorted()).toEqual(MUTATE_GLOBS.filter((glob) => !glob.startsWith("!")).toSorted());
+  const expected = MUTATE_GLOBS.filter((glob) => !glob.startsWith("!") && glob !== SIMULATION_GLOB);
+  expect(positive.toSorted()).toEqual([...expected, ...simulationSources()].toSorted());
+});
+
+test("a shard that lists files mutates exactly those files and keeps every exclusion", () => {
+  const { mutate } = shardOptions("simulation-main");
+  expect(mutate.filter((glob) => !glob.startsWith("!"))).toEqual(["src/game/simulation/simulation.ts"]);
+  expect(mutate.filter((glob) => glob.startsWith("!"))).toEqual(NEGATED);
 });
 
 test("each shard keeps its own incremental file and reports, so parallel jobs never share one", () => {
@@ -28,7 +45,7 @@ test("each shard keeps its own incremental file and reports, so parallel jobs ne
 
 test("each shard breaks at its own ratcheted score", () => {
   expect(shardOptions("research").thresholds.break).toBe(MUTATION_SHARDS.research.break);
-  expect(shardOptions("simulation").thresholds.break).toBe(MUTATION_SHARDS.simulation.break);
+  expect(shardOptions("simulation-core").thresholds.break).toBe(MUTATION_SHARDS["simulation-core"].break);
 });
 
 test("no shard leaves the whole-set options unchanged, and an unknown shard throws", () => {
