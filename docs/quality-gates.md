@@ -37,6 +37,12 @@ One reference for every gate that raises trust in a change before it is committe
 **Catches:** a high-severity advisory in a production dependency.
 **Run:** `npm run audit` (`npm audit --omit=dev --audit-level=high`). It is not part of `verify` because it needs the network. In CI it is its own `Audit` job, outside the deployment's needs: a finding fails the job on the pull request and on `main`, but does not hold back a deployment, because a new upstream advisory says nothing about the change under test and the live site keeps the same dependency either way. It reads only `package-lock.json`, so the job installs nothing.
 
+## Slow-test budget
+
+**Catches:** a node-project test that used more than half of its own effective timeout (the project's `testTimeout`, 60 s, or the test's explicit `{ timeout }`), so a test close to timing out under CPU load fails while it still passes.
+**Run:** `npm test`. The reporter `scripts/slow-test-reporter.mjs` prints the tests and sets a nonzero exit code; its decision function is tested in `scripts/slow-test-reporter.test.mjs`.
+**Reproduce:** any test over 5 s carries an explicit timeout of about 4x its measured time, rounded up to 10 s, with a comment giving the measured time and date. Speed the test up, or re-measure and raise the timeout with a new comment. Do not raise the project-wide timeout.
+
 ## Property tests (A06-A10)
 
 **Catches:** a violated invariant of the random source, collision geometry, every projectile motion kind and the bomb type, a whole simulation (determinism, step chunking, arena containment, health bounds, unique accepted projectile ids), every loader of untrusted input, the study JSON round trip, cadence recovery and timeline zoom.
