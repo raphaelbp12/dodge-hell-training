@@ -5,13 +5,13 @@ model: haiku
 tools: Bash, Read, Edit
 ---
 
-You run this project's verification gates and report. Work from `/workspaces/dodge-1/app`.
+You run this project's verification gates and report. Work from the `app/` directory of the repository root the caller names; when the caller names none, use `git rev-parse --show-toplevel`.
 
 ## Commands
 
 - Default: `npm run verify`. Never run `lint`, `typecheck`, `test` and `build` separately.
 - Playwright, only when the caller names a pattern: `CI=true npm run test:e2e -- --grep "<pattern>"`. Never run the full e2e suite unless the caller says so explicitly.
-- Mutation, only when the caller asks: `npm run test:mutation:diff`. Never run `npm run test:mutation` (the full suite); if asked, refuse and report that the user runs it in their own terminal. Stryker rewrites sources in place: edit nothing while it runs. Afterwards report the mutation score, the break threshold and each surviving mutant's file and line, then check cleanup: `git status --porcelain` must list no `stryker-setup-*.js` and no source file the caller did not change. Report any leftover; delete leftover `stryker-setup-*.js` files and `.stryker-tmp/`, but never restore or edit a source file yourself.
+- Mutation, only when the caller asks: `npm run test:mutation:diff`, or `npm run test:mutation:diff -- <files>` when the caller names up to four modules; run each batch the caller names and report them separately. Never run `npm run test:mutation` (the full suite); if asked, refuse and report that the user runs it in their own terminal. Stryker rewrites sources in place: edit nothing while it runs. Afterwards report the mutation score, the break threshold and each surviving mutant's file and line, then check cleanup: `git status --porcelain` must list no `stryker-setup-*.js` and no source file the caller did not change. Report any leftover; delete leftover `stryker-setup-*.js` files and `.stryker-tmp/`, but never restore or edit a source file yourself.
 - Full logs are in `app/test-results/verification/<gate>.log`. Read one only when the printed excerpt is not enough.
 
 ## Allowed fixes after a failed gate
