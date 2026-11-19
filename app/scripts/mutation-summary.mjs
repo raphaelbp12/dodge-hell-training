@@ -93,6 +93,12 @@ export function formatSummary(summary, { title, breakAt = null, changed = false,
   if (!changed) return lines.join("\n");
   const onChanged = summary.undetectedMutants.filter((entry) => entry.onChangedLine);
   lines.push("");
+  const blocking = blockingMutants(summary);
+  if (blocking.length > 0) {
+    lines.push(`#### Blocks the merge: changed lines no test runs (${blocking.length})`, "");
+    for (const entry of blocking.slice(0, listLimit)) lines.push(`- \`${entry.file}:${entry.line}\` ${describe(entry)}`);
+    lines.push("");
+  }
   if (onChanged.length === 0) lines.push("No undetected mutant on the lines this pull request changed.");
   else {
     lines.push(`#### Undetected on lines this pull request changed (${onChanged.length})`, "");
@@ -125,6 +131,25 @@ export function annotations(summary, limit = ANNOTATION_LIMIT) {
     );
 }
 
+/**
+ * Uncovered mutants on changed lines: the only finding that fails the pull-request
+ * run (approved deviation from plan V22 A17). Survivors stay warnings, as some are equivalent.
+ */
+export function blockingMutants(summary) {
+  return summary.undetectedMutants.filter((entry) => entry.onChangedLine && entry.status === "NoCoverage");
+}
+
+/** `::error` commands for the blocking mutants, so the diff shows the unrun line. */
+export function blockingAnnotations(summary, limit = ANNOTATION_LIMIT) {
+  return blockingMutants(summary)
+    .slice(0, limit)
+    .map(
+      (entry) =>
+        `::error file=app/${entry.file},line=${entry.line},title=Changed line not covered::` +
+        `No test runs this changed line (${entry.mutator}); add a test or a "Stryker disable next-line all: <reason>" comment`,
+    );
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const changedIndex = args.indexOf("--changed");
@@ -147,5 +172,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   });
   console.log(text);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text}\n`);
-  if (changed !== null) for (const line of annotations(summary)) console.log(line);
+  if (changed !== null) {
+    for (const line of annotations(summary)) console.log(line);
+    for (const line of blockingAnnotations(summary)) console.log(line);
+    if (blockingMutants(summary).length > 0) process.exitCode = 1;
+  }
 }

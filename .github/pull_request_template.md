@@ -13,7 +13,7 @@ Mark each gate "ran" with its result, or "not applicable" with the reason (see [
 
 - [ ] `npm run test:soak:sim`:
 - [ ] `npm run bench` and the base-versus-head gate (simulation hot path: `simulation.ts`, `projectiles.ts`, `bombs.ts`, `geometry.ts`):
-- [ ] `npm run test:mutation:diff` (modules in the mutate globs), mutation score of the changed files:
+- [ ] `npm run test:mutation:diff` (modules in the mutate globs), mutation score of the changed files, and `node scripts/mutation-summary.mjs reports/mutation/mutation.json --changed reports/mutation/changed-lines.json` exits 0 (a changed line no test runs fails it):
 
 ## Rules
 
@@ -23,6 +23,15 @@ Mark each gate "ran" with its result, or "not applicable" with the reason (see [
 ## Deferred register
 
 - [ ] An item in `docs/deferred-work.md` was touched: no / yes, approved by:
+
+## Independent review
+
+<!-- Required when the pull request changes `app/` or `.github/workflows/`: `/code-review high <number> --comment` run by a session that did not author it. Otherwise "not applicable" with the reason. -->
+
+- Reviewing model:
+- Date:
+- Number of findings:
+- Per finding, "fixed" or "declined" with the reason:
 
 ## Findings
 
