@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { ReconcilePanel } from "./ReconcilePanel";
-import type { Segment, StudyV5 } from "./study";
+import type { Segment, StudyV6 } from "./study";
 
 const segment = (id: string, durationSeconds: number | null): Segment => {
   const [phaseId, subPhaseId = null] = id.split("/");
@@ -17,8 +17,8 @@ const segment = (id: string, durationSeconds: number | null): Segment => {
 };
 const segments = [segment("a", null), segment("b/x", 10)];
 
-const study: StudyV5 = {
-  schemaVersion: 5,
+const study: StudyV6 = {
+  schemaVersion: 6,
   encounterId: "e",
   archetypeId: "m",
   recordedAt: "2026-11-13T00:00:00.000Z",
@@ -30,42 +30,50 @@ const study: StudyV5 = {
   statusSpans: [],
   tracks: [],
   scratch: [],
-  acceptedSegmentValues: {},
 };
 
 function renderPanel() {
-  const onAccept = vi.fn();
   const onSeek = vi.fn();
   render(
     <ReconcilePanel
       study={study}
       segments={segments}
-      videoEndSeconds={100}
-      frameSeconds={1 / 30}
       warnings={[{ where: "structure", text: "Boundary at 12.500 s is odd." }]}
       fileText={{ ok: true, value: "{}\n" }}
       fileName="app/src/game/data/enemies/m.json"
       variants={[]}
-      onAccept={onAccept}
       onSeek={onSeek}
       onExportStudy={vi.fn()}
-    />,
+    >
+      <p>parity goes here</p>
+    </ReconcilePanel>,
   );
-  return { onAccept, onSeek };
+  return { onSeek };
 }
 
-test("shows the measured telegraph and accepts it", async () => {
-  const { onAccept } = renderPanel();
+test("shows the measured telegraph export writes beside the authored one", () => {
+  renderPanel();
   const row = screen.getByRole("row", { name: /Label a/ });
   expect(within(row).getByText("1.250 s")).toBeTruthy();
-  await userEvent.click(within(row).getByRole("button", { name: "Accept telegraph for Label a" }));
-  expect(onAccept).toHaveBeenCalledWith("a", "telegraphSeconds", 1.25);
+  expect(within(row).getByText("authored 2.000 s")).toBeTruthy();
 });
 
-test("a phase-level segment offers no duration Accept; a sub-phase does", () => {
+test("an unmeasured value says export keeps the authored one", () => {
   renderPanel();
-  expect(screen.queryByRole("button", { name: "Accept duration for Label a" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Accept duration for Label b/x" })).toBeTruthy();
+  const row = screen.getByRole("row", { name: /Label b\/x/ });
+  expect(within(row).getAllByText("not measured").length).toBeGreaterThan(0);
+  expect(within(row).getByText("export keeps 10.000 s")).toBeTruthy();
+});
+
+test("no Accept control remains (plan V23 Q17)", () => {
+  renderPanel();
+  expect(screen.queryByRole("button", { name: /Accept/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Clear/ })).toBeNull();
+});
+
+test("renders its children, the parity panel", () => {
+  renderPanel();
+  expect(screen.getByText("parity goes here")).toBeTruthy();
 });
 
 test("a warning with a time seeks there", async () => {

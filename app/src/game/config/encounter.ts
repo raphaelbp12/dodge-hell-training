@@ -14,6 +14,7 @@ import {
   type AuthoredAppearanceTemplate,
   type AuthoredArchetype,
   type AuthoredAttack,
+  type AuthoredAttackMarks,
   type AuthoredBody,
   type AuthoredEncounterEntry,
   type AuthoredPhase,
@@ -261,18 +262,30 @@ export type AttackCadence = Readonly<{
   initialDelaySeconds: number;
 }>;
 
-export type AttackSpec = Readonly<{
+/** Plan V23 Q06-Q10: offsets in seconds from the segment's entry. */
+export type AttackMarks = AuthoredAttackMarks;
+
+type AttackSpecBase = Readonly<{
   id: string;
   projectileId: string;
   tuningSource: string;
   pattern: AttackPattern;
-  cadence: AttackCadence;
   /**
    * N28-N30: a bomb thrown at the player's position at fire time. Only a
    * single-shot, player-aimed spread firing a bomb may carry it.
    */
   target?: "player";
 }>;
+
+/** An attack timed by its cadence (Q11). */
+export type CadencedAttackSpec = AttackSpecBase &
+  Readonly<{ cadence: AttackCadence; marks?: undefined }>;
+
+/** An attack timed by its marked volleys (Q10). */
+export type MarkedAttackSpec = AttackSpecBase &
+  Readonly<{ marks: AttackMarks; cadence?: undefined }>;
+
+export type AttackSpec = CadencedAttackSpec | MarkedAttackSpec;
 
 export type { TelegraphColorName };
 
@@ -400,6 +413,8 @@ const authoredPrimaryPhase = authoredPrimary.phases[0];
 // The debug panel tunes exactly one attack; later steps that add a second
 // attack to any archetype must not route sliders through this index.
 const authoredPrimaryAttack = authoredPrimaryPhase.attacks[0];
+if (authoredPrimaryAttack.cadence === undefined)
+  throw new RangeError("The debug-tunable attack must have a cadence");
 // The debug panel only ever tunes a ring-kind attack (the shipped Crystal
 // Worm spiral); a `spread` attack is additive and not yet debug-tunable.
 if (authoredPrimaryAttack.pattern.kind !== "ring")
@@ -750,7 +765,9 @@ export function attackSpecFromAuthored(attack: AuthoredAttack): AttackSpec {
     projectileId: attack.projectile,
     tuningSource: attack.tuningSource,
     pattern: patternFromAuthored(attack.pattern),
-    cadence: attack.cadence,
+    ...(attack.marks === undefined
+      ? { cadence: attack.cadence }
+      : { marks: attack.marks }),
     ...(attack.target === undefined ? {} : { target: attack.target }),
   });
 }
@@ -805,7 +822,7 @@ function phaseSpecFromAuthored(phase: AuthoredPhase): PhaseSpec {
  * path (`buildEncounterConfig`, above) never needed until a second, static
  * encounter existed (F5).
  */
-function archetypeFromAuthored(authored: AuthoredArchetype): EnemyArchetype {
+export function archetypeFromAuthored(authored: AuthoredArchetype): EnemyArchetype {
   const outline = loadOutline(authored.body.shape);
   return Object.freeze({
     id: authored.id,
@@ -1094,7 +1111,7 @@ function buildStaticEncounterConfig(
     simulation: AUTHORED_ENCOUNTER_DATA.simulation,
     arena,
     player: {
-      spawnTiles: AUTHORED_ENCOUNTER_DATA.player.spawnTiles,
+      spawnTiles: entry.playerSpawnTiles ?? AUTHORED_ENCOUNTER_DATA.player.spawnTiles,
       verticesTiles: scaleBody(
         loadOutline(AUTHORED_ENCOUNTER_DATA.player.body.shape),
         AUTHORED_ENCOUNTER_DATA.player.body.widthTiles,
@@ -1184,6 +1201,8 @@ export function attackShardBound(
 ): number {
   const { pattern, cadence } = attack;
   const projectile = projectileOf(config, attack.projectileId);
+  if (cadence === undefined)
+    return shotsPerVolley(pattern) * markedVolleyBound(attack.marks, lifetimeSecondsOf(projectile));
   const groupSeconds =
     (cadence.shotsPerBurst - 1) * cadence.shotIntervalSeconds +
     cadence.cooldownAfterLastShotSeconds;
@@ -1191,6 +1210,21 @@ export function attackShardBound(
     shotsPerVolley(pattern) *
     cadence.shotsPerBurst *
     Math.ceil(lifetimeSecondsOf(projectile) / groupSeconds)
+  );
+}
+
+/**
+ * Worst-case marked volleys alive at once: every volley without a period;
+ * with one, a cycle's volleys times the cycles that can overlap one lifetime.
+ */
+function markedVolleyBound(marks: AttackMarks, lifetimeSeconds: number): number {
+  const perCycle = marks.bursts.reduce((sum, burst) => sum + burst.length, 0);
+  if (marks.periodSeconds === undefined) return perCycle;
+  const flat = marks.bursts.flat();
+  const cycleSeconds = flat[flat.length - 1] - flat[0];
+  return (
+    perCycle *
+    (Math.ceil((lifetimeSeconds + cycleSeconds) / marks.periodSeconds) + 1)
   );
 }
 
@@ -1555,18 +1589,22 @@ export function validateAttackSpec(
   }
   // Strictly positive: a zero here would make the attack degenerate (an
   // infinite fire rate or no shots).
-  const positiveValues = {
-    shotsPerVolley: shotsPerVolley(pattern),
-    shotsPerEmitter: cadence.shotsPerBurst,
-    shotIntervalSeconds: cadence.shotIntervalSeconds,
-    cooldownAfterLastShotSeconds: cadence.cooldownAfterLastShotSeconds,
-  };
-  for (const [name, value] of Object.entries(positiveValues))
-    assertPositive(value, name);
-  assertNonnegative(cadence.initialDelaySeconds, "initialCooldownSeconds");
-  for (const count of [shotsPerVolley(pattern), cadence.shotsPerBurst]) {
-    if (!Number.isSafeInteger(count))
+  assertPositive(shotsPerVolley(pattern), "shotsPerVolley");
+  if (!Number.isSafeInteger(shotsPerVolley(pattern)))
+    throw new RangeError("Counts must be safe integers");
+  if (cadence !== undefined) {
+    const positiveValues = {
+      shotsPerEmitter: cadence.shotsPerBurst,
+      shotIntervalSeconds: cadence.shotIntervalSeconds,
+      cooldownAfterLastShotSeconds: cadence.cooldownAfterLastShotSeconds,
+    };
+    for (const [name, value] of Object.entries(positiveValues))
+      assertPositive(value, name);
+    assertNonnegative(cadence.initialDelaySeconds, "initialCooldownSeconds");
+    if (!Number.isSafeInteger(cadence.shotsPerBurst))
       throw new RangeError("Counts must be safe integers");
+  } else if (attack.marks === undefined) {
+    throw new RangeError("An attack must have exactly one of marks and cadence");
   }
   if (pattern.kind === "ring") {
     // Nonnegative: zero is a meaningful, supported value - an idle emitter.

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
-import { AUTHORED_ARCHETYPES, type AuthoredAttack } from "../game/config/data";
+import { AUTHORED_ARCHETYPES, type CadencedAuthoredAttack } from "../game/config/data";
 import { encounterConfigOf } from "../game/config/encounter";
 import { AttackEditor } from "./AttackEditor";
 import * as help from "./helpText";
@@ -9,19 +9,19 @@ import type { AttackChange } from "./monsterDraft";
 
 const config = encounterConfigOf("killer-bee-queen");
 
-const allAttacks: AuthoredAttack[] = Object.values(AUTHORED_ARCHETYPES).flatMap((archetype) =>
-  archetype.phases.flatMap((phase) => [
-    ...phase.attacks,
-    ...(phase.subPhases ?? []).flatMap((sub) => sub.attacks),
-  ]),
+// A track's attack keeps a cadence (plan V23 Q15), so only cadence attacks are editor inputs.
+const allAttacks: CadencedAuthoredAttack[] = Object.values(AUTHORED_ARCHETYPES).flatMap((archetype) =>
+  archetype.phases
+    .flatMap((phase) => [...phase.attacks, ...(phase.subPhases ?? []).flatMap((sub) => sub.attacks)])
+    .filter((attack): attack is CadencedAuthoredAttack => attack.cadence !== undefined),
 );
-const kindOf = (attack: AuthoredAttack) => (attack.pattern as unknown as { kind: string }).kind;
+const kindOf = (attack: CadencedAuthoredAttack) => (attack.pattern as unknown as { kind: string }).kind;
 const ringAttack = allAttacks.find((attack) => kindOf(attack) === "ring")!;
 const spreadAttack = allAttacks.find(
   (attack) => kindOf(attack) === "spread" && config.projectiles[attack.projectile],
 )!;
 
-function renderEditor(attack: AuthoredAttack, extra: Partial<Parameters<typeof AttackEditor>[0]> = {}) {
+function renderEditor(attack: CadencedAuthoredAttack, extra: Partial<Parameters<typeof AttackEditor>[0]> = {}) {
   const apply = vi.fn<(change: AttackChange) => boolean>(() => true);
   render(<AttackEditor attack={attack} config={config} apply={apply} {...extra} />);
   return apply;

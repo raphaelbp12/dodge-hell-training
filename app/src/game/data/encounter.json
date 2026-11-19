@@ -50,10 +50,12 @@
       }
     },
     "killer-bee-queen": {
-      "rulesVersion": "killer-bee-queen-nest-paladin-v13",
+      "rulesVersion": "killer-bee-queen-nest-paladin-v14",
       "displayName": "Killer Bee Queen",
       "primaryArchetype": "killer-bee-queen",
       "arenaId": "nest-boss-room",
+      "playerSpawnTiles": { "x": 3.527, "y": 3.527 },
+      "playerSpawnComment": "User decision 2026-11-19: the player starts 45 degrees from the Queen (who spawns at the centre), midway across the walkable band between the centre honey diamond (halfDiagonalTiles 3.5, so 1.75 * sqrt 2 = 2.475 tiles out along 45 degrees) and the honey annulus (innerRadiusTiles 7.5): (2.475 + 7.5) / 2 = 4.987 tiles, which is 3.527 tiles on each axis.",
       "spawns": {
         "comment": "K10: a single boss, not a swarm. One enemy at t=0 and never again - everySeconds null means the periodic schedule never repeats. P40: arena-center replaces farthest-from-player so she no longer walks in from 16.2 tiles out during a phase-3 drill; her phase-3 move-to-point movement stays authored as-is and is now a no-op at spawn.",
         "archetype": "killer-bee-queen",

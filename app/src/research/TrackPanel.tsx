@@ -5,7 +5,7 @@ import { AttackEditor } from "./AttackEditor";
 import { HelpMark } from "./HelpMark";
 import * as help from "./helpText";
 import type { AttackChange } from "./monsterDraft";
-import { segmentIdOf, type Segment, type StudyV5 } from "./study";
+import { segmentIdOf, type Segment, type StudyV6 } from "./study";
 import styles from "./TaggerRoute.module.css";
 
 /** Tracks at positions 1-9 are selected by their digit key (E10). */
@@ -64,7 +64,7 @@ export function TrackPanel({
   onRemoveMark,
   onCreateFromScratch,
 }: Readonly<{
-  study: StudyV5;
+  study: StudyV6;
   segments: readonly Segment[];
   config: EncounterConfig;
   selectedTrackId: string | null;
@@ -128,8 +128,8 @@ export function TrackPanel({
                 )}{" "}
                 <span className={styles.attackId}>{track.id}</span>{" "}
                 <small>
-                  {labelOf(segmentIdOf(track.location))}, {track.marks.length} marks,{" "}
-                  {track.cadenceSource}
+                  {labelOf(segmentIdOf(track.location))}, {track.marks.length} marks
+                  {track.periodSeconds === undefined ? "" : `, every ${track.periodSeconds} s`}
                 </small>
               </button>
             </li>

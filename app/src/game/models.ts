@@ -97,6 +97,11 @@ export type AttackClockState = {
   rotationPhaseAtEpoch: number;
   ringPhaseRadians: number;
   volleysFired: number;
+  /**
+   * Plan V23 Q03: only on a marked attack. Its volleys count from the
+   * segment's entry, and every volley up to `throughOffsetSeconds` has fired.
+   */
+  marks?: { entrySeconds: number; throughOffsetSeconds: number };
 };
 
 export type EnemyState = {

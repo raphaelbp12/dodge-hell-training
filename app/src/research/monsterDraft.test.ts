@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AUTHORED_MONSTER_FILES, type AuthoredAttack } from "../game/config/data";
+import { AUTHORED_MONSTER_FILES, type CadencedAuthoredAttack } from "../game/config/data";
 import { archetypeOf, encounterConfigOf } from "../game/config/encounter";
 import {
   blocksOfMonster,
@@ -23,7 +23,7 @@ function must<T>(
   return result.value;
 }
 
-const queenAttacks = (): readonly AuthoredAttack[] =>
+const queenAttacks = (): readonly CadencedAuthoredAttack[] =>
   tracksFromMonsterFile(AUTHORED_MONSTER_FILES["killer-bee-queen"]).map((track) => track.attack);
 const sample = () =>
   tracksFromMonsterFile(AUTHORED_MONSTER_FILES["red-killer-bee"])[0].attack;
@@ -67,7 +67,8 @@ describe("monsters and blocks", () => {
     expect(sub.id).toBe(`${sub.phaseId}/${sub.subPhaseId}`);
     expect(sub.durationSeconds).not.toBeNull();
     const nests = blocks.find((block) => block.id === "phase-6-nests")!;
-    expect(nests.durationSeconds).toBe(29);
+    // Plan V23 Q13, Q22: the study's measured exitAfterSeconds.
+    expect(nests.durationSeconds).toBe(33.133);
     expect(blocks.some((block) => block.durationSeconds === null)).toBe(true);
   });
 

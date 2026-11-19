@@ -49,7 +49,7 @@ import {
   newAttack,
   type AttackChange,
 } from "./monsterDraft";
-import { bombVariantOf, monsterFileTextFromStudy, studyExportJson } from "./studyExport";
+import { exportedVariantsOf, monsterFileTextFromStudy, studyExportJson } from "./studyExport";
 import { studyWarnings } from "./studyWarnings";
 import { ReconcilePanel } from "./ReconcilePanel";
 import {
@@ -67,13 +67,11 @@ import {
   attackIdsInPhaseOf,
   segmentWindows,
   segmentsOfMonster,
-  windowsForTrack,
   type AttackTrack,
-  type StudyV5,
+  type StudyV6,
 } from "./study";
 import { emptyStudy, studyV5FromLegacy, tracksFromMonsterFile } from "./studyMigrate";
 import {
-  acceptSegmentValue,
   addBoundary,
   addMark,
   addTrack,
@@ -82,14 +80,12 @@ import {
   reloadTracks,
   removeMarkNear,
   removeTrack,
-  setBurstGapThreshold,
   setEndMark,
   setMeasuredRange,
-  setProjectileOverride,
   setScale,
-  type ProjectileOverride,
   setTrackAttack,
   setTrackLocation,
+  setTrackPeriod,
   removeBoundary,
   removeSpan,
   setBoundarySegment,
@@ -99,10 +95,12 @@ import {
 } from "./studyEdits";
 import { StructurePanel } from "./StructurePanel";
 import { TrackPanel } from "./TrackPanel";
-import { FitPanel, type CadenceField } from "./FitPanel";
+import { TimingPanel } from "./TimingPanel";
+import { ParityPanel } from "./ParityPanel";
+import { parityReport } from "./parity";
 import { ScalePanel } from "./ScalePanel";
 import { distanceTiles, tileWidthFractionOf, type VideoPoint } from "./scale";
-import { predictedTimesInWindows, type DetonationPair } from "./cadenceFit";
+import type { DetonationPair } from "./cadenceFit";
 import type { StudyState } from "./tagging";
 import { PreviewPanel } from "./PreviewPanel";
 import {
@@ -148,7 +146,7 @@ export function TaggerRoute() {
     () => encounterConfigOf(initialEncounter).primaryArchetypeId,
   );
   // Plan V20 E02: one v5 study and the selected attack track; null before a video or monster.
-  const [study, setStudy] = useState<StudyV5 | null>(null);
+  const [study, setStudy] = useState<StudyV6 | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const monsterIds = taggableMonsters(config);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -242,7 +240,7 @@ export function TaggerRoute() {
   }, []);
 
   /** The study as the autosave and export write it: provenance from the video in use now. */
-  const currentStudy = (): StudyV5 | null => {
+  const currentStudy = (): StudyV6 | null => {
     const source = videoUrl ? { fileName, durationSeconds } : studyMeta;
     if (!study || !source || source.fileName.trim().length === 0 || !(source.durationSeconds > 0))
       return null;
@@ -443,7 +441,7 @@ export function TaggerRoute() {
   };
 
   /** Every study edit goes through `studyEdits.ts`; the route only applies the result. */
-  const applyStudyEdit = (edit: (current: StudyV5) => EditResult<StudyV5>): boolean => {
+  const applyStudyEdit = (edit: (current: StudyV6) => EditResult<StudyV6>): boolean => {
     if (!study) {
       setError("Choose the monster or open a video before editing the study.");
       return false;
@@ -461,7 +459,7 @@ export function TaggerRoute() {
 
   const markAtFrame = (
     what: string,
-    edit: (current: StudyV5, timeSeconds: number) => EditResult<StudyV5>,
+    edit: (current: StudyV6, timeSeconds: number) => EditResult<StudyV6>,
   ) => {
     const problem = presentedFrameProblem(what);
     if (problem) {
@@ -574,16 +572,6 @@ export function TaggerRoute() {
           ? "Click the monster's centre at this throw frame."
           : "Click the explosion's centre at this detonation frame.";
 
-  const acceptOverride = (fields: ProjectileOverride) => {
-    if (!selectedTrack) return;
-    applyStudyEdit((current) =>
-      setProjectileOverride(current, selectedTrack.id, {
-        ...selectedTrack.projectileOverride,
-        ...fields,
-      }),
-    );
-  };
-
   const selectedBomb = (() => {
     if (!selectedTrack) return undefined;
     const projectile = config.projectiles[selectedTrack.attack.projectile];
@@ -622,13 +610,13 @@ export function TaggerRoute() {
   };
 
   /** A track with the new-attack conveniences, at a segment's attack list (step 86.1). */
-  const newTrack = (current: StudyV5, id: string, segmentId: string): AttackTrack | string => {
+  const newTrack = (current: StudyV6, id: string, segmentId: string): AttackTrack | string => {
     const segment = segments.find((entry) => entry.id === segmentId);
     if (!segment) return "Choose the segment the attack belongs to.";
     if (id.length === 0) return "An attack track needs a name.";
     const attack = newAttack(id, current.tracks.map((track) => track.id), config);
     if (!attack.ok) return attack.error;
-    return { id, location: segment.ref, attack: attack.value, cadenceSource: "typed", marks: [] };
+    return { id, location: segment.ref, attack: attack.value, marks: [] };
   };
   const addAttackTrack = (id: string, segmentId: string): boolean => {
     const added = applyStudyEdit((current) => {
@@ -667,7 +655,6 @@ export function TaggerRoute() {
       `Reloaded the attacks from the game; kept ${keptCount} track${keptCount === 1 ? "" : "s"} with marks.`,
     );
   };
-  /** E06: a typed cadence field makes the cadence typed; any other edit keeps its source. */
   const editSelectedAttack = (change: AttackChange): boolean => {
     if (!selectedTrack) return false;
     const result = changedAttack(
@@ -685,24 +672,7 @@ export function TaggerRoute() {
         `Removed fields that do not apply to the new kind: ${result.value.removed.join(", ")}.`,
       );
     return applyStudyEdit((current) =>
-      setTrackAttack(
-        current,
-        selectedTrack.id,
-        result.value.attack,
-        change.field === "cadence" ? "typed" : selectedTrack.cadenceSource,
-      ),
-    );
-  };
-  /** E06: accepting fitted values writes them into the cadence as fitted. */
-  const acceptFit = (values: Partial<Record<CadenceField, number>>) => {
-    if (!selectedTrack) return;
-    applyStudyEdit((current) =>
-      setTrackAttack(
-        current,
-        selectedTrack.id,
-        { ...selectedTrack.attack, cadence: { ...selectedTrack.attack.cadence, ...values } },
-        "fitted",
-      ),
+      setTrackAttack(current, selectedTrack.id, result.value.attack),
     );
   };
 
@@ -765,8 +735,8 @@ export function TaggerRoute() {
   const freshStudy = (
     nextEncounterId: string,
     nextArchetypeId: string,
-    provenance: StudyV5["provenance"],
-  ): StudyV5 =>
+    provenance: StudyV6["provenance"],
+  ): StudyV6 =>
     emptyStudy({
       encounterId: nextEncounterId,
       archetypeId: nextArchetypeId,
@@ -778,7 +748,7 @@ export function TaggerRoute() {
   /** The provenance of the video in use now, for a new study. */
   const provenanceNow = (
     source: Readonly<{ fileName: string; durationSeconds: number }>,
-  ): StudyV5["provenance"] => {
+  ): StudyV6["provenance"] => {
     const trimmed = sourceUrlText.trim();
     return {
       sourceUrl: trimmed.length === 0 ? null : trimmed,
@@ -790,8 +760,8 @@ export function TaggerRoute() {
 
   /** E02: a legacy study converts in memory; each notice is shown once. */
   const v5Of = (
-    loaded: StudyState | StudyV5,
-  ): Readonly<{ study: StudyV5; notices: readonly string[] }> => {
+    loaded: StudyState | StudyV6,
+  ): Readonly<{ study: StudyV6; notices: readonly string[] }> => {
     if ("schemaVersion" in loaded) return { study: loaded, notices: [] };
     const loadedConfig = taggingConfigOf(loaded.encounterId);
     const id = loaded.archetypeId ?? loadedConfig.primaryArchetypeId;
@@ -894,7 +864,7 @@ export function TaggerRoute() {
 
   /** Shared by loading a study file and restoring a saved session. */
   const applyStudy = (
-    next: StudyV5,
+    next: StudyV6,
     nextSelectedTrackId: string | null,
     notices: readonly string[],
   ) => {
@@ -1129,17 +1099,8 @@ export function TaggerRoute() {
   const boundaryCount = study?.boundaries.length ?? 0;
   const tracksWithMarks = study?.tracks.filter((track) => track.marks.length > 0).length ?? 0;
   const windows = study ? segmentWindows(study.boundaries, segments, duration) : [];
-  // Step 86.3: each track's predicted volleys are the timeline's faint ticks.
-  const predicted = study
-    ? Object.fromEntries(
-        study.tracks.map((track) => [
-          track.id,
-          predictedTimesInWindows(windowsForTrack(windows, track.location), track.attack.cadence),
-        ]),
-      )
-    : {};
   const rowsOfTimeline = study
-    ? timelineRows({ study, segments, durationSeconds: duration, predicted })
+    ? timelineRows({ study, segments, durationSeconds: duration })
     : [];
   // Step 88.1: the Reconcile step's warnings and export, derived on render.
   const warnings = study
@@ -1158,12 +1119,16 @@ export function TaggerRoute() {
         config,
       })
     : null;
-  const variants = study
-    ? study.tracks.flatMap((track) => {
-        const variant = bombVariantOf(track);
-        return variant ? [variant] : [];
-      })
-    : [];
+  const variants = study ? exportedVariantsOf(study, AUTHORED_MONSTER_FILES[archetypeId]) : [];
+  // Plan V23 Q19: parity is read from the export; an export error shows none.
+  const parity =
+    study && fileText?.ok
+      ? parityReport({
+          study,
+          shippedRawFile: AUTHORED_MONSTER_FILES[archetypeId],
+          exportedRawFile: JSON.parse(fileText.value),
+        })
+      : null;
   /** E20: a track row selects its track, the scratch row selects scratch (null). */
   const selectRow = (id: string) => {
     if (id === "scratch") setSelectedTrackId(null);
@@ -1625,7 +1590,6 @@ export function TaggerRoute() {
           <PreviewPanel
             key={encounterId}
             study={study}
-            segments={segments}
             windows={windows}
             mediaTime={mediaTime}
             hasVideo={videoUrl !== null}
@@ -1712,20 +1676,13 @@ export function TaggerRoute() {
               onCreateFromScratch={createFromScratch}
             />
             {selectedTrack && (
-              <FitPanel
+              <TimingPanel
                 track={selectedTrack}
-                windows={windows}
-                frameRate={frameRate}
-                onAccept={(field, value) => acceptFit({ [field]: value })}
-                onAcceptAll={acceptFit}
-                onSetThreshold={(seconds) =>
-                  applyStudyEdit((current) =>
-                    setBurstGapThreshold(current, selectedTrack.id, seconds),
-                  )
-                }
                 bomb={selectedBomb}
                 tileWidthFraction={study.scale?.tileWidthFraction ?? null}
-                onAcceptOverride={acceptOverride}
+                onSetPeriod={(seconds) =>
+                  applyStudyEdit((current) => setTrackPeriod(current, selectedTrack.id, seconds))
+                }
                 onMeasurePair={(pairIndex, pair) => {
                   if (!videoUrl) {
                     setError("Load a video before measuring a range.");
@@ -1748,20 +1705,22 @@ export function TaggerRoute() {
           <ReconcilePanel
             study={study}
             segments={segments}
-            videoEndSeconds={duration}
-            frameSeconds={2 * volleyStepTolerance(frameRate)}
             warnings={warnings}
             fileText={fileText}
             fileName={monsterFilePath(archetypeId)}
             variants={variants}
-            onAccept={(segmentId, field, value) =>
-              applyStudyEdit((current) => acceptSegmentValue(current, segmentId, field, value))
-            }
             onSeek={(time) => {
               if (videoUrl) seekTo(time);
             }}
             onExportStudy={exportStudy}
-          />
+          >
+            <ParityPanel
+              report={parity}
+              onSeek={(time) => {
+                if (videoUrl) seekTo(time);
+              }}
+            />
+          </ReconcilePanel>
         ) : (
           <p className={styles.note}>Open a video or choose the monster to start a study.</p>
         )}

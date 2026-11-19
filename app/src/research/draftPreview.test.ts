@@ -1,67 +1,132 @@
 import { describe, expect, test } from "vitest";
 import { DEFAULT_DEBUG_SETTINGS } from "../game/config/debug";
-import { AUTHORED_MONSTER_FILES, type AuthoredAttack } from "../game/config/data";
+import type { CadencedAuthoredAttack } from "../game/config/data";
 import {
   archetypeOf,
   attackSpecFromAuthored,
-  ENCOUNTER_CONFIGS,
   encounterConfigOf,
+  type AttackMarks,
   type EncounterConfig,
 } from "../game/config/encounter";
-import {
-  advanceSimulation,
-  createSimulation,
-  setDebugSettings,
-} from "../game/simulation/simulation";
-import { resolveBearings } from "../game/simulation/patterns";
-import {
-  draftVolleysLiveAt,
-  fittedPreviewAt,
-  observedPreviewAt,
-  windowsFromBoundaries,
-  type BlockWindow,
-} from "./draftPreview";
-import { segmentsOfMonster, segmentWindows, type SegmentWindow, type StudyV5 } from "./study";
-import { emptyStudy } from "./studyMigrate";
+import { advanceSimulation, createSimulation, setDebugSettings } from "../game/simulation/simulation";
+import { previewAt, previewVolleysOf } from "./draftPreview";
+import type { AttackTrack, Mark, SegmentWindow, StudyV6 } from "./study";
+import { trackMarksOf } from "./trackMarks";
 
 const queen = encounterConfigOf("killer-bee-queen");
 const IDLE = { north: false, south: false, east: false, west: false };
+const bullet = Object.keys(queen.projectiles).find(
+  (id) => queen.projectiles[id].appearance && queen.projectiles[id].type === "bullet",
+)!;
 
-describe("draftVolleysLiveAt", () => {
-  const window: BlockWindow = { blockId: "a", anchorSeconds: 0, epochSeconds: 2, endSeconds: 20 };
-  const cadence = {
-    shotsPerBurst: 3,
-    shotIntervalSeconds: 0.5,
-    cooldownAfterLastShotSeconds: 2,
-    initialDelaySeconds: 1,
-  };
+const attack: CadencedAuthoredAttack = {
+  id: "probe",
+  projectile: bullet,
+  tuningSource: "video-observation",
+  pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "fixed", fixedBearingDegrees: 0, emitterRadiusTiles: 0 },
+  // Plan V23 Q15: kept, and ignored because the track has marks.
+  cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 0.5, initialDelaySeconds: 0 },
+};
+const volleys = (...times: number[]): Mark[] => times.map((timeSeconds) => ({ timeSeconds, kind: "volley" }));
+const track = (overrides: Partial<AttackTrack> = {}): AttackTrack => ({
+  id: "probe",
+  location: { phaseId: "only", subPhaseId: null },
+  attack,
+  marks: [],
+  ...overrides,
+});
+const window = (startSeconds: number, endSeconds: number, telegraphSeconds = 1): SegmentWindow => ({
+  segmentId: "only",
+  startSeconds,
+  epochSeconds: startSeconds + telegraphSeconds,
+  endSeconds,
+});
+const timesOf = (entries: ReturnType<typeof previewVolleysOf>) =>
+  entries.map((entry) => Math.round(entry.volley.timeSeconds * 1000) / 1000);
 
-  test("uses interval and cooldown as the formula states", () => {
-    const times = draftVolleysLiveAt(cadence, window, 9, 100).map((v) => v.timeSeconds);
-    // base 3, period 3: bursts at 3, 6, 9 with shots 0.5 apart.
-    expect(times).toEqual([3, 3.5, 4, 6, 6.5, 7, 9]);
-    const last = draftVolleysLiveAt(cadence, window, 6.5, 100).at(-1)!;
-    expect(last).toMatchObject({ burstIndex: 1, volleyIndex: 1 });
+describe("previewVolleysOf (plan V23 step 99.1)", () => {
+  const windows = [window(10, 20), window(30, 40)];
+
+  test("a marked track draws its marks in its first window and the same offsets in a later window (Q04)", () => {
+    const marked = track({ marks: volleys(12, 12.5, 15, 35.2) });
+    expect(timesOf(previewVolleysOf(marked, windows, 39, 100))).toEqual([12, 12.5, 15, 32, 32.5, 35]);
   });
 
-  test("a volley at exactly the end does not fire, and one fired before it stays in flight", () => {
-    const w = { ...window, endSeconds: 6 };
-    expect(draftVolleysLiveAt(cadence, w, 6, 100).map((v) => v.timeSeconds)).toEqual([3, 3.5, 4]);
-    expect(draftVolleysLiveAt(cadence, w, 8, 100).map((v) => v.timeSeconds)).toEqual([3, 3.5, 4]);
-    expect(draftVolleysLiveAt(cadence, w, 8, 4.2).map((v) => v.timeSeconds)).toEqual([4]);
+  test("a mark during the telegraph is drawn (Q03)", () => {
+    const marked = track({ marks: volleys(10.5) });
+    expect(timesOf(previewVolleysOf(marked, windows, 10.6, 100))).toEqual([10.5]);
   });
 
-  test("a late time returns a bounded set", () => {
-    const late = draftVolleysLiveAt(cadence, { ...window, endSeconds: 1e9 }, 1e6, 5);
-    expect(late.length).toBeLessThanOrEqual(6);
-    expect(late.length).toBeGreaterThan(0);
+  test("a periodic track repeats until its stop, and a started cycle finishes (Q06, Q07)", () => {
+    const periodic = track({ marks: volleys(11, 11.5), periodSeconds: 3, endSeconds: 17.5 });
+    // Cycles start at 11, 14 and 17; the one at 20 is after the stop at 17.5.
+    expect(timesOf(previewVolleysOf(periodic, [window(10, 25)], 25, 100))).toEqual([11, 11.5, 14, 14.5, 17, 17.5]);
+  });
+
+  test("volleys stop at the window's end and leave the drawing after their lifetime", () => {
+    const periodic = track({ marks: volleys(11), periodSeconds: 3 });
+    expect(timesOf(previewVolleysOf(periodic, [window(10, 18)], 30, 100))).toEqual([11, 14, 17]);
+    expect(timesOf(previewVolleysOf(periodic, [window(10, 18)], 17.5, 1))).toEqual([17]);
+  });
+
+  test("a burst's volleys carry the burst and shot indices the game uses", () => {
+    const marked = track({ marks: volleys(11, 11.1, 11.2, 13, 13.1, 13.2) });
+    expect(
+      previewVolleysOf(marked, [window(10, 20)], 20, 100).map(({ volley }) => [volley.burstIndex, volley.volleyIndex]),
+    ).toEqual([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]]);
+  });
+
+  test("a track with no volley mark in its first window draws nothing, even with later marks (Q16)", () => {
+    expect(previewVolleysOf(track({ marks: volleys(35) }), windows, 39, 100)).toEqual([]);
+    expect(previewVolleysOf(track(), windows, 39, 100)).toEqual([]);
   });
 });
 
-/** The primary monster with one phase holding only `authored`, no spawns. */
-function oneAttackConfig(authored: AuthoredAttack): EncounterConfig {
+function studyOf(tracks: readonly AttackTrack[]): StudyV6 {
+  return {
+    schemaVersion: 6,
+    encounterId: "e",
+    archetypeId: "m",
+    recordedAt: "2026-11-13T00:00:00.000Z",
+    provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 100 },
+    boundaries: [],
+    statusSpans: [],
+    tracks,
+    scratch: [],
+  };
+}
+
+describe("previewAt", () => {
+  const frameAt = (tracks: readonly AttackTrack[], timeSeconds: number) =>
+    previewAt({
+      study: studyOf(tracks),
+      windows: [window(10, 20)],
+      config: queen,
+      timeSeconds,
+      playerTiles: { x: 0, y: 0 },
+      headingRadians: 0,
+    });
+
+  test("draws a marked volley once it fires, tagged with its track's index", () => {
+    const tracks = [track({ id: "dropped" }), track({ marks: volleys(12) })];
+    expect(frameAt(tracks, 11.9).frame.projectiles).toHaveLength(0);
+    const after = frameAt(tracks, 12.1).frame.projectiles;
+    expect(after).toHaveLength(1);
+    expect(after[0].tagIndex).toBe(1);
+  });
+
+  test("a track whose projectile has no sprite is reported, not drawn", () => {
+    const unseen = Object.keys(queen.projectiles).find((id) => !queen.projectiles[id].appearance);
+    if (!unseen) return;
+    const frame = frameAt([track({ attack: { ...attack, projectile: unseen }, marks: volleys(12) })], 12.1);
+    expect(frame.undrawnAttackIds).toEqual(["probe"]);
+  });
+});
+
+/** The primary monster with one phase holding only `marks` as an attack, no spawns. */
+function oneMarkedAttackConfig(marks: AttackMarks): EncounterConfig {
   const primary = archetypeOf(queen, queen.primaryArchetypeId);
-  const base = primary.phases[2];
+  const { cadence: _cadence, ...rest } = attack;
   return {
     ...queen,
     archetypes: {
@@ -70,13 +135,13 @@ function oneAttackConfig(authored: AuthoredAttack): EncounterConfig {
         ...primary,
         phases: [
           {
-            ...base,
+            ...primary.phases[2],
             enterAtHpFraction: 1,
             exitAfterSeconds: null,
             subPhases: null,
             spawns: null,
             progression: null,
-            attacks: [attackSpecFromAuthored(authored)],
+            attacks: [attackSpecFromAuthored({ ...rest, marks })],
           },
         ],
       },
@@ -92,278 +157,27 @@ function simulatedVolleyTimes(config: EncounterConfig, seconds: number): number[
   let seen = state.nextShardId;
   while (state.elapsedSeconds < seconds) {
     advanceSimulation(state, step, IDLE);
-    if (state.nextShardId !== seen) times.push(state.elapsedSeconds);
+    for (let shard = seen; shard < state.nextShardId; shard++) times.push(state.elapsedSeconds);
     seen = state.nextShardId;
   }
   return times;
 }
 
-describe("draftVolleysLiveAt against the simulation", () => {
-  const attack = (cadence: AuthoredAttack["cadence"]): AuthoredAttack => ({
-    id: "probe",
-    projectile: "red-stinger-v2" in queen.projectiles ? "red-stinger-v2" : Object.keys(queen.projectiles)[0],
-    tuningSource: "video-observation",
-    pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "fixed", fixedBearingDegrees: 0, emitterRadiusTiles: 0 },
-    cadence,
-  });
-
-  for (const [name, cadence] of [
-    ["a single shot", { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 0.7, initialDelaySeconds: 0.42 }],
-    ["a multi-shot burst", { shotsPerBurst: 3, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1.4, initialDelaySeconds: 0.42 }],
+describe("the preview and the game fire the same volleys (Q01)", () => {
+  for (const [name, marks, periodSeconds] of [
+    ["once-only marks", volleys(0.4, 0.5, 0.6, 2, 2, 3.3), undefined],
+    ["a periodic cycle", volleys(0.4, 0.9), 1.7],
   ] as const) {
-    test(`matches the real clock for ${name}`, () => {
-      const config = oneAttackConfig(attack(cadence));
+    test(name, () => {
+      const marked = track({ marks, ...(periodSeconds === undefined ? {} : { periodSeconds }) });
+      const windows = [window(0, 12, queen.archetypes[queen.primaryArchetypeId].phases[2].telegraphSeconds)];
+      const config = oneMarkedAttackConfig(trackMarksOf(marked, windows)!);
       const step = config.simulation.fixedStepSeconds;
       const real = simulatedVolleyTimes(config, 12);
-      const window = { blockId: "x", anchorSeconds: 0, epochSeconds: config.archetypes[config.primaryArchetypeId].phases[0].telegraphSeconds, endSeconds: 12 };
-      const predicted = draftVolleysLiveAt(cadence, window, 12, 1e9).map((v) => v.timeSeconds);
+      const drawn = timesOf(previewVolleysOf(marked, windows, 12, 1e9));
       expect(real.length).toBeGreaterThan(3);
-      expect(predicted.length).toBe(real.length);
-      predicted.forEach((time, index) => expect(Math.abs(real[index] - time)).toBeLessThanOrEqual(step * 1.5));
+      expect(drawn.length).toBe(real.length);
+      drawn.forEach((time, index) => expect(Math.abs(real[index] - time)).toBeLessThanOrEqual(step));
     });
   }
-});
-
-/** A study holding one track of `authored` in segment "only", fitted in one window from 0 s. */
-function fittedOne(
-  authored: AuthoredAttack,
-  config: EncounterConfig,
-  input: Readonly<{ telegraphSeconds?: number; endSeconds?: number; timeSeconds: number; playerTiles?: { x: number; y: number } }>,
-) {
-  const study: StudyV5 = {
-    schemaVersion: 5,
-    encounterId: "e",
-    archetypeId: "m",
-    recordedAt: "2026-11-13T00:00:00.000Z",
-    provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 1e6 },
-    boundaries: [],
-    statusSpans: [],
-    tracks: [{ id: authored.id, location: { phaseId: "only", subPhaseId: null }, attack: authored, cadenceSource: "authored", marks: [] }],
-    scratch: [],
-    acceptedSegmentValues: {},
-  };
-  const windows: SegmentWindow[] = [
-    { segmentId: "only", startSeconds: 0, epochSeconds: input.telegraphSeconds ?? 0, endSeconds: input.endSeconds ?? 1e6 },
-  ];
-  return fittedPreviewAt({
-    study,
-    segments: [],
-    windows,
-    config,
-    timeSeconds: input.timeSeconds,
-    playerTiles: input.playerTiles ?? { x: 0, y: 0 },
-    headingRadians: 0,
-  });
-}
-
-describe("fittedPreviewAt on one track", () => {
-  const player = { x: 0, y: 0 };
-  const single = (cooldown: number): AuthoredAttack =>
-    ({
-      id: "one",
-      projectile: Object.keys(queen.projectiles).find((id) => queen.projectiles[id].appearance && queen.projectiles[id].type === "bullet")!,
-      tuningSource: "video-observation",
-      pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
-      cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: cooldown, initialDelaySeconds: 0 },
-    }) satisfies AuthoredAttack;
-
-  test("shots outlive their window's end, and none fire after it", () => {
-    expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 3.9 }).frame.projectiles.length).toBeGreaterThan(0);
-    expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 4.1 }).frame.projectiles.length).toBeGreaterThan(0);
-    expect(fittedOne(single(0.5), queen, { endSeconds: 4, timeSeconds: 60 }).frame.projectiles).toHaveLength(0);
-  });
-
-  test("per-burst advance changes the bearings between bursts as in resolveBearings", () => {
-    const authored: AuthoredAttack = {
-      id: "adv",
-      projectile: Object.keys(queen.projectiles).find((id) => queen.projectiles[id].appearance && queen.projectiles[id].type === "bullet")!,
-      tuningSource: "video-observation",
-      pattern: { kind: "ring", arms: 1, emitterRadiusTiles: 0, initialPhaseDegrees: 0, clockwiseDegreesPerSecond: 0, perBurstAdvanceDegrees: 30 },
-      cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
-    };
-    const at = (time: number) => fittedOne(authored, queen, { endSeconds: 50, timeSeconds: time }).frame.projectiles;
-    const spec = attackSpecFromAuthored(authored);
-    const bearing = (burst: number) =>
-      resolveBearings(spec.pattern, { enemyPositionTiles: { x: 0, y: 0 }, playerPositionTiles: player, enemyHeadingRadians: 0, ringPhaseRadians: 0, volleyIndexInBurst: 0, burstsFired: burst, secondsSinceEpoch: 0 })[0].bearingRadians;
-    expect(bearing(1)).not.toBeCloseTo(bearing(0));
-    const first = at(0.2)[0];
-    const second = at(1.2).find((p) => Math.abs(p.orientationRadians - bearing(1)) < 1e-9);
-    expect(first.orientationRadians).toBeCloseTo(bearing(0));
-    expect(second).toBeDefined();
-  });
-
-  test("a targeted bomb lands at the player point", () => {
-    const bomb = Object.keys(queen.projectiles).find((id) => queen.projectiles[id].type === "bomb" && queen.projectiles[id].appearance)!;
-    const authored: AuthoredAttack = {
-      id: "bomb",
-      projectile: bomb,
-      tuningSource: "video-observation",
-      target: "player",
-      pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
-      cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 30, initialDelaySeconds: 0 },
-    };
-    const spec = queen.projectiles[bomb];
-    const travel = spec.type === "bomb" ? spec.travelSeconds : 0;
-    const { frame } = fittedOne(authored, queen, { endSeconds: 50, timeSeconds: travel + 0.01, playerTiles: { x: 3, y: 2 } });
-    expect(frame.detonations[0].positionTiles).toEqual({ x: 3, y: 2 });
-  });
-
-  test("an attack with no sprite is reported and draws nothing", () => {
-    const worm = encounterConfigOf("crystal-worm");
-    const noSprite = Object.keys(worm.projectiles).find((id) => !worm.projectiles[id].appearance);
-    expect(noSprite).toBeDefined();
-    const authored: AuthoredAttack = {
-      id: "blank",
-      projectile: noSprite!,
-      tuningSource: "video-observation",
-      pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
-      cadence: { shotsPerBurst: 1, shotIntervalSeconds: 0.1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
-    };
-    const result = fittedOne(authored, worm, { endSeconds: 50, timeSeconds: 2 });
-    expect(result.undrawnAttackIds).toEqual(["blank"]);
-    expect(result.frame.projectiles).toHaveLength(0);
-  });
-});
-
-describe("fittedPreviewAt against the simulation", () => {
-  test("projectile count matches a real run of one block at sampled times", () => {
-    const projectile = Object.keys(queen.projectiles).find(
-      (id) => queen.projectiles[id].type === "bullet" && queen.projectiles[id].appearance,
-    )!;
-    const authored: AuthoredAttack = {
-      id: "probe",
-      projectile,
-      tuningSource: "video-observation",
-      pattern: { kind: "ring", arms: 3, emitterRadiusTiles: 0.2, initialPhaseDegrees: 10, clockwiseDegreesPerSecond: 20 },
-      cadence: { shotsPerBurst: 2, shotIntervalSeconds: 0.2, cooldownAfterLastShotSeconds: 0.9, initialDelaySeconds: 0.3 },
-    };
-    const config = oneAttackConfig(authored);
-    const phase = config.archetypes[config.primaryArchetypeId].phases[0];
-    const state = createSimulation(config, 1);
-    setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
-    const step = config.simulation.fixedStepSeconds;
-    const samples = [3, 5, 8, 11];
-    for (const sample of samples) {
-      while (state.elapsedSeconds < sample - step / 2) advanceSimulation(state, step, IDLE);
-      const preview = fittedOne(authored, config, { telegraphSeconds: phase.telegraphSeconds, timeSeconds: state.elapsedSeconds });
-      expect(Math.abs(preview.frame.projectiles.length - state.shards.length)).toBeLessThanOrEqual(3);
-    }
-  });
-});
-
-describe("the timeline preview (plan V20 step 86.4)", () => {
-  const segments = segmentsOfMonster(archetypeOf(queen, "killer-bee-queen"));
-  const base = emptyStudy({
-    encounterId: "killer-bee-queen",
-    archetypeId: "killer-bee-queen",
-    provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 200 },
-    recordedAt: "2026-11-13T00:00:00.000Z",
-    rawFile: AUTHORED_MONSTER_FILES["killer-bee-queen"],
-  });
-  const index = base.tracks.findIndex((track) => {
-    const projectile = queen.projectiles[track.attack.projectile];
-    return projectile?.appearance !== undefined && projectile.type === "bullet";
-  });
-  const chosen = base.tracks[index];
-  const segmentId = chosen.location.subPhaseId === null
-    ? chosen.location.phaseId
-    : `${chosen.location.phaseId}/${chosen.location.subPhaseId}`;
-  const study: StudyV5 = {
-    ...base,
-    boundaries: [{ timeSeconds: 0, segmentId }],
-    tracks: base.tracks.map((track, at) =>
-      at === index ? { ...track, marks: [{ timeSeconds: 1, kind: "volley" }] } : track,
-    ),
-  };
-  const windows = segmentWindows(study.boundaries, segments, 200);
-  const input = (timeSeconds: number) => ({
-    study,
-    segments,
-    windows,
-    config: queen,
-    timeSeconds,
-    playerTiles: { x: 0, y: 0 },
-    headingRadians: 0,
-  });
-
-  test("windowsFromBoundaries maps a window one-to-one", () => {
-    const window: SegmentWindow = { segmentId: "a", startSeconds: 2, epochSeconds: 3, endSeconds: 9 };
-    expect(windowsFromBoundaries([window])).toEqual([
-      { blockId: "a", anchorSeconds: 2, epochSeconds: 3, endSeconds: 9 },
-    ]);
-  });
-
-  test("observedPreviewAt draws a mark's volley from its own age only", () => {
-    expect(observedPreviewAt(input(0.99)).frame.projectiles).toHaveLength(0);
-    const after = observedPreviewAt(input(1.1)).frame.projectiles;
-    expect(after.length).toBeGreaterThan(0);
-    expect(after.every((projectile) => projectile.tagIndex === index)).toBe(true);
-    expect(after.some((projectile) => projectile.ghost)).toBe(false);
-  });
-
-  test("fittedPreviewAt marks every entry as a ghost", () => {
-    const { frame } = fittedPreviewAt(input(30));
-    expect(frame.projectiles.length).toBeGreaterThan(0);
-    expect(frame.projectiles.every((projectile) => projectile.ghost === true)).toBe(true);
-    expect(frame.detonations.every((detonation) => detonation.ghost === true)).toBe(true);
-  });
-});
-
-describe("a bomb track's flight-time override (plan V20 step 87.1)", () => {
-  const found = Object.entries(ENCOUNTER_CONFIGS).flatMap(([encounterId, config]) =>
-    Object.keys(config.archetypes)
-      .filter((archetypeId) => AUTHORED_MONSTER_FILES[archetypeId] !== undefined)
-      .map((archetypeId) => ({ encounterId, archetypeId, config })),
-  ).flatMap(({ encounterId, archetypeId, config }) => {
-    const base = emptyStudy({
-      encounterId,
-      archetypeId,
-      provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 200 },
-      recordedAt: "2026-11-13T00:00:00.000Z",
-      rawFile: AUTHORED_MONSTER_FILES[archetypeId],
-    });
-    const index = base.tracks.findIndex((track) => {
-      const projectile = config.projectiles[track.attack.projectile];
-      return projectile?.type === "bomb" && projectile.appearance?.bomb !== undefined;
-    });
-    return index < 0 ? [] : [{ base, index, config, archetypeId }];
-  })[0];
-
-  test("observedPreviewAt detonates at the override's travel time", () => {
-    expect(found).toBeDefined();
-    const { base, index, config, archetypeId } = found!;
-    const segments = segmentsOfMonster(archetypeOf(config, archetypeId));
-    const chosen = base.tracks[index];
-    const projectile = config.projectiles[chosen.attack.projectile]!;
-    const travelSeconds = projectile.type === "bomb" ? projectile.travelSeconds : 0;
-    const override = travelSeconds + 0.5;
-    const studyOf = (projectileOverride?: { travelSeconds: number }): StudyV5 => ({
-      ...base,
-      boundaries: [{ timeSeconds: 0, segmentId: segments[0].id }],
-      tracks: base.tracks.map((track, at) =>
-        at === index
-          ? {
-              ...track,
-              location: segments[0].ref,
-              marks: [{ timeSeconds: 1, kind: "volley" }],
-              ...(projectileOverride ? { projectileOverride } : {}),
-            }
-          : track,
-      ),
-    });
-    const at = (study: StudyV5, timeSeconds: number) =>
-      observedPreviewAt({
-        study,
-        segments,
-        windows: segmentWindows(study.boundaries, segments, 200),
-        config,
-        timeSeconds,
-        playerTiles: { x: 0, y: 0 },
-        headingRadians: 0,
-      }).frame.detonations.filter((detonation) => detonation.tagIndex === index);
-    const probe = 1 + travelSeconds + 0.01;
-    expect(at(studyOf(), probe).length).toBeGreaterThan(0);
-    expect(at(studyOf({ travelSeconds: override }), probe)).toHaveLength(0);
-    expect(at(studyOf({ travelSeconds: override }), 1 + override + 0.01).length).toBeGreaterThan(0);
-  });
 });

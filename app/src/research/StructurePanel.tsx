@@ -1,6 +1,6 @@
 import { HelpMark } from "./HelpMark";
 import * as help from "./helpText";
-import type { Segment, SegmentWindow, StudyV5 } from "./study";
+import type { Segment, SegmentWindow, StudyV6 } from "./study";
 import styles from "./TaggerRoute.module.css";
 
 const seconds = (value: number) => `${value.toFixed(3)} s`;
@@ -25,7 +25,7 @@ export function StructurePanel({
   onRemoveSpan,
   onSeek,
 }: Readonly<{
-  study: StudyV5;
+  study: StudyV6;
   segments: readonly Segment[];
   windows: readonly SegmentWindow[];
   mediaTime: number;

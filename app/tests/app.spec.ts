@@ -2507,8 +2507,28 @@ test("a Queen phase-3 drill spawns her at the arena centre; the pond damages an 
     y: 0,
   } satisfies Vector2);
 
-  // Idle in the pond (the player also spawns at the arena centre): health
-  // falls by exactly HONEY_DAMAGE_HP on each 1.0s tick, in step with hitsTaken.
+  // Since 2026-11-19 the Queen's player spawns at (3.527, 3.527), off the
+  // pond, so walk north-west to the arena centre first. Movement keys are only
+  // sampled while the arena itself holds focus.
+  await page
+    .getByRole("region", { name: "Encounter", exact: true })
+    .evaluate((element) => (element as HTMLElement).focus());
+  await page.keyboard.down("w");
+  await page.keyboard.down("a");
+  for (
+    let slice = 0;
+    slice < 100 && (await inspect(page)).player.positionTiles.x > 0.1;
+    slice++
+  )
+    await page.clock.runFor(20);
+  await page.keyboard.up("w");
+  await page.keyboard.up("a");
+  const centred = await inspect(page);
+  expect(Math.abs(centred.player.positionTiles.x)).toBeLessThan(0.3);
+  expect(Math.abs(centred.player.positionTiles.y)).toBeLessThan(0.3);
+
+  // Idle in the pond: health falls by exactly HONEY_DAMAGE_HP on each 1.0s
+  // tick, in step with hitsTaken.
   const before = await inspect(page);
   let afterHit = before;
   for (
@@ -2527,11 +2547,7 @@ test("a Queen phase-3 drill spawns her at the arena centre; the pond damages an 
 
   // Drive east in fixed slices, measuring tiles/second inside the pond
   // (halfDiagonal 3.5 tiles) and on the safe floor beyond it but short of the
-  // outer honey ring (7.5-9.5 tiles). Movement keys are only sampled while the
-  // arena itself holds focus.
-  await page
-    .getByRole("region", { name: "Encounter", exact: true })
-    .evaluate((element) => (element as HTMLElement).focus());
+  // outer honey ring (7.5-9.5 tiles).
   await page.keyboard.down("d");
   const samples: { x: number; elapsedSeconds: number }[] = [];
   for (let slice = 0; slice < 40; slice++) {
@@ -2972,7 +2988,7 @@ test("the structure step marks a boundary, a telegraph end and an invulnerable s
   await expect(rows).not.toHaveAttribute("data-selected-row", "scratch");
 });
 
-test("the attacks step marks volleys by key, fits them and accepts the fit", async ({
+test("the attacks step marks volleys by key and deletes an end mark", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -3006,13 +3022,12 @@ test("the attacks step marks volleys by key, fits them and accepts the fit", asy
     await page.keyboard.press("Enter");
   }
   await expect(marks.getByRole("row")).toHaveCount(4);
-  await expect(page.getByText(/^3 volleys/)).toBeVisible();
   await page.keyboard.press("x");
   await expect(page.getByText(/^End mark at 1\.\d{3} s/)).toBeVisible();
   await page.keyboard.press("Delete");
   await expect(marks.getByRole("row")).toHaveCount(3);
-  await page.getByRole("button", { name: "Accept all" }).click();
-  await expect(tracks.getByRole("button").first()).toContainText("fitted");
+  // Plan V23 Q17 removed the fit and every Accept control.
+  await expect(page.getByRole("button", { name: /^Accept/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Attacks/ })).toContainText("2 marks on 1 tracks");
 });
 
@@ -3078,7 +3093,7 @@ test.describe("timeline tagger", () => {
   });
 });
 
-test("a legacy study converts with a notice and a reload restores the v5 session", async ({
+test("a legacy study converts with a notice and a reload restores the v6 session", async ({
   page,
 }) => {
   await page.goto("./?tagger=1");

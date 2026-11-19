@@ -5,7 +5,7 @@
  * The monster file text now comes from `studyExport.ts`. No React, DOM,
  * storage or simulation here, and nothing is written anywhere (L02, L23).
  */
-import { validateAttack, type AuthoredAttack } from "../game/config/data";
+import { validateAttack, type CadencedAuthoredAttack } from "../game/config/data";
 import {
   attackSpecFromAuthored,
   ENCOUNTER_CONFIGS,
@@ -167,7 +167,7 @@ export type AttackChange =
   | Readonly<{ field: "target"; value: "player" | null }>
   | Readonly<{
       field: "cadence";
-      key: keyof AuthoredAttack["cadence"];
+      key: keyof CadencedAuthoredAttack["cadence"];
       value: number;
     }>
   | Readonly<{ field: "patternKind"; value: "ring" | "spread" | "scatter" }>
@@ -177,10 +177,10 @@ export type AttackChange =
 
 /** Runs the game's own validators; returns their message unchanged on refusal. */
 function validated(
-  attack: AuthoredAttack,
+  attack: CadencedAuthoredAttack,
   otherIds: readonly string[],
   config: EncounterConfig,
-): DraftResult<AuthoredAttack> {
+): DraftResult<CadencedAuthoredAttack> {
   try {
     const checked = validateAttack(
       attack,
@@ -196,9 +196,9 @@ function validated(
 }
 
 function applyChange(
-  attack: AuthoredAttack,
+  attack: CadencedAuthoredAttack,
   change: AttackChange,
-): Readonly<{ attack: AuthoredAttack; removed: readonly string[] }> {
+): Readonly<{ attack: CadencedAuthoredAttack; removed: readonly string[] }> {
   const pattern = { ...attack.pattern } as Record<string, unknown>;
   let removed: string[] = [];
   const next: Record<string, unknown> = { ...attack };
@@ -231,16 +231,16 @@ function applyChange(
     next.pattern = pattern;
   }
   next.tuningSource = EXPORT_TUNING_SOURCE;
-  return { attack: next as AuthoredAttack, removed };
+  return { attack: next as CadencedAuthoredAttack, removed };
 }
 
 /** Plan V20 step 86.1: one change to one attack, validated against the other ids. */
 export function changedAttack(
-  current: AuthoredAttack,
+  current: CadencedAuthoredAttack,
   change: AttackChange,
   otherIds: readonly string[],
   config: EncounterConfig,
-): DraftResult<Readonly<{ attack: AuthoredAttack; removed: readonly string[] }>> {
+): DraftResult<Readonly<{ attack: CadencedAuthoredAttack; removed: readonly string[] }>> {
   const { attack, removed } = applyChange(current, change);
   const checked = validated(attack, otherIds, config);
   if (!checked.ok) return checked;
@@ -252,7 +252,7 @@ export function newAttack(
   id: string,
   otherIds: readonly string[],
   config: EncounterConfig,
-): DraftResult<AuthoredAttack> {
+): DraftResult<CadencedAuthoredAttack> {
   const projectile = Object.keys(config.projectiles)[0];
   const attack = {
     id,
@@ -260,6 +260,6 @@ export function newAttack(
     tuningSource: EXPORT_TUNING_SOURCE,
     pattern: { ...NEW_ATTACK_DEFAULTS.pattern },
     cadence: { ...NEW_ATTACK_DEFAULTS.cadence },
-  } as AuthoredAttack;
+  } as CadencedAuthoredAttack;
   return validated(attack, otherIds, config);
 }

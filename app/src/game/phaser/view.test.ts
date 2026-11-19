@@ -47,7 +47,8 @@ const queen = primaryArchetype(encounterConfigOf("killer-bee-queen"));
 
 test.each([
   [2, 0.675, 0, 0.5],
-  [5, 0.25, 14.5, 0.5],
+  // Plan V23 Q13: phase 6 lasts its measured 33.133 s.
+  [5, 0.25, 33.133 / 2, 0.5],
   [6, 0.1875, 0, 0.5],
   [7, 0.0625, 0, 0.5],
 ])("phaseProgressOf phase index %i", (index, fraction, seconds, expected) => {

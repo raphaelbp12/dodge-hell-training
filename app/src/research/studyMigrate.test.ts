@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import { archetypeOf, encounterConfigOf } from "../game/config/encounter";
-import { validateStudyV5 } from "./study";
+import { validateStudyV6 } from "./study";
 import { emptyStudy, studyV5FromLegacy, tracksFromMonsterFile } from "./studyMigrate";
 import {
   studyFromExport,
@@ -49,7 +49,7 @@ describe("tracksFromMonsterFile and emptyStudy", () => {
     ]);
     expect(tracks.map((track) => `${track.location.phaseId}|${track.location.subPhaseId}`)).toEqual(expected);
     expect(new Set(tracks.map((track) => track.id)).size).toBe(tracks.length);
-    expect(tracks.every((track) => track.cadenceSource === "authored" && track.marks.length === 0)).toBe(true);
+    expect(tracks.every((track) => track.marks.length === 0 && track.attack.cadence !== undefined)).toBe(true);
   });
 
   test("emptyStudy has no boundaries, spans or marks and validates", () => {
@@ -57,7 +57,7 @@ describe("tracksFromMonsterFile and emptyStudy", () => {
     expect(study.boundaries).toEqual([]);
     expect(study.statusSpans).toEqual([]);
     expect(study.scratch).toEqual([]);
-    expect(validateStudyV5(study)).toBe(study);
+    expect(validateStudyV6(study)).toBe(study);
   });
 });
 
@@ -69,7 +69,7 @@ describe("studyV5FromLegacy", () => {
     );
     const state = legacyStudyFromExport(validateObservationExport(JSON.parse(text)));
     const { study } = convert(state);
-    expect(validateStudyV5(study)).toBe(study);
+    expect(validateStudyV6(study)).toBe(study);
     const marks =
       study.tracks.reduce((sum, track) => sum + track.marks.length, 0) + study.scratch.length;
     expect(marks).toBe(state.tags.length);
@@ -94,9 +94,8 @@ describe("studyV5FromLegacy", () => {
     const track = study.tracks.find((entry) => entry.id === "white-bomb")!;
     expect(track.marks.map((mark) => mark.timeSeconds)).toEqual([10, 12]);
     expect(track.endSeconds).toBe(20);
-    expect(track.cadenceSource).toBe("typed");
     expect(track.attack.cadence).toMatchObject({ cooldownAfterLastShotSeconds: 2, initialDelaySeconds: 0 });
-    expect(validateStudyV5(study)).toBe(study);
+    expect(validateStudyV6(study)).toBe(study);
   });
 
   test("two unlinked tags of identical fields become one observed track", () => {

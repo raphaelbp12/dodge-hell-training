@@ -26,6 +26,7 @@ import {
   bulletOf,
   projectileOf,
   type AttackSpec,
+  type MarkedAttackSpec,
   type EncounterConfig,
   type EnemyArchetype,
   type MovementSpec,
@@ -38,6 +39,7 @@ import {
   shardOverlapsPlayer,
 } from "./projectiles";
 import { advanceBomb, createBomb } from "./bombs";
+import { markedVolleysBetween } from "./marks";
 import { resolveBearings, scatterDrawCount } from "./patterns";
 import {
   DEFAULT_DEBUG_SETTINGS,
@@ -185,6 +187,7 @@ export function createEnemy(
     attackClocks: createAttackClocks(
       attacks,
       spawnedAtSeconds + telegraphSeconds,
+      spawnedAtSeconds,
     ),
     nextContactEligibleSeconds: spawnedAtSeconds,
     movementPhaseRadians: 0,
@@ -431,7 +434,8 @@ export function setDebugSettings(
             : clock.ringPhaseRadians;
         clock.ringPhaseRadians = clock.rotationPhaseAtEpoch;
       }
-      if (burstChanged) {
+      // Q12: the timing sliders never move a marked volley.
+      if (burstChanged && attack.marks === undefined) {
         clock.epochSeconds = state.elapsedSeconds;
         clock.volleysAtEpoch = clock.volleysFired;
         clock.initialDelaySeconds =
@@ -869,6 +873,21 @@ function updateAttacks(state: SimulationState): void {
   }
 }
 
+/**
+ * User decision 2026-11-19 (finding F100-1): a segment's exit runs before
+ * this step's attacks, so every marked volley already due on an outgoing
+ * clock fires first, a mark on the segment's last frame included. A clock
+ * entered at this very time has nothing due yet and is left alone.
+ */
+export function fireDueMarkedVolleys(state: SimulationState, enemy: EnemyState): void {
+  const attacks = activeAttacks(archetypeOf(state.config, enemy.archetypeId), enemy);
+  enemy.attackClocks.forEach((clock, index) => {
+    const attack = attacks[index];
+    if (attack?.marks !== undefined && clock.marks && clock.marks.entrySeconds < state.elapsedSeconds)
+      updateAttackClock(state, enemy, attack, clock);
+  });
+}
+
 /** Advances one attack's rotation and fires its volley when its clock is due. */
 function updateAttackClock(
   state: SimulationState,
@@ -876,8 +895,7 @@ function updateAttackClock(
   attack: AttackSpec,
   clock: AttackClockState,
 ): void {
-  const projectile = projectileOf(state.config, attack.projectileId);
-  const { pattern, cadence } = attack;
+  const { pattern } = attack;
   // Only a `ring` pattern rotates; every other kind leaves ringPhaseRadians
   // at its fixed, deterministic starting value (see createEnemy).
   if (pattern.kind === "ring") {
@@ -889,6 +907,11 @@ function updateAttackClock(
           180) %
       fullTurnRadians;
   }
+  if (attack.marks !== undefined) {
+    fireMarkedVolleys(state, enemy, attack, clock);
+    return;
+  }
+  const { cadence } = attack;
   const { shotsPerBurst, shotIntervalSeconds } = cadence;
   const burstGroupSeconds =
     (shotsPerBurst - 1) * shotIntervalSeconds +
@@ -904,7 +927,42 @@ function updateAttackClock(
   const shotToleranceSeconds =
     Math.max(state.elapsedSeconds, nextShotSeconds) * Number.EPSILON * 16;
   if (state.elapsedSeconds + shotToleranceSeconds < nextShotSeconds) return;
+  fireVolley(state, enemy, attack, clock, shotIndex, groupIndex);
+}
 
+/**
+ * Plan V23 Q03, Q08: fires, in order, every marked volley due since the last
+ * step, counted from the segment's entry, each with its own burst and shot.
+ */
+function fireMarkedVolleys(
+  state: SimulationState,
+  enemy: EnemyState,
+  attack: MarkedAttackSpec,
+  clock: AttackClockState,
+): void {
+  const marked = clock.marks!;
+  const offsetSeconds = state.elapsedSeconds - marked.entrySeconds;
+  const volleys = markedVolleysBetween(
+    attack.marks,
+    marked.throughOffsetSeconds,
+    offsetSeconds,
+  );
+  marked.throughOffsetSeconds = offsetSeconds;
+  for (const volley of volleys)
+    fireVolley(state, enemy, attack, clock, volley.shotIndex, volley.burstIndex);
+}
+
+/** Fires one volley of `attack` from `enemy` at the current simulation time. */
+function fireVolley(
+  state: SimulationState,
+  enemy: EnemyState,
+  attack: AttackSpec,
+  clock: AttackClockState,
+  shotIndex: number,
+  groupIndex: number,
+): void {
+  const projectile = projectileOf(state.config, attack.projectileId);
+  const { pattern } = attack;
   // A volley draws one unit-random value per final scatter shot (a top-level
   // scatter or a scatter inside a ring's arms), in depth-first arm order,
   // advancing the shared generator cursor - the only place this attack's

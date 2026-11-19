@@ -1,8 +1,8 @@
 /**
- * Pure timeline preview for the tagger (plan V18 phase 75, plan V20
- * step 86.4): the volleys of a cadence inside a segment window, and one
- * preview frame of a study's tracks, observed or fitted. It runs no simulation
- * and owns no clock; the video's `mediaTime` is the only time it reads (M01, L32).
+ * Pure timeline preview for the tagger (plan V18 phase 75, plan V20 step 86.4,
+ * plan V23 Q17): one preview frame of what the game will fire for a study's
+ * tracks. It runs no simulation and owns no clock; the video's `mediaTime` is
+ * the only time it reads (M01, L32).
  */
 import {
   attackSpecFromAuthored,
@@ -11,13 +11,14 @@ import {
   type EncounterConfig,
   type ProjectileSpec,
 } from "../game/config/encounter";
-import type { AuthoredAttack } from "../game/config/data";
 import type { Vector2 } from "../game/models";
 import { BOMB_EXPLOSION_FRAME_SECONDS } from "../game/phaser/appearance-pixels";
 import { resolveBombDestination } from "../game/simulation/bombs";
+import { markedVolleysBetween } from "../game/simulation/marks";
 import { resolveBearings } from "../game/simulation/patterns";
-import { splitGaps } from "./cadenceFit";
-import { windowAt, windowsForTrack, type Segment, type SegmentWindow, type StudyV5 } from "./study";
+import { measuredRangeTilesOf, measuredTravelSeconds } from "./studyExport";
+import { windowAt, windowsForTrack, type AttackTrack, type SegmentWindow, type StudyV6 } from "./study";
+import { trackMarksOf, trackWindowsOf } from "./trackMarks";
 import {
   drawnLifetimeSeconds,
   emitterTilesOf,
@@ -28,61 +29,13 @@ import {
   type PreviewProjectile,
 } from "./previewModel";
 
-export type BlockWindow = Readonly<{
-  blockId: string;
-  anchorSeconds: number;
-  /** L20: the anchor plus the block's telegraph. */
-  epochSeconds: number;
-  /** L19, L34: where the block stops firing. */
-  endSeconds: number;
-}>;
-
 export type DraftVolley = Readonly<{
   timeSeconds: number;
-  /** The burst group `g` of the formula, which the game calls `burstsFired`. */
+  /** The game's `burstsFired`. */
   burstIndex: number;
-  /** The shot `s` inside the burst. */
+  /** The shot inside the burst, the game's `volleyIndexInBurst`. */
   volleyIndex: number;
 }>;
-
-type Cadence = AuthoredAttack["cadence"];
-
-/**
- * Every volley of `cadence` that fired at or before `timeSeconds`, before the
- * window's end, and is still inside `lifetimeSeconds` of flight. The first
- * relevant burst is found by arithmetic, so cost follows the lifetime and not
- * the distance from the anchor.
- *
- *   volleyTime(g, s) = epoch + initialDelay + g * burstPeriod + s * interval
- */
-export function draftVolleysLiveAt(
-  cadence: Cadence,
-  window: BlockWindow,
-  timeSeconds: number,
-  lifetimeSeconds: number,
-): readonly DraftVolley[] {
-  const { shotsPerBurst, shotIntervalSeconds, cooldownAfterLastShotSeconds } = cadence;
-  const burstPeriod =
-    (shotsPerBurst - 1) * shotIntervalSeconds + cooldownAfterLastShotSeconds;
-  const base = window.epochSeconds + cadence.initialDelaySeconds;
-  const burstSpan = (shotsPerBurst - 1) * shotIntervalSeconds;
-  const lastBurst = Math.floor((timeSeconds - base) / burstPeriod);
-  if (lastBurst < 0) return [];
-  const firstBurst = Math.max(
-    0,
-    Math.floor((timeSeconds - lifetimeSeconds - base - burstSpan) / burstPeriod),
-  );
-  const volleys: DraftVolley[] = [];
-  for (let burstIndex = firstBurst; burstIndex <= lastBurst; burstIndex += 1)
-    for (let volleyIndex = 0; volleyIndex < shotsPerBurst; volleyIndex += 1) {
-      const volleyTime =
-        base + burstIndex * burstPeriod + volleyIndex * shotIntervalSeconds;
-      if (volleyTime > timeSeconds || volleyTime >= window.endSeconds) continue;
-      if (timeSeconds - volleyTime >= lifetimeSeconds) continue;
-      volleys.push({ timeSeconds: volleyTime, burstIndex, volleyIndex });
-    }
-  return volleys;
-}
 
 /** How long a projectile's shot stays drawn: flight, plus a bomb's explosion. */
 function explosionSecondsOf(projectile: ProjectileSpec): number {
@@ -109,7 +62,6 @@ export function projectilesOfVolley(input: {
   playerTiles: Vector2;
   headingRadians: number;
   tagIndex: number;
-  ghost?: boolean;
 }): Readonly<{ projectiles: PreviewProjectile[]; detonations: PreviewDetonation[] }> {
   const {
     attack,
@@ -126,7 +78,6 @@ export function projectilesOfVolley(input: {
   const projectiles: PreviewProjectile[] = [];
   const detonations: PreviewDetonation[] = [];
   if (!appearance) return { projectiles, detonations };
-  const ghost = input.ghost ? { ghost: true } : {};
   const explosionSeconds = explosionSecondsOf(projectile);
   const targetTiles = attack.target === "player" ? playerTiles : undefined;
   const { pattern } = attack;
@@ -160,7 +111,7 @@ export function projectilesOfVolley(input: {
       targetTiles,
     );
     if (pose) {
-      projectiles.push({ tagIndex, appearance, ...pose, ...ghost });
+      projectiles.push({ tagIndex, appearance, ...pose });
       continue;
     }
     if (projectile.type !== "bomb" || !appearance.bomb) continue;
@@ -168,7 +119,6 @@ export function projectilesOfVolley(input: {
     if (sinceLandingSeconds >= 0 && sinceLandingSeconds < explosionSeconds)
       detonations.push({
         tagIndex,
-        ...ghost,
         positionTiles: resolveBombDestination(
           projectile,
           spawnTiles,
@@ -187,19 +137,8 @@ export type DraftFrame = Readonly<{
   undrawnAttackIds: readonly string[];
 }>;
 
-/** Plan V20 step 86.4: a segment window as the block window `draftVolleysLiveAt` reads. */
-export function windowsFromBoundaries(windows: readonly SegmentWindow[]): readonly BlockWindow[] {
-  return windows.map((window) => ({
-    blockId: window.segmentId,
-    anchorSeconds: window.startSeconds,
-    epochSeconds: window.epochSeconds,
-    endSeconds: window.endSeconds,
-  }));
-}
-
-type TimelinePreviewInput = Readonly<{
-  study: StudyV5;
-  segments: readonly Segment[];
+export type TimelinePreviewInput = Readonly<{
+  study: StudyV6;
   windows: readonly SegmentWindow[];
   config: EncounterConfig;
   timeSeconds: number;
@@ -208,35 +147,65 @@ type TimelinePreviewInput = Readonly<{
 }>;
 
 /**
- * Plan V20 step 87.1: a bomb track's measured flight time and range replace
- * the catalog's, so an observed bomb explodes where the marks say.
+ * Plan V23 Q14: a bomb track fires its measured variant, so its measured
+ * flight time and range replace the catalog's, as export writes them.
  */
-function withProjectileOverride(
-  projectile: ProjectileSpec,
-  track: StudyV5["tracks"][number],
-): ProjectileSpec {
-  const override = track.projectileOverride;
-  if (projectile.type !== "bomb" || override === undefined) return projectile;
+function withMeasuredBomb(projectile: ProjectileSpec, track: AttackTrack): ProjectileSpec {
+  if (projectile.type !== "bomb") return projectile;
+  const travelSeconds = measuredTravelSeconds(track);
+  const rangeTiles = track.attack.target === "player" ? null : measuredRangeTilesOf(track);
   return {
     ...projectile,
-    ...(override.travelSeconds === undefined ? {} : { travelSeconds: override.travelSeconds }),
-    ...(override.rangeTiles === undefined ? {} : { rangeTiles: override.rangeTiles }),
+    ...(travelSeconds === null ? {} : { travelSeconds }),
+    ...(rangeTiles === null ? {} : { rangeTiles }),
   };
 }
 
 /**
- * Draws one volley list per track into a frame. A projectile's `tagIndex` is
- * its track's index in the study, so the selected track can be highlighted.
+ * Plan V23 Q04, Q17: each window of the track replays the volleys
+ * `markedVolleysBetween` gives for the track's exported marks, from the
+ * window's start, while still drawn and before the window's end. Each volley's
+ * epoch is the epoch of the segment window it falls in.
  */
-function timelineFrame(
-  input: TimelinePreviewInput,
-  ghost: boolean,
-  withOverride: boolean,
-  volleysOf: (
-    track: StudyV5["tracks"][number],
-    lifetimeSeconds: number,
-  ) => readonly Readonly<{ volley: DraftVolley; epochSeconds: number }>[],
-): DraftFrame {
+export function previewVolleysOf(
+  track: AttackTrack,
+  windows: readonly SegmentWindow[],
+  timeSeconds: number,
+  lifetimeSeconds: number,
+): readonly Readonly<{ volley: DraftVolley; epochSeconds: number }>[] {
+  const marks = trackMarksOf(track, windows);
+  if (marks === null) return [];
+  const segmentWindowsOfTrack = windowsForTrack(windows, track.location);
+  return trackWindowsOf(track, windows)
+    .filter((window) => window.startSeconds <= timeSeconds)
+    .flatMap((window) =>
+      markedVolleysBetween(
+        marks,
+        timeSeconds - window.startSeconds - lifetimeSeconds,
+        timeSeconds - window.startSeconds,
+      ).flatMap((volley) => {
+        const volleySeconds = window.startSeconds + volley.offsetSeconds;
+        if (volleySeconds >= window.endSeconds) return [];
+        return [
+          {
+            volley: {
+              timeSeconds: volleySeconds,
+              burstIndex: volley.burstIndex,
+              volleyIndex: volley.shotIndex,
+            },
+            epochSeconds: (windowAt(segmentWindowsOfTrack, volleySeconds) ?? window).epochSeconds,
+          },
+        ];
+      }),
+    );
+}
+
+/**
+ * Plan V23 Q17: one frame of what the game will fire. A projectile's
+ * `tagIndex` is its track's index in the study, so the selected track can be
+ * highlighted. A track export drops draws nothing.
+ */
+export function previewAt(input: TimelinePreviewInput): DraftFrame {
   const { study, config, timeSeconds, playerTiles, headingRadians } = input;
   const emitterTiles = emitterTilesOf(config);
   const projectiles: PreviewProjectile[] = [];
@@ -249,8 +218,13 @@ function timelineFrame(
       undrawn.add(track.id);
       return;
     }
-    const projectile = withOverride ? withProjectileOverride(catalog, track) : catalog;
-    for (const { volley, epochSeconds } of volleysOf(track, lifetimeOf(projectile))) {
+    const projectile = withMeasuredBomb(catalog, track);
+    for (const { volley, epochSeconds } of previewVolleysOf(
+      track,
+      input.windows,
+      timeSeconds,
+      lifetimeOf(projectile),
+    )) {
       const drawn = projectilesOfVolley({
         attack,
         projectile,
@@ -261,7 +235,6 @@ function timelineFrame(
         playerTiles,
         headingRadians,
         tagIndex,
-        ghost,
       });
       projectiles.push(...drawn.projectiles);
       detonations.push(...drawn.detonations);
@@ -279,62 +252,4 @@ function timelineFrame(
     },
     undrawnAttackIds: [...undrawn],
   };
-}
-
-/** E12: every track's accepted cadence in its windows, as ghosts. */
-export function fittedPreviewAt(input: TimelinePreviewInput): DraftFrame {
-  return timelineFrame(input, true, false, (track, lifetimeSeconds) =>
-    windowsFromBoundaries(windowsForTrack(input.windows, track.location))
-      .filter((window) => window.anchorSeconds <= input.timeSeconds)
-      .flatMap((window) =>
-        draftVolleysLiveAt(track.attack.cadence, window, input.timeSeconds, lifetimeSeconds).map(
-          (volley) => ({ volley, epochSeconds: window.epochSeconds }),
-        ),
-      ),
-  );
-}
-
-/**
- * E12: every volley mark fired as its track's attack. A mark's burst and shot
- * indices come from `splitGaps` over the marks of its window (0 outside every
- * window); a detonation mark draws nothing on its own.
- */
-export function observedPreviewAt(input: TimelinePreviewInput): DraftFrame {
-  return timelineFrame(input, false, true, (track, lifetimeSeconds) => {
-    const trackWindows = windowsForTrack(input.windows, track.location);
-    const times = track.marks
-      .filter((mark) => mark.kind === "volley")
-      .map((mark) => mark.timeSeconds)
-      .sort((first, second) => first - second);
-    const groups = new Map<SegmentWindow | null, number[]>();
-    for (const time of times) {
-      const window = windowAt(trackWindows, time);
-      groups.set(window, [...(groups.get(window) ?? []), time]);
-    }
-    const drawn: { volley: DraftVolley; epochSeconds: number }[] = [];
-    for (const [window, group] of groups) {
-      const gaps = group.slice(1).map((time, index) => time - group[index]);
-      const { classes } =
-        window === null
-          ? { classes: [] }
-          : splitGaps(gaps, track.burstGapThresholdSeconds);
-      let burstIndex = 0;
-      let volleyIndex = 0;
-      group.forEach((time, index) => {
-        if (index > 0) {
-          if (window !== null && classes[index - 1] === "cooldown") {
-            burstIndex += 1;
-            volleyIndex = 0;
-          } else if (window !== null) volleyIndex += 1;
-        }
-        const ageSeconds = input.timeSeconds - time;
-        if (ageSeconds < 0 || ageSeconds >= lifetimeSeconds) return;
-        drawn.push({
-          volley: { timeSeconds: time, burstIndex, volleyIndex },
-          epochSeconds: window?.epochSeconds ?? time,
-        });
-      });
-    }
-    return drawn;
-  });
 }
