@@ -1,12 +1,14 @@
 import { expect, test } from "vitest";
 import {
-  ENCOUNTER_CONFIG,
   primaryArchetype,
   type EncounterConfig,
   type EnemyArchetype,
   type PhaseSpec,
   type PhaseSpawnSpec,
 } from "../config/encounter";
+// Periodic spawning and the large arena are exercised on the pre-V24 swarm
+// fixture (DC-V24-12, plan V24).
+import { SWARM_CONFIG as ENCOUNTER_CONFIG } from "../../test/swarm-config";
 import type { SimulationInput } from "../models";
 import { advanceSimulation, createSimulation } from "./simulation";
 

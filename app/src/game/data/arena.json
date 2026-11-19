@@ -1,10 +1,10 @@
 {
-  "comment": "Named arenas (W05, superseding K05). Each encounter references one by arenaId. nest-boss-room's geometry is measured in docs/killer-bee-queen-geometry-source.md: flatHalfWidthTiles 9.5 is the measured walkable half-span (W03), and cornerSumTiles 14.25 is the measured chamfer constant, 1.5 * 9.5 (W03). The honey hazards are the source's zones A/D (W07): a 3.5-tile half-diagonal diamond at the pond and an annulus from 7.5 to 9.5 tiles at the outer ring, both counted by the user rather than directly measured.",
+  "comment": "Named arenas (W05, superseding K05). Each encounter references one by arenaId. nest-boss-room's geometry is measured in docs/killer-bee-queen-geometry-source.md: flatHalfWidthTiles 9.5 is the measured walkable half-span (W03), and cornerSumTiles 14.25 is the measured chamfer constant, 1.5 * 9.5 (W03). The honey hazards are the source's zones A/D (W07): a 3.5-tile half-diagonal diamond at the pond and an annulus from 7.5 to 9.5 tiles at the outer ring, both counted by the user rather than directly measured. crystal-worm-circle radiusTiles 8.645 is 70 percent of the Crystal Worm shard's maximum reach, 0.7 * (0.35 + 8 * 1.5) = 8.645 tiles, measured from the worm's centre to the shard centre at reversal (DC-V24-1, DC-V24-2, plan V24).",
   "arenas": {
     "crystal-worm-circle": {
       "kind": "circle",
       "centerTiles": { "x": 0, "y": 0 },
-      "radiusTiles": 19.2,
+      "radiusTiles": 8.645,
       "hazards": []
     },
     "nest-boss-room": {

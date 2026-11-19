@@ -1,8 +1,8 @@
 {
-  "comment": "spawnTiles is the approved north spawn, a 3-tile center-to-wall margin inside the 19.2-tile arena.",
+  "comment": "spawnTiles is the spawn-ring point due north, 0.84375 * 8.645 = 7.29421875 tiles from the centre inside the 8.645-tile arena (DC-V24-7, plan V24).",
   "spawnTiles": {
     "x": 0,
-    "y": -16.2
+    "y": -7.29421875
   },
   "body": {
     "shape": "beveled-octagon",

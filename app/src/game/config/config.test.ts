@@ -190,7 +190,7 @@ test("the player body is the symmetric 5 x 7 body core", () => {
 });
 
 test("selected values are the normal scoring-eligible defaults", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v7");
+  expect(RULES_VERSION).toBe("crystal-worm-child-solo-paladin-v1");
   expect(DEFAULT_DEBUG_SETTINGS).toMatchObject(SELECTED_DEBUG_VALUES);
   expect(DEFAULT_DEBUG_SETTINGS.matchPlayerToHead).toBe(true);
   expect(
@@ -505,13 +505,13 @@ test.each([-1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
 );
 
 test("encodes approved tuning and independent reversal/lifetime values with explicit units", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v7");
+  expect(RULES_VERSION).toBe("crystal-worm-child-solo-paladin-v1");
   expect(ENCOUNTER_CONFIG.rulesVersion).toBe(RULES_VERSION);
   expect(ENCOUNTER_CONFIG.arena).toEqual({
     shape: {
       kind: "circle",
       centerTiles: { x: 0, y: 0 },
-      radiusTiles: 19.2,
+      radiusTiles: 8.645,
     },
     hazards: [],
   });
@@ -525,7 +525,7 @@ test("encodes approved tuning and independent reversal/lifetime values with expl
   expect(ENCOUNTER_CONFIG.primaryArchetypeId).toBe("crystal-worm-child-head");
   expect(PRIMARY).toEqual({
     id: "crystal-worm-child-head",
-    spawnTiles: { x: 0, y: -16.2 },
+    spawnTiles: { x: 0, y: -7.29421875 },
     verticesTiles: BEVELED_BODY_1_25_TILES,
     contactDamageHp: 0,
     contactConditions: [],
@@ -832,12 +832,8 @@ test("the Spawns group exposes the rule and replaces the spawn-point sliders", (
   const spawnKeys = DEBUG_PARAMETERS.filter(
     (parameter) => parameter.group === "Spawns",
   ).map((parameter) => parameter.key);
-  expect(spawnKeys).toEqual([
-    "firstSpawnSeconds",
-    "spawnEverySeconds",
-    "maxConcurrentEnemies",
-    "spawnRingFraction",
-  ]);
+  // The spawn cadence is authored, not tunable (DC-V24-8, plan V24).
+  expect(spawnKeys).toEqual(["spawnRingFraction"]);
   // Rule-driven placement means there is no single spawn point to edit (G05).
   const keys = DEBUG_PARAMETERS.map((parameter) => parameter.key);
   expect(keys).not.toContain("spawnX");
@@ -860,12 +856,6 @@ test("spawn sliders reach the config and stay inside the arena at both ends", ()
       expect(config.spawns.placement.ringRadiusTiles).toBeLessThan(
         config.arena.shape.radiusTiles,
       );
-      if (parameter.key === "maxConcurrentEnemies")
-        expect(config.spawns.maxConcurrent).toBe(value);
-      if (parameter.key === "spawnEverySeconds")
-        expect(config.spawns.everySeconds).toBe(value);
-      if (parameter.key === "firstSpawnSeconds")
-        expect(config.spawns.firstSpawnSeconds).toBe(value);
     }
   }
 });
@@ -968,12 +958,12 @@ test("older Killer Bee Queen attempt records are retained but excluded from the 
   ).toBe(500);
 });
 
-test("an older Crystal Worm v6 attempt record is retained but excluded from the v7 best", () => {
-  expect(RULES_VERSION).toBe("crystal-worm-child-swarm-paladin-v7");
+test("an older Crystal Worm v7 attempt record is retained but excluded from the solo v1 best", () => {
+  expect(RULES_VERSION).toBe("crystal-worm-child-solo-paladin-v1");
   const records = [
     {
       id: "old",
-      rulesVersion: "crystal-worm-child-swarm-paladin-v6",
+      rulesVersion: "crystal-worm-child-swarm-paladin-v7",
       elapsedSeconds: 40,
       hitsTaken: 1,
       outcome: "death" as const,
@@ -988,7 +978,7 @@ test("an older Crystal Worm v6 attempt record is retained but excluded from the 
   ];
   expect(retainedBestSeconds(records, RULES_VERSION)).toBe(80);
   expect(
-    retainedBestSeconds(records, "crystal-worm-child-swarm-paladin-v6"),
+    retainedBestSeconds(records, "crystal-worm-child-swarm-paladin-v7"),
   ).toBe(40);
 });
 
@@ -2118,8 +2108,8 @@ test("a Killer Bee Queen phase-1 drill starts at the arena centre, and her orbit
 test("the Crystal Worm's opening spawn for a fixed seed is unchanged by the placement-rule union", () => {
   const state = createSimulation(ENCOUNTER_CONFIG, 1);
   expect(state.enemies[0].positionTiles).toEqual({
-    x: 1.192057794691812,
-    y: 16.156082390669912,
+    x: 0.5367364393286831,
+    y: 7.274444388924032,
   });
 });
 

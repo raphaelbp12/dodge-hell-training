@@ -29,10 +29,11 @@ This file is the reusable process for every planning effort in this repository: 
 | V20 | 83-88 | complete (manual checks pending) | E | [`docs/plan-v20.md`](docs/plan-v20.md) |
 | V21 | 89 | complete | B | [`docs/plan-v21.md`](docs/plan-v21.md) |
 | V22 | 90-96 | complete | A | [`docs/plan-v22.md`](docs/plan-v22.md) |
+| V24 | 101 | complete | DC-V24 | [`docs/plan-v24.md`](docs/plan-v24.md) |
 
 (V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 
-More than one plan-vN file can exist at once. A row's status is `drafted` from the moment `/brainstorm` writes it until its first phase is actually implemented, then `active`; a drafted plan does not replace or pause the active one. Each plan version picks its own, never-reused decision-letter prefix (G, K, ...) for its recorded decisions, so a decision ID is globally unambiguous. Phase numbers are global and sequential across every plan version - a new plan continues from the highest phase number used anywhere, it never restarts at 1.
+More than one plan-vN file can exist at once. A row's status is `drafted` from the moment `/brainstorm` writes it until its first phase is actually implemented, then `active`; a drafted plan does not replace or pause the active one. From V24 on, a plan's recorded decisions are numbered `DC-V<plan>-<n>`, with the plan number unpadded and `n` counting from 1 (for example `DC-V24-1`), so a decision ID is globally unambiguous without tracking spent letters; the Decision prefix column holds `DC-V<plan>`. Plans before V24 keep their single-letter prefixes (G, K, ...), which are never reused. Phase numbers are global and sequential across every plan version - a new plan continues from the highest phase number used anywhere, it never restarts at 1.
 
 ## Execution Modes
 
