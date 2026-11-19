@@ -39,8 +39,9 @@ One reference for every gate that raises trust in a change before it is committe
 
 ## Slow-test budget
 
-**Catches:** a node-project test that used more than half of its own effective timeout (the project's `testTimeout`, 60 s, or the test's explicit `{ timeout }`), so a test close to timing out under CPU load fails while it still passes.
-**Run:** `npm test`. The reporter `scripts/slow-test-reporter.mjs` prints the tests and sets a nonzero exit code; its decision function is tested in `scripts/slow-test-reporter.test.mjs`.
+**Catches:** a node-project test that used more than half of its own effective timeout (the project's `testTimeout`, 60 s, or the test's explicit `{ timeout }`), so a test close to timing out under CPU load is caught while it still passes.
+**Behaviour (2026-11-19):** locally the reporter prints the tests and sets exit code 1. On the GitHub-hosted runner (`GITHUB_ACTIONS=true`) it prints the same message plus one `::warning title=Slow test::` annotation per test and leaves the exit code alone, because a shared runner's slowness turned `main` red (run 44376706799). A real timeout still fails everywhere.
+**Run:** `npm test`. The reporter `scripts/slow-test-reporter.mjs` decides in `decideSlowTestReport`; it is tested in `scripts/slow-test-reporter.test.mjs`.
 **Reproduce:** any test over 5 s carries an explicit timeout of about 4x its measured time, rounded up to 10 s, with a comment giving the measured time and date. Speed the test up, or re-measure and raise the timeout with a new comment. Do not raise the project-wide timeout.
 
 ## Property tests (A06-A10)
