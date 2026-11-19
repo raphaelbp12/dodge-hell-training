@@ -67,6 +67,7 @@ Checks cost time and tokens, so run them at the end of a unit of work, not after
 ## Git and deployment
 
 - Never commit, push or claim a live deployment without authorization and evidence. An orchestrated `/implement-phase` run is authorized to commit locally on its work branch, as its skill describes, and to nothing more.
+- Merge a pull request that changes `app/` or `.github/workflows/` only after a session that did not author it has run `/code-review high <number> --comment`. The reviewing session reports findings and does not edit the branch. The authoring session fixes each finding or records why it is declined, in the pull request's "Independent review" section. Prefer a different model from the author's when one is available.
 - After pushing, do not watch or poll GitHub Actions or the Pages deployment. Report the push and stop.
 
 ## Instruction files

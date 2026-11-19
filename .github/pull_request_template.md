@@ -24,6 +24,15 @@ Mark each gate "ran" with its result, or "not applicable" with the reason (see [
 
 - [ ] An item in `docs/deferred-work.md` was touched: no / yes, approved by:
 
+## Independent review
+
+<!-- Required when the pull request changes `app/` or `.github/workflows/`: `/code-review high <number> --comment` run by a session that did not author it. Otherwise "not applicable" with the reason. -->
+
+- Reviewing model:
+- Date:
+- Number of findings:
+- Per finding, "fixed" or "declined" with the reason:
+
 ## Findings
 
 <!-- Any failing property, contract or mutation finding raised under plan V22 A10, with its seed, path and counterexample; or "none". -->
