@@ -114,14 +114,15 @@ export type SegmentMeasure = Readonly<{
 
 const phaseOfId = (id: string) => id.split("/")[0];
 
-const roundedMedian = (values: readonly number[]): number | null => {
-  const median = medianOf(values);
-  return median === null ? null : roundToMillisecond(median);
-};
+/** The earliest measurement, in video order, rounded; null for none. */
+const firstMeasured = (values: readonly number[]): number | null =>
+  values.length === 0 ? null : roundToMillisecond(values[0]);
 
 /**
- * Plan V23 Q13: the medians over a segment's (or, with a phase id, a phase's)
- * windows. A telegraph from each boundary's telegraph end; a sub-phase's
+ * Plan V23 Q13, amended by the user on 2026-11-19 (finding F100-2): the
+ * first measurement of a segment (or, with a phase id, a phase) in video
+ * order, not the median, so the game follows the window whose marks it fires
+ * (Q04). A telegraph from each boundary's telegraph end; a sub-phase's
  * duration from windows ending at another boundary of the same phase; a
  * phase's exit time from each run of its boundaries to the next phase's
  * boundary; the invulnerable time from closed spans opening within one frame
@@ -133,13 +134,14 @@ export function measuredSegmentValues(study: StudyV6, ownerId: string): SegmentM
   const frameSeconds = frameRate ? 1 / frameRate : 0;
   const isPhase = !ownerId.includes("/");
   const own = sorted.filter((boundary) => boundary.segmentId === ownerId);
-  const telegraphSeconds = roundedMedian(
+  const telegraphSeconds = firstMeasured(
     own.flatMap((boundary) =>
       boundary.telegraphEndSeconds === undefined ? [] : [boundary.telegraphEndSeconds - boundary.timeSeconds],
     ),
   );
-  const invulnerableOnEnterSeconds = roundedMedian(
-    study.statusSpans.flatMap((span) =>
+  const spans = [...study.statusSpans].sort((first, second) => first.inSeconds - second.inSeconds);
+  const invulnerableOnEnterSeconds = firstMeasured(
+    spans.flatMap((span) =>
       span.outSeconds !== null &&
       own.some((boundary) => Math.abs(span.inSeconds - boundary.timeSeconds) <= frameSeconds)
         ? [span.outSeconds - span.inSeconds]
@@ -163,8 +165,8 @@ export function measuredSegmentValues(study: StudyV6, ownerId: string): SegmentM
   return {
     telegraphSeconds,
     invulnerableOnEnterSeconds,
-    durationSeconds: isPhase ? null : roundedMedian(durations),
-    exitAfterSeconds: isPhase ? roundedMedian(exits) : null,
+    durationSeconds: isPhase ? null : firstMeasured(durations),
+    exitAfterSeconds: isPhase ? firstMeasured(exits) : null,
   };
 }
 

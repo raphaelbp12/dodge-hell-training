@@ -544,7 +544,7 @@
           "id": "yellow",
           "comment": "Source (23.4): 3-way spread of Large Yellow Stingers, a rotating spiral of Yellow Balls, and White Bombs (Dazed). The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) shows the White Bomb ring is one arm, not the earlier large arm count, and a second, player-targeted White Bomb (target-white-bomb) fires alongside it. Spawns despawn-on-exit Yellow Killer Bees.",
           "durationSeconds": 9.967,
-          "telegraphSeconds": 1.8,
+          "telegraphSeconds": 1.767,
           "invulnerableOnEnterSeconds": 3.2,
           "movement": null,
           "attacks": [
@@ -2651,8 +2651,8 @@
         },
         {
           "id": "blue",
-          "durationSeconds": 21.3,
-          "telegraphSeconds": 4.133,
+          "durationSeconds": 22.367,
+          "telegraphSeconds": 5,
           "invulnerableOnEnterSeconds": 5.033,
           "movement": {
             "kind": "chase",

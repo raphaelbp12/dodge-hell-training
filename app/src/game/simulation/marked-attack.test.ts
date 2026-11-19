@@ -119,6 +119,29 @@ test("a sub-phase attack restarts its marks on each sub-phase entry", () => {
   expect(times.map((time) => Math.round(time * 10) / 10)).toEqual([0.5, 2.5, 4.5, 6.5]);
 });
 
+test("a mark on a sub-phase's last frame fires before the sub-phase exits (F100-1)", () => {
+  const subPhase = (id: string): SubPhaseSpec => ({
+    id,
+    durationSeconds: 2,
+    telegraphSeconds: 0,
+    invulnerableOnEnterSeconds: 0,
+    movement: null,
+    attacks: [markedAttack(`${id}-m`, { bursts: [[1], [2]] })],
+    spawns: null,
+  });
+  // The exit rebuilds the clocks, so volleys are counted by the shards they mint.
+  const state = createSimulation(configWith({ attacks: [], subPhases: [subPhase("a"), subPhase("b")] }), 1);
+  const fullHealthHp = state.player.healthHp;
+  const mintedAt: number[] = [];
+  while (state.elapsedSeconds < 2.5) {
+    const before = state.nextShardId;
+    state.player.healthHp = fullHealthHp;
+    advanceSimulation(state, stepSeconds, idle);
+    if (state.nextShardId > before) mintedAt.push(Math.round(state.elapsedSeconds * 10) / 10);
+  }
+  expect(mintedAt).toEqual([1, 2]);
+});
+
 test("a phase attack keeps counting from the phase's entry across its sub-phases", () => {
   const subPhase = (id: string): SubPhaseSpec => ({
     id,

@@ -873,6 +873,21 @@ function updateAttacks(state: SimulationState): void {
   }
 }
 
+/**
+ * User decision 2026-11-19 (finding F100-1): a segment's exit runs before
+ * this step's attacks, so every marked volley already due on an outgoing
+ * clock fires first, a mark on the segment's last frame included. A clock
+ * entered at this very time has nothing due yet and is left alone.
+ */
+export function fireDueMarkedVolleys(state: SimulationState, enemy: EnemyState): void {
+  const attacks = activeAttacks(archetypeOf(state.config, enemy.archetypeId), enemy);
+  enemy.attackClocks.forEach((clock, index) => {
+    const attack = attacks[index];
+    if (attack?.marks !== undefined && clock.marks && clock.marks.entrySeconds < state.elapsedSeconds)
+      updateAttackClock(state, enemy, attack, clock);
+  });
+}
+
 /** Advances one attack's rotation and fires its volley when its clock is due. */
 function updateAttackClock(
   state: SimulationState,

@@ -9,7 +9,7 @@ import type {
 } from "../config/encounter";
 import type { AttackClockState, EnemyState } from "../models";
 import { arenaInradiusTiles, pointOnRing } from "./geometry";
-import { createEnemy, type SimulationState } from "./simulation";
+import { createEnemy, fireDueMarkedVolleys, type SimulationState } from "./simulation";
 
 /** 1 for an archetype with no `health` block, so callers need one query for both kinds. */
 export function healthFraction(enemy: EnemyState): number {
@@ -194,6 +194,9 @@ export function enterSubPhase(
   phaseIndex: number,
   subPhaseIndex: number,
 ): void {
+  // enterPhase already fired the outgoing phase's due volleys; its clocks no
+  // longer match this phase's attacks, so only a sub-phase change fires here.
+  if (enemy.phaseEnteredAtSeconds < state.elapsedSeconds) fireDueMarkedVolleys(state, enemy);
   despawnExitedMinions(state, enemy.id);
   const elapsedSeconds = state.elapsedSeconds;
   const phase = archetype.phases[phaseIndex];
@@ -240,6 +243,7 @@ export function enterPhase(
   archetype: EnemyArchetype,
   index: number,
 ): void {
+  fireDueMarkedVolleys(state, enemy);
   despawnExitedMinions(state, enemy.id);
   const elapsedSeconds = state.elapsedSeconds;
   const phase = archetype.phases[index];
@@ -313,6 +317,8 @@ function tryAdvancePhase(
   if (state.drill !== null && archetype.id === state.config.primaryArchetypeId) {
     const nextDrillIndex = nextDrillPhaseIndex(state.drill, enemy.phaseIndex);
     if (nextDrillIndex === null) {
+      // The drilled segment ends here too, so its due marks fire first.
+      fireDueMarkedVolleys(state, enemy);
       state.phase = "cleared";
       return false;
     }

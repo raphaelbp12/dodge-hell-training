@@ -58,15 +58,20 @@ function gameOffsets(track: AttackTrack, spanSeconds: number): number[] {
   if (subIndex >= 0)
     while (enemy.subPhaseIndex !== subIndex) forceNextSubPhase(state, enemy, archetype);
   const clockOf = () => enemy.attackClocks.find((clock) => clock.attackId === track.attack.id);
-  const entrySeconds = clockOf()!.marks!.entrySeconds;
+  let clock = clockOf()!;
+  const entrySeconds = clock.marks!.entrySeconds;
   const offsets: number[] = [];
-  let fired = clockOf()!.volleysFired;
+  let fired = clock.volleysFired;
   while (state.phase === "playing" && state.elapsedSeconds < entrySeconds + spanSeconds) {
     advanceSimulation(state, fixedStepSeconds, IDLE);
-    const clock = clockOf();
-    if (clock?.marks?.entrySeconds !== entrySeconds) break;
+    // The step a segment exits fires its due volleys on the outgoing clock first.
     for (; fired < clock.volleysFired; fired++) offsets.push(state.elapsedSeconds - entrySeconds);
-    fired = clock.volleysFired;
+    const current = clockOf();
+    if (current?.marks?.entrySeconds !== entrySeconds) break;
+    if (current !== clock) {
+      clock = current;
+      fired = clock.volleysFired;
+    }
   }
   return offsets;
 }
@@ -83,22 +88,9 @@ describe("study-game parity: telegraph", () => {
   });
 });
 
-/**
- * Findings F100-1 and F100-2 (docs/plan-archive/phase-100.md, execution
- * record; seed 1, god-mode progression-paused drill): the game fires every
- * mark of these tracks except the last, which the segment's exit comes first.
- * F100-1: the last mark is in the window's final frame, at the exported
- * duration or exit time itself. F100-2: the first window is longer than the
- * median duration export writes (Q13), so its marks after that median never
- * fire. Kept as `test.fails` for a user decision (plan V22 A10).
- */
-const FINDINGS: Readonly<Record<string, string>> = {
-  "red-ball-stream-scatter": "F100-1",
-  "machine-gun-10-shots": "F100-1",
-  "blue-glaive-spiral": "F100-2",
-  "blue-ball-ring": "F100-2",
-};
-
+// Findings F100-1 and F100-2 were resolved by the user on 2026-11-19: due
+// marks fire before a segment exits, and segment values follow the first
+// window instead of the median.
 function expectMarksFired(track: AttackTrack): void {
   const { spanSeconds, offsets } = markedOffsets(track);
   const game = gameOffsets(track, spanSeconds);
@@ -110,12 +102,7 @@ describe("study-game parity: marks", () => {
   const labelled = (tracks: readonly AttackTrack[]) =>
     tracks.map((track) => [`${segmentIdOf(track.location)} ${track.id}`, track] as const);
   test("the study exports at least one marked track", () => expect(exported.length).toBeGreaterThan(0));
-  test.each(labelled(exported.filter((track) => !(track.id in FINDINGS))))(
-    "%s fires its marked volleys from the segment's entry",
-    (_label, track) => expectMarksFired(track),
-  );
-  test.fails.each(labelled(exported.filter((track) => track.id in FINDINGS)))(
-    "%s fires its marked volleys from the segment's entry (finding, see FINDINGS)",
-    (_label, track) => expectMarksFired(track),
+  test.each(labelled(exported))("%s fires its marked volleys from the segment's entry", (_label, track) =>
+    expectMarksFired(track),
   );
 });

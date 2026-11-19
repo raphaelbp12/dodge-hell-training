@@ -66,6 +66,8 @@ function withPreV23Queen(shipped: EncounterConfig): EncounterConfig {
   )["killer-bee-queen"];
   return {
     ...shipped,
+    // The recorded values predate the 2026-11-19 player spawn as well.
+    player: { ...shipped.player, spawnTiles: { x: 0, y: 0 } },
     archetypes: { ...shipped.archetypes, "killer-bee-queen": archetypeFromAuthored(authored) },
   };
 }

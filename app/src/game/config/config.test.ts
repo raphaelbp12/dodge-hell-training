@@ -1608,9 +1608,11 @@ test("the Killer Bee Queen's phase 5 is damaging when stationary", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const idle = { north: false, south: false, east: false, west: false };
   const stationary = createSimulation(queenConfig, 1, { startPhaseIndex: 4 });
-  for (let tick = 0; tick < 300; tick++)
+  // Since 2026-11-19 the player starts off the Queen's spawn, so a standing
+  // player is hurt rather than killed within the sampled 10 s.
+  for (let tick = 0; tick < 600; tick++)
     advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
-  expect(stationary.player.healthHp).toBe(0);
+  expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
 });
 
 // Step 23.8: the machinegun's two arms start vertical (180 degrees apart,
@@ -2002,6 +2004,22 @@ test("the Killer Bee Queen spawns at the arena centre on every seed", () => {
       queenConfig.arena.shape.centerTiles,
     );
   }
+});
+
+// User decision 2026-11-19: the player starts 45 degrees from the Queen,
+// midway across the walkable band between the two honey regions.
+test("the Killer Bee Queen's player starts 45 degrees from her, on walkable floor midway between the honey", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const { x, y } = queenConfig.player.spawnTiles;
+  expect(Math.atan2(y, x)).toBeCloseTo(Math.PI / 4, 3);
+  // The diamond |x| + |y| = 3.5 meets the 45-degree line at x = y = 1.75.
+  const diamondEdge = 3.5 / 2;
+  expect(Math.hypot(x, y)).toBeCloseTo((Math.hypot(diamondEdge, diamondEdge) + 7.5) / 2, 2);
+  expect(Math.abs(x) + Math.abs(y)).toBeGreaterThan(3.5);
+  expect(Math.hypot(x, y)).toBeLessThan(7.5);
+  const state = createSimulation(queenConfig, 1);
+  expect(state.player.positionTiles).toEqual({ x, y });
+  expect(encounterConfigOf("crystal-worm").player.spawnTiles).toEqual({ x: 0, y: 0 });
 });
 
 test("a Killer Bee Queen phase-3 drill starts at the arena centre on the first playing step", () => {

@@ -1111,7 +1111,7 @@ function buildStaticEncounterConfig(
     simulation: AUTHORED_ENCOUNTER_DATA.simulation,
     arena,
     player: {
-      spawnTiles: AUTHORED_ENCOUNTER_DATA.player.spawnTiles,
+      spawnTiles: entry.playerSpawnTiles ?? AUTHORED_ENCOUNTER_DATA.player.spawnTiles,
       verticesTiles: scaleBody(
         loadOutline(AUTHORED_ENCOUNTER_DATA.player.body.shape),
         AUTHORED_ENCOUNTER_DATA.player.body.widthTiles,

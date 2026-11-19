@@ -1894,6 +1894,8 @@ export type AuthoredEncounterEntry = Readonly<{
   displayName: string;
   primaryArchetype: string;
   arenaId: string;
+  /** Where this encounter's player starts; absent means the shared `player.spawnTiles`. */
+  playerSpawnTiles?: Vector2;
   spawns: AuthoredSpawns;
   session: Readonly<{
     startCountdownSeconds: number;
@@ -2006,6 +2008,9 @@ function validateEncounterEntry(
     displayName: text(data.displayName, `${path}.displayName`),
     primaryArchetype: text(data.primaryArchetype, `${path}.primaryArchetype`),
     arenaId: text(data.arenaId, `${path}.arenaId`),
+    ...(data.playerSpawnTiles === undefined
+      ? {}
+      : { playerSpawnTiles: readPoint(data.playerSpawnTiles, `${path}.playerSpawnTiles`) }),
     spawns: validateSpawns(data.spawns, `${path}.spawns`),
     session: Object.freeze({
       startCountdownSeconds: nonnegativeNumber(

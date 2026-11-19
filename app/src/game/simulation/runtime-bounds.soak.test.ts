@@ -62,24 +62,8 @@ function emptyPeaks(): Peaks {
   return { shards: 0, bombs: 0, enemies: 0, conditions: 0 };
 }
 
-/**
- * Finding F100-3 (docs/plan-archive/phase-100.md, execution record; seed
- * source 1, 2, 3...): after plan V23 step 100.1's measured Queen timings, a
- * looping phase 8 drill (index 7) ends at 40,910 serialized bytes against an
- * early maximum of 31,682. Every count stays inside its bound (enemies 13/13);
- * the size follows the Beehemoth population, which grows by three per drill
- * loop and resets on a retry, so the end sample lands on a high point. Kept as
- * `test.fails` for a user decision (plan V22 A10).
- */
-const SIZE_FINDING_PHASES: ReadonlySet<number> = new Set([7]);
-
 describe("ten simulated minutes of each drilled Queen phase", () => {
-  const phases = Array.from({ length: phaseCount }, (_, index) => index);
-  test.each(phases.filter((index) => !SIZE_FINDING_PHASES.has(index)))("phase %i stays bounded", soakPhase);
-  test.fails.each(phases.filter((index) => SIZE_FINDING_PHASES.has(index)))(
-    "phase %i stays bounded (finding F100-3)",
-    soakPhase,
-  );
+  test.each(Array.from({ length: phaseCount }, (_, index) => index))("phase %i stays bounded", soakPhase);
 });
 
 function soakPhase(phaseIndex: number): void {

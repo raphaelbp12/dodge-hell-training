@@ -220,6 +220,23 @@ describe("measured segment values (plan V23 step 98.3)", () => {
     expect(phase3.telegraphSeconds).toBe(shipped.telegraphSeconds);
   });
 
+  test("a segment seen in several windows takes its first window's values, not the median (F100-2)", () => {
+    const study = queenStudy(
+      [
+        { timeSeconds: 10, segmentId: `${SUB}/blue`, telegraphEndSeconds: 15 },
+        { timeSeconds: 32, segmentId: `${SUB}/red`, telegraphEndSeconds: 33 },
+        { timeSeconds: 50, segmentId: `${SUB}/blue`, telegraphEndSeconds: 51 },
+        { timeSeconds: 60, segmentId: `${SUB}/red`, telegraphEndSeconds: 61 },
+        { timeSeconds: 61.5, segmentId: `${SUB}/blue`, telegraphEndSeconds: 62.5 },
+        { timeSeconds: 70, segmentId: `${SUB}/red` },
+      ],
+      {},
+    );
+    const blue = measuredSegmentValues(study, `${SUB}/blue`);
+    expect(blue.durationSeconds).toBe(22);
+    expect(blue.telegraphSeconds).toBe(5);
+  });
+
   test("a span away from every boundary is not attributed to the segment (E05)", () => {
     const study = queenStudy([{ timeSeconds: 10, segmentId: PHASE_6 }], {}, {
       statusSpans: [{ kind: "invulnerable", inSeconds: 11, outSeconds: 12 }],
