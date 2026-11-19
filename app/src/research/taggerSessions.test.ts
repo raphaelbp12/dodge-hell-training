@@ -14,7 +14,7 @@ import {
 } from "./taggerSessions";
 import { appearanceOptions, type StickySelection } from "./taggingOptions";
 import type { StudyState } from "./tagging";
-import type { StudyV5 } from "./study";
+import type { StudyV6 } from "./study";
 
 class FakeStorage implements SessionStorage {
   data = new Map<string, string>();
@@ -70,9 +70,9 @@ function draft(fileName = "a.mp4", frameRate: number | null = 30) {
   };
 }
 
-function studyV5(fileName = "a.mp4", archetypeId = "killer-bee-queen"): StudyV5 {
+function studyV5(fileName = "a.mp4", archetypeId = "killer-bee-queen"): StudyV6 {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     encounterId: "killer-bee-queen",
     archetypeId,
     recordedAt: "2026-11-13T00:00:00.000Z",
@@ -83,13 +83,11 @@ function studyV5(fileName = "a.mp4", archetypeId = "killer-bee-queen"): StudyV5 
       {
         id: "bee",
         location: { phaseId: "p1", subPhaseId: null },
-        attack: unsafeFixture<StudyV5["tracks"][number]["attack"]>({ id: "bee" }),
-        cadenceSource: "authored",
+        attack: unsafeFixture<StudyV6["tracks"][number]["attack"]>({ id: "bee" }),
         marks: [{ timeSeconds: 2, kind: "volley" }, { timeSeconds: 3, kind: "volley" }],
       },
     ],
     scratch: [{ timeSeconds: 4, kind: "volley" }],
-    acceptedSegmentValues: {},
   };
 }
 
@@ -101,13 +99,30 @@ function draftV4(fileName = "a.mp4", archetypeId = "killer-bee-queen") {
   });
 }
 
-describe("version 4 drafts (plan V20 E14)", () => {
-  test("a version 4 draft round-trips through storage", () => {
+describe("version 5 drafts (plan V20 E14, plan V23 Q15)", () => {
+  test("a version 5 draft round-trips through storage", () => {
     const storage = new FakeStorage();
     const sessions = new TaggerSessions(() => storage);
     sessions.write(draftV4("a.mp4"), "killer-bee-queen");
     expect(sessions.read(TaggerSessions.keyFor("a.mp4"))).toEqual({ ok: true, value: draftV4("a.mp4") });
-    expect(draftV4().draftVersion).toBe(4);
+    expect(draftV4().draftVersion).toBe(5);
+  });
+
+  test("a version 4 draft carrying a v5 study restores as version 5 with a v6 study", () => {
+    const v5Study = {
+      ...studyV5(),
+      schemaVersion: 5,
+      acceptedSegmentValues: { p1: { telegraphSeconds: 1 } },
+      tracks: studyV5().tracks.map((track) => ({ ...track, cadenceSource: "fitted", burstGapThresholdSeconds: 0.3 })),
+    };
+    const restored = validateSessionDraft({ ...draftV4(), draftVersion: 4, study: v5Study });
+    expect(restored.draftVersion).toBe(5);
+    expect(isLegacyDraft(restored)).toBe(false);
+    expect((restored as ReturnType<typeof draftV4>).study).toEqual(studyV5());
+  });
+
+  test("a version 4 draft must carry a version 5 study", () => {
+    expect(() => validateSessionDraft({ ...draftV4(), draftVersion: 4 })).toThrow(/schemaVersion/);
   });
 
   test("a version 3 draft is returned as legacy", () => {

@@ -8,7 +8,7 @@ import {
   type StudyState,
   type VideoProvenance,
 } from "./tagging";
-import type { StudyV5 } from "./study";
+import type { StudyV6 } from "./study";
 
 /**
  * Z19: parses and validates a study file. Throws a readable error for invalid
@@ -18,14 +18,14 @@ import type { StudyV5 } from "./study";
 export function parseStudyFile(
   text: string,
   knownEncounterIds: readonly string[],
-): StudyState | StudyV5 {
+): StudyState | StudyV6 {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
     throw new Error("The study file is not valid JSON.");
   }
-  let study: StudyState | StudyV5;
+  let study: StudyState | StudyV6;
   try {
     study = studyFromExport(validateObservationExport(parsed));
   } catch (cause) {
@@ -128,7 +128,7 @@ export function currentDuration(
  * and saved attacks. Returns null when the study is consistent.
  */
 export function studyMonsterProblem(
-  study: StudyState | StudyV5,
+  study: StudyState | StudyV6,
   primaryArchetypeId: string,
   monsterIds: readonly string[],
 ): string | null {

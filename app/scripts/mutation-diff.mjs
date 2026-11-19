@@ -37,6 +37,16 @@ export function selectMutatedFiles(changedFiles, globs = MUTATE_GLOBS, exists = 
 }
 
 /**
+ * Files named on the command line (`npm run test:mutation:diff -- a.ts b.ts`)
+ * replace the changed-file selection, so a change touching more modules than
+ * the limit can still mutate the few that matter; null when none are named.
+ * The module limit still applies to the named list.
+ */
+export function requestedFiles(args, exists = existsSync) {
+  return args.length === 0 ? null : selectMutatedFiles(args, MUTATE_GLOBS, exists);
+}
+
+/**
  * Most modules one pull-request run mutates. Two core modules take about ten
  * to twenty minutes on a hosted runner and the job allows thirty, so a larger
  * selection would only time out; the scheduled sharded run covers it instead.
@@ -141,7 +151,7 @@ function changedLinesAgainst(base, files) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const base = baseRef();
-  const files = selectMutatedFiles(changedFilesAgainst(base));
+  const files = requestedFiles(process.argv.slice(2)) ?? selectMutatedFiles(changedFilesAgainst(base));
   const plan = diffPlan(files);
   console.log(plan.message);
   if (!plan.run) {

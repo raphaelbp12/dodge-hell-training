@@ -1,5 +1,20 @@
 import { expect, test } from "vitest";
-import { baseRef, changedLineRanges, DIFF_MODULE_LIMIT, diffPlan, selectMutatedFiles } from "./mutation-diff.mjs";
+import {
+  baseRef,
+  changedLineRanges,
+  DIFF_MODULE_LIMIT,
+  diffPlan,
+  requestedFiles,
+  selectMutatedFiles,
+} from "./mutation-diff.mjs";
+
+test("named files replace the changed-file selection, keeping only mutated modules", () => {
+  const exists = () => false;
+  expect(
+    requestedFiles(["src/game/simulation/marks.ts", "src/game/simulation/marks.test.ts", "README.md"], exists),
+  ).toEqual(["src/game/simulation/marks.ts"]);
+  expect(requestedFiles([], exists)).toBeNull();
+});
 
 test("the diff is taken against the pull request's base branch, so a stacked pull request counts only its own changes", () => {
   expect(baseRef({ GITHUB_BASE_REF: "plan-v22-quality-gates" })).toBe("origin/plan-v22-quality-gates");

@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { cadenced } from "./test-support";
 import {
   archetypeOf,
   ENCOUNTER_CONFIG,
@@ -129,7 +130,7 @@ test("the drain is identical at 30, 60 and 120 Hz for the same elapsed time", ()
 
 // --- Step 22.3: the phase machine -----------------------------------------
 
-const PRIMARY_ATTACK = PRIMARY.phases[0].attacks[0];
+const PRIMARY_ATTACK = cadenced(PRIMARY.phases[0].attacks[0]);
 const STATIONARY_MOVEMENT = { kind: "stationary" as const };
 
 /** A fresh three-phase test archetype's config: p1 (1), p2 (0.5), p3 (0.2, scripted exit). */

@@ -19,7 +19,7 @@ const LABEL_COLOR = "rgba(255, 255, 255, 0.75)";
 const SELECTED_ROW_COLOR = "rgba(255, 255, 255, 0.08)";
 const ROW_RULE_COLOR = "rgba(255, 255, 255, 0.1)";
 const PLAYHEAD_COLOR = "#ffffff";
-/** E20: a predicted volley is drawn at 40 % alpha. */
+/** E20, plan V23 Q18: a periodic track's repeated volley is drawn at 40 % alpha. */
 const FAINT_ALPHA = 0.4;
 const TICK_WIDTH_PX = 2;
 const LABEL_FONT = "10px sans-serif";

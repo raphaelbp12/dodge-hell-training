@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { annotations, formatSummary, summarize } from "./mutation-summary.mjs";
+import { annotations, blockingAnnotations, blockingMutants, formatSummary, summarize } from "./mutation-summary.mjs";
 
 function mutant(status, line, mutatorName = "ConditionalExpression", replacement = "false") {
   return { status, mutatorName, replacement, location: { start: { line, column: 1 }, end: { line, column: 9 } } };
@@ -85,4 +85,41 @@ test("annotations name the repository path and line of each undetected mutant on
     "::warning file=app/src/a.ts,line=8,title=Mutant survived::ConditionalExpression replaced this code with `false` and no test failed",
   ]);
   expect(annotations(summary, 1)).toHaveLength(1);
+});
+
+const GATE_REPORT = {
+  files: {
+    "src/a.ts": { mutants: [mutant("NoCoverage", 5, "BlockStatement", "{}"), mutant("NoCoverage", 50), mutant("Survived", 6)] },
+  },
+};
+
+test("a NoCoverage mutant on a changed line blocks; on an unchanged line it does not", () => {
+  const blocking = blockingMutants(summarize(GATE_REPORT, { "src/a.ts": [[1, 10]] }));
+  expect(blocking.map((entry) => [entry.line, entry.status])).toEqual([[5, "NoCoverage"]]);
+  expect(blockingMutants(summarize(GATE_REPORT, { "src/a.ts": [[40, 60]] })).map((entry) => entry.line)).toEqual([50]);
+  expect(blockingMutants(summarize(GATE_REPORT, { "src/a.ts": [[20, 30]] }))).toEqual([]);
+});
+
+test("a Survived mutant on a changed line does not block and still gets its warning", () => {
+  const summary = summarize({ files: { "src/a.ts": { mutants: [mutant("Survived", 6)] } } }, { "src/a.ts": [[1, 10]] });
+  expect(blockingMutants(summary)).toEqual([]);
+  expect(blockingAnnotations(summary)).toEqual([]);
+  expect(annotations(summary)).toEqual([expect.stringMatching(/^::warning file=app\/src\/a\.ts,line=6,title=Mutant survived::/)]);
+});
+
+test("a summary without changed-line data blocks nothing", () => {
+  expect(blockingMutants(summarize(GATE_REPORT))).toEqual([]);
+  expect(blockingAnnotations(summarize(GATE_REPORT))).toEqual([]);
+});
+
+test("blocking annotations are errors naming the repository path and line, up to the limit", () => {
+  const summary = summarize(GATE_REPORT, { "src/a.ts": [[1, 60]] });
+  expect(blockingAnnotations(summary)[0]).toMatch(/^::error file=app\/src\/a\.ts,line=5,title=Changed line not covered::/);
+  expect(blockingAnnotations(summary, 1)).toHaveLength(1);
+});
+
+test("the pull-request summary lists blocking mutants under a heading that says they block the merge", () => {
+  const text = formatSummary(summarize(GATE_REPORT, { "src/a.ts": [[1, 10]] }), { title: "x", changed: true });
+  expect(text).toContain("#### Blocks the merge: changed lines no test runs (1)");
+  expect(formatSummary(summarize(GATE_REPORT, {}), { title: "x", changed: true })).not.toContain("Blocks the merge");
 });

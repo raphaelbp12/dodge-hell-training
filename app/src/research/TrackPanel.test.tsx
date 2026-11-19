@@ -2,8 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { encounterConfigOf } from "../game/config/encounter";
-import type { AuthoredAttack } from "../game/config/data";
-import type { AttackTrack, Segment, StudyV5 } from "./study";
+import type { CadencedAuthoredAttack } from "../game/config/data";
+import type { AttackTrack, Segment, StudyV6 } from "./study";
 import { TrackPanel } from "./TrackPanel";
 
 const config = encounterConfigOf("killer-bee-queen");
@@ -36,13 +36,12 @@ const track = (id: string, marks: AttackTrack["marks"] = []): AttackTrack => ({
       cooldownAfterLastShotSeconds: 1,
       initialDelaySeconds: 0,
     },
-  } as unknown as AuthoredAttack,
-  cadenceSource: "authored",
+  } as unknown as CadencedAuthoredAttack,
   marks,
 });
 
-const study: StudyV5 = {
-  schemaVersion: 5,
+const study: StudyV6 = {
+  schemaVersion: 6,
   encounterId: "killer-bee-queen",
   archetypeId: "killer-bee-queen",
   recordedAt: "2026-11-13T00:00:00.000Z",
@@ -58,7 +57,6 @@ const study: StudyV5 = {
     track("third"),
   ],
   scratch: [{ timeSeconds: 7, kind: "volley" }],
-  acceptedSegmentValues: {},
 };
 
 function renderPanel(selectedTrackId: string | null = "second") {

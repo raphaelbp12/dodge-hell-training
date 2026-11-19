@@ -1,5 +1,5 @@
 {
-  "comment": "Step 23.2's harmless eight-phase skeleton (K16): real body, health, thresholds, telegraphs, invulnerability and movement from docs/killer-bee-queen-source.md, with zero attacks and zero minions - those are steps 23.3-23.10. Fidelity gaps, all trainer-authored pending a later step's own sourcing: every telegraphSeconds/invulnerableOnEnterSeconds except phase 6's sourced 29s; every sub-phase durationSeconds; every movement speed/radius/rate not stated by the source as a number. Phase 6's exitAfterSeconds and invulnerableOnEnterSeconds are both the source's sourced 29 seconds (K08), which is why phase 7 repeats phase 6's 25% threshold instead of draining through it.",
+  "comment": "Step 23.2's harmless eight-phase skeleton (K16): real body, health, thresholds, telegraphs, invulnerability and movement from docs/killer-bee-queen-source.md, with zero attacks and zero minions - those are steps 23.3-23.10. Fidelity gaps, all trainer-authored pending a later step's own sourcing: every telegraphSeconds/invulnerableOnEnterSeconds except phase 6's sourced 29s; every sub-phase durationSeconds; every movement speed/radius/rate not stated by the source as a number. Phase 6's exitAfterSeconds and invulnerableOnEnterSeconds were both the source's sourced 29 seconds (K08), which is why phase 7 repeats phase 6's 25% threshold instead of draining through it. Plan V23 (Q13, Q22): every segment the solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json) shows now takes its telegraph, invulnerable time, sub-phase duration and phase 6's exitAfterSeconds from that study's measured medians, and its attacks are the study's marked volleys; segments the video never shows keep their earlier values.",
   "spawnTiles": {
     "x": 0,
     "y": -16.2
@@ -26,7 +26,7 @@
   "phases": [
     {
       "id": "phase-1-honey-pond",
-      "comment": "Source (23.3): radial blue-bomb ring (Quiet), targeted white-bomb (Dazed), and three stacked stinger spreads (red/blue/yellow, 3 shots each = 9 shards) sharing one cadence. Authored on the phase itself so both sub-phases (circling the room vs the pond) fire identically. Bomb travelSeconds and every cadence/arc value are trainer-authored; the five projectiles and their shapes are wiki-prose.",
+      "comment": "Source (23.3): radial blue-bomb ring (Quiet), targeted white-bomb (Dazed), and three stacked stinger spreads (red/blue/yellow, 3 shots each = 9 shards). Authored on the phase itself so both sub-phases (circling the room vs the pond) fire identically. Bomb travelSeconds and every arc value are trainer-authored; the five projectiles and their shapes are wiki-prose. Plan V23: each attack fires the volleys marked in the solo-nest video study, counted from the phase's entry, once; the earlier shared trainer-authored cadence is gone.",
       "enterAtHpFraction": 1,
       "exitAfterSeconds": null,
       "telegraphSeconds": 2,
@@ -53,11 +53,60 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.8,
-            "initialDelaySeconds": 0.85
+          "marks": {
+            "bursts": [
+              [
+                0.067
+              ],
+              [
+                0.867
+              ],
+              [
+                1.667
+              ],
+              [
+                2.5
+              ],
+              [
+                3.333
+              ],
+              [
+                4.133
+              ],
+              [
+                4.967
+              ],
+              [
+                5.767
+              ],
+              [
+                6.567
+              ],
+              [
+                7.367
+              ],
+              [
+                8.1
+              ],
+              [
+                8.967
+              ],
+              [
+                9.767
+              ],
+              [
+                10.6
+              ],
+              [
+                11.4
+              ],
+              [
+                12.2
+              ],
+              [
+                13.067
+              ]
+            ]
           }
         },
         {
@@ -72,11 +121,24 @@
             "aim": "player",
             "emitterRadiusTiles": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.1,
-            "initialDelaySeconds": 1.27
+          "marks": {
+            "bursts": [
+              [
+                0.067
+              ],
+              [
+                3.133
+              ],
+              [
+                6.033
+              ],
+              [
+                9.167
+              ],
+              [
+                12.233
+              ]
+            ]
           }
         },
         {
@@ -90,11 +152,30 @@
             "aim": "player",
             "emitterRadiusTiles": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1.75,
-            "initialDelaySeconds": 1.7
+          "marks": {
+            "bursts": [
+              [
+                0.033
+              ],
+              [
+                4.1
+              ],
+              [
+                6.133
+              ],
+              [
+                8.1
+              ],
+              [
+                8.1
+              ],
+              [
+                10.133
+              ],
+              [
+                12.2
+              ]
+            ]
           }
         },
         {
@@ -108,11 +189,30 @@
             "aim": "player",
             "emitterRadiusTiles": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1.75,
-            "initialDelaySeconds": 1.7
+          "marks": {
+            "bursts": [
+              [
+                0.033
+              ],
+              [
+                0.033
+              ],
+              [
+                4.1
+              ],
+              [
+                6.133
+              ],
+              [
+                8.1
+              ],
+              [
+                10.133
+              ],
+              [
+                12.2
+              ]
+            ]
           }
         },
         {
@@ -126,11 +226,27 @@
             "aim": "player",
             "emitterRadiusTiles": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1.75,
-            "initialDelaySeconds": 1.7
+          "marks": {
+            "bursts": [
+              [
+                0.033
+              ],
+              [
+                4.1
+              ],
+              [
+                6.133
+              ],
+              [
+                8.1
+              ],
+              [
+                10.133
+              ],
+              [
+                12.2
+              ]
+            ]
           }
         }
       ],
@@ -138,8 +254,8 @@
         {
           "id": "circle-room",
           "durationSeconds": 10,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 0,
+          "telegraphSeconds": 0.033,
+          "invulnerableOnEnterSeconds": 4.067,
           "movement": {
             "comment": "W27: 8 tiles, retuned from the previous 10 which was calibrated against the old 19.2-tile circle.",
             "kind": "orbit",
@@ -184,9 +300,9 @@
         {
           "id": "red",
           "comment": "Source (23.4): multi-directional spread of Small Red Stingers, single directed Large Red Stinger, and a non-aimed radial ring of Red Bombs (Confused) so standing in front of the Queen misses them. Spawns despawn-on-exit Red Killer Bees. Invulnerable between colours (K08 pauses the drain).",
-          "durationSeconds": 10,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 1,
+          "durationSeconds": 9.867,
+          "telegraphSeconds": 1.8,
+          "invulnerableOnEnterSeconds": 3.167,
           "movement": null,
           "attacks": [
             {
@@ -200,11 +316,33 @@
                 "aim": "player",
                 "emitterRadiusTiles": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.7,
-                "initialDelaySeconds": 0.85
+              "marks": {
+                "bursts": [
+                  [
+                    1.833
+                  ],
+                  [
+                    2.8
+                  ],
+                  [
+                    3.8
+                  ],
+                  [
+                    4.833
+                  ],
+                  [
+                    5.867
+                  ],
+                  [
+                    6.8
+                  ],
+                  [
+                    7.833
+                  ],
+                  [
+                    8.867
+                  ]
+                ]
               }
             },
             {
@@ -218,11 +356,33 @@
                 "aim": "player",
                 "emitterRadiusTiles": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 1.27
+              "marks": {
+                "bursts": [
+                  [
+                    1.8
+                  ],
+                  [
+                    2.8
+                  ],
+                  [
+                    3.8
+                  ],
+                  [
+                    4.833
+                  ],
+                  [
+                    5.867
+                  ],
+                  [
+                    6.8
+                  ],
+                  [
+                    7.833
+                  ],
+                  [
+                    8.867
+                  ]
+                ]
               }
             },
             {
@@ -236,11 +396,39 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3.4,
-                "initialDelaySeconds": 1.7
+              "marks": {
+                "bursts": [
+                  [
+                    1.8
+                  ],
+                  [
+                    2.633
+                  ],
+                  [
+                    3.433
+                  ],
+                  [
+                    4.267
+                  ],
+                  [
+                    5.067
+                  ],
+                  [
+                    5.9
+                  ],
+                  [
+                    6.633
+                  ],
+                  [
+                    7.467
+                  ],
+                  [
+                    8.3
+                  ],
+                  [
+                    9.133
+                  ]
+                ]
               }
             }
           ],
@@ -355,9 +543,9 @@
         {
           "id": "yellow",
           "comment": "Source (23.4): 3-way spread of Large Yellow Stingers, a rotating spiral of Yellow Balls, and White Bombs (Dazed). The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) shows the White Bomb ring is one arm, not the earlier large arm count, and a second, player-targeted White Bomb (target-white-bomb) fires alongside it. Spawns despawn-on-exit Yellow Killer Bees.",
-          "durationSeconds": 10,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 1,
+          "durationSeconds": 9.967,
+          "telegraphSeconds": 1.767,
+          "invulnerableOnEnterSeconds": 3.2,
           "movement": null,
           "attacks": [
             {
@@ -371,11 +559,21 @@
                 "aim": "player",
                 "emitterRadiusTiles": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.7,
-                "initialDelaySeconds": 0.85
+              "marks": {
+                "bursts": [
+                  [
+                    1.8
+                  ],
+                  [
+                    3.833
+                  ],
+                  [
+                    5.867
+                  ],
+                  [
+                    7.933
+                  ]
+                ]
               }
             },
             {
@@ -389,11 +587,69 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": -50
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 1.27
+              "marks": {
+                "bursts": [
+                  [
+                    1.8
+                  ],
+                  [
+                    2.2
+                  ],
+                  [
+                    2.6
+                  ],
+                  [
+                    3.033
+                  ],
+                  [
+                    3.433
+                  ],
+                  [
+                    3.833
+                  ],
+                  [
+                    4.233
+                  ],
+                  [
+                    4.667
+                  ],
+                  [
+                    5.067
+                  ],
+                  [
+                    5.467
+                  ],
+                  [
+                    5.867
+                  ],
+                  [
+                    6.3
+                  ],
+                  [
+                    6.7
+                  ],
+                  [
+                    7.133
+                  ],
+                  [
+                    7.533
+                  ],
+                  [
+                    7.933
+                  ],
+                  [
+                    8.333
+                  ],
+                  [
+                    8.733
+                  ],
+                  [
+                    9.167
+                  ],
+                  [
+                    9.567
+                  ]
+                ]
               }
             },
             {
@@ -407,11 +663,39 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 3.4,
-                "initialDelaySeconds": 1.7
+              "marks": {
+                "bursts": [
+                  [
+                    1.8
+                  ],
+                  [
+                    2.633
+                  ],
+                  [
+                    3.467
+                  ],
+                  [
+                    4.233
+                  ],
+                  [
+                    5.1
+                  ],
+                  [
+                    5.9
+                  ],
+                  [
+                    6.733
+                  ],
+                  [
+                    7.567
+                  ],
+                  [
+                    8.367
+                  ],
+                  [
+                    9.2
+                  ]
+                ]
               }
             },
             {
@@ -425,13 +709,29 @@
                 "aim": "player",
                 "emitterRadiusTiles": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1,
-                "initialDelaySeconds": 0
-              },
-              "target": "player"
+              "target": "player",
+              "marks": {
+                "bursts": [
+                  [
+                    1.8
+                  ],
+                  [
+                    1.8
+                  ],
+                  [
+                    1.8
+                  ],
+                  [
+                    1.8
+                  ],
+                  [
+                    1.8
+                  ],
+                  [
+                    8.067
+                  ]
+                ]
+              }
             }
           ],
           "spawns": [
@@ -451,11 +751,11 @@
     },
     {
       "id": "phase-3-pond-barrage",
-      "comment": "Source (V8 measurement, docs/killer-bee-queen-observations.json and its markdown sibling; wiki prose for phase 3 in docs/killer-bee-queen-source.md): at 75% HP she despawns phase 2's minions, moves to the centre and flashes white, then stays stationary while firing the tagged barrage: two counter-rotating 3-arm blue spirals at 0.40 s with a 60-degree offset, which interleave into six balls and coincide into three every fourth volley (a 1.6 s beat); a clockwise 2-arm red spiral at 0.40 s; 8-arm yellow rings every 2.50 s; a 4-way bee burst every 3.04 s; 4 white bombs every 3.23 s - the footage shows four, contradicting the wiki's cardinal/intermediate (8) count, and the recording is the authority here; and a 60-glaive Armor-Break wave every 6.02 s, superseding the wiki's 'every 7 seconds'. Red's rotation rate, the zero initial delays and the white telegraph/movement remain trainer-authored. Fidelity note: the 60-arm wave may be effectively unavoidable in this 19.2-tile arena, matching the source's 'unavoidable' description; record what playtest shows rather than claiming it.",
+      "comment": "Source (V8 measurement, docs/killer-bee-queen-observations.json and its markdown sibling; wiki prose for phase 3 in docs/killer-bee-queen-source.md): at 75% HP she despawns phase 2's minions, moves to the centre and flashes white, then stays stationary while firing the tagged barrage: two counter-rotating 3-arm blue spirals at 0.40 s with a 60-degree offset, which interleave into six balls and coincide into three every fourth volley (a 1.6 s beat); a clockwise 2-arm red spiral at 0.40 s; 8-arm yellow rings every 2.50 s; a 4-way bee burst every 3.04 s; 4 white bombs every 3.23 s - the footage shows four, contradicting the wiki's cardinal/intermediate (8) count, and the recording is the authority here; and a 60-glaive Armor-Break wave every 6.02 s, superseding the wiki's 'every 7 seconds'. Red's rotation rate and the white movement remain trainer-authored. Plan V23: the cadences above are superseded; each attack now fires the volleys marked in the solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json), and the telegraph is that study's measured value. Fidelity note: the 60-arm wave may be effectively unavoidable in this 19.2-tile arena, matching the source's 'unavoidable' description; record what playtest shows rather than claiming it.",
       "enterAtHpFraction": 0.75,
       "exitAfterSeconds": null,
-      "telegraphSeconds": 2,
-      "invulnerableOnEnterSeconds": 0,
+      "telegraphSeconds": 1.467,
+      "invulnerableOnEnterSeconds": 4.867,
       "telegraphColor": "white",
       "movement": {
         "kind": "move-to-point",
@@ -475,11 +775,117 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 37.5
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.4,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.833
+              ],
+              [
+                4.233
+              ],
+              [
+                4.667
+              ],
+              [
+                5.067
+              ],
+              [
+                5.467
+              ],
+              [
+                5.9
+              ],
+              [
+                6.3
+              ],
+              [
+                6.7
+              ],
+              [
+                7.1
+              ],
+              [
+                7.533
+              ],
+              [
+                7.933
+              ],
+              [
+                8.333
+              ],
+              [
+                8.733
+              ],
+              [
+                9.133
+              ],
+              [
+                9.533
+              ],
+              [
+                9.933
+              ],
+              [
+                10.367
+              ],
+              [
+                10.767
+              ],
+              [
+                11.167
+              ],
+              [
+                11.567
+              ],
+              [
+                11.967
+              ],
+              [
+                12.4
+              ],
+              [
+                12.8
+              ],
+              [
+                13.2
+              ],
+              [
+                13.6
+              ],
+              [
+                13.933
+              ],
+              [
+                14.333
+              ],
+              [
+                14.733
+              ],
+              [
+                15.167
+              ],
+              [
+                15.567
+              ],
+              [
+                16
+              ],
+              [
+                16.4
+              ],
+              [
+                16.8
+              ],
+              [
+                17.2
+              ],
+              [
+                17.6
+              ],
+              [
+                18
+              ]
+            ]
           }
         },
         {
@@ -493,11 +899,117 @@
             "initialPhaseDegrees": 60,
             "clockwiseDegreesPerSecond": -37.5
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.4,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.833
+              ],
+              [
+                4.233
+              ],
+              [
+                4.667
+              ],
+              [
+                5.067
+              ],
+              [
+                5.467
+              ],
+              [
+                5.9
+              ],
+              [
+                6.3
+              ],
+              [
+                6.7
+              ],
+              [
+                7.1
+              ],
+              [
+                7.533
+              ],
+              [
+                7.933
+              ],
+              [
+                8.333
+              ],
+              [
+                8.733
+              ],
+              [
+                9.133
+              ],
+              [
+                9.533
+              ],
+              [
+                9.933
+              ],
+              [
+                10.367
+              ],
+              [
+                10.767
+              ],
+              [
+                11.167
+              ],
+              [
+                11.567
+              ],
+              [
+                11.967
+              ],
+              [
+                12.4
+              ],
+              [
+                12.8
+              ],
+              [
+                13.2
+              ],
+              [
+                13.6
+              ],
+              [
+                13.933
+              ],
+              [
+                14.333
+              ],
+              [
+                14.733
+              ],
+              [
+                15.167
+              ],
+              [
+                15.567
+              ],
+              [
+                16
+              ],
+              [
+                16.4
+              ],
+              [
+                16.8
+              ],
+              [
+                17.2
+              ],
+              [
+                17.6
+              ],
+              [
+                18
+              ]
+            ]
           }
         },
         {
@@ -511,11 +1023,117 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 40
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.4,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.833
+              ],
+              [
+                4.233
+              ],
+              [
+                4.667
+              ],
+              [
+                5.067
+              ],
+              [
+                5.467
+              ],
+              [
+                5.9
+              ],
+              [
+                6.3
+              ],
+              [
+                6.7
+              ],
+              [
+                7.1
+              ],
+              [
+                7.533
+              ],
+              [
+                7.933
+              ],
+              [
+                8.333
+              ],
+              [
+                8.733
+              ],
+              [
+                9.133
+              ],
+              [
+                9.533
+              ],
+              [
+                9.933
+              ],
+              [
+                10.367
+              ],
+              [
+                10.767
+              ],
+              [
+                11.167
+              ],
+              [
+                11.567
+              ],
+              [
+                11.967
+              ],
+              [
+                12.4
+              ],
+              [
+                12.8
+              ],
+              [
+                13.2
+              ],
+              [
+                13.6
+              ],
+              [
+                13.933
+              ],
+              [
+                14.333
+              ],
+              [
+                14.733
+              ],
+              [
+                15.167
+              ],
+              [
+                15.567
+              ],
+              [
+                16
+              ],
+              [
+                16.4
+              ],
+              [
+                16.8
+              ],
+              [
+                17.2
+              ],
+              [
+                17.6
+              ],
+              [
+                18
+              ]
+            ]
           }
         },
         {
@@ -529,11 +1147,27 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.5,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.833
+              ],
+              [
+                6.5
+              ],
+              [
+                8.967
+              ],
+              [
+                11.567
+              ],
+              [
+                13.933
+              ],
+              [
+                16.4
+              ]
+            ]
           }
         },
         {
@@ -547,11 +1181,24 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 3.04,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.833
+              ],
+              [
+                6.9
+              ],
+              [
+                9.933
+              ],
+              [
+                13
+              ],
+              [
+                16
+              ]
+            ]
           }
         },
         {
@@ -565,11 +1212,27 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 3.23,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                1.467
+              ],
+              [
+                3.833
+              ],
+              [
+                7.133
+              ],
+              [
+                10.4
+              ],
+              [
+                13.633
+              ],
+              [
+                16.733
+              ]
+            ]
           }
         },
         {
@@ -583,22 +1246,29 @@
             "initialPhaseDegrees": 0,
             "clockwiseDegreesPerSecond": 0
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 6.02,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                2.9
+              ],
+              [
+                8.933
+              ],
+              [
+                14.967
+              ]
+            ]
           }
         }
       ]
     },
     {
       "id": "phase-4-glaive-circle",
-      "comment": "Source (23.6): at 60% HP she slowly circles counter-clockwise in the centre while firing 4-directional glaive spreads, each colour's ring sharing one cadence but advancing its own, mutually-prime bearing per burst (7/11/13 degrees - none share a divisor with 90, so the four-arm rings never realign; asserted over many bursts rather than trusted) so standing still cannot dodge them. Also fires the Tips-sourced 'shotgun of Red Hive Shots' (200 unblockable/armour-piercing damage each, 600 total tanked) as a three-shot player-aimed spread of hive-spiral-shot-v1: the behaviour prose for this phase never mentions it, but the Tips text is specific, quantitative and names phase 4, and row 15's 200-damage armour-piercing projectile matches the quoted 600 exactly, so the conflict is resolved by including it (recorded here rather than silently dropped). Fidelity gap: the Plagued Nest's faster spinner spreads and multicoloured 4-way spiral are excluded (K07).",
+      "comment": "Source (23.6): at 60% HP she slowly circles counter-clockwise in the centre while firing 4-directional glaive spreads, each colour's ring sharing one cadence but advancing its own, mutually-prime bearing per burst (7/11/13 degrees - none share a divisor with 90, so the four-arm rings never realign; asserted over many bursts rather than trusted) so standing still cannot dodge them. Also fires the Tips-sourced 'shotgun of Red Hive Shots' (200 unblockable/armour-piercing damage each, 600 total tanked) as a three-shot player-aimed spread of hive-spiral-shot-v1: the behaviour prose for this phase never mentions it, but the Tips text is specific, quantitative and names phase 4, and row 15's 200-damage armour-piercing projectile matches the quoted 600 exactly, so the conflict was resolved by including it. Plan V23 (Q16): the solo-nest video study marks no volley for that shotgun, so the export drops it; the three glaive rings fire their marked volleys. Fidelity gap: the Plagued Nest's faster spinner spreads and multicoloured 4-way spiral are excluded (K07).",
       "enterAtHpFraction": 0.6,
       "exitAfterSeconds": null,
-      "telegraphSeconds": 2,
-      "invulnerableOnEnterSeconds": 0,
+      "telegraphSeconds": 3.067,
+      "invulnerableOnEnterSeconds": 2.433,
       "telegraphColor": "amber",
       "movement": {
         "kind": "orbit",
@@ -621,11 +1291,27 @@
             "clockwiseDegreesPerSecond": 0,
             "perBurstAdvanceDegrees": 7
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.3,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.067
+              ],
+              [
+                4.467
+              ],
+              [
+                5.9
+              ],
+              [
+                7.5
+              ],
+              [
+                8.933
+              ],
+              [
+                10.333
+              ]
+            ]
           }
         },
         {
@@ -640,11 +1326,27 @@
             "clockwiseDegreesPerSecond": 0,
             "perBurstAdvanceDegrees": 11
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.3,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                3.067
+              ],
+              [
+                4.467
+              ],
+              [
+                5.9
+              ],
+              [
+                7.5
+              ],
+              [
+                8.933
+              ],
+              [
+                10.333
+              ]
+            ]
           }
         },
         {
@@ -659,29 +1361,27 @@
             "clockwiseDegreesPerSecond": 0,
             "perBurstAdvanceDegrees": 13
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.3,
-            "initialDelaySeconds": 0
-          }
-        },
-        {
-          "id": "hive-spiral-shot-shotgun",
-          "projectile": "hive-spiral-shot-v1",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "spread",
-            "shots": 3,
-            "arcDegrees": 20,
-            "aim": "player",
-            "emitterRadiusTiles": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.8,
-            "initialDelaySeconds": 1.7
+          "marks": {
+            "bursts": [
+              [
+                3.067
+              ],
+              [
+                4.467
+              ],
+              [
+                5.9
+              ],
+              [
+                7.5
+              ],
+              [
+                8.933
+              ],
+              [
+                10.333
+              ]
+            ]
           }
         }
       ]
@@ -703,9 +1403,9 @@
       "subPhases": [
         {
           "id": "red",
-          "durationSeconds": 15,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 1,
+          "durationSeconds": 16.333,
+          "telegraphSeconds": 5.233,
+          "invulnerableOnEnterSeconds": 6.267,
           "movement": {
             "kind": "orbit",
             "radiusTiles": 3,
@@ -725,11 +1425,47 @@
                 "initialPhaseDegrees": 40,
                 "clockwiseDegreesPerSecond": 25
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.05,
-                "initialDelaySeconds": 0.42
+              "marks": {
+                "bursts": [
+                  [
+                    6.467,
+                    6.667,
+                    6.9,
+                    7.1,
+                    7.3,
+                    7.5,
+                    7.7,
+                    7.9,
+                    8.1
+                  ],
+                  [
+                    9.933,
+                    10.133,
+                    10.333,
+                    10.533,
+                    10.733,
+                    10.933,
+                    11.133,
+                    11.4
+                  ],
+                  [
+                    12.767,
+                    12.967,
+                    13.167,
+                    13.367,
+                    13.633,
+                    13.9
+                  ],
+                  [
+                    15.133,
+                    15.333,
+                    15.533,
+                    15.733,
+                    15.933,
+                    16.133,
+                    16.333
+                  ]
+                ]
               }
             },
             {
@@ -743,11 +1479,18 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.8,
-                "initialDelaySeconds": 0.85
+              "marks": {
+                "bursts": [
+                  [
+                    5.267
+                  ],
+                  [
+                    10.533
+                  ],
+                  [
+                    15.733
+                  ]
+                ]
               }
             },
             {
@@ -766,11 +1509,18 @@
                   "arcDegrees": 30
                 }
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.8,
-                "initialDelaySeconds": 1.7
+              "marks": {
+                "bursts": [
+                  [
+                    6.467
+                  ],
+                  [
+                    9.533
+                  ],
+                  [
+                    15.533
+                  ]
+                ]
               }
             },
             {
@@ -789,11 +1539,18 @@
                   "arcDegrees": 30
                 }
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.8,
-                "initialDelaySeconds": 2.55
+              "marks": {
+                "bursts": [
+                  [
+                    6.467
+                  ],
+                  [
+                    10.533
+                  ],
+                  [
+                    14.5
+                  ]
+                ]
               }
             },
             {
@@ -807,11 +1564,34 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": -25
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1,
-                "initialDelaySeconds": 0
+              "marks": {
+                "bursts": [
+                  [
+                    8.3,
+                    8.5,
+                    8.7,
+                    8.933,
+                    9.133,
+                    9.333,
+                    9.533,
+                    9.733
+                  ],
+                  [
+                    11.6,
+                    11.8,
+                    11.967,
+                    12.167,
+                    12.367,
+                    12.567
+                  ],
+                  [
+                    14.1,
+                    14.3,
+                    14.5,
+                    14.7,
+                    14.933
+                  ]
+                ]
               }
             }
           ],
@@ -928,8 +1708,8 @@
         {
           "id": "yellow",
           "durationSeconds": 15,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 1,
+          "telegraphSeconds": 2.233,
+          "invulnerableOnEnterSeconds": 2.233,
           "movement": {
             "kind": "wander",
             "speedTilesPerSecond": 2,
@@ -948,11 +1728,38 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": -40
               },
-              "cadence": {
-                "shotsPerBurst": 3,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.4,
-                "initialDelaySeconds": 0.42
+              "marks": {
+                "bursts": [
+                  [
+                    2.233,
+                    2.467,
+                    2.667,
+                    2.867,
+                    3.067
+                  ],
+                  [
+                    4.1,
+                    4.3,
+                    4.5,
+                    4.7,
+                    4.9,
+                    5.1,
+                    5.3,
+                    5.5,
+                    5.7
+                  ],
+                  [
+                    6.733,
+                    6.933,
+                    7.133,
+                    7.333,
+                    7.533,
+                    7.733,
+                    7.967,
+                    8.133,
+                    8.333
+                  ]
+                ]
               }
             },
             {
@@ -971,11 +1778,18 @@
                   "coneDegrees": 30
                 }
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.4,
-                "initialDelaySeconds": 0.85
+              "marks": {
+                "bursts": [
+                  [
+                    2.233
+                  ],
+                  [
+                    4.9
+                  ],
+                  [
+                    7.533
+                  ]
+                ]
               }
             },
             {
@@ -989,11 +1803,15 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.8,
-                "initialDelaySeconds": 1.7
+              "marks": {
+                "bursts": [
+                  [
+                    2.233
+                  ],
+                  [
+                    6.333
+                  ]
+                ]
               }
             },
             {
@@ -1007,11 +1825,18 @@
                 "initialPhaseDegrees": 45,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.8,
-                "initialDelaySeconds": 2.55
+              "marks": {
+                "bursts": [
+                  [
+                    2.233
+                  ],
+                  [
+                    4.9
+                  ],
+                  [
+                    8.333
+                  ]
+                ]
               }
             }
           ],
@@ -1032,11 +1857,11 @@
     },
     {
       "id": "phase-6-nests",
-      "comment": "Source: at 25% HP she returns to the centre, flashing red, invulnerable for the sourced 29 seconds while 3 Nests spawn (K08: no health cost, so phase 7 re-enters at the same 25%). Step 23.8: the 2-arm gapped, spreading machinegun of red-stinger-small and the three Nests, one per colour, despawnOnExit false so they survive into phase 7. The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) retunes the machinegun to start at 0 degrees and turn 15 degrees per second counter-clockwise, and adds six 2-arm machine-gun rings firing 1, 3, 5, 7, 9 and 10 scattered shots per arm. All seven attacks fire for the whole phase, because an authored attack has no start or end time within its phase.",
+      "comment": "Source: at 25% HP she returns to the centre, flashing red, invulnerable for the sourced 29 seconds while 3 Nests spawn (K08: no health cost, so phase 7 re-enters at the same 25%). Step 23.8: the three Nests, one per colour, despawnOnExit false so they survive into phase 7. The solo-nest video study (docs/killer-bee-queen-study-TFclwuPtC94.json, approved by the user as correct on 2026-11-18) adds six 2-arm machine-gun rings firing 1, 3, 5, 7, 9 and 10 scattered shots per arm. Plan V23: each ring fires only the volleys the study marks, at their times from the phase's entry, so the machine gun escalates as the video shows; the earlier 2-arm stinger machinegun has no marked volley and is dropped (Q16). The telegraph, invulnerable time and exitAfterSeconds are the study's measured values.",
       "enterAtHpFraction": 0.25,
-      "exitAfterSeconds": 29,
-      "telegraphSeconds": 2,
-      "invulnerableOnEnterSeconds": 29,
+      "exitAfterSeconds": 33.133,
+      "telegraphSeconds": 4.067,
+      "invulnerableOnEnterSeconds": 40.133,
       "telegraphColor": "red",
       "movement": {
         "kind": "move-to-point",
@@ -1045,36 +1870,6 @@
       },
       "progression": null,
       "attacks": [
-        {
-          "id": "stinger-machinegun",
-          "projectile": "red-stinger-small",
-          "tuningSource": "video-observation",
-          "pattern": {
-            "kind": "ring",
-            "arms": 2,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 0,
-            "clockwiseDegreesPerSecond": -15,
-            "gapSectorsDegrees": [
-              [
-                90,
-                180
-              ],
-              [
-                270,
-                0
-              ]
-            ],
-            "armSpreadDegreesPerSecond": 15,
-            "maxArmSpreadDegrees": 45
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 0.1,
-            "initialDelaySeconds": 0
-          }
-        },
         {
           "id": "machine-gun",
           "projectile": "red-stinger-small",
@@ -1091,11 +1886,15 @@
               "coneDegrees": 30
             }
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                4.067
+              ],
+              [
+                4.267
+              ]
+            ]
           }
         },
         {
@@ -1114,11 +1913,18 @@
               "coneDegrees": 30
             }
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                4.467
+              ],
+              [
+                4.667
+              ],
+              [
+                4.667
+              ]
+            ]
           }
         },
         {
@@ -1137,11 +1943,15 @@
               "coneDegrees": 50
             }
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                4.867
+              ],
+              [
+                5.067
+              ]
+            ]
           }
         },
         {
@@ -1160,11 +1970,15 @@
               "coneDegrees": 70
             }
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                5.267
+              ],
+              [
+                5.467
+              ]
+            ]
           }
         },
         {
@@ -1183,11 +1997,15 @@
               "coneDegrees": 90
             }
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                5.667
+              ],
+              [
+                5.867
+              ]
+            ]
           }
         },
         {
@@ -1206,11 +2024,408 @@
               "coneDegrees": 100
             }
           },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 1,
-            "initialDelaySeconds": 0
+          "marks": {
+            "bursts": [
+              [
+                6.067
+              ],
+              [
+                6.267
+              ],
+              [
+                6.467
+              ],
+              [
+                6.667
+              ],
+              [
+                6.867
+              ],
+              [
+                7.067
+              ],
+              [
+                7.267
+              ],
+              [
+                7.5
+              ],
+              [
+                7.6
+              ],
+              [
+                7.8
+              ],
+              [
+                8
+              ],
+              [
+                8.2
+              ],
+              [
+                8.433
+              ],
+              [
+                8.633
+              ],
+              [
+                8.833
+              ],
+              [
+                9.033
+              ],
+              [
+                9.233
+              ],
+              [
+                9.433
+              ],
+              [
+                9.633
+              ],
+              [
+                9.833
+              ],
+              [
+                10.067
+              ],
+              [
+                10.267
+              ],
+              [
+                10.467
+              ],
+              [
+                10.667
+              ],
+              [
+                10.867
+              ],
+              [
+                11.067
+              ],
+              [
+                11.267
+              ],
+              [
+                11.467
+              ],
+              [
+                11.667
+              ],
+              [
+                11.9
+              ],
+              [
+                12.1
+              ],
+              [
+                12.3
+              ],
+              [
+                12.5
+              ],
+              [
+                12.7
+              ],
+              [
+                12.9
+              ],
+              [
+                13.133
+              ],
+              [
+                13.333
+              ],
+              [
+                13.533
+              ],
+              [
+                13.733
+              ],
+              [
+                13.933
+              ],
+              [
+                14.133
+              ],
+              [
+                14.333
+              ],
+              [
+                14.533
+              ],
+              [
+                14.733
+              ],
+              [
+                14.933
+              ],
+              [
+                15.167
+              ],
+              [
+                15.367
+              ],
+              [
+                15.567
+              ],
+              [
+                15.767
+              ],
+              [
+                15.967
+              ],
+              [
+                16.167
+              ],
+              [
+                16.367
+              ],
+              [
+                16.567
+              ],
+              [
+                16.767
+              ],
+              [
+                17
+              ],
+              [
+                17.2
+              ],
+              [
+                17.4
+              ],
+              [
+                17.6
+              ],
+              [
+                17.8
+              ],
+              [
+                18
+              ],
+              [
+                18.2
+              ],
+              [
+                18.4
+              ],
+              [
+                18.6
+              ],
+              [
+                18.733
+              ],
+              [
+                18.933
+              ],
+              [
+                19.133
+              ],
+              [
+                19.333
+              ],
+              [
+                19.533
+              ],
+              [
+                19.733
+              ],
+              [
+                19.933
+              ],
+              [
+                20.133
+              ],
+              [
+                20.433
+              ],
+              [
+                20.633
+              ],
+              [
+                20.833
+              ],
+              [
+                21.033
+              ],
+              [
+                21.233
+              ],
+              [
+                21.433
+              ],
+              [
+                21.633
+              ],
+              [
+                21.833
+              ],
+              [
+                21.933
+              ],
+              [
+                22.133
+              ],
+              [
+                22.333
+              ],
+              [
+                22.533
+              ],
+              [
+                22.767
+              ],
+              [
+                22.967
+              ],
+              [
+                23.167
+              ],
+              [
+                23.367
+              ],
+              [
+                23.567
+              ],
+              [
+                24.2
+              ],
+              [
+                24.4
+              ],
+              [
+                24.6
+              ],
+              [
+                24.8
+              ],
+              [
+                25
+              ],
+              [
+                25.2
+              ],
+              [
+                25.4
+              ],
+              [
+                25.6
+              ],
+              [
+                25.8
+              ],
+              [
+                26
+              ],
+              [
+                26.2
+              ],
+              [
+                26.4
+              ],
+              [
+                26.6
+              ],
+              [
+                26.833
+              ],
+              [
+                27.033
+              ],
+              [
+                27.233
+              ],
+              [
+                27.433
+              ],
+              [
+                27.633
+              ],
+              [
+                27.833
+              ],
+              [
+                28.033
+              ],
+              [
+                28.233
+              ],
+              [
+                28.467
+              ],
+              [
+                28.667
+              ],
+              [
+                28.867
+              ],
+              [
+                29.067
+              ],
+              [
+                29.267
+              ],
+              [
+                29.467
+              ],
+              [
+                29.667
+              ],
+              [
+                29.867
+              ],
+              [
+                30.067
+              ],
+              [
+                30.267
+              ],
+              [
+                30.467
+              ],
+              [
+                30.7
+              ],
+              [
+                30.9
+              ],
+              [
+                31.1
+              ],
+              [
+                31.3
+              ],
+              [
+                31.5
+              ],
+              [
+                31.7
+              ],
+              [
+                31.9
+              ],
+              [
+                32.1
+              ],
+              [
+                32.3
+              ],
+              [
+                32.5
+              ],
+              [
+                32.7
+              ],
+              [
+                32.933
+              ],
+              [
+                33.133
+              ]
+            ]
           }
         }
       ],
@@ -1300,110 +2515,18 @@
         {
           "id": "yellow",
           "durationSeconds": 15,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 0,
+          "telegraphSeconds": 4.533,
+          "invulnerableOnEnterSeconds": 6.467,
           "movement": {
             "kind": "stationary"
           },
-          "attacks": [
-            {
-              "id": "slowing-bee-spiral",
-              "projectile": "bee-shot",
-              "tuningSource": "trainer-authored",
-              "pattern": {
-                "kind": "ring",
-                "arms": 1,
-                "emitterRadiusTiles": 0,
-                "initialPhaseDegrees": 0,
-                "clockwiseDegreesPerSecond": 40
-              },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 0.36,
-                "initialDelaySeconds": 0
-              }
-            },
-            {
-              "id": "yellow-ball-spiral",
-              "projectile": "yellow-ball-v2",
-              "tuningSource": "trainer-authored",
-              "pattern": {
-                "kind": "ring",
-                "arms": 1,
-                "emitterRadiusTiles": 0,
-                "initialPhaseDegrees": 90,
-                "clockwiseDegreesPerSecond": -40
-              },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 0.36,
-                "initialDelaySeconds": 0.17
-              }
-            },
-            {
-              "id": "yellow-stinger-burst",
-              "projectile": "yellow-stinger-large",
-              "tuningSource": "trainer-authored",
-              "pattern": {
-                "kind": "ring",
-                "arms": 6,
-                "emitterRadiusTiles": 0,
-                "initialPhaseDegrees": 0,
-                "clockwiseDegreesPerSecond": 0
-              },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.7,
-                "initialDelaySeconds": 0.42
-              }
-            },
-            {
-              "id": "yellow-blast-burst",
-              "projectile": "hive-shot-v1",
-              "tuningSource": "trainer-authored",
-              "pattern": {
-                "kind": "ring",
-                "arms": 6,
-                "emitterRadiusTiles": 0,
-                "initialPhaseDegrees": 30,
-                "clockwiseDegreesPerSecond": 0
-              },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.7,
-                "initialDelaySeconds": 0.85
-              }
-            },
-            {
-              "id": "white-bomb-advance",
-              "projectile": "white-bomb-v2",
-              "tuningSource": "wiki-prose",
-              "pattern": {
-                "kind": "ring",
-                "arms": 4,
-                "emitterRadiusTiles": 0,
-                "initialPhaseDegrees": 0,
-                "clockwiseDegreesPerSecond": 0,
-                "perBurstAdvanceDegrees": 15
-              },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.5,
-                "initialDelaySeconds": 1.5
-              }
-            }
-          ]
+          "attacks": []
         },
         {
           "id": "red",
-          "durationSeconds": 15,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 0,
+          "durationSeconds": 20.233,
+          "telegraphSeconds": 3.233,
+          "invulnerableOnEnterSeconds": 5,
           "movement": {
             "kind": "orbit",
             "radiusTiles": 6,
@@ -1423,11 +2546,24 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 0
+              "marks": {
+                "bursts": [
+                  [
+                    3.667
+                  ],
+                  [
+                    4.4
+                  ],
+                  [
+                    5.2
+                  ],
+                  [
+                    6.233
+                  ],
+                  [
+                    7.267
+                  ]
+                ]
               }
             },
             {
@@ -1441,11 +2577,24 @@
                 "initialPhaseDegrees": 30,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 0.64
+              "marks": {
+                "bursts": [
+                  [
+                    3.267
+                  ],
+                  [
+                    4
+                  ],
+                  [
+                    4.8
+                  ],
+                  [
+                    6.867
+                  ],
+                  [
+                    7.667
+                  ]
+                ]
               }
             },
             {
@@ -1459,11 +2608,18 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 1.27
+              "marks": {
+                "bursts": [
+                  [
+                    3.2
+                  ],
+                  [
+                    5.633
+                  ],
+                  [
+                    7.467
+                  ]
+                ]
               }
             },
             {
@@ -1477,20 +2633,27 @@
                 "initialPhaseDegrees": 60,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.7,
-                "initialDelaySeconds": 1.91
+              "marks": {
+                "bursts": [
+                  [
+                    3.2
+                  ],
+                  [
+                    5.433
+                  ],
+                  [
+                    6.267
+                  ]
+                ]
               }
             }
           ]
         },
         {
           "id": "blue",
-          "durationSeconds": 15,
-          "telegraphSeconds": 1,
-          "invulnerableOnEnterSeconds": 0,
+          "durationSeconds": 22.367,
+          "telegraphSeconds": 5,
+          "invulnerableOnEnterSeconds": 5.033,
           "movement": {
             "kind": "chase",
             "speedTilesPerSecond": 3
@@ -1507,11 +2670,138 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 50
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 0.43,
-                "initialDelaySeconds": 0
+              "marks": {
+                "bursts": [
+                  [
+                    5
+                  ],
+                  [
+                    5.6
+                  ],
+                  [
+                    6
+                  ],
+                  [
+                    6.4
+                  ],
+                  [
+                    6.833
+                  ],
+                  [
+                    7.233
+                  ],
+                  [
+                    7.633
+                  ],
+                  [
+                    8.033
+                  ],
+                  [
+                    8.433
+                  ],
+                  [
+                    8.833
+                  ],
+                  [
+                    9.233
+                  ],
+                  [
+                    9.633
+                  ],
+                  [
+                    10.033
+                  ],
+                  [
+                    10.467
+                  ],
+                  [
+                    10.867
+                  ],
+                  [
+                    11.267
+                  ],
+                  [
+                    11.667
+                  ],
+                  [
+                    12.067
+                  ],
+                  [
+                    12.467
+                  ],
+                  [
+                    12.9
+                  ],
+                  [
+                    13.3
+                  ],
+                  [
+                    13.7
+                  ],
+                  [
+                    14.133
+                  ],
+                  [
+                    14.533
+                  ],
+                  [
+                    14.933
+                  ],
+                  [
+                    15.333
+                  ],
+                  [
+                    15.633
+                  ],
+                  [
+                    16.067
+                  ],
+                  [
+                    16.467
+                  ],
+                  [
+                    16.867
+                  ],
+                  [
+                    17.267
+                  ],
+                  [
+                    17.667
+                  ],
+                  [
+                    18.1
+                  ],
+                  [
+                    18.5
+                  ],
+                  [
+                    18.9
+                  ],
+                  [
+                    19.3
+                  ],
+                  [
+                    19.7
+                  ],
+                  [
+                    20.133
+                  ],
+                  [
+                    20.533
+                  ],
+                  [
+                    20.967
+                  ],
+                  [
+                    21.367
+                  ],
+                  [
+                    21.767
+                  ],
+                  [
+                    22.167
+                  ]
+                ]
               }
             },
             {
@@ -1525,11 +2815,138 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 25
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 0.42
+              "marks": {
+                "bursts": [
+                  [
+                    5
+                  ],
+                  [
+                    5.6
+                  ],
+                  [
+                    6
+                  ],
+                  [
+                    6.4
+                  ],
+                  [
+                    6.833
+                  ],
+                  [
+                    7.233
+                  ],
+                  [
+                    7.633
+                  ],
+                  [
+                    8.033
+                  ],
+                  [
+                    8.433
+                  ],
+                  [
+                    8.833
+                  ],
+                  [
+                    9.233
+                  ],
+                  [
+                    9.633
+                  ],
+                  [
+                    10.033
+                  ],
+                  [
+                    10.467
+                  ],
+                  [
+                    10.867
+                  ],
+                  [
+                    11.267
+                  ],
+                  [
+                    11.667
+                  ],
+                  [
+                    12.067
+                  ],
+                  [
+                    12.467
+                  ],
+                  [
+                    12.9
+                  ],
+                  [
+                    13.3
+                  ],
+                  [
+                    13.7
+                  ],
+                  [
+                    14.133
+                  ],
+                  [
+                    14.533
+                  ],
+                  [
+                    14.933
+                  ],
+                  [
+                    15.333
+                  ],
+                  [
+                    15.633
+                  ],
+                  [
+                    16.067
+                  ],
+                  [
+                    16.467
+                  ],
+                  [
+                    16.867
+                  ],
+                  [
+                    17.267
+                  ],
+                  [
+                    17.667
+                  ],
+                  [
+                    18.1
+                  ],
+                  [
+                    18.5
+                  ],
+                  [
+                    18.9
+                  ],
+                  [
+                    19.3
+                  ],
+                  [
+                    19.7
+                  ],
+                  [
+                    20.133
+                  ],
+                  [
+                    20.533
+                  ],
+                  [
+                    20.967
+                  ],
+                  [
+                    21.367
+                  ],
+                  [
+                    21.767
+                  ],
+                  [
+                    22.167
+                  ]
+                ]
               }
             },
             {
@@ -1543,11 +2960,18 @@
                 "aim": "player",
                 "emitterRadiusTiles": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 0.85
+              "marks": {
+                "bursts": [
+                  [
+                    8.833
+                  ],
+                  [
+                    13.1
+                  ],
+                  [
+                    17.067
+                  ]
+                ]
               }
             },
             {
@@ -1561,11 +2985,18 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 1.28,
-                "initialDelaySeconds": 1.27
+              "marks": {
+                "bursts": [
+                  [
+                    8.833
+                  ],
+                  [
+                    13.1
+                  ],
+                  [
+                    17.067
+                  ]
+                ]
               }
             },
             {
@@ -1579,11 +3010,18 @@
                 "initialPhaseDegrees": 0,
                 "clockwiseDegreesPerSecond": 0
               },
-              "cadence": {
-                "shotsPerBurst": 1,
-                "shotIntervalSeconds": 0.1,
-                "cooldownAfterLastShotSeconds": 2.12,
-                "initialDelaySeconds": 1.7
+              "marks": {
+                "bursts": [
+                  [
+                    5
+                  ],
+                  [
+                    13.1
+                  ],
+                  [
+                    21.133
+                  ]
+                ]
               }
             }
           ]
@@ -1592,11 +3030,11 @@
     },
     {
       "id": "phase-8-final",
-      "comment": "Source: at 12.5% HP she returns to the centre and fires slow radial bursts of Large Red Stingers, Small Yellow Stingers, Blue Balls, Hive Range Shots and all three Glaives until death. No sub-phases; runs until death since there is no further phase. No progression override here (unlike phase 7's 195 HP/s) - implements the source's 'they will cease healing the boss if her HP decreases further' by using the encounter's full 375 HP/s drain. The three Beehemoths are re-spawned at startPhaseIndex 1 (final-phase behaviour authored in 23.9) with despawnOnExit false, since this phase ends only at death; the source's 'orbit her closely' reuses phase 7's placements.",
+      "comment": "Source: at 12.5% HP she returns to the centre and fires slow radial bursts of Large Red Stingers, Small Yellow Stingers, Blue Balls, Hive Range Shots and all three Glaives until death. Plan V23 (Q16): the solo-nest video study shows this phase but marks none of those volleys, so the export drops every attack and the phase fires nothing until its attacks are marked. No sub-phases; runs until death since there is no further phase. No progression override here (unlike phase 7's 195 HP/s) - implements the source's 'they will cease healing the boss if her HP decreases further' by using the encounter's full 375 HP/s drain. The three Beehemoths are re-spawned at startPhaseIndex 1 (final-phase behaviour authored in 23.9) with despawnOnExit false, since this phase ends only at death; the source's 'orbit her closely' reuses phase 7's placements.",
       "enterAtHpFraction": 0.125,
       "exitAfterSeconds": null,
-      "telegraphSeconds": 2,
-      "invulnerableOnEnterSeconds": 0,
+      "telegraphSeconds": 1.033,
+      "invulnerableOnEnterSeconds": 2.067,
       "telegraphColor": "red",
       "movement": {
         "kind": "move-to-point",
@@ -1636,134 +3074,7 @@
           }
         }
       ],
-      "attacks": [
-        {
-          "id": "final-red-stinger-burst",
-          "projectile": "red-stinger-large-v2",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 0,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 0
-          }
-        },
-        {
-          "id": "final-yellow-stinger-burst",
-          "projectile": "yellow-stinger-small-v2",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 30,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 0.42
-          }
-        },
-        {
-          "id": "final-blue-ball-burst",
-          "projectile": "blue-ball-v2",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 60,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 0.85
-          }
-        },
-        {
-          "id": "final-hive-range-burst",
-          "projectile": "hive-range-shot-v1",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 90,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 1.27
-          }
-        },
-        {
-          "id": "final-yellow-glaive-burst",
-          "projectile": "yellow-glaive-v1",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 120,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 1.7
-          }
-        },
-        {
-          "id": "final-red-glaive-burst",
-          "projectile": "red-glaive-v2",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 150,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 2.12
-          }
-        },
-        {
-          "id": "final-blue-glaive-burst",
-          "projectile": "blue-glaive-v1",
-          "tuningSource": "trainer-authored",
-          "pattern": {
-            "kind": "ring",
-            "arms": 6,
-            "emitterRadiusTiles": 0,
-            "initialPhaseDegrees": 180,
-            "clockwiseDegreesPerSecond": 0
-          },
-          "cadence": {
-            "shotsPerBurst": 1,
-            "shotIntervalSeconds": 0.1,
-            "cooldownAfterLastShotSeconds": 2.55,
-            "initialDelaySeconds": 2.55
-          }
-        }
-      ]
+      "attacks": []
     }
   ]
 }

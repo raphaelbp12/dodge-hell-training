@@ -20,16 +20,22 @@ import {
   type StickySelection,
 } from "./taggingOptions";
 import type { EncounterConfig } from "../game/config/encounter";
-import { validateStudyV5, type StudyV5 } from "./study";
+import { studyV6FromV5, validateStudyV6, type StudyV6 } from "./study";
 
 export const TAGGER_SESSION_KEY_PREFIX = "dodge-hell-training.tagger-session.";
 
-/** Plan V20 E14: a version 4 draft carries a v5 study and the selected track. */
+/** The draft version `buildDraft` writes; browser specs read it, so a bump cannot leave them behind. */
+export const SESSION_DRAFT_VERSION = 5;
+
+/**
+ * Plan V20 E14, plan V23 Q15: a version 5 draft carries a v6 study and the
+ * selected track. A version 4 draft's v5 study converts on restore.
+ */
 export type SessionDraft = Readonly<{
-  draftVersion: 4;
+  draftVersion: typeof SESSION_DRAFT_VERSION;
   /** ISO-8601 time of this write. */
   savedAt: string;
-  study: StudyV5;
+  study: StudyV6;
   selectedTrackId: string | null;
 }>;
 
@@ -84,11 +90,11 @@ function positiveFinite(value: unknown, path: string): number {
 export function isLegacyDraft(
   draft: SessionDraft | LegacySessionDraft,
 ): draft is LegacySessionDraft {
-  return draft.draftVersion !== 4;
+  return draft.draftVersion !== SESSION_DRAFT_VERSION;
 }
 
 /** Every mark on the study's tracks and scratch track. */
-export function markCountOf(study: StudyV5): number {
+export function markCountOf(study: StudyV6): number {
   return study.tracks.reduce((sum, track) => sum + track.marks.length, study.scratch.length);
 }
 
@@ -99,18 +105,23 @@ export function markCountOf(study: StudyV5): number {
 export function validateSessionDraft(value: unknown): SessionDraft | LegacySessionDraft {
   const source = record(value, "");
   const version = source.draftVersion;
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4)
-    reject("draftVersion", "must be 1, 2, 3 or 4");
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5)
+    reject("draftVersion", "must be 1, 2, 3, 4 or 5");
   const savedAt = nonEmptyString(source.savedAt, "savedAt");
   if (Number.isNaN(Date.parse(savedAt))) reject("savedAt", "must be a date");
-  if (version === 4) {
+  if (version === 4 || version === 5) {
+    // A version 4 draft carries a v5 study; it converts here (plan V23 Q15).
+    const converted = version === 4 ? studyV6FromV5(source.study) : source.study;
+    let study: StudyV6;
     try {
-      validateStudyV5(source.study);
+      if (version === 4 && record(source.study, "study").schemaVersion !== 5)
+        reject("study.schemaVersion", "must be 5 in a version 4 draft");
+      study = validateStudyV6(converted);
     } catch (cause) {
       reject("study", cause instanceof Error ? cause.message : String(cause));
     }
     if (source.selectedTrackId !== null) nonEmptyString(source.selectedTrackId, "selectedTrackId");
-    return value as SessionDraft;
+    return { ...(value as SessionDraft), draftVersion: 5, study };
   }
   const study = record(source.study, "study");
   nonEmptyString(study.encounterId, "study.encounterId");
@@ -187,12 +198,12 @@ export function validateSessionDraft(value: unknown): SessionDraft | LegacySessi
 
 /** E14: the draft built from the live session at write time. */
 export function buildDraft(input: {
-  study: StudyV5;
+  study: StudyV6;
   selectedTrackId: string | null;
   savedAt: string;
 }): SessionDraft {
   return {
-    draftVersion: 4,
+    draftVersion: SESSION_DRAFT_VERSION,
     savedAt: input.savedAt,
     study: input.study,
     selectedTrackId: input.selectedTrackId,

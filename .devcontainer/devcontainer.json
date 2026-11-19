@@ -22,11 +22,13 @@
     "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright",
     "CODEGRAPH_TELEMETRY": "0",
     "DO_NOT_TRACK": "1",
+    "CAVEMAN_DEFAULT_MODE": "caveman",
+    "PONYTAIL_DEFAULT_MODE": "full",
     "CODEGRAPH_DIR": ".codegraph-container"
   },
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci && codegraph init && rtk init -g --hook-only --auto-patch --no-trust-filters && (claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman || echo 'WARNING: caveman plugin install failed; rerun it manually')",
-  "postStartCommand": "sudo /usr/local/bin/init-devcontainer-firewall.sh",
+  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci && codegraph init && rtk init -g --hook-only --auto-patch --no-trust-filters && /usr/local/bin/configure-rtk.sh && /usr/local/bin/install-claude-plugins.sh",
+  "postStartCommand": "sudo /usr/local/bin/init-devcontainer-firewall.sh && sudo /usr/local/bin/update-claude.sh",
   "waitFor": "postStartCommand",
   "runArgs": [
     "--cap-add=NET_ADMIN",

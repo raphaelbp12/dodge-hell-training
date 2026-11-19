@@ -1,9 +1,12 @@
 import { expect, test } from "vitest";
 import {
+  archetypeFromAuthored,
   ENCOUNTER_CONFIGS,
   type AttackSpec,
   type EncounterConfig,
 } from "../config/encounter";
+import { AUTHORED_MONSTER_FILES, validateArchetypes } from "../config/data";
+import preV23Queen from "./__fixtures__/killer-bee-queen.pre-v23.json";
 import type { SimulationInput } from "../models";
 import { advanceSimulation, createSimulation, type SimulationState } from "./simulation";
 
@@ -50,7 +53,25 @@ function withoutTargets(shipped: EncounterConfig): EncounterConfig {
   );
   return { ...shipped, archetypes };
 }
-const config = withoutTargets(ENCOUNTER_CONFIGS["killer-bee-queen"]);
+/**
+ * Plan V23 step 100.1 replaced the shipped Queen with her study's export, so
+ * the recorded values are checked against the Queen file as it stood before
+ * that change, frozen beside this test; every other monster is shipped.
+ */
+function withPreV23Queen(shipped: EncounterConfig): EncounterConfig {
+  const authored = validateArchetypes(
+    { archetypes: { ...AUTHORED_MONSTER_FILES, "killer-bee-queen": preV23Queen } },
+    new Set(Object.keys(shipped.projectiles)),
+    shipped.maxConcurrentMinions,
+  )["killer-bee-queen"];
+  return {
+    ...shipped,
+    // The recorded values predate the 2026-11-19 player spawn as well.
+    player: { ...shipped.player, spawnTiles: { x: 0, y: 0 } },
+    archetypes: { ...shipped.archetypes, "killer-bee-queen": archetypeFromAuthored(authored) },
+  };
+}
+const config = withoutTargets(withPreV23Queen(ENCOUNTER_CONFIGS["killer-bee-queen"]));
 
 /** Every live projectile in id order, across both lists. */
 function liveProjectiles(state: SimulationState): readonly {

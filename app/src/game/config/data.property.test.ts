@@ -11,6 +11,7 @@ import {
   validateAppearances,
   validateArchetypes,
   validateArenaMap,
+  validateAttack,
   validateEncounterData,
   validateProjectiles,
 } from "./data";
@@ -72,6 +73,48 @@ test("loaders fail with RangeError, or return, for any JSON value", () => {
       expectReturnsOrRangeError(() =>
         validateArchetypes({ archetypes: { anything: value } }, PROJECTILE_IDS, 12),
       );
+    }),
+    propertyParameters(),
+  );
+});
+
+test("every valid marks object is accepted (plan V23 Q10)", () => {
+  const marksArbitrary = fc
+    .record(
+      {
+        bursts: fc.array(
+          fc.array(fc.double({ min: 0, max: 100, noNaN: true }), { minLength: 1, maxLength: 5 }),
+          { minLength: 1, maxLength: 5 },
+        ),
+        periodSeconds: fc.double({ min: Number.MIN_VALUE, max: 100, noNaN: true }),
+        stopAfterSeconds: fc.double({ min: 0, max: 100, noNaN: true }),
+      },
+      { requiredKeys: ["bursts"] },
+    )
+    .map((marks) => {
+      const sorted = marks.bursts.flat().sort((a, b) => a - b);
+      let cursor = 0;
+      const bursts = marks.bursts.map((burst) => burst.map(() => sorted[cursor++]));
+      return marks.periodSeconds === undefined
+        ? { bursts }
+        : { ...marks, bursts };
+    });
+  const projectile = [...PROJECTILE_IDS][0];
+  fc.assert(
+    fc.property(marksArbitrary, (marks) => {
+      const attack = validateAttack(
+        {
+          id: "a",
+          projectile,
+          tuningSource: "video-observation",
+          pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player", emitterRadiusTiles: 0 },
+          marks,
+        },
+        "a",
+        PROJECTILE_IDS,
+        new Set(),
+      );
+      expect(attack.marks).toEqual(marks);
     }),
     propertyParameters(),
   );

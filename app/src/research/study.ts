@@ -1,9 +1,9 @@
 /**
- * The pure model of a timeline study, schema v5 (plan V20 E02-E05, E16).
+ * The pure model of a timeline study, schema v6 (plan V20 E02-E04, E16; plan V23 Q15).
  * Imports only types from `game/config/` one way (T13); no React, DOM,
  * storage or simulation.
  */
-import type { AuthoredAttack } from "../game/config/data";
+import type { CadencedAuthoredAttack } from "../game/config/data";
 import type { EnemyArchetype } from "../game/config/encounter";
 
 export type SegmentRef = Readonly<{ phaseId: string; subPhaseId: string | null }>;
@@ -32,29 +32,23 @@ export type StatusSpan = Readonly<{
 
 export type Mark = Readonly<{ timeSeconds: number; kind: "volley" | "detonation" }>;
 
-export type CadenceSource = "authored" | "fitted" | "typed";
-
 export type AttackTrack = Readonly<{
   id: string;
   location: SegmentRef;
-  attack: AuthoredAttack;
-  cadenceSource: CadenceSource;
+  /** Plan V23 Q15: `cadence` is kept, and ignored when the track has volley marks. */
+  attack: CadencedAuthoredAttack;
   marks: readonly Mark[];
+  /** The stop mark on a periodic track (Q07); changes nothing otherwise. */
   endSeconds?: number;
-  burstGapThresholdSeconds?: number;
-  projectileOverride?: Readonly<{ travelSeconds?: number; rangeTiles?: number }>;
+  /** Present means periodic: its first window's marks repeat every period (Q06). */
+  periodSeconds?: number;
   /** E09: indexed by detonation pair, as evidence; null for an unmeasured pair (step 87.3). */
   measuredRangeTiles?: readonly (number | null)[];
 }>;
 
-export type AcceptedSegmentValues = Readonly<{
-  telegraphSeconds?: number;
-  invulnerableOnEnterSeconds?: number;
-  durationSeconds?: number;
-}>;
-
-export type StudyV5 = Readonly<{
-  schemaVersion: 5;
+/** Plan V23 Q15: schema 6, without accepted values, cadence sources, thresholds or overrides. */
+export type StudyV6 = Readonly<{
+  schemaVersion: 6;
   encounterId: string;
   archetypeId: string;
   recordedAt: string;
@@ -68,7 +62,6 @@ export type StudyV5 = Readonly<{
   statusSpans: readonly StatusSpan[];
   tracks: readonly AttackTrack[];
   scratch: readonly Mark[];
-  acceptedSegmentValues: Readonly<Record<string, AcceptedSegmentValues>>;
   scale?: Readonly<{ tileWidthFraction: number }>;
 }>;
 
@@ -91,7 +84,7 @@ export function segmentIdOf(ref: SegmentRef): string {
  * (`validatePhase` in data.ts keeps one id set per phase and shares it with the
  * phase's sub-phases), so an id may repeat in another phase.
  */
-export function attackIdsInPhaseOf(study: StudyV5, track: AttackTrack): readonly string[] {
+export function attackIdsInPhaseOf(study: StudyV6, track: AttackTrack): readonly string[] {
   return study.tracks
     .filter(
       (other) => other !== track && other.location.phaseId === track.location.phaseId,
@@ -244,19 +237,54 @@ function validateTrack(value: unknown, path: string): string {
   if (location.subPhaseId !== null)
     nonEmptyString(location.subPhaseId, `${path}.location.subPhaseId`);
   record(track.attack, `${path}.attack`);
-  if (!["authored", "fitted", "typed"].includes(track.cadenceSource as string))
-    reject(`${path}.cadenceSource`, "must be authored, fitted or typed");
   array(track.marks, `${path}.marks`).forEach((mark, index) =>
     validateMark(mark, `${path}.marks[${index}]`),
   );
   if (track.endSeconds !== undefined) nonNegativeFinite(track.endSeconds, `${path}.endSeconds`);
+  if (
+    track.periodSeconds !== undefined &&
+    (typeof track.periodSeconds !== "number" ||
+      !Number.isFinite(track.periodSeconds) ||
+      track.periodSeconds <= 0)
+  )
+    reject(`${path}.periodSeconds`, "must be a positive finite number");
   return id;
 }
 
+/**
+ * Plan V23 Q15: a schema 5 study as schema 6. Accepted segment values, cadence
+ * sources, burst-gap thresholds and bomb overrides are dropped and kept nowhere.
+ * Anything that is not a schema 5 object is returned unchanged for the
+ * validator to reject. It lives here, not in `studyMigrate.ts`, so the legacy
+ * loader in `tagging.ts` can call it without an import cycle.
+ */
+export function studyV6FromV5(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const study = value as Record<string, unknown>;
+  if (study.schemaVersion !== 5) return value;
+  const { acceptedSegmentValues: _accepted, ...rest } = study;
+  return {
+    ...rest,
+    schemaVersion: 6,
+    tracks: Array.isArray(study.tracks)
+      ? study.tracks.map((track: unknown) => {
+          if (typeof track !== "object" || track === null) return track;
+          const {
+            cadenceSource: _source,
+            burstGapThresholdSeconds: _threshold,
+            projectileOverride: _override,
+            ...kept
+          } = track as Record<string, unknown>;
+          return kept;
+        })
+      : study.tracks,
+  };
+}
+
 /** Structural check, throwing a readable error at the offending path (T31). Attack contents stay unchecked. */
-export function validateStudyV5(value: unknown): StudyV5 {
+export function validateStudyV6(value: unknown): StudyV6 {
   const study = record(value, "study");
-  if (study.schemaVersion !== 5) reject("schemaVersion", "must be 5");
+  if (study.schemaVersion !== 6) reject("schemaVersion", "must be 6");
   nonEmptyString(study.encounterId, "encounterId");
   nonEmptyString(study.archetypeId, "archetypeId");
   record(study.provenance, "provenance");
@@ -289,12 +317,6 @@ export function validateStudyV5(value: unknown): StudyV5 {
   array(study.scratch, "scratch").forEach((mark, index) =>
     validateMark(mark, `scratch[${index}]`),
   );
-  const accepted = record(study.acceptedSegmentValues, "acceptedSegmentValues");
-  for (const [segmentId, entry] of Object.entries(accepted))
-    for (const [field, number] of Object.entries(
-      record(entry, `acceptedSegmentValues.${segmentId}`),
-    ))
-      nonNegativeFinite(number, `acceptedSegmentValues.${segmentId}.${field}`);
   if (study.scale !== undefined) {
     const scale = record(study.scale, "scale");
     if (
@@ -304,5 +326,5 @@ export function validateStudyV5(value: unknown): StudyV5 {
     )
       reject("scale.tileWidthFraction", "must be a positive finite number");
   }
-  return value as StudyV5;
+  return value as StudyV6;
 }

@@ -249,12 +249,13 @@ describe("validateObservationExport v2", () => {
 
   test("rejects an unknown schema version", () => {
     expect(() =>
-      validateObservationExport(observation2([tag2()], { schemaVersion: 6 })),
+      validateObservationExport(observation2([tag2()], { schemaVersion: 7 })),
     ).toThrow(/schemaVersion/);
-    // Plan V20: version 5 delegates to the v5 study validator.
-    expect(() =>
-      validateObservationExport(observation2([tag2()], { schemaVersion: 5 })),
-    ).toThrow(/Study/);
+    // Plan V20, V23: versions 5 and 6 delegate to the v6 study validator.
+    for (const schemaVersion of [5, 6])
+      expect(() =>
+        validateObservationExport(observation2([tag2()], { schemaVersion })),
+      ).toThrow(/Study/);
     expect(() =>
       validateObservationExport(observation2([tag2()], { schemaVersion: 1 })),
     ).toThrow(/schemaVersion/);

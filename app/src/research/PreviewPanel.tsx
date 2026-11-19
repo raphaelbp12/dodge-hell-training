@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EncounterConfig } from "../game/config/encounter";
 import type { Vector2 } from "../game/models";
-import { fittedPreviewAt, observedPreviewAt } from "./draftPreview";
+import { previewAt } from "./draftPreview";
 import { HelpMark } from "./HelpMark";
 import { HELP_SECTION_PREVIEW } from "./helpText";
 import { drawPreviewFrame, drawEmptyPreview } from "./previewDraw";
-import { initialHeadingSliderDegrees, type PreviewFrame } from "./previewModel";
+import { initialHeadingSliderDegrees } from "./previewModel";
 import {
   PREVIEW_SIZE_PIXELS,
   type PreviewPreferenceValue,
@@ -19,8 +19,7 @@ import {
   zoomAbout,
   type PreviewView,
 } from "./previewView";
-import type { Segment, SegmentWindow, StudyV5 } from "./study";
-import { Segmented } from "./TaggerControls";
+import type { SegmentWindow, StudyV6 } from "./study";
 import styles from "./PreviewPanel.module.css";
 
 const PLAYER_SLIDER_STEP_TILES = 0.1;
@@ -29,13 +28,8 @@ const HEADING_SLIDER_STEP_DEGREES = 1;
 const SIZES: readonly PreviewSize[] = ["small", "medium", "large"];
 const NO_VIDEO_NOTE = "Open a video to see the preview";
 
-/** E12: what the preview draws. */
-const PREVIEW_MODES = ["Observed", "Fitted", "Both"] as const;
-type PreviewMode = (typeof PREVIEW_MODES)[number];
-
 type Props = Readonly<{
-  study: StudyV5 | null;
-  segments: readonly Segment[];
+  study: StudyV6 | null;
   windows: readonly SegmentWindow[];
   mediaTime: number;
   hasVideo: boolean;
@@ -48,13 +42,12 @@ type Props = Readonly<{
 }>;
 
 /**
- * Draws the study's observed volleys, its fitted volleys as ghosts, or both,
- * at the presented video time onto a plain 2D canvas (M10, E12). React holds
- * only the inputs; no element exists per projectile.
+ * Draws what the game will fire for the study at the presented video time
+ * onto a plain 2D canvas (M10, plan V23 Q17). React holds only the inputs; no
+ * element exists per projectile.
  */
 export function PreviewPanel({
   study,
-  segments,
   windows,
   mediaTime,
   hasVideo,
@@ -67,7 +60,6 @@ export function PreviewPanel({
   const { shown, size } = layout;
   const canvasPixels = PREVIEW_SIZE_PIXELS[size];
   const [view, setView] = useState<PreviewView>(() => fitView(shape));
-  const [mode, setMode] = useState<PreviewMode>("Both");
   const [playerTiles, setPlayerTiles] = useState<Vector2>(
     config.player.spawnTiles,
   );
@@ -81,33 +73,20 @@ export function PreviewPanel({
   const drag = useRef<Vector2 | null>(null);
   const ranges = playerSliderRanges(shape);
 
-  const result = useMemo(() => {
-    if (study === null) return null;
-    const input = {
-      study,
-      segments,
-      windows,
-      config,
-      timeSeconds: mediaTime,
-      playerTiles,
-      headingRadians: (headingDegrees * Math.PI) / 180,
-    };
-    const observed = mode === "Fitted" ? null : observedPreviewAt(input);
-    const fitted = mode === "Observed" ? null : fittedPreviewAt(input);
-    const base = (observed ?? fitted)!;
-    const frame: PreviewFrame = {
-      ...base.frame,
-      projectiles: [
-        ...(fitted?.frame.projectiles ?? []),
-        ...(observed?.frame.projectiles ?? []),
-      ],
-      detonations: [
-        ...(fitted?.frame.detonations ?? []),
-        ...(observed?.frame.detonations ?? []),
-      ],
-    };
-    return { frame, undrawnAttackIds: base.undrawnAttackIds };
-  }, [study, segments, windows, config, mediaTime, playerTiles, headingDegrees, mode]);
+  const result = useMemo(
+    () =>
+      study === null
+        ? null
+        : previewAt({
+            study,
+            windows,
+            config,
+            timeSeconds: mediaTime,
+            playerTiles,
+            headingRadians: (headingDegrees * Math.PI) / 180,
+          }),
+    [study, windows, config, mediaTime, playerTiles, headingDegrees],
+  );
   const highlighted = useMemo(
     () => (selectedTrackIndex === null ? [] : [selectedTrackIndex]),
     [selectedTrackIndex],
@@ -152,13 +131,6 @@ export function PreviewPanel({
 
   return (
     <aside className={styles.panel} aria-label="Tag preview">
-      <Segmented
-        legend="Draw"
-        name="preview-mode"
-        options={PREVIEW_MODES}
-        value={mode}
-        onChange={setMode}
-      />
       <div className={styles.controls}>
         <button
           type="button"
@@ -220,9 +192,9 @@ export function PreviewPanel({
           )}
           {result && (
             <p className={styles.note} role="status">
-              Observed volleys are the marks; fitted volleys, drawn faint, are
-              each track&apos;s cadence in its windows. One fixed emitter, no
-              movement, and only the selected monster.
+              What the game will fire: each marked track&apos;s volleys in every
+              window of its segment. One fixed emitter, no movement, and only
+              the selected monster.
             </p>
           )}
           {result && result.undrawnAttackIds.length > 0 && (

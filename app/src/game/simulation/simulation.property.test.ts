@@ -19,6 +19,24 @@ const QUEEN = encounterConfigOf("killer-bee-queen");
 const WORM = encounterConfigOf("crystal-worm");
 const QUEEN_PHASE_COUNT = primaryArchetype(QUEEN).phases.length;
 
+/** The Crystal Worm with its first attack timed by periodic marks (plan V23 step 97.3). */
+const MARKED_WORM: EncounterConfig = (() => {
+  const worm = primaryArchetype(WORM);
+  const [first, ...rest] = worm.phases;
+  const { cadence: _cadence, ...attack } = first.attacks[0];
+  const marked = { ...attack, marks: { bursts: [[0, 0.1, 0.1], [0.5]], periodSeconds: 0.8 } };
+  return {
+    ...WORM,
+    archetypes: {
+      ...WORM.archetypes,
+      [worm.id]: {
+        ...worm,
+        phases: [{ ...first, attacks: [marked, ...first.attacks.slice(1)] }, ...rest],
+      },
+    },
+  };
+})();
+
 /** Longest script, in segments and steps per segment: a runtime budget for the file. */
 const MAX_SEGMENTS = 4;
 const MAX_STEPS_PER_SEGMENT = 90;
@@ -27,6 +45,8 @@ type Scenario = {
   /** A drilled Queen phase index, or `null` for the Crystal Worm's full fight. */
   phaseIndex: number | null;
   seed: number;
+  /** With `phaseIndex` null: fight the marked Crystal Worm instead. */
+  marked: boolean;
   script: { input: SimulationInput; steps: number }[];
 };
 
@@ -40,6 +60,7 @@ const inputArbitrary = fc.record({
 const scenario: fc.Arbitrary<Scenario> = fc.record({
   phaseIndex: fc.option(fc.nat({ max: QUEEN_PHASE_COUNT - 1 }), { nil: null }),
   seed: fc.integer({ min: 0, max: 0xffffffff }),
+  marked: fc.boolean(),
   script: fc.array(
     fc.record({
       input: inputArbitrary,
@@ -50,7 +71,8 @@ const scenario: fc.Arbitrary<Scenario> = fc.record({
 });
 
 function configOf(input: Scenario): EncounterConfig {
-  return input.phaseIndex === null ? WORM : QUEEN;
+  if (input.phaseIndex !== null) return QUEEN;
+  return input.marked ? MARKED_WORM : WORM;
 }
 
 function create(input: Scenario): SimulationState {

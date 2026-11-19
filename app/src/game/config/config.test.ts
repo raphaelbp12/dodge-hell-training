@@ -41,7 +41,6 @@ import {
 import { loadOutline } from "./data";
 import { advanceSimulation, createSimulation } from "../simulation/simulation";
 import { arenaInradiusTiles } from "../simulation/geometry";
-import { resolveBearings, type PatternContext } from "../simulation/patterns";
 import { applyPlayerHit } from "../simulation/health";
 import {
   applyConditions,
@@ -909,7 +908,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
   const queenConfig = encounterConfigOf("killer-bee-queen");
   expect(queenConfig.spawns.maxConcurrent).toBe(1);
   expect(queenConfig.spawns.everySeconds).toBeNull();
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v13");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v14");
   const state = createSimulation(queenConfig, 1);
   expect(state.enemies).toHaveLength(1);
   const idle = { north: false, south: false, east: false, west: false };
@@ -925,7 +924,7 @@ test("the Killer Bee Queen is the default selection and spawns exactly one enemy
 // from the new rules version's best.
 test("older Killer Bee Queen attempt records are retained but excluded from the v13 best", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
-  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v13");
+  expect(queenConfig.rulesVersion).toBe("killer-bee-queen-nest-paladin-v14");
   const records = [
     {
       id: "a",
@@ -1001,14 +1000,10 @@ test("the Killer Bee Queen's eight phases carry phases 1, 3, 4, 6 and 8's attack
   expect(archetype.phases[2].attacks.length).toBeGreaterThan(0);
   expect(archetype.phases[3].attacks.length).toBeGreaterThan(0);
   expect(archetype.phases[5].attacks.length).toBeGreaterThan(0);
-  expect(archetype.phases[7].attacks.length).toBeGreaterThan(0);
+  // Plan V23 Q16: the solo-nest study shows phase 8 with no marked volley, so
+  // its export has no attacks.
   for (const phase of archetype.phases.filter(
-    (_, index) =>
-      index !== 0 &&
-      index !== 2 &&
-      index !== 3 &&
-      index !== 5 &&
-      index !== 7,
+    (_, index) => index !== 0 && index !== 2 && index !== 3 && index !== 5,
   ))
     expect(phase.attacks).toHaveLength(0);
   expect(archetype.health?.maxHealthHp).toBe(112_500);
@@ -1016,7 +1011,8 @@ test("the Killer Bee Queen's eight phases carry phases 1, 3, 4, 6 and 8's attack
     kind: "simulated-dps",
     hpPerSecond: 375,
   });
-  expect(archetype.phases[5].exitAfterSeconds).toBe(29);
+  // Plan V23 Q13: the study's measured phase 6 length, superseding 29 s.
+  expect(archetype.phases[5].exitAfterSeconds).toBe(33.133);
   expect(archetype.phases[5].enterAtHpFraction).toBe(0.25);
   expect(archetype.phases[6].enterAtHpFraction).toBe(0.25);
 
@@ -1034,12 +1030,15 @@ test("the Killer Bee Queen's eight phases carry phases 1, 3, 4, 6 and 8's attack
   // numbers) instead of the encounter's default 375, so phase 8's entry
   // time shifts later: draining from 25% to 12.5% of 112,500 HP (14,062.5
   // HP) now takes ~72.1s instead of ~37.5s.
+  // Plan V23 Q13, Q22: every observed segment's telegraph, invulnerable time
+  // and sub-phase duration are the study's measured medians, so every entry
+  // after phase 1 moves; measured 2026-11-19 on the shipped data.
   const expectedPhaseEntrySeconds = [
-    0, 30, 79.916667, 124.916667, 169.916667, 234.833333, 263.85, 335.933333,
+    0, 38.133333, 97.8, 147.666667, 195.083333, 271.8, 304.933333, 409.983333,
   ];
   const observedPhaseEntrySeconds: number[] = [0];
   let previousPhaseIndex = 0;
-  for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++) {
+  for (let tick = 0; tick < 28000 && state.phase === "playing"; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
     if (enemy.phaseIndex !== previousPhaseIndex) {
       observedPhaseEntrySeconds.push(state.elapsedSeconds);
@@ -1071,33 +1070,17 @@ test("the Killer Bee Queen's phase 1 fires its five sourced projectiles", () => 
   for (const attack of phase1Attacks) expect(attack.tuningSource).toBeTruthy();
 
   const state = createSimulation(queenConfig, 1);
+  state.debugSettings = { ...state.debugSettings, godMode: true };
   const idle = { north: false, south: false, east: false, west: false };
   const observedProjectileIds = new Set<string>();
-  for (let tick = 0; tick < 600; tick++) {
+  // Plan V23: phase 1 fires its marked volleys over the study's 13.4 s window,
+  // so the stingers no longer share one cadence and fire together.
+  for (let tick = 0; tick < 840; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
     for (const shard of [...state.shards, ...state.bombs]) observedProjectileIds.add(shard.projectileId);
   }
   for (const attack of phase1Attacks)
     expect(observedProjectileIds.has(attack.projectileId)).toBe(true);
-
-  const stingerShards = (() => {
-    const fresh = createSimulation(queenConfig, 1);
-    let countAtFirstTick = 0;
-    for (let tick = 0; tick < 600; tick++) {
-      const before = fresh.shards.length;
-      advanceSimulation(fresh, queenConfig.simulation.fixedStepSeconds, idle);
-      const fired = fresh.shards.filter(
-        (shard) =>
-          shard.projectileId === "red-stinger-large-v1" ||
-          shard.projectileId === "blue-stinger-large" ||
-          shard.projectileId === "yellow-stinger-small-v1",
-      );
-      if (fired.length >= 9 && countAtFirstTick === 0) countAtFirstTick = fired.length;
-      void before;
-    }
-    return countAtFirstTick;
-  })();
-  expect(stingerShards).toBeGreaterThanOrEqual(9);
 });
 
 // Step 23.4: phase 2's red sub-phase fires its three sourced projectiles and
@@ -1215,9 +1198,8 @@ test("the Killer Bee Queen's phase 3 fires two counter-rotating blue spirals", (
   for (const ring of blueRings) {
     if (ring.pattern.kind !== "ring") throw new Error("expected ring");
     expect(ring.pattern.arms).toBe(3);
-    expect(ring.cadence.cooldownAfterLastShotSeconds).toBe(0.4);
-    expect(ring.cadence.shotsPerBurst).toBe(1);
-    expect(ring.cadence.initialDelaySeconds).toBe(0);
+    // Plan V23: the 0.40 s cadence is now the study's 36 marked volleys.
+    expect(ring.marks?.bursts.flat()).toHaveLength(36);
   }
   if (
     blueRings[0].pattern.kind !== "ring" ||
@@ -1246,6 +1228,8 @@ test("the Killer Bee Queen's phase 3 reproduces the source's six-attack barrage"
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
   const phase3 = archetype.phases[2];
+  // Plan V23: every cadence below is now the study's marked volleys.
+  const volleyCount = (attack: (typeof phase3.attacks)[number]) => attack.marks?.bursts.flat().length;
   expect(phase3.movement).toEqual({
     kind: "move-to-point",
     target: "arena-center",
@@ -1258,41 +1242,39 @@ test("the Killer Bee Queen's phase 3 reproduces the source's six-attack barrage"
   if (redRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(redRing.pattern.arms).toBe(2);
   expect(redRing.pattern.clockwiseDegreesPerSecond).toBe(40);
-  expect(redRing.cadence.cooldownAfterLastShotSeconds).toBe(0.4);
+  expect(volleyCount(redRing)).toBe(36);
 
   const yellowRing = phase3.attacks.find(
     (attack) => attack.projectileId === "yellow-ball-v1",
   )!;
   if (yellowRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(yellowRing.pattern.arms).toBe(8);
-  expect(yellowRing.cadence.cooldownAfterLastShotSeconds).toBe(2.5);
+  expect(volleyCount(yellowRing)).toBe(6);
 
   const beeRing = phase3.attacks.find(
     (attack) => attack.projectileId === "bee-shot",
   )!;
   if (beeRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(beeRing.pattern.arms).toBe(4);
-  expect(beeRing.cadence.cooldownAfterLastShotSeconds).toBe(3.04);
+  expect(volleyCount(beeRing)).toBe(5);
 
   const bombRing = phase3.attacks.find(
     (attack) => attack.projectileId === "white-bomb-v1",
   )!;
   if (bombRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(bombRing.pattern.arms).toBe(4);
-  expect(bombRing.cadence.cooldownAfterLastShotSeconds).toBe(3.23);
+  expect(volleyCount(bombRing)).toBe(6);
 
   const glaiveRing = phase3.attacks.find(
     (attack) => attack.projectileId === "red-glaive-v1",
   )!;
   if (glaiveRing.pattern.kind !== "ring") throw new Error("expected ring");
   expect(glaiveRing.pattern.arms).toBe(60);
-  expect(glaiveRing.cadence.cooldownAfterLastShotSeconds).toBe(6.02);
-  expect(glaiveRing.cadence.initialDelaySeconds).toBe(0);
+  expect(volleyCount(glaiveRing)).toBe(3);
   expect(glaiveRing.tuningSource).toBe("video-observation");
 
   expect(phase3.attacks).toHaveLength(7);
-  for (const attack of phase3.attacks)
-    expect(attack.cadence.initialDelaySeconds).toBe(0);
+  for (const attack of phase3.attacks) expect(attack.cadence).toBeUndefined();
   const glaiveProjectile = projectileOf(queenConfig, "red-glaive-v1");
   expect(glaiveProjectile.damageHp).toBe(0);
   expect(glaiveProjectile.conditions).toEqual([
@@ -1376,7 +1358,8 @@ test("the Killer Bee Queen's phase 4 fires three non-realigning glaive rings", (
     }
   }
   for (const [, bearingSets] of bearingSetsByProjectile) {
-    expect(bearingSets.length).toBeGreaterThanOrEqual(50);
+    // Plan V23: each ring fires its study's six marked volleys, not a cadence.
+    expect(bearingSets.length).toBeGreaterThanOrEqual(6);
     const distinctBearingSets = new Set(
       bearingSets.map((set) => [...set].sort().join(",")),
     );
@@ -1414,19 +1397,13 @@ test("the Killer Bee Queen's phase 4 reproduces its glaives and the Tips-sourced
   const hiveSpiralShot = projectileOf(queenConfig, "hive-spiral-shot-v1");
   expect(hiveSpiralShot.damageHp).toBe(200);
   expect(hiveSpiralShot.armorPiercing).toBe(true);
-  const shotgun = phase4.attacks.find(
-    (attack) => attack.projectileId === "hive-spiral-shot-v1",
-  )!;
-  if (shotgun.pattern.kind !== "spread") throw new Error("expected spread");
-  expect(shotgun.pattern.shots).toBe(3);
-  expect(shotgun.pattern.aim).toBe("player");
+  // Plan V23 Q16: the study marks no volley of the Tips-sourced shotgun, so
+  // the export drops it from phase 4; its projectile still deals 200 per shot.
+  expect(phase4.attacks.some((attack) => attack.projectileId === "hive-spiral-shot-v1")).toBe(false);
 
   const state = createSimulation(queenConfig, 1, { startPhaseIndex: 3 });
   const defense = effectiveDefenseFor(state.player, hiveSpiralShot.armorPiercing);
-  const totalDamageHp =
-    applyPlayerHit(state.player, hiveSpiralShot.damageHp, defense, false)! *
-    shotgun.pattern.shots;
-  expect(totalDamageHp).toBe(600);
+  expect(applyPlayerHit(state.player, hiveSpiralShot.damageHp, defense, false)).toBe(200);
 
   state.player.healthHp = PALADIN_STATS.healthHp;
   applyConditions(state.player, yellowGlaive.conditions);
@@ -1554,7 +1531,9 @@ test("the Killer Bee Queen's phase 5 cycles three sub-phases with movement, atta
     state.enemies.some((enemy) => enemy.spawnedByEnemyId === queen.id),
   ).toBe(true);
 
-  for (let tick = 0; tick < 960; tick++)
+  // Plan V23 Q13: red lasts the study's measured duration.
+  const redTicks = Math.ceil(red.durationSeconds / queenConfig.simulation.fixedStepSeconds) + 1;
+  for (let tick = 0; tick < redTicks; tick++)
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
   expect(queen.subPhaseIndex).toBe(1);
 
@@ -1619,47 +1598,35 @@ test("the Killer Bee Queen's phase 5 is damaging when stationary", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const idle = { north: false, south: false, east: false, west: false };
   const stationary = createSimulation(queenConfig, 1, { startPhaseIndex: 4 });
-  for (let tick = 0; tick < 300; tick++)
+  // Since 2026-11-19 the player starts off the Queen's spawn, so a standing
+  // player is hurt rather than killed within the sampled 10 s.
+  for (let tick = 0; tick < 600; tick++)
     advanceSimulation(stationary, queenConfig.simulation.fixedStepSeconds, idle);
-  expect(stationary.player.healthHp).toBe(0);
+  expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
 });
 
 // Step 23.8: the machinegun's two arms start vertical (180 degrees apart,
 // aimed at the room's top and bottom per the source) and the authored
 // spread grows arm 1 away from arm 0 up to the 45-degree maximum over the
 // first few seconds, then holds there.
-test("the Killer Bee Queen's phase 6 machinegun starts vertical and spreads to 45 degrees then holds", () => {
-  const queenConfig = encounterConfigOf("killer-bee-queen");
-  const archetype = primaryArchetype(queenConfig);
-  const phase6 = archetype.phases[5];
-  const machinegun = phase6.attacks.find(
-    (attack) => attack.projectileId === "red-stinger-small",
-  )!;
-  if (machinegun.pattern.kind !== "ring") throw new Error("expected ring");
-  expect(machinegun.pattern.arms).toBe(2);
-  expect(machinegun.pattern.gapSectorsDegrees).toHaveLength(2);
-  expect(machinegun.pattern.maxArmSpreadDegrees).toBe(45);
-
-  const baseContext: PatternContext = {
-    enemyPositionTiles: { x: 0, y: 0 },
-    playerPositionTiles: { x: 0, y: 0 },
-    ringPhaseRadians: machinegun.pattern.initialPhaseRadians,
-    volleyIndexInBurst: 0,
-    burstsFired: 0,
-    secondsSinceEpoch: 0,
-  };
-  const degreesBetweenArms = (context: PatternContext): number => {
-    const bearings = resolveBearings(machinegun.pattern, context);
-    const [arm0, arm1] = bearings.map((b) => (b.bearingRadians * 180) / Math.PI);
-    return Math.abs(arm1 - arm0);
-  };
-  expect(degreesBetweenArms(baseContext)).toBeCloseTo(180, 5);
-  expect(
-    degreesBetweenArms({ ...baseContext, secondsSinceEpoch: 3 }),
-  ).toBeCloseTo(225, 5);
-  expect(
-    degreesBetweenArms({ ...baseContext, secondsSinceEpoch: 60 }),
-  ).toBeCloseTo(225, 5);
+// Plan V23 Q16: the solo-nest study marks no volley of that gapped
+// machinegun, so the export drops it; phase 6 is the study's six marked
+// machine-gun rings, which escalate as the video shows.
+test("the Killer Bee Queen's phase 6 fires only its six marked machine-gun rings", () => {
+  const phase6 = primaryArchetype(encounterConfigOf("killer-bee-queen")).phases[5];
+  expect(phase6.attacks.map((attack) => attack.id)).toEqual([
+    "machine-gun",
+    "machine-gun-9-shots",
+    "machine-gun-5-shots",
+    "machine-gun-7-shots",
+    "machine-gun-9true-shots",
+    "machine-gun-10-shots",
+  ]);
+  for (const attack of phase6.attacks) {
+    expect(attack.marks).toBeDefined();
+    if (attack.pattern.kind !== "ring") throw new Error("expected ring");
+    expect(attack.pattern.arms).toBe(2);
+  }
 });
 
 // Step 23.8: a player standing in the swept beam path is hit hard and
@@ -1685,7 +1652,9 @@ test("the Killer Bee Queen's phase 6 machinegun is lethal in the beam", () => {
   // ring has an arm starting at or near bearing 0, so it is in the fire
   // from t = 0.
   exposed.player.positionTiles = { x: 8, y: 0 };
-  for (let tick = 0; tick < 300 && exposed.phase === "playing"; tick++)
+  // Plan V23: the rings fire their marked volleys from about 4.9 s on, so the
+  // beam is sampled over the first 10 s rather than 5 s.
+  for (let tick = 0; tick < 600 && exposed.phase === "playing"; tick++)
     advanceSimulation(exposed, queenConfig.simulation.fixedStepSeconds, idle);
   expect(exposed.hitsTaken).toBeGreaterThan(0);
   // The 0.556 x 0.778 player body (V11 follow-up) is narrower than the old
@@ -1694,10 +1663,11 @@ test("the Killer Bee Queen's phase 6 machinegun is lethal in the beam", () => {
   expect(exposed.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp * 0.6);
 });
 
-// Step 23.8: phase 6 runs exactly its authored 29 seconds at no health cost
+// Step 23.8: phase 6 runs exactly its exitAfterSeconds at no health cost
 // (K08's invulnerability pauses the drain) and spawns the three Nests, one
-// per colour, placed on the arena ring.
-test("the Killer Bee Queen's phase 6 runs 29 seconds at no health cost and spawns three Nests", () => {
+// per colour, placed on the arena ring. Plan V23 Q13: that length is the
+// solo-nest study's measured 33.133 s, superseding the sourced 29 s.
+test("the Killer Bee Queen's phase 6 runs its measured 33.133 seconds at no health cost and spawns three Nests", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const state = createSimulation(queenConfig, 1, { startPhaseIndex: 5 });
   const queen = state.enemies.find((enemy) => enemy.spawnedByEnemyId === null)!;
@@ -1722,9 +1692,9 @@ test("the Killer Bee Queen's phase 6 runs 29 seconds at no health cost and spawn
       break;
     }
   }
-  expect(secondsAtPhaseExit).toBeCloseTo(29, 1);
+  expect(secondsAtPhaseExit).toBeCloseTo(33.133, 1);
   expect(queen.phaseIndex).toBe(6);
-  // K08: invulnerability pauses the drain for the phase's own 29 seconds;
+  // K08: invulnerability pauses the drain for the whole phase;
   // only the single fixed step straddling the exact exit boundary can drain,
   // negligible next to the Queen's total health pool.
   expect((healthBeforePhase ?? 0) - (queen.healthHp ?? 0)).toBeLessThanOrEqual(
@@ -1803,59 +1773,18 @@ test("each Killer Bee Nest transitions from its alive phase to its corpse phase 
 // degree-increasing angle each time" is the sourced number in this phase,
 // expressed with step 20.5's perBurstAdvanceDegrees - the advance
 // accumulates per burst (4 shots in one burst), not per shot.
-test("the Killer Bee Queen's phase 7 yellow sub-phase advances its bomb ring 15 degrees per burst", () => {
+test("the Killer Bee Queen's phase 7 yellow sub-phase fires nothing the study did not mark", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
   const phase7 = archetype.phases[6];
   const yellowSubPhase = phase7.subPhases!.find(
     (subPhase) => subPhase.id === "yellow",
   )!;
-  const bombAttack = yellowSubPhase.attacks.find(
-    (attack) => attack.projectileId === "white-bomb-v2",
-  )!;
-  expect(bombAttack.tuningSource).toBe("wiki-prose");
-  if (bombAttack.pattern.kind !== "ring") throw new Error("expected ring");
-  expect(bombAttack.pattern.arms).toBe(4);
-  expect(bombAttack.pattern.perBurstAdvanceDegrees).toBe(15);
-
-  const baseContext: PatternContext = {
-    enemyPositionTiles: { x: 0, y: 0 },
-    playerPositionTiles: { x: 0, y: 0 },
-    ringPhaseRadians: bombAttack.pattern.initialPhaseRadians,
-    volleyIndexInBurst: 0,
-    burstsFired: 0,
-    secondsSinceEpoch: 0,
-  };
-  const firstBearing = resolveBearings(bombAttack.pattern, baseContext)[0]
-    .bearingRadians;
-  const afterOneBurst = resolveBearings(bombAttack.pattern, {
-    ...baseContext,
-    burstsFired: 1,
-  })[0].bearingRadians;
-  const afterOneBurstTwoVolleys = resolveBearings(bombAttack.pattern, {
-    ...baseContext,
-    burstsFired: 1,
-    volleyIndexInBurst: 3,
-  })[0].bearingRadians;
-  const degreesAdvanced =
-    (((afterOneBurst - firstBearing) * 180) / Math.PI + 360) % 360;
-  expect(degreesAdvanced).toBeCloseTo(15, 5);
-  // Advancing within the same burst's four shots (volleyIndexInBurst) must
-  // not add a second advance on top of the per-burst one.
-  expect(afterOneBurstTwoVolleys).toBeCloseTo(afterOneBurst, 10);
-
-  // The two yellow spirals rotate in opposite directions.
-  const beeSpiral = yellowSubPhase.attacks.find(
-    (attack) => attack.projectileId === "bee-shot",
-  )!;
-  const ballSpiral = yellowSubPhase.attacks.find(
-    (attack) => attack.projectileId === "yellow-ball-v2",
-  )!;
-  if (beeSpiral.pattern.kind !== "ring" || ballSpiral.pattern.kind !== "ring")
-    throw new Error("expected rings");
-  expect(Math.sign(beeSpiral.pattern.clockwiseDegreesPerSecond)).not.toBe(
-    Math.sign(ballSpiral.pattern.clockwiseDegreesPerSecond),
-  );
+  // Plan V23 Q16: the solo-nest study shows the yellow sub-phase but marks
+  // none of its volleys, so the export drops its attacks, the 15-degree bomb
+  // ring included; the per-burst advance itself stays covered by the
+  // pattern tests.
+  expect(yellowSubPhase.attacks).toEqual([]);
 });
 
 // Step 23.9: the new projectiles match their cited rows, and the six new
@@ -1914,10 +1843,14 @@ test("the Killer Bee Queen's phase 7 drains at 195 HP per second, not 375", () =
 
   const state = createSimulation(queenConfig, 1, { startPhaseIndex: 6 });
   const queen = state.enemies.find((enemy) => enemy.spawnedByEnemyId === null)!;
-  const healthBefore = queen.healthHp!;
   const idle = { north: false, south: false, east: false, west: false };
   state.debugSettings = { ...state.debugSettings, godMode: true };
   const stepSeconds = queenConfig.simulation.fixedStepSeconds;
+  // Plan V23 Q13: the first sub-phase's measured invulnerability pauses the
+  // drain first (K08), so the drain is sampled after it.
+  while (state.elapsedSeconds < queen.invulnerableUntilSeconds)
+    advanceSimulation(state, stepSeconds, idle);
+  const healthBefore = queen.healthHp!;
   const ticksForOneSecond = Math.round(1 / stepSeconds);
   for (let tick = 0; tick < ticksForOneSecond; tick++)
     advanceSimulation(state, stepSeconds, idle);
@@ -1981,28 +1914,14 @@ test("the Killer Bee Queen's phase 7 spawns the three Beehemoths firing aimed pa
 // seven listed/reused rows in no-rotation radial bursts; it uses the
 // encounter's full drain rate (no progression override, unlike phase 7),
 // implementing "cease healing the boss if her HP decreases further".
-test("the Killer Bee Queen's phase 8 fires its seven radial bursts at the full drain rate", () => {
+// Plan V23 Q16: the solo-nest study shows phase 8 but marks none of its
+// volleys, so the export drops all seven bursts; the phase still drains.
+test("the Killer Bee Queen's phase 8 fires nothing the study did not mark, at the full drain rate", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
   const phase8 = archetype.phases[7];
   expect(phase8.progression).toBeNull();
-  expect(
-    phase8.attacks.map((attack) => attack.projectileId).sort(),
-  ).toEqual(
-    [
-      "red-stinger-large-v2",
-      "yellow-stinger-small-v2",
-      "blue-ball-v2",
-      "hive-range-shot-v1",
-      "yellow-glaive-v1",
-      "red-glaive-v2",
-      "blue-glaive-v1",
-    ].sort(),
-  );
-  for (const attack of phase8.attacks) {
-    if (attack.pattern.kind !== "ring") throw new Error("expected ring");
-    expect(attack.pattern.clockwiseDegreesPerSecond).toBe(0);
-  }
+  expect(phase8.attacks).toEqual([]);
 
   const newProjectile = projectileOf(queenConfig, "yellow-stinger-small-v2");
   expect(newProjectile.damageHp).toBe(100);
@@ -2014,8 +1933,11 @@ test("the Killer Bee Queen's phase 8 fires its seven radial bursts at the full d
   const queen = state.enemies.find((enemy) => enemy.spawnedByEnemyId === null)!;
   state.debugSettings = { ...state.debugSettings, godMode: true };
   const idle = { north: false, south: false, east: false, west: false };
-  const healthBefore = queen.healthHp!;
   const stepSeconds = queenConfig.simulation.fixedStepSeconds;
+  // The measured invulnerability pauses the drain first (K08).
+  while (state.elapsedSeconds < queen.invulnerableUntilSeconds)
+    advanceSimulation(state, stepSeconds, idle);
+  const healthBefore = queen.healthHp!;
   const ticksForOneSecond = Math.round(1 / stepSeconds);
   for (let tick = 0; tick < ticksForOneSecond; tick++)
     advanceSimulation(state, stepSeconds, idle);
@@ -2050,7 +1972,8 @@ test("the Killer Bee Queen's full fight clears through all eight phases", () => 
   const enemy = state.enemies[0];
   const idle = { north: false, south: false, east: false, west: false };
   const observedPhaseIndices = new Set<number>([0]);
-  for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++) {
+  // Plan V23: the measured timeline clears at about 449.6 s.
+  for (let tick = 0; tick < 28000 && state.phase === "playing"; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
     observedPhaseIndices.add(enemy.phaseIndex);
   }
@@ -2073,6 +1996,22 @@ test("the Killer Bee Queen spawns at the arena centre on every seed", () => {
   }
 });
 
+// User decision 2026-11-19: the player starts 45 degrees from the Queen,
+// midway across the walkable band between the two honey regions.
+test("the Killer Bee Queen's player starts 45 degrees from her, on walkable floor midway between the honey", () => {
+  const queenConfig = encounterConfigOf("killer-bee-queen");
+  const { x, y } = queenConfig.player.spawnTiles;
+  expect(Math.atan2(y, x)).toBeCloseTo(Math.PI / 4, 3);
+  // The diamond |x| + |y| = 3.5 meets the 45-degree line at x = y = 1.75.
+  const diamondEdge = 3.5 / 2;
+  expect(Math.hypot(x, y)).toBeCloseTo((Math.hypot(diamondEdge, diamondEdge) + 7.5) / 2, 2);
+  expect(Math.abs(x) + Math.abs(y)).toBeGreaterThan(3.5);
+  expect(Math.hypot(x, y)).toBeLessThan(7.5);
+  const state = createSimulation(queenConfig, 1);
+  expect(state.player.positionTiles).toEqual({ x, y });
+  expect(encounterConfigOf("crystal-worm").player.spawnTiles).toEqual({ x: 0, y: 0 });
+});
+
 test("a Killer Bee Queen phase-3 drill starts at the arena centre on the first playing step", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const state = createSimulation(queenConfig, 1, {
@@ -2091,6 +2030,8 @@ test("a Killer Bee Queen phase-1 drill starts at the arena centre, and her orbit
   });
   const queen = state.enemies[0];
   expect(queen.positionTiles).toEqual(queenConfig.arena.shape.centerTiles);
+  // The marked phase 1 volleys can kill an idle player; this test is about movement.
+  state.debugSettings = { ...state.debugSettings, godMode: true };
   const idle = { north: false, south: false, east: false, west: false };
   for (let tick = 0; tick < 600; tick++)
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
@@ -2123,7 +2064,7 @@ test("the Killer Bee Queen's full fight never exceeds the derived live-shard bou
   let peakShards = 0;
   let peakEnemies = 0;
   let peakParts = 0;
-  for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++) {
+  for (let tick = 0; tick < 28000 && state.phase === "playing"; tick++) {
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
     // Bombs count toward the live-projectile totals as before the split (N26).
     peakShards = Math.max(peakShards, state.shards.length + state.bombs.length);
@@ -2331,27 +2272,6 @@ test("the Killer Bee Queen's phase 8 is damaging when stationary", () => {
   expect(stationary.player.healthHp).toBeLessThan(PALADIN_STATS.healthHp);
 });
 
-// Step 24.2: the phase 6 machinegun's gap-survivability assertion (step 23.8)
-// must still hold after tightening cadences elsewhere in the fight. Not a
-// new test - a guard that the existing one above still exists and passes
-// is enough, since this file runs it unmodified; this test instead checks
-// that tightening did not change the gap geometry itself, which is what
-// that assertion actually depends on.
-test("the Killer Bee Queen's phase 6 machinegun gap geometry is unchanged by the 24.2 tuning pass", () => {
-  const queenConfig = encounterConfigOf("killer-bee-queen");
-  const archetype = primaryArchetype(queenConfig);
-  const phase6 = archetype.phases[5];
-  const machinegun = phase6.attacks.find(
-    (attack) => attack.projectileId === "red-stinger-small",
-  )!;
-  if (machinegun.pattern.kind !== "ring") throw new Error("expected ring");
-  expect(machinegun.pattern.gapSectorsDegrees).toEqual([
-    [90, 180],
-    [270, 0],
-  ]);
-  expect(machinegun.pattern.maxArmSpreadDegrees).toBe(45);
-});
-
 // Step 24.2: every value whose provenance is "wiki-prose" or "approved-v3"
 // must be untouched by that tuning pass. Checked against the source extract's
 // own "Quantitative Facts Present In The Prose" table
@@ -2366,14 +2286,10 @@ test("the 24.2 tuning pass changed no wiki-prose or approved-v3 value", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const archetype = primaryArchetype(queenConfig);
 
-  const phase7 = archetype.phases[6];
-  const yellowSub = phase7.subPhases!.find((sub) => sub.id === "yellow")!;
-  const bombAdvance = yellowSub.attacks.find(
-    (attack) => attack.projectileId === "white-bomb-v2",
-  )!;
-  expect(bombAdvance.tuningSource).toBe("wiki-prose");
-  if (bombAdvance.pattern.kind !== "ring") throw new Error("expected ring");
-  expect(bombAdvance.pattern.perBurstAdvanceDegrees).toBe(15);
+  // Plan V23 Q16 dropped phase 7 yellow's wiki-prose 15-degree bomb ring,
+  // which the solo-nest study does not mark; the sourced projectile stays.
+  expect(archetype.phases[6].subPhases!.find((sub) => sub.id === "yellow")!.attacks).toEqual([]);
+  expect(projectileOf(queenConfig, "white-bomb-v2").damageHp).toBe(120);
 
   // Sourced projectile stats this tuning pass never touches (23.6/23.7
   // assertions, repeated here as a regression guard specific to this step).
@@ -2406,18 +2322,18 @@ test("every phase-3 attack cites the tagged video observation", () => {
 // attack cadence - so tightening trainer-authored cadences must leave the
 // measured full-fight length unchanged from step 24.1's reported 373.43s,
 // confirming the length still lands where K15's 375 HP/second implies.
-test("the Killer Bee Queen's full fight length is unchanged by the 24.2 cadence tuning", () => {
+// Plan V23 Q13 measured every observed telegraph, invulnerable time and
+// sub-phase duration from the solo-nest study, which moved the length to
+// 449.55 s (measured 2026-11-19); attack timing still never governs it.
+test("the Killer Bee Queen's full fight length follows only the progression and its measured overheads", () => {
   const queenConfig = encounterConfigOf("killer-bee-queen");
   const state = createSimulation(queenConfig, 1);
   state.debugSettings = { ...state.debugSettings, godMode: true };
   const idle = { north: false, south: false, east: false, west: false };
-  for (let tick = 0; tick < 23000 && state.phase === "playing"; tick++)
+  for (let tick = 0; tick < 28000 && state.phase === "playing"; tick++)
     advanceSimulation(state, queenConfig.simulation.fixedStepSeconds, idle);
   expect(state.phase).toBe("cleared");
-  expect(state.elapsedSeconds).toBeCloseTo(373.43, 0);
-  console.log(
-    `Queen full fight after 24.2 tuning: cleared at ${state.elapsedSeconds.toFixed(2)}s (24.1 baseline: 373.43s)`,
-  );
+  expect(state.elapsedSeconds).toBeCloseTo(449.55, 0);
 });
 
 // Step 38.3's guard: every orbit/wander radius, plus the moving body's own

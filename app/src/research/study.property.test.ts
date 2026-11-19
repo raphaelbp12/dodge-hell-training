@@ -5,7 +5,7 @@ import { ENCOUNTER_LIST } from "../game/config/encounter";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import { HISTORY_STORAGE_KEY, AttemptHistory } from "../storage/attempts";
 import { propertyParameters } from "../test/property";
-import { validateStudyV5, type Mark, type StudyV5 } from "./study";
+import { studyV6FromV5, validateStudyV6, type Mark, type StudyV6 } from "./study";
 import { parseStudyFile } from "./studyLoad";
 import { emptyStudy } from "./studyMigrate";
 import { validateSessionDraft } from "./taggerSessions";
@@ -24,7 +24,7 @@ function expectReturnsOrRangeError(call: () => unknown): void {
 test("the study and session validators fail with RangeError, or return, for any value", () => {
   fc.assert(
     fc.property(anyJson, (value) => {
-      expectReturnsOrRangeError(() => validateStudyV5(value));
+      expectReturnsOrRangeError(() => validateStudyV6(value));
       expectReturnsOrRangeError(() => validateSessionDraft(value));
     }),
     propertyParameters(),
@@ -75,7 +75,7 @@ const mark: fc.Arbitrary<Mark> = fc
   })
   .map((value) => ({ ...value }));
 
-const queenStudy = (): StudyV5 =>
+const queenStudy = (): StudyV6 =>
   emptyStudy({
     encounterId: "killer-bee-queen",
     archetypeId: "killer-bee-queen",
@@ -84,12 +84,14 @@ const queenStudy = (): StudyV5 =>
     rawFile: AUTHORED_MONSTER_FILES["killer-bee-queen"],
   });
 
-const committedStudy = JSON.parse(
-  readFileSync(
-    new URL("../../../docs/killer-bee-queen-study-TFclwuPtC94.json", import.meta.url),
-    "utf8",
+// The committed study is schema 5; it is compared as the v6 study it converts to (plan V23 Q15).
+const committedStudy = validateStudyV6(
+  studyV6FromV5(
+    JSON.parse(
+      readFileSync(new URL("../../../docs/killer-bee-queen-study-TFclwuPtC94.json", import.meta.url), "utf8"),
+    ),
   ),
-) as StudyV5;
+);
 
 test("a valid study survives a JSON round trip unchanged, whatever its marks", () => {
   const base = queenStudy();
@@ -100,14 +102,14 @@ test("a valid study survives a JSON round trip unchanged, whatever its marks", (
       fc.boolean(),
       (marks, scratch, useCommitted) => {
         const source = useCommitted ? committedStudy : base;
-        const study: StudyV5 = {
+        const study: StudyV6 = {
           ...source,
           scratch,
           tracks: source.tracks.map((track, index) =>
             index === 0 ? { ...track, marks } : track,
           ),
         };
-        const restored = validateStudyV5(JSON.parse(JSON.stringify(study)));
+        const restored = validateStudyV6(JSON.parse(JSON.stringify(study)));
         expect(restored).toStrictEqual(study);
       },
     ),

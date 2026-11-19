@@ -12,16 +12,18 @@ import {
 import { ENCOUNTER_CONFIGS, encounterConfigOf } from "../game/config/encounter";
 import { propertyParameters } from "../test/property";
 import { taggingConfigOf } from "./monsterDraft";
-import { segmentIdOf, type StudyV5 } from "./study";
+import { segmentIdOf, type StudyV6 } from "./study";
 import {
   bombVariantOf,
+  exportedVariantsOf,
   monsterFileTextFromStudy,
 } from "./studyExport";
 import {
+  addMark,
   duplicateTrack,
   removeTrack,
-  setProjectileOverride,
   setTrackAttack,
+  setTrackPeriod,
   type EditResult,
 } from "./studyEdits";
 import { emptyStudy } from "./studyMigrate";
@@ -45,7 +47,7 @@ function configFor(archetypeId: string) {
   return config;
 }
 
-function studyOf(archetypeId: string): StudyV5 {
+function studyOf(archetypeId: string): StudyV6 {
   return emptyStudy({
     encounterId: "killer-bee-queen",
     archetypeId,
@@ -108,23 +110,30 @@ describe("any monster exports unedited under any encounter's tagging config", ()
 });
 
 type Edit = Readonly<{
-  kind: "cadence" | "add" | "delete" | "aim" | "override";
+  kind: "cadence" | "add" | "delete" | "aim" | "mark" | "period";
   track: number;
   value: number;
 }>;
 
 const edit: fc.Arbitrary<Edit> = fc
   .record({
-    kind: fc.constantFrom("cadence" as const, "add" as const, "delete" as const, "aim" as const, "override" as const),
+    kind: fc.constantFrom(
+      "cadence" as const,
+      "add" as const,
+      "delete" as const,
+      "aim" as const,
+      "mark" as const,
+      "period" as const,
+    ),
     track: fc.nat({ max: 200 }),
     value: fc.double({ min: 0.1, max: 6, noNaN: true }),
   })
   .map((value) => ({ ...value }));
 
-function apply(study: StudyV5, step: Edit, serial: number): StudyV5 {
+function apply(study: StudyV6, step: Edit, serial: number): StudyV6 {
   if (study.tracks.length === 0) return study;
   const track = study.tracks[step.track % study.tracks.length];
-  const accept = (result: EditResult<StudyV5>) => (result.ok ? result.value : study);
+  const accept = (result: EditResult<StudyV6>) => (result.ok ? result.value : study);
   switch (step.kind) {
     case "cadence":
       return accept(
@@ -135,7 +144,6 @@ function apply(study: StudyV5, step: Edit, serial: number): StudyV5 {
             ...track.attack,
             cadence: { ...track.attack.cadence, cooldownAfterLastShotSeconds: step.value },
           },
-          "typed",
         ),
       );
     case "add":
@@ -153,17 +161,35 @@ function apply(study: StudyV5, step: Edit, serial: number): StudyV5 {
             ...track.attack,
             pattern: { ...track.attack.pattern, aim: aims[Math.floor(step.value) % aims.length] },
           }),
-          "typed",
         ),
       );
     }
-    case "override":
-      return accept(setProjectileOverride(study, track.id, { travelSeconds: step.value }));
+    case "mark":
+      return accept(markedInBoundary(study, track.id, step.value * 10));
+    case "period":
+      return accept(setTrackPeriod(study, track.id, step.value));
   }
 }
 
+/**
+ * Plan V23: a boundary of the track's segment at `startSeconds`, then a throw
+ * and a detonation mark after it, so the segment is observed and the track
+ * exports its marks and, for a bomb, a measured variant.
+ */
+function markedInBoundary(study: StudyV6, trackId: string, startSeconds: number): EditResult<StudyV6> {
+  const track = study.tracks.find((entry) => entry.id === trackId)!;
+  const observed = {
+    ...study,
+    boundaries: [...study.boundaries, { timeSeconds: startSeconds, segmentId: segmentIdOf(track.location) }],
+  };
+  const thrown = addMark(observed, trackId, { timeSeconds: startSeconds + 0.5, kind: "volley" }, () => true);
+  return thrown.ok
+    ? addMark(thrown.value, trackId, { timeSeconds: startSeconds + 1.5, kind: "detonation" }, () => true)
+    : thrown;
+}
+
 describe("any export the editor produces is valid game data or is refused", () => {
-  test("the Queen under arbitrary cadence, add, delete, aim and override edits", () => {
+  test("the Queen under arbitrary cadence, add, delete, aim, mark and period edits", () => {
     const archetypeId = "killer-bee-queen";
     const config = encounterConfigOf("killer-bee-queen");
     fc.assert(
@@ -180,10 +206,9 @@ describe("any export the editor produces is valid game data or is refused", () =
           return;
         }
         const variants = Object.fromEntries(
-          study.tracks.flatMap((track) => {
-            const variant = bombVariantOf(track);
-            return variant ? [[variant.id, variant.entry] as const] : [];
-          }),
+          exportedVariantsOf(study, AUTHORED_MONSTER_FILES[archetypeId]).map(
+            (variant) => [variant.id, variant.entry] as const,
+          ),
         );
         for (const [id, entry] of Object.entries(variants))
           expect(() => validateProjectile(entry, id, STEP_SECONDS, APPEARANCE_IDS)).not.toThrow();
@@ -214,7 +239,7 @@ test("a targeted bomb's measured variant passes the projectile validator and kee
     return authored?.type === "bomb" && track.attack.target === "player";
   });
   if (!targeted) throw new Error("expected a targeted bomb track in the Queen's file");
-  const edited = setProjectileOverride(study, targeted.id, { travelSeconds: 1 });
+  const edited = markedInBoundary(study, targeted.id, 1);
   if (!edited.ok) throw new Error(edited.error);
   const variant = edited.value.tracks.map(bombVariantOf).find((entry) => entry !== null);
   if (!variant) throw new Error("expected a variant");

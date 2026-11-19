@@ -93,6 +93,8 @@ export const MUTATION_SHARDS = {
       "src/game/simulation/projectiles.ts",
       "src/game/simulation/conditions.ts",
       "src/game/simulation/patterns.ts",
+      // Plan V23 step 97.2: the marked-volley schedule, a rules module.
+      "src/game/simulation/marks.ts",
     ],
     break: 89,
   },

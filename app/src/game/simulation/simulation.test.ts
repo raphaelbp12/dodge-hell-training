@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { cadenced } from "./test-support";
 import {
   encounterConfigOf,
   liveShardBoundPerEnemy,
@@ -53,7 +54,7 @@ if (ENCOUNTER_CONFIG.spawns.placement.rule !== "farthest-from-player")
 const spawnRingRadiusTiles = ENCOUNTER_CONFIG.spawns.placement.ringRadiusTiles;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
 const PRIMARY_PHASE = PRIMARY.phases[0];
-const PRIMARY_ATTACK = PRIMARY_PHASE.attacks[0];
+const PRIMARY_ATTACK = cadenced(PRIMARY_PHASE.attacks[0]);
 const PRIMARY_PROJECTILE = bulletOf(
   ENCOUNTER_CONFIG,
   PRIMARY_ATTACK.projectileId,

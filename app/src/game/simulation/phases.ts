@@ -9,7 +9,7 @@ import type {
 } from "../config/encounter";
 import type { AttackClockState, EnemyState } from "../models";
 import { arenaInradiusTiles, pointOnRing } from "./geometry";
-import { createEnemy, type SimulationState } from "./simulation";
+import { createEnemy, fireDueMarkedVolleys, type SimulationState } from "./simulation";
 
 /** 1 for an archetype with no `health` block, so callers need one query for both kinds. */
 export function healthFraction(enemy: EnemyState): number {
@@ -32,12 +32,17 @@ function setHealthToPhaseEntry(enemy: EnemyState, phase: PhaseSpec): void {
 export function createAttackClocks(
   attacks: readonly AttackSpec[],
   epochSeconds: number,
+  entrySeconds: number,
 ): AttackClockState[] {
   return attacks.map((attack) => ({
     attackId: attack.id,
     epochSeconds,
     volleysAtEpoch: 0,
-    initialDelaySeconds: attack.cadence.initialDelaySeconds,
+    initialDelaySeconds: attack.cadence?.initialDelaySeconds ?? 0,
+    // Offsets are at least 0, so -1 lets the first step fire a volley at entry.
+    ...(attack.marks === undefined
+      ? {}
+      : { marks: { entrySeconds, throughOffsetSeconds: -1 } }),
     rotationEpochSeconds: epochSeconds,
     rotationPhaseAtEpoch:
       attack.pattern.kind === "ring" ? attack.pattern.initialPhaseRadians : 0,
@@ -189,19 +194,36 @@ export function enterSubPhase(
   phaseIndex: number,
   subPhaseIndex: number,
 ): void {
+  // enterPhase already fired the outgoing phase's due volleys; its clocks no
+  // longer match this phase's attacks, so only a sub-phase change fires here.
+  if (enemy.phaseEnteredAtSeconds < state.elapsedSeconds) fireDueMarkedVolleys(state, enemy);
   despawnExitedMinions(state, enemy.id);
   const elapsedSeconds = state.elapsedSeconds;
   const phase = archetype.phases[phaseIndex];
   const subPhase = phase.subPhases?.[subPhaseIndex];
   if (!subPhase) throw new RangeError("Unknown sub-phase index");
+  const previousClocks = enemy.attackClocks;
+  // A later sub-phase of the same phase: the phase's own marked attacks keep
+  // counting from the phase's entry instead of replaying their marks.
+  const phaseContinues = enemy.phaseEnteredAtSeconds < elapsedSeconds;
   enemy.subPhaseIndex = subPhaseIndex;
   enemy.subPhaseEnteredAtSeconds = elapsedSeconds;
   enemy.invulnerableUntilSeconds =
     elapsedSeconds + subPhase.invulnerableOnEnterSeconds;
-  enemy.attackClocks = createAttackClocks(
-    [...phase.attacks, ...subPhase.attacks],
-    elapsedSeconds + subPhase.telegraphSeconds,
-  );
+  const epochSeconds = elapsedSeconds + subPhase.telegraphSeconds;
+  enemy.attackClocks = [
+    ...createAttackClocks(
+      phase.attacks,
+      epochSeconds,
+      enemy.phaseEnteredAtSeconds,
+    ).map((clock) => {
+      const previous = previousClocks.find((entry) => entry.attackId === clock.attackId)?.marks;
+      return phaseContinues && clock.marks && previous
+        ? { ...clock, marks: { ...previous } }
+        : clock;
+    }),
+    ...createAttackClocks(subPhase.attacks, epochSeconds, elapsedSeconds),
+  ];
   resolveSpawns(state, enemy, subPhase.spawns);
 }
 
@@ -221,6 +243,7 @@ export function enterPhase(
   archetype: EnemyArchetype,
   index: number,
 ): void {
+  fireDueMarkedVolleys(state, enemy);
   despawnExitedMinions(state, enemy.id);
   const elapsedSeconds = state.elapsedSeconds;
   const phase = archetype.phases[index];
@@ -239,6 +262,7 @@ export function enterPhase(
     enemy.attackClocks = createAttackClocks(
       phase.attacks,
       elapsedSeconds + phase.telegraphSeconds,
+      elapsedSeconds,
     );
   }
   resolveSpawns(state, enemy, phase.spawns);
@@ -293,6 +317,8 @@ function tryAdvancePhase(
   if (state.drill !== null && archetype.id === state.config.primaryArchetypeId) {
     const nextDrillIndex = nextDrillPhaseIndex(state.drill, enemy.phaseIndex);
     if (nextDrillIndex === null) {
+      // The drilled segment ends here too, so its due marks fire first.
+      fireDueMarkedVolleys(state, enemy);
       state.phase = "cleared";
       return false;
     }

@@ -183,10 +183,18 @@ function fireTargetedWhiteBomb() {
   const queen = ENCOUNTER_CONFIG_QUEEN;
   const state = createSimulation(queen, 5);
   const idle = { north: false, south: false, east: false, west: false };
+  // Plan V23: phase 1's marked stingers fire one frame after entry, from the
+  // Queen standing on the player's spawn, so the player starts off to the side
+  // and every bullet is cleared: these tests are about the bomb alone.
+  state.player.positionTiles = { x: 5, y: 0 };
   for (let step = 0; step < 600; step++) {
     advanceSimulation(state, queen.simulation.fixedStepSeconds, idle);
+    state.shards = [];
     const bomb = state.bombs.find((entry) => entry.projectileId === "white-bomb-v1");
-    if (bomb) return { state, bombId: bomb.id, queen, idle };
+    if (bomb) {
+      state.bombs = [bomb];
+      return { state, bombId: bomb.id, queen, idle };
+    }
   }
   throw new Error("the targeted white bomb never fired");
 }

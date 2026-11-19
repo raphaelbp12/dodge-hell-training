@@ -3,21 +3,20 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { unsafeFixture } from "../test/fixture";
 import { AUTHORED_MONSTER_FILES } from "../game/config/data";
-import { encounterConfigOf, primaryArchetype } from "../game/config/encounter";
+import { encounterConfigOf } from "../game/config/encounter";
 import { HELP_SECTION_PREVIEW } from "./helpText";
 import { PreviewPanel } from "./PreviewPanel";
 import { drawEmptyPreview, drawPreviewFrame } from "./previewDraw";
 import { PREVIEW_SIZE_PIXELS } from "./previewPreference";
-import { segmentsOfMonster, type StudyV5 } from "./study";
+import type { StudyV6 } from "./study";
 import { emptyStudy } from "./studyMigrate";
 
 // The canvas drawer is stubbed: these tests assert what the panel hands it.
 vi.mock("./previewDraw", () => ({ drawPreviewFrame: vi.fn(), drawEmptyPreview: vi.fn() }));
 
 const config = encounterConfigOf("killer-bee-queen");
-const segments = segmentsOfMonster(primaryArchetype(config));
 
-const study: StudyV5 = emptyStudy({
+const study: StudyV6 = emptyStudy({
   encounterId: "killer-bee-queen",
   archetypeId: "killer-bee-queen",
   provenance: { sourceUrl: null, fileName: "x.mp4", frameRate: 30, durationSeconds: 100 },
@@ -37,7 +36,6 @@ function renderPanel(props: Partial<Parameters<typeof PreviewPanel>[0]> = {}) {
   render(
     <PreviewPanel
       study={study}
-      segments={segments}
       windows={[]}
       mediaTime={0}
       hasVideo
@@ -100,12 +98,10 @@ test("choosing a size reports it", async () => {
   expect(screen.getByRole("button", { name: "Medium" })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("the draw mode switches between observed, fitted and both", async () => {
-  const user = userEvent.setup();
+test("the panel draws one thing and offers no draw-mode toggle (plan V23 Q17)", () => {
   renderPanel();
-  expect(screen.getByRole("radio", { name: "Both" })).toBeChecked();
-  await user.click(screen.getByRole("radio", { name: "Observed" }));
-  expect(screen.getByRole("radio", { name: "Observed" })).toBeChecked();
+  expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "Draw" })).not.toBeInTheDocument();
 });
 
 test("moving a player slider updates its readout", async () => {
