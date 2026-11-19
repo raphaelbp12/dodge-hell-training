@@ -19,8 +19,10 @@ fi
 
 # A second [hooks] header makes the file unparsable and rtk silently falls back
 # to its defaults, so edit the existing section and never append a header.
-if grep -q '^exclude_commands[[:space:]]*=' "$CONFIG"; then
-    sed -i "s|^exclude_commands[[:space:]]*=.*|$EXCLUDE|" "$CONFIG"
+# Only the [hooks] section is touched: the range runs from its header to the
+# next section header.
+if sed -n '/^\[hooks\]/,/^\[/p' "$CONFIG" | grep -q '^exclude_commands[[:space:]]*='; then
+    sed -i "/^\[hooks\]/,/^\[/s|^exclude_commands[[:space:]]*=.*|$EXCLUDE|" "$CONFIG"
 elif grep -q '^\[hooks\]' "$CONFIG"; then
     sed -i "/^\[hooks\]/a $EXCLUDE" "$CONFIG"
 else
