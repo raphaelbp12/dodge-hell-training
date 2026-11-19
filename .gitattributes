@@ -1,0 +1,4 @@
+# `graphify hook install` adds this line when it is missing. graphify-out/ is
+# gitignored (each dev container builds its own graph), so the driver never
+# runs; the line is committed so container creation leaves the tree clean.
+graphify-out/graph.json merge=graphify

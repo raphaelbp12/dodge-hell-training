@@ -29,10 +29,17 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
  && apt-get install -y --no-install-recommends gh \
  && rm -rf /var/lib/apt/lists/*
 
-# CodeGraph's npm package selects the matching native binary through its
-# optional dependencies, so the same install serves amd64 and arm64.
-RUN npm install -g @colbymchenry/codegraph@1.6.2 \
- && codegraph --version
+# graphify (PyPI package graphifyy) through uv, its recommended installer. The
+# runtime firewall blocks PyPI, so it is installed here, at build time. Debian
+# bookworm's Python 3.11.2 is below graphify's minimum, so uv installs its own
+# managed Python. Tool, Python and launcher live outside /home/node so every
+# rebuild gets the same paths, which the git hooks and merge driver pin.
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
+RUN UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin \
+    UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PYTHON_PREFERENCE=only-managed UV_NO_CACHE=1 \
+    uv tool install --python 3.12 graphifyy==0.9.103 \
+ && UV_TOOL_DIR=/opt/uv/tools uv tool list | grep -F 'graphifyy v0.9.103' \
+ && command -v graphify
 
 # RTK's official installer verifies the pinned release checksum and selects the
 # matching Linux target for the build architecture.

@@ -7,8 +7,9 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 - Do not read `implementation-plan.md`, `docs/plan-v*.md`, `first-draft.md`, `docs/plan/`, `docs/mechanics.md`, the plan archives or `README.md` unless the user asks, `/implement-phase` or `/brainstorm` runs, or the task changes gameplay rules. Even then, grep for the relevant heading and read that section, not the whole file.
 - If a request conflicts with a recorded decision in the plan, ask rather than silently choosing.
 - Do not re-read a file already in context this session.
-- For code under `app/src`, query the codegraph index first when it is available (`codegraph_explore`, or the `codegraph` CLI): one call returns a symbol's source, its call paths and what depends on it, and the source it returns counts as already read. Use `grep` or a line-range read only for a single known line, or when the index is unavailable. Do not call it before an edit merely to survey blast radius.
-- codegraph does not index Markdown, JSON or configuration. For those, grep for the relevant heading or key and read that range, never the whole file.
+- For code under `app/`, query the graphify graph first when `graphify-out/graph.json` exists: `graphify explain "<symbol>"` lists a symbol's source file and line and what it connects to, `graphify path "<A>" "<B>"` traces how two symbols connect, and `graphify query "<question>"` returns a scoped subgraph for a plain question. Then read only the line ranges they point to. Use `grep` or a line-range read only for a single known line, or when the graph is missing. Do not query before an edit merely to survey blast radius. Put this rule in every subagent brief that explores code.
+- The graph is code-only: it does not index Markdown, JSON or configuration. For those, grep for the relevant heading or key and read that range, never the whole file.
+- After changing code, run `graphify update .` (AST only, no model calls, a few seconds) so later queries see the change. Git hooks rebuild the graph after each commit, checkout, merge and rebase.
 
 ## Tool use and replies
 
@@ -20,7 +21,7 @@ The single source of truth for agent rules in this repository. `CLAUDE.md` only 
 
 Every turn resends the whole conversation, so context size, not output, drives cost. A session past about 300k tokens of context costs several times more per turn than a fresh one.
 
-- Read a file by the section you need (`offset`/`limit`, or a grep for the heading or symbol), not whole. Prefer one narrow `codegraph_explore` query with exact symbol names over a broad question.
+- Read a file by the section you need (`offset`/`limit`, or a grep for the heading or symbol), not whole. Prefer one narrow `graphify explain` or `graphify path` call with exact symbol names over a broad `graphify query`.
 - Cap command output: pipe compiler errors through `| head -40` or `| cut -c1-200`, and filter test runs to their failures and summary (`| grep -E "FAIL|×|Tests "`). Read a full log file only for the failure you are fixing.
 - Do not rerun the full test suite while iterating; run the focused files, then the whole suite once at the end.
 - Delegate bulk mechanical work - fixing dozens of test fixtures after a data or type change, a rename across many files, a survey of many call sites - to a subagent with a precise brief, and keep only its summary in the main session.

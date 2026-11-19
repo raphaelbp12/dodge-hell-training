@@ -1,8 +1,8 @@
 # Agent scratch workspace (ledgers, briefs, review packages)
 /.superpowers/
 
-# Per-container CodeGraph index; the host's .codegraph/ stays separate.
-/.codegraph-container/
+# Per-container graphify graph, built by the dev container's postCreateCommand.
+/graphify-out/
 
 # Local Vitest JSON output from tooling; not a source or build artifact.
 /app/.vitest/
