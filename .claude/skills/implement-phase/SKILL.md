@@ -9,6 +9,15 @@ Act as a Senior Software developer, follow TDD, SOLID, YAGNI and DRY principles.
 
 Implement only what the user named with this command: `$ARGUMENTS`. If that reads as a literal placeholder, use the ID the user typed after `/implement-phase`. If it is absent or invalid, ask for it. The ID is either a whole phase (`23`) or a single step of one (`23.6`); a step ID means implement that step alone, then stop. Follow [the project instructions](../../../AGENTS.md).
 
+**Several phases or a whole plan** (for example `plan-v23`, `97-100`, or an explicit request to run more than one phase): do not implement them in this session, because the context of every finished phase would be resent on every later turn. Act as an orchestrator instead:
+
+1. Read only the plan's Phase Index and the dependency order.
+2. For each phase in order, launch one `general-purpose` subagent with this brief: "In /workspaces/dodge-1, implement phase <phase> by following steps 1-8 of `.claude/skills/implement-phase/SKILL.md` (this skill cannot be invoked as a command from a subagent, so read and follow it) and AGENTS.md. Do not commit. Report changed files, check results, findings and open questions in under 300 words." Wait for its report before starting the next phase.
+3. Stop the chain when a report shows a failed check, an A10 finding or an open question that later phases depend on, and bring it to the user.
+4. Run the final cross-phase checks yourself (`npm run verify` through the `verifier`, then any review the user asked for), and report a summary of every phase.
+
+If subagents are unavailable (rate limit, no Agent tool), implement the first phase only, record it, and ask the user to `/clear` and run the next phase.
+
 1. **Load the owning plan once per session, by section.** More than one `docs/plan-v*.md` can exist; find the one whose Phase Index lists the requested phase, or the phase part of a step ID (grep `^| <phase> |` across `docs/plan-v*.md` if `implementation-plan.md`'s Current Plan table does not make it obvious). Read that file from the top through its Phase Index section. Skip "Recorded User Decisions" and "Target Data Shapes" unless the step cites a decision (its lettered ID) or a data shape; then read only that part. Do not reread these sections for a later step in the same session.
 2. **Read only what the ID names.** The Phase Index line links the phase file under `docs/plan/`, named `phase-*.md` containing the phase number. For a step ID, read that step's `### Step <id>` section only, plus one grep of the file's `### Step` and `Status:` lines for the phase's step list and statuses; do not read the whole phase file. For a whole-phase ID, read the phase file. Completed dependencies are summarised by their one-line index entries; open an archive in `docs/plan-archive/` only when a summary does not answer a specific question.
 3. **Check dependencies.** Use the status lines from step 2. If any dependency is not complete, report the blocker and stop. Do not implement dependencies.
