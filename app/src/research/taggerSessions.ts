@@ -24,9 +24,12 @@ import { validateStudyV5, type StudyV5 } from "./study";
 
 export const TAGGER_SESSION_KEY_PREFIX = "dodge-hell-training.tagger-session.";
 
+/** The draft version `buildDraft` writes; browser specs read it, so a bump cannot leave them behind. */
+export const SESSION_DRAFT_VERSION = 4;
+
 /** Plan V20 E14: a version 4 draft carries a v5 study and the selected track. */
 export type SessionDraft = Readonly<{
-  draftVersion: 4;
+  draftVersion: typeof SESSION_DRAFT_VERSION;
   /** ISO-8601 time of this write. */
   savedAt: string;
   study: StudyV5;
@@ -84,7 +87,7 @@ function positiveFinite(value: unknown, path: string): number {
 export function isLegacyDraft(
   draft: SessionDraft | LegacySessionDraft,
 ): draft is LegacySessionDraft {
-  return draft.draftVersion !== 4;
+  return draft.draftVersion !== SESSION_DRAFT_VERSION;
 }
 
 /** Every mark on the study's tracks and scratch track. */
@@ -192,7 +195,7 @@ export function buildDraft(input: {
   savedAt: string;
 }): SessionDraft {
   return {
-    draftVersion: 4,
+    draftVersion: SESSION_DRAFT_VERSION,
     savedAt: input.savedAt,
     study: input.study,
     selectedTrackId: input.selectedTrackId,
