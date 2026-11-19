@@ -103,7 +103,8 @@ test("a NoCoverage mutant on a changed line blocks; on an unchanged line it does
 test("a Survived mutant on a changed line does not block and still gets its warning", () => {
   const summary = summarize({ files: { "src/a.ts": { mutants: [mutant("Survived", 6)] } } }, { "src/a.ts": [[1, 10]] });
   expect(blockingMutants(summary)).toEqual([]);
-  expect(annotations(summary)).toHaveLength(1);
+  expect(blockingAnnotations(summary)).toEqual([]);
+  expect(annotations(summary)).toEqual([expect.stringMatching(/^::warning file=app\/src\/a\.ts,line=6,title=Mutant survived::/)]);
 });
 
 test("a summary without changed-line data blocks nothing", () => {
