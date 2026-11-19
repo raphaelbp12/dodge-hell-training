@@ -232,6 +232,21 @@ async function savedAttempts(page: Page) {
   );
 }
 
+/**
+ * Reads an exported value from the app's own source through the dev server,
+ * so a spec asserts the current version instead of a copy that a bump leaves
+ * behind (a draftVersion bump broke CI on PR #12). The spec cannot import
+ * these modules in Node: their JSON imports carry no import attribute. Works
+ * only on the dev server; the production preview serves no source module.
+ */
+async function sourceExport(page: Page, path: string, name: string): Promise<unknown> {
+  return page.evaluate(
+    async ([modulePath, exportName]) =>
+      (await import(/* @vite-ignore */ new URL(modulePath, document.baseURI).href))[exportName],
+    [path, name] as const,
+  );
+}
+
 async function renderedPixels(page: Page) {
   return page.locator("canvas").evaluate((canvas, { shardColours, groundColour }) => {
     if (!(canvas instanceof HTMLCanvasElement))
@@ -926,6 +941,8 @@ for (const width of [1440, 390]) {
       expect((await renderedPixels(page)).healthBar).toBe(0);
       expect((await renderedPixels(page)).missingHealth).toBeGreaterThan(150);
       const saved = await savedAttempts(page);
+      // A literal: this path also runs on the production preview, which serves
+      // no source module for sourceExport to read.
       expect(saved.schemaVersion).toBe(1);
       expect(saved.records).toHaveLength(attempt);
       expect(
@@ -1283,7 +1300,9 @@ for (const width of [1440, 390]) {
     await page.clock.resume();
     const ended = await inspect(page);
     const saved = await savedAttempts(page);
-    expect(saved.schemaVersion).toBe(1);
+    expect(saved.schemaVersion).toBe(
+      await sourceExport(page, "src/storage/attempts.ts", "HISTORY_SCHEMA_VERSION"),
+    );
     expect(saved.records).toHaveLength(1);
     expect(saved.records[0]).toEqual({
       id: expect.any(String),
@@ -3096,8 +3115,8 @@ test("a legacy study converts with a notice and a reload restores the v6 session
   });
   await expect(page.getByRole("status").filter({ hasText: /was converted/ })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
-  // An edit makes the study dirty, so the autosave writes a version 5 draft
-  // (plan V23 Q15).
+  // An edit makes the study dirty, so the autosave writes a current-version
+  // draft.
   await page.getByLabel(/presented frame rate/i).fill("60");
   await expect
     .poll(() =>
@@ -3107,7 +3126,9 @@ test("a legacy study converts with a notice and a reload restores the v6 session
           .map((key) => JSON.parse(window.localStorage.getItem(key)!).draftVersion),
       ),
     )
-    .toEqual([5]);
+    .toEqual([
+      await sourceExport(page, "src/research/taggerSessions.ts", "SESSION_DRAFT_VERSION"),
+    ]);
   await page.reload();
   await page.getByRole("button", { name: "Restore" }).click();
   await page.getByRole("button", { name: /^Structure/ }).click();

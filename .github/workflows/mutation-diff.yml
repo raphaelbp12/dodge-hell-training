@@ -2,9 +2,11 @@ name: Mutation Tests (Pull Request)
 
 # Plan V22 A17: mutates the modules a pull request changes and reports the
 # undetected mutants in the job summary and as annotations on the changed
-# lines. It has no break value, so a finding never fails it; it fails only when
-# Stryker itself cannot run, which would otherwise go unnoticed. The full
-# scheduled run is .github/workflows/mutation.yml.
+# lines. It has no break value, so a surviving mutant never fails it. It fails
+# when Stryker itself cannot run, and when a mutant with status NoCoverage sits
+# on a changed line (no test runs that line; approved deviation from A17,
+# 2026-11-19, see docs/quality-gates.md). The full scheduled run is
+# .github/workflows/mutation.yml.
 
 on:
   pull_request:
