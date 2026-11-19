@@ -38,6 +38,8 @@ The `gh` credentials and git global config live in the `/home/node/.config` volu
 
 **RTK 1.1.0** is installed globally and initialized for Claude Code with a hook-only global config. `rtk init -g --hook-only --auto-patch` writes the `PreToolUse` hook to the `~/.claude` volume, so it survives rebuilds; running it again is idempotent. The hook rewrites Bash commands for Claude Code, so restart an already-open Claude session after a rebuild. `rtk --version` checks the binary.
 
+`configure-rtk.sh` (run from `postCreateCommand` after `rtk init`) sets `exclude_commands = ["npm", "npx", "git"]` in the `[hooks]` section of `~/.config/rtk/config.toml`, so the hook leaves those commands alone. Reason: auto mode refuses a Bash call the hook rewrote (`npm run verify` becomes `rtk npm run verify`) until it is issued again, which left subagent checks partial; `npm` and `npx` are everything the `verifier` runs, and `git` keeps `git diff` complete for `commit-drafter`. The main session can still type `rtk git ...` itself. Trap: the file must have exactly one `[hooks]` header. A second one fails the parse ("duplicate key `hooks`") and rtk silently uses its defaults, so the script edits the existing section and never appends a header. `rtk config --create` overwrites an existing file, so the script calls it only when the file is missing.
+
 ## Rebuild versus reset
 
 - **Dev Containers: Rebuild Container** rebuilds the image and keeps the named volumes. Both logins and `node_modules` survive.

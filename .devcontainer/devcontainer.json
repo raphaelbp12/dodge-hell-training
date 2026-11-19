@@ -27,7 +27,7 @@
     "CODEGRAPH_DIR": ".codegraph-container"
   },
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci && codegraph init && rtk init -g --hook-only --auto-patch --no-trust-filters && /usr/local/bin/install-claude-plugins.sh",
+  "postCreateCommand": "sudo /usr/local/bin/prepare-devcontainer-volumes.sh && npm --prefix app ci && codegraph init && rtk init -g --hook-only --auto-patch --no-trust-filters && /usr/local/bin/configure-rtk.sh && /usr/local/bin/install-claude-plugins.sh",
   "postStartCommand": "sudo /usr/local/bin/init-devcontainer-firewall.sh && sudo /usr/local/bin/update-claude.sh",
   "waitFor": "postStartCommand",
   "runArgs": [

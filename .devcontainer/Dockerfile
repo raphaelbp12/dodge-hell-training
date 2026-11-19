@@ -58,8 +58,9 @@ COPY .devcontainer/init-firewall.sh /usr/local/bin/init-devcontainer-firewall.sh
 COPY .devcontainer/prepare-devcontainer-volumes.sh /usr/local/bin/prepare-devcontainer-volumes.sh
 COPY .devcontainer/update-claude.sh /usr/local/bin/update-claude.sh
 COPY .devcontainer/install-claude-plugins.sh /usr/local/bin/install-claude-plugins.sh
+COPY .devcontainer/configure-rtk.sh /usr/local/bin/configure-rtk.sh
 RUN chmod 755 /usr/local/bin/init-devcontainer-firewall.sh /usr/local/bin/prepare-devcontainer-volumes.sh \
-      /usr/local/bin/update-claude.sh /usr/local/bin/install-claude-plugins.sh \
+      /usr/local/bin/update-claude.sh /usr/local/bin/install-claude-plugins.sh /usr/local/bin/configure-rtk.sh \
  && echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-devcontainer-firewall.sh" > /etc/sudoers.d/node-firewall \
  && chmod 0440 /etc/sudoers.d/node-firewall \
  && echo "node ALL=(root) NOPASSWD: /usr/local/bin/prepare-devcontainer-volumes.sh" > /etc/sudoers.d/node-volumes \

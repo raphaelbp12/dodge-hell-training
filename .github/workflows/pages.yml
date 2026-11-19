@@ -1,10 +1,12 @@
 name: Validate And Deploy Pages
 
 # A change to Markdown or agent instruction files alone cannot change the site
-# or a test result (the tests read only JSON under docs/), so it starts no run.
+# or a test result (the tests read only JSON under docs/), so a push of one to
+# main starts no run. A pull request always runs, because branch protection
+# requires its checks and a required check that never runs stays pending for
+# ever (trust plan 2026-11-19, T3).
 on:
   pull_request:
-    paths-ignore: ["**/*.md", ".claude/**"]
   push:
     branches: [main]
     paths-ignore: ["**/*.md", ".claude/**"]
