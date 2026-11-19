@@ -7,8 +7,9 @@ import {
   windowAt,
   windowsForTrack,
   type Segment,
-  type StudyV5,
+  type StudyV6,
 } from "./study";
+import { repeatTimesOf } from "./trackMarks";
 
 /** Plan V20 E20: the height of one timeline row, in canvas pixels. */
 export const TIMELINE_ROW_HEIGHT_PX = 14;
@@ -82,16 +83,15 @@ export function volleyStepTolerance(frameRate: number | null): number {
  * E20: the rows the timeline draws, in order: structure (boundaries and
  * telegraph ends), status (invulnerable spans; an open span runs to the end),
  * one row per attack track in study order (volley marks solid, detonation
- * marks hollow, predicted volleys faint, the end mark as a bar to its window's
- * end, or to the video end outside every window), and scratch.
+ * marks hollow, a periodic track's repeats faint (plan V23 Q18), the end mark
+ * as a bar to its window's end, or to the video end outside every window), and
+ * scratch.
  */
 export function timelineRows(
   input: Readonly<{
-    study: StudyV5;
+    study: StudyV6;
     segments: readonly Segment[];
     durationSeconds: number;
-    /** Predicted volley times per track id, from phase 86; empty until then. */
-    predicted: Readonly<Record<string, readonly number[]>>;
   }>,
 ): readonly TimelineRow[] {
   const { study, segments, durationSeconds } = input;
@@ -149,7 +149,7 @@ export function timelineRows(
         ...track.marks.flatMap((mark) =>
           ticksOf([mark.timeSeconds], mark.kind === "volley" ? "solid" : "hollow"),
         ),
-        ...ticksOf(input.predicted[track.id] ?? [], "faint"),
+        ...ticksOf(repeatTimesOf(track, windows), "faint"),
       ],
       bars:
         track.endSeconds === undefined || !(durationSeconds > 0)

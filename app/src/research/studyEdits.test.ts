@@ -1,8 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { AuthoredAttack } from "../game/config/data";
-import type { AttackTrack, Segment, StudyV5 } from "./study";
+import type { CadencedAuthoredAttack } from "../game/config/data";
+import type { AttackTrack, Segment, StudyV6 } from "./study";
 import {
-  acceptSegmentValue,
   addBoundary,
   addMark,
   addTrack,
@@ -14,14 +13,13 @@ import {
   reloadTracks,
   removeTrack,
   setBoundarySegment,
-  setBurstGapThreshold,
   setEndMark,
   setMeasuredRange,
-  setProjectileOverride,
   setScale,
   setTelegraphEnd,
   setTrackAttack,
   setTrackLocation,
+  setTrackPeriod,
   toggleInvulnerable,
   type EditResult,
 } from "./studyEdits";
@@ -33,20 +31,19 @@ const attack = (id: string) =>
     tuningSource: "trainer-authored",
     pattern: { kind: "spread", shots: 1, arcDegrees: 0, aim: "player" },
     cadence: { shotsPerBurst: 1, cooldownAfterLastShotSeconds: 1, initialDelaySeconds: 0 },
-  }) as unknown as AuthoredAttack;
+  }) as unknown as CadencedAuthoredAttack;
 
 const track = (id: string, overrides: Partial<AttackTrack> = {}): AttackTrack => ({
   id,
   location: { phaseId: "a", subPhaseId: null },
   attack: attack(id),
-  cadenceSource: "authored",
   marks: [],
   ...overrides,
 });
 
-function study(overrides: Partial<StudyV5> = {}): StudyV5 {
+function study(overrides: Partial<StudyV6> = {}): StudyV6 {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     encounterId: "e",
     archetypeId: "m",
     recordedAt: "2026-11-13T00:00:00.000Z",
@@ -55,7 +52,6 @@ function study(overrides: Partial<StudyV5> = {}): StudyV5 {
     statusSpans: [],
     tracks: [track("bee"), track("bomb")],
     scratch: [],
-    acceptedSegmentValues: {},
     ...overrides,
   };
 }
@@ -75,17 +71,17 @@ const segments = [segment("a"), segment("b/x"), segment("b/y")];
 const isBomb = (id: string) => id === "bomb";
 
 /** Runs an edit and asserts it left its input untouched. */
-function run(input: StudyV5, edit: (value: StudyV5) => EditResult<StudyV5>): EditResult<StudyV5> {
+function run(input: StudyV6, edit: (value: StudyV6) => EditResult<StudyV6>): EditResult<StudyV6> {
   const before = structuredClone(input);
   const result = edit(input);
   expect(input).toEqual(before);
   return result;
 }
-function value(result: EditResult<StudyV5>): StudyV5 {
+function value(result: EditResult<StudyV6>): StudyV6 {
   if (!result.ok) throw new Error(result.error);
   return result.value;
 }
-function error(result: EditResult<StudyV5>): string {
+function error(result: EditResult<StudyV6>): string {
   if (result.ok) throw new Error("expected a refusal");
   expect(result.error).toMatch(/^[A-Z].*\.$/);
   return result.error;
@@ -191,18 +187,23 @@ describe("track edits", () => {
     error(run(base, (s) => duplicateTrack(s, "bee", "bee")));
   });
 
-  test("setTrackAttack, setTrackLocation and setBurstGapThreshold", () => {
-    const attacked = value(run(study(), (s) => setTrackAttack(s, "bee", attack("other"), "typed")));
-    expect(attacked.tracks[0]).toMatchObject({ cadenceSource: "typed", attack: { id: "other" } });
+  test("setTrackAttack and setTrackLocation", () => {
+    const attacked = value(run(study(), (s) => setTrackAttack(s, "bee", attack("other"))));
+    expect(attacked.tracks[0]).toMatchObject({ attack: { id: "other" } });
     const moved = value(run(study(), (s) => setTrackLocation(s, "bee", { phaseId: "b", subPhaseId: "x" })));
     expect(moved.tracks[0].location).toEqual({ phaseId: "b", subPhaseId: "x" });
     error(run(study(), (s) => setTrackLocation(s, "bee", { phaseId: "", subPhaseId: null })));
-    const threshold = value(run(study(), (s) => setBurstGapThreshold(s, "bee", 0.2)));
-    expect(threshold.tracks[0].burstGapThresholdSeconds).toBe(0.2);
-    expect(value(run(threshold, (s) => setBurstGapThreshold(s, "bee", undefined))).tracks[0]).not.toHaveProperty(
-      "burstGapThresholdSeconds",
+  });
+
+  test("setTrackPeriod sets and clears the period, refusing a non-positive one (plan V23 Q06)", () => {
+    const periodic = value(run(study(), (s) => setTrackPeriod(s, "bee", 4)));
+    expect(periodic.tracks[0].periodSeconds).toBe(4);
+    expect(value(run(periodic, (s) => setTrackPeriod(s, "bee", undefined))).tracks[0]).not.toHaveProperty(
+      "periodSeconds",
     );
-    error(run(study(), (s) => setBurstGapThreshold(s, "bee", 0)));
+    error(run(study(), (s) => setTrackPeriod(s, "bee", 0)));
+    error(run(study(), (s) => setTrackPeriod(s, "bee", Number.NaN)));
+    error(run(study(), (s) => setTrackPeriod(s, "nobody", 1)));
   });
 
   test("createTrackFromScratch moves exactly the listed marks", () => {
@@ -218,14 +219,7 @@ describe("track edits", () => {
   });
 });
 
-describe("accepted values and scale", () => {
-  test("acceptSegmentValue sets and withdraws", () => {
-    const accepted = value(run(study(), (s) => acceptSegmentValue(s, "a", "telegraphSeconds", 1.5)));
-    expect(accepted.acceptedSegmentValues).toEqual({ a: { telegraphSeconds: 1.5 } });
-    expect(value(run(accepted, (s) => acceptSegmentValue(s, "a", "telegraphSeconds", undefined))).acceptedSegmentValues).toEqual({});
-    error(run(study(), (s) => acceptSegmentValue(s, "a", "durationSeconds", -1)));
-  });
-
+describe("scale", () => {
   test("setScale sets, clears and refuses a non-positive fraction", () => {
     const scaled = value(run(study(), (s) => setScale(s, 0.05)));
     expect(scaled.scale).toEqual({ tileWidthFraction: 0.05 });
@@ -238,12 +232,12 @@ describe("reloadTracks", () => {
   test("replaces every track with no marks and keeps every track with marks", () => {
     const marked = track("bee", { marks: [{ timeSeconds: 1, kind: "volley" }] });
     const start = study({ tracks: [marked, track("bomb"), track("old")] });
-    const fresh = [track("bee"), track("bomb", { cadenceSource: "fitted" }), track("new")];
+    const fresh = [track("bee"), track("bomb", { periodSeconds: 3 }), track("new")];
     const { study: next, keptCount } = reloadTracks(start, fresh);
     expect(keptCount).toBe(1);
     expect(next.tracks.map((entry) => entry.id)).toEqual(["bee", "bomb", "new"]);
     expect(next.tracks[0]).toBe(marked);
-    expect(next.tracks[1].cadenceSource).toBe("fitted");
+    expect(next.tracks[1].periodSeconds).toBe(3);
   });
 
   test("a kept track whose id the file no longer has stays at the end", () => {
@@ -253,24 +247,7 @@ describe("reloadTracks", () => {
   });
 });
 
-describe("bomb overrides (plan V20 phase 87)", () => {
-  test("setProjectileOverride merges fields and clears with undefined", () => {
-    const first = run(study(), (value) => setProjectileOverride(value, "bomb", { travelSeconds: 1.5 }));
-    if (!first.ok) throw new Error(first.error);
-    const second = run(first.value, (value) =>
-      setProjectileOverride(value, "bomb", { ...first.value.tracks[1].projectileOverride, rangeTiles: 4 }),
-    );
-    if (!second.ok) throw new Error(second.error);
-    expect(second.value.tracks[1].projectileOverride).toEqual({ travelSeconds: 1.5, rangeTiles: 4 });
-    const cleared = run(second.value, (value) => setProjectileOverride(value, "bomb", undefined));
-    if (!cleared.ok) throw new Error(cleared.error);
-    expect("projectileOverride" in cleared.value.tracks[1]).toBe(false);
-  });
-
-  test("setProjectileOverride refuses a non-positive value", () => {
-    expect(setProjectileOverride(study(), "bomb", { travelSeconds: 0 }).ok).toBe(false);
-  });
-
+describe("bomb ranges (plan V20 phase 87)", () => {
   test("setMeasuredRange writes at the pair index and leaves earlier entries", () => {
     const start = study({ tracks: [track("bomb", { measuredRangeTiles: [3] })] });
     const result = run(start, (value) => setMeasuredRange(value, "bomb", 2, 5));

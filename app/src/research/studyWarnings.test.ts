@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { unsafeFixture } from "../test/fixture";
-import type { AuthoredAttack } from "../game/config/data";
-import type { AttackTrack, Mark, Segment, StudyV5 } from "./study";
+import type { CadencedAuthoredAttack } from "../game/config/data";
+import type { AttackTrack, Mark, Segment, StudyV6 } from "./study";
 import { studyWarnings } from "./studyWarnings";
 
 const segment = (id: string): Segment => {
@@ -13,15 +13,14 @@ const volleys = (...times: number[]): Mark[] => times.map((timeSeconds) => ({ ti
 const track = (overrides: Partial<AttackTrack> = {}): AttackTrack => ({
   id: "bee",
   location: { phaseId: "a", subPhaseId: null },
-  attack: unsafeFixture<AuthoredAttack>({ id: "bee" }),
-  cadenceSource: "authored",
+  attack: unsafeFixture<CadencedAuthoredAttack>({ id: "bee" }),
   marks: volleys(0, 1, 2),
   ...overrides,
 });
 
-function study(overrides: Partial<StudyV5> = {}): StudyV5 {
+function study(overrides: Partial<StudyV6> = {}): StudyV6 {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     encounterId: "e",
     archetypeId: "m",
     recordedAt: "2026-11-13T00:00:00.000Z",
@@ -30,11 +29,10 @@ function study(overrides: Partial<StudyV5> = {}): StudyV5 {
     statusSpans: [],
     tracks: [track()],
     scratch: [],
-    acceptedSegmentValues: {},
     ...overrides,
   };
 }
-const texts = (value: StudyV5, frameToleranceSeconds = 1 / 60) =>
+const texts = (value: StudyV6, frameToleranceSeconds = 1 / 60) =>
   studyWarnings({ study: value, segments, videoEndSeconds: 10, frameToleranceSeconds }).map(
     (warning) => warning.text,
   );
@@ -81,19 +79,12 @@ describe("studyWarnings", () => {
     ]);
   });
 
-  test("6. a fit with a null cooldown or burst size", () => {
-    expect(texts(study({ tracks: [track({ marks: volleys(1) })] }))).toEqual([
-      "bee: the fit needs one more burst to measure the cooldown.",
-    ]);
-    expect(texts(study({ tracks: [track({ marks: volleys(0, 0.1, 0.2), burstGapThresholdSeconds: 0.5 })] }))).toEqual([
-      "bee: the fit needs one more burst to measure the cooldown.",
-      "bee: the fit cannot tell bursts apart; set a burst gap threshold.",
-    ]);
+  test("no fit warning remains: one mark or an irregular cadence warns nothing (plan V23 Q17)", () => {
+    expect(texts(study({ tracks: [track({ marks: volleys(1) })] }))).toEqual([]);
+    expect(texts(study({ tracks: [track({ marks: volleys(0, 1, 2, 3.5, 4.5, 5.5) })] }))).toEqual([]);
   });
 
-  test("7. a residual above two frames, only with a frame rate", () => {
-    const value = study({ tracks: [track({ marks: volleys(0, 1, 2, 3.5, 4.5, 5.5) })] });
-    expect(texts(value)).toEqual(["bee: a mark lies 0.500 s from the fitted cadence."]);
-    expect(texts(value, 0)).toEqual([]);
+  test("a periodic track's end mark is its stop and warns nothing (plan V23 Q07)", () => {
+    expect(texts(study({ tracks: [track({ endSeconds: 3, periodSeconds: 2 })] }))).toEqual([]);
   });
 });

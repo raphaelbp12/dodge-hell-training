@@ -1,8 +1,7 @@
 /**
- * Pure warnings about a v5 study (plan V20 E07, E18). A warning informs; it
- * never blocks an export.
+ * Pure warnings about a v6 study (plan V20 E07, E18; the fit warnings were
+ * removed by plan V23 Q17). A warning informs; it never blocks an export.
  */
-import { fitCadence } from "./cadenceFit";
 import {
   nextSegmentId,
   segmentIdOf,
@@ -12,11 +11,8 @@ import {
   type AttackTrack,
   type Segment,
   type SegmentWindow,
-  type StudyV5,
+  type StudyV6,
 } from "./study";
-
-/** E18: a fit whose residual is above this many frames is reported. */
-export const RESIDUAL_WARNING_FRAMES = 2;
 
 export type StudyWarning = Readonly<{
   /** "structure", "status", or a track id. */
@@ -33,7 +29,7 @@ function labelOf(track: AttackTrack, segments: readonly Segment[]): string {
 
 export function studyWarnings(
   input: Readonly<{
-    study: StudyV5;
+    study: StudyV6;
     segments: readonly Segment[];
     videoEndSeconds: number;
     /** Half a frame; from `volleyStepTolerance`. Zero without a frame rate. */
@@ -88,9 +84,10 @@ export function studyWarnings(
         });
   }
 
-  // 5. An end mark before its window ends (E07).
+  // 5. An end mark before its window ends on a track that plays once (E07);
+  // on a periodic track it is the stop mark (plan V23 Q07).
   for (const track of study.tracks) {
-    if (track.endSeconds === undefined) continue;
+    if (track.endSeconds === undefined || track.periodSeconds !== undefined) continue;
     const window = windowAt(trackWindows.get(track.id) ?? [], track.endSeconds);
     if (window && track.endSeconds < window.endSeconds - frame)
       warnings.push({
@@ -98,35 +95,5 @@ export function studyWarnings(
         text: `${track.id}: ends at ${seconds(track.endSeconds)} s but its window runs to ${seconds(window.endSeconds)} s; the game runs an attack until its segment ends, so a sub-phase boundary may be missing.`,
       });
   }
-
-  // 6 and 7. The fit.
-  const fits = study.tracks
-    .filter((track) => track.marks.some((mark) => mark.kind === "volley"))
-    .map((track) => ({
-      track,
-      fit: fitCadence({
-        marks: track.marks,
-        windows: trackWindows.get(track.id) ?? [],
-        ...(track.burstGapThresholdSeconds === undefined
-          ? {}
-          : { thresholdSeconds: track.burstGapThresholdSeconds }),
-      }),
-    }));
-  for (const { track, fit } of fits) {
-    if (fit.cooldownAfterLastShotSeconds === null)
-      warnings.push({ where: track.id, text: `${track.id}: the fit needs one more burst to measure the cooldown.` });
-    if (fit.shotsPerBurst === null)
-      warnings.push({
-        where: track.id,
-        text: `${track.id}: the fit cannot tell bursts apart; set a burst gap threshold.`,
-      });
-  }
-  if (frameToleranceSeconds > 0)
-    for (const { track, fit } of fits)
-      if (fit.maxResidualSeconds !== null && fit.maxResidualSeconds > RESIDUAL_WARNING_FRAMES * frame)
-        warnings.push({
-          where: track.id,
-          text: `${track.id}: a mark lies ${seconds(fit.maxResidualSeconds)} s from the fitted cadence.`,
-        });
   return warnings;
 }

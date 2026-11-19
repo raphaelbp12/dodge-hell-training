@@ -903,15 +903,35 @@ const validTuningSources = [
   "video-observation",
 ] as const;
 
-export type AuthoredAttack = Readonly<{
+/**
+ * Plan V23 Q06-Q10: an attack timed by marked volleys. Offsets are seconds
+ * from the segment's entry; each inner list is one burst, all in time order.
+ */
+export type AuthoredAttackMarks = Readonly<{
+  bursts: readonly (readonly number[])[];
+  periodSeconds?: number;
+  stopAfterSeconds?: number;
+}>;
+
+type AuthoredAttackBase = Readonly<{
   id: string;
   projectile: string;
   tuningSource: (typeof validTuningSources)[number];
   pattern: AuthoredAttackPattern;
-  cadence: AuthoredAttackCadence;
   /** N28/N29: a bomb thrown at the player's fire-time position. */
   target?: "player";
 }>;
+
+/** Plan V23 Q10: exactly one of `cadence` and `marks`. */
+export type AuthoredAttack = AuthoredAttackBase &
+  (
+    | Readonly<{ cadence: AuthoredAttackCadence; marks?: undefined }>
+    | Readonly<{ marks: AuthoredAttackMarks; cadence?: undefined }>
+  );
+
+/** An attack timed by a cadence, the shape every study track keeps (Q15). */
+export type CadencedAuthoredAttack = AuthoredAttackBase &
+  Readonly<{ cadence: AuthoredAttackCadence; marks?: undefined }>;
 
 /**
  * Validates the shared aim fields for `spread`/`scatter`. `front` (N16) aims
@@ -1260,10 +1280,61 @@ export function validateAttack(
     projectile,
     tuningSource: attack.tuningSource as (typeof validTuningSources)[number],
     pattern: validateAttackPattern(attack.pattern, `${path}.pattern`),
-    cadence: validateAttackCadence(attack.cadence, `${path}.cadence`),
+    ...validateAttackTiming(attack, path),
     ...(attack.target === undefined
       ? {}
       : { target: validateAttackTarget(attack.target, `${path}.target`) }),
+  });
+}
+
+function validateAttackTiming(
+  attack: Record<string, unknown>,
+  path: string,
+):
+  | Readonly<{ cadence: AuthoredAttackCadence }>
+  | Readonly<{ marks: AuthoredAttackMarks }> {
+  if ((attack.marks === undefined) === (attack.cadence === undefined))
+    reject(path, "must have exactly one of marks and cadence (plan V23 Q10)");
+  if (attack.cadence !== undefined)
+    return { cadence: validateAttackCadence(attack.cadence, `${path}.cadence`) };
+  return { marks: validateAttackMarks(attack.marks, `${path}.marks`) };
+}
+
+function validateAttackMarks(value: unknown, path: string): AuthoredAttackMarks {
+  const marks = record(value, path);
+  if (!Array.isArray(marks.bursts) || marks.bursts.length === 0)
+    reject(`${path}.bursts`, "must be a non-empty array of bursts");
+  let previous = 0;
+  const bursts = marks.bursts.map((burst: unknown, b: number) => {
+    const burstPath = `${path}.bursts[${b}]`;
+    if (!Array.isArray(burst) || burst.length === 0)
+      reject(burstPath, "must be a non-empty array of offsets");
+    return Object.freeze(
+      burst.map((offset: unknown, s: number) => {
+        const offsetPath = `${burstPath}[${s}]`;
+        const seconds = nonnegativeNumber(offset, offsetPath);
+        if (seconds < previous) reject(offsetPath, "must not be before the previous offset");
+        previous = seconds;
+        return seconds;
+      }),
+    );
+  });
+  const periodic = marks.periodSeconds !== undefined;
+  if (!periodic && marks.stopAfterSeconds !== undefined)
+    reject(`${path}.stopAfterSeconds`, "is only allowed with periodSeconds");
+  return Object.freeze({
+    bursts: Object.freeze(bursts),
+    ...(periodic
+      ? { periodSeconds: positiveNumber(marks.periodSeconds, `${path}.periodSeconds`) }
+      : {}),
+    ...(marks.stopAfterSeconds === undefined
+      ? {}
+      : {
+          stopAfterSeconds: nonnegativeNumber(
+            marks.stopAfterSeconds,
+            `${path}.stopAfterSeconds`,
+          ),
+        }),
   });
 }
 

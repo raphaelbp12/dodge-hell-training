@@ -1,27 +1,25 @@
 /**
- * Pure edits of a v5 study (plan V20 E04, E05, E16). Every function returns a
- * new study and never mutates its input; a refusal carries a sentence the
- * route can show.
+ * Pure edits of a v6 study (plan V20 E04, E05, E16; plan V23 Q06). Every
+ * function returns a new study and never mutates its input; a refusal carries
+ * a sentence the route can show.
  */
-import type { AuthoredAttack } from "../game/config/data";
+import type { CadencedAuthoredAttack } from "../game/config/data";
 import {
   nextSegmentId,
-  type AcceptedSegmentValues,
   type AttackTrack,
   type Boundary,
-  type CadenceSource,
   type Mark,
   type Segment,
   type SegmentRef,
-  type StudyV5,
+  type StudyV6,
 } from "./study";
 
 export type EditResult<T> =
   | Readonly<{ ok: true; value: T }>
   | Readonly<{ ok: false; error: string }>;
 
-const ok = (value: StudyV5): EditResult<StudyV5> => ({ ok: true, value });
-const fail = (error: string): EditResult<StudyV5> => ({ ok: false, error });
+const ok = (value: StudyV6): EditResult<StudyV6> => ({ ok: true, value });
+const fail = (error: string): EditResult<StudyV6> => ({ ok: false, error });
 
 function isTime(seconds: number): boolean {
   return Number.isFinite(seconds) && seconds >= 0;
@@ -43,10 +41,10 @@ function latestBoundaryIndex(boundaries: readonly Boundary[], timeSeconds: numbe
 }
 
 function withTrack(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string,
   update: (track: AttackTrack) => AttackTrack | string,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   const index = study.tracks.findIndex((track) => track.id === trackId);
   if (index < 0) return fail(`No attack track is named ${trackId}.`);
   const next = update(study.tracks[index]);
@@ -54,7 +52,7 @@ function withTrack(
   return ok({ ...study, tracks: study.tracks.map((track, at) => (at === index ? next : track)) });
 }
 
-function hasTrack(study: StudyV5, trackId: string): boolean {
+function hasTrack(study: StudyV6, trackId: string): boolean {
   return study.tracks.some((track) => track.id === trackId);
 }
 
@@ -62,10 +60,10 @@ function hasTrack(study: StudyV5, trackId: string): boolean {
 
 /** E04: the new boundary enters the segment after the latest boundary at or before it. */
 export function addBoundary(
-  study: StudyV5,
+  study: StudyV6,
   timeSeconds: number,
   segments: readonly Segment[],
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (!isTime(timeSeconds)) return fail(NOT_A_TIME);
   if (segments.length === 0) return fail("This monster has no segment to enter.");
   const sorted = byTime(study.boundaries);
@@ -81,10 +79,10 @@ export function addBoundary(
 }
 
 export function setBoundarySegment(
-  study: StudyV5,
+  study: StudyV6,
   index: number,
   segmentId: string,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (study.boundaries[index] === undefined) return fail("No boundary is at that position.");
   if (segmentId.trim().length === 0) return fail("A boundary must name a segment.");
   return ok({
@@ -95,13 +93,13 @@ export function setBoundarySegment(
   });
 }
 
-export function removeBoundary(study: StudyV5, index: number): EditResult<StudyV5> {
+export function removeBoundary(study: StudyV6, index: number): EditResult<StudyV6> {
   if (study.boundaries[index] === undefined) return fail("No boundary is at that position.");
   return ok({ ...study, boundaries: study.boundaries.filter((_, at) => at !== index) });
 }
 
 /** E05: on the latest boundary at or before `timeSeconds`. */
-export function setTelegraphEnd(study: StudyV5, timeSeconds: number): EditResult<StudyV5> {
+export function setTelegraphEnd(study: StudyV6, timeSeconds: number): EditResult<StudyV6> {
   if (!isTime(timeSeconds)) return fail(NOT_A_TIME);
   const index = latestBoundaryIndex(study.boundaries, timeSeconds);
   if (index < 0) return fail("Add a boundary before marking where its telegraph ends.");
@@ -117,7 +115,7 @@ export function setTelegraphEnd(study: StudyV5, timeSeconds: number): EditResult
 }
 
 /** E05: closes the open span at `timeSeconds`, otherwise opens a new one. */
-export function toggleInvulnerable(study: StudyV5, timeSeconds: number): EditResult<StudyV5> {
+export function toggleInvulnerable(study: StudyV6, timeSeconds: number): EditResult<StudyV6> {
   if (!isTime(timeSeconds)) return fail(NOT_A_TIME);
   const open = study.statusSpans.findIndex((span) => span.outSeconds === null);
   if (open >= 0) {
@@ -137,7 +135,7 @@ export function toggleInvulnerable(study: StudyV5, timeSeconds: number): EditRes
   return ok({ ...study, statusSpans: spans });
 }
 
-export function removeSpan(study: StudyV5, index: number): EditResult<StudyV5> {
+export function removeSpan(study: StudyV6, index: number): EditResult<StudyV6> {
   if (study.statusSpans[index] === undefined) return fail("No invulnerable span is at that position.");
   return ok({ ...study, statusSpans: study.statusSpans.filter((_, at) => at !== index) });
 }
@@ -146,11 +144,11 @@ export function removeSpan(study: StudyV5, index: number): EditResult<StudyV5> {
 
 /** A null `trackId` is the scratch track, which takes only volley marks (E16). */
 export function addMark(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string | null,
   mark: Mark,
   isBombTrack: (trackId: string) => boolean,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (!isTime(mark.timeSeconds)) return fail(NOT_A_TIME);
   if (trackId === null) {
     if (mark.kind !== "volley")
@@ -164,11 +162,11 @@ export function addMark(
 
 /** Removes the single nearest mark within the tolerance. */
 export function removeMarkNear(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string | null,
   timeSeconds: number,
   toleranceSeconds: number,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   const without = (marks: readonly Mark[]): readonly Mark[] | string => {
     let nearest = -1;
     marks.forEach((mark, index) => {
@@ -194,10 +192,10 @@ export function removeMarkNear(
 
 /** E07: a null time removes the end mark. */
 export function setEndMark(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string,
   timeSeconds: number | null,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (timeSeconds !== null && !isTime(timeSeconds)) return fail(NOT_A_TIME);
   return withTrack(study, trackId, (track) => {
     const { endSeconds: _dropped, ...rest } = track;
@@ -209,12 +207,12 @@ export function setEndMark(
 
 const duplicateId = (id: string) => `An attack track named ${id} already exists.`;
 
-export function addTrack(study: StudyV5, track: AttackTrack): EditResult<StudyV5> {
+export function addTrack(study: StudyV6, track: AttackTrack): EditResult<StudyV6> {
   if (hasTrack(study, track.id)) return fail(duplicateId(track.id));
   return ok({ ...study, tracks: [...study.tracks, track] });
 }
 
-export function removeTrack(study: StudyV5, trackId: string): EditResult<StudyV5> {
+export function removeTrack(study: StudyV6, trackId: string): EditResult<StudyV6> {
   if (!hasTrack(study, trackId)) return fail(`No attack track is named ${trackId}.`);
   return ok({ ...study, tracks: study.tracks.filter((track) => track.id !== trackId) });
 }
@@ -225,9 +223,9 @@ export function removeTrack(study: StudyV5, trackId: string): EditResult<StudyV5
  * place for its id, or at the end when the file no longer has it.
  */
 export function reloadTracks(
-  study: StudyV5,
+  study: StudyV6,
   fromFile: readonly AttackTrack[],
-): Readonly<{ study: StudyV5; keptCount: number }> {
+): Readonly<{ study: StudyV6; keptCount: number }> {
   const kept = study.tracks.filter((track) => track.marks.length > 0);
   const keptById = new Map(kept.map((track) => [track.id, track]));
   const fileIds = new Set(fromFile.map((track) => track.id));
@@ -239,7 +237,7 @@ export function reloadTracks(
 }
 
 /** Copies the definition under a new id, with no marks, end mark or measured ranges. */
-export function duplicateTrack(study: StudyV5, trackId: string, newId: string): EditResult<StudyV5> {
+export function duplicateTrack(study: StudyV6, trackId: string, newId: string): EditResult<StudyV6> {
   const source = study.tracks.find((track) => track.id === trackId);
   if (!source) return fail(`No attack track is named ${trackId}.`);
   if (newId.trim().length === 0) return fail("An attack track needs a name.");
@@ -253,67 +251,43 @@ export function duplicateTrack(study: StudyV5, trackId: string, newId: string): 
 }
 
 export function setTrackAttack(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string,
-  attack: AuthoredAttack,
-  cadenceSource: CadenceSource,
-): EditResult<StudyV5> {
-  return withTrack(study, trackId, (track) => ({ ...track, attack, cadenceSource }));
+  attack: CadencedAuthoredAttack,
+): EditResult<StudyV6> {
+  return withTrack(study, trackId, (track) => ({ ...track, attack }));
+}
+
+/** Plan V23 Q06: a period makes the track periodic; undefined makes it play its marks once. */
+export function setTrackPeriod(
+  study: StudyV6,
+  trackId: string,
+  seconds: number | undefined,
+): EditResult<StudyV6> {
+  if (seconds !== undefined && !(Number.isFinite(seconds) && seconds > 0))
+    return fail("A period must be a positive number of seconds.");
+  return withTrack(study, trackId, (track) => {
+    const { periodSeconds: _dropped, ...rest } = track;
+    return seconds === undefined ? rest : { ...rest, periodSeconds: seconds };
+  });
 }
 
 export function setTrackLocation(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string,
   location: SegmentRef,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (location.phaseId.trim().length === 0) return fail("An attack track must name a phase.");
   return withTrack(study, trackId, (track) => ({ ...track, location }));
 }
 
-/** E17: undefined returns the track to the automatic split. */
-export function setBurstGapThreshold(
-  study: StudyV5,
-  trackId: string,
-  seconds: number | undefined,
-): EditResult<StudyV5> {
-  if (seconds !== undefined && !(Number.isFinite(seconds) && seconds > 0))
-    return fail("A burst gap threshold must be a positive number of seconds.");
-  return withTrack(study, trackId, (track) => {
-    const { burstGapThresholdSeconds: _dropped, ...rest } = track;
-    return seconds === undefined ? rest : { ...rest, burstGapThresholdSeconds: seconds };
-  });
-}
-
-export type ProjectileOverride = NonNullable<AttackTrack["projectileOverride"]>;
-
-/**
- * E08, E09: replaces the track's projectile override with `override`; the
- * caller spreads the current override to merge. Undefined, or an override with
- * no fields, removes it.
- */
-export function setProjectileOverride(
-  study: StudyV5,
-  trackId: string,
-  override: ProjectileOverride | undefined,
-): EditResult<StudyV5> {
-  const fields = Object.entries(override ?? {}).filter(([, value]) => value !== undefined);
-  if (fields.some(([, value]) => !(Number.isFinite(value) && (value as number) > 0)))
-    return fail("A projectile override must be a positive number.");
-  return withTrack(study, trackId, (track) => {
-    const { projectileOverride: _dropped, ...rest } = track;
-    return fields.length === 0
-      ? rest
-      : { ...rest, projectileOverride: Object.fromEntries(fields) as ProjectileOverride };
-  });
-}
-
 /** E09: writes one pair's measured range at its pair index; unmeasured pairs before it are null. */
 export function setMeasuredRange(
-  study: StudyV5,
+  study: StudyV6,
   trackId: string,
   pairIndex: number,
   tiles: number,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (!(Number.isInteger(pairIndex) && pairIndex >= 0)) return fail("No pair is at that position.");
   if (!(Number.isFinite(tiles) && tiles >= 0))
     return fail("A measured range must be a finite number of tiles, zero or more.");
@@ -327,10 +301,10 @@ export function setMeasuredRange(
 
 /** E16: moves the listed scratch marks onto a new track with no marks of its own. */
 export function createTrackFromScratch(
-  study: StudyV5,
+  study: StudyV6,
   markIndices: readonly number[],
   track: AttackTrack,
-): EditResult<StudyV5> {
+): EditResult<StudyV6> {
   if (track.marks.length > 0) return fail("A track made from scratch marks must start with no marks.");
   const chosen = new Set(markIndices);
   if (chosen.size === 0) return fail("Select at least one scratch mark first.");
@@ -344,28 +318,8 @@ export function createTrackFromScratch(
   return ok({ ...added.value, scratch: study.scratch.filter((_, index) => !chosen.has(index)) });
 }
 
-// ---- Accepted values ------------------------------------------------------
-
-/** E13: undefined withdraws the accepted value. */
-export function acceptSegmentValue(
-  study: StudyV5,
-  segmentId: string,
-  field: keyof AcceptedSegmentValues,
-  value: number | undefined,
-): EditResult<StudyV5> {
-  if (value !== undefined && !isTime(value))
-    return fail("An accepted value must be a finite number of seconds, zero or more.");
-  const { [field]: _dropped, ...rest } = study.acceptedSegmentValues[segmentId] ?? {};
-  const entry: AcceptedSegmentValues = value === undefined ? rest : { ...rest, [field]: value };
-  const { [segmentId]: _old, ...others } = study.acceptedSegmentValues;
-  return ok({
-    ...study,
-    acceptedSegmentValues: Object.keys(entry).length === 0 ? others : { ...others, [segmentId]: entry },
-  });
-}
-
 /** E09: undefined removes the calibration. */
-export function setScale(study: StudyV5, tileWidthFraction: number | undefined): EditResult<StudyV5> {
+export function setScale(study: StudyV6, tileWidthFraction: number | undefined): EditResult<StudyV6> {
   const { scale: _dropped, ...rest } = study;
   if (tileWidthFraction === undefined) return ok(rest);
   if (!(Number.isFinite(tileWidthFraction) && tileWidthFraction > 0))

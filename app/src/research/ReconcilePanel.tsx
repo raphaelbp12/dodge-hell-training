@@ -1,15 +1,14 @@
-import { useState } from "react";
-import { medianOf } from "./cadenceFit";
+import { useState, type ReactNode } from "react";
 import { HelpMark } from "./HelpMark";
 import * as help from "./helpText";
-import {
-  segmentIdOf,
-  segmentWindows,
-  type AcceptedSegmentValues,
-  type Segment,
-  type StudyV5,
-} from "./study";
+import { segmentIdOf, type Segment, type StudyV6 } from "./study";
 import type { DraftResult } from "./monsterDraft";
+import {
+  measuredRangeTilesOf,
+  measuredSegmentValues,
+  measuredTravelSeconds,
+  type SegmentMeasure,
+} from "./studyExport";
 import type { StudyWarning } from "./studyWarnings";
 import styles from "./TaggerRoute.module.css";
 
@@ -18,81 +17,43 @@ const seconds = (value: number) => `${value.toFixed(3)} s`;
 /** The first `<n>.<3 digits> s` time in a warning's text, or null. */
 const WARNING_TIME = /(\d+\.\d{3}) s/;
 
-type Field = keyof AcceptedSegmentValues;
-
-type SegmentMeasure = Readonly<{
-  segment: Segment;
-  telegraph: number | null;
-  invulnerable: number | null;
-  duration: number | null;
-}>;
-
-/** E13: one row per segment with at least one boundary; medians over its boundaries. */
+/** Plan V23 Q13: one row per segment with at least one boundary, with what export writes. */
 function measuresOf(
-  study: StudyV5,
+  study: StudyV6,
   segments: readonly Segment[],
-  videoEndSeconds: number,
-  frameSeconds: number,
-): readonly SegmentMeasure[] {
-  const windows = segmentWindows(study.boundaries, segments, videoEndSeconds);
-  return segments.flatMap((segment): SegmentMeasure[] => {
-    const boundaries = study.boundaries.filter((boundary) => boundary.segmentId === segment.id);
-    if (boundaries.length === 0) return [];
-    const telegraph = medianOf(
-      boundaries.flatMap((boundary) =>
-        boundary.telegraphEndSeconds === undefined ? [] : [boundary.telegraphEndSeconds - boundary.timeSeconds],
-      ),
-    );
-    const invulnerable = medianOf(
-      study.statusSpans.flatMap((span) =>
-        span.outSeconds !== null &&
-        boundaries.some((boundary) => Math.abs(span.inSeconds - boundary.timeSeconds) <= frameSeconds)
-          ? [span.outSeconds - span.inSeconds]
-          : [],
-      ),
-    );
-    const duration =
-      segment.ref.subPhaseId === null
-        ? null
-        : medianOf(
-            windows
-              .filter((window) => window.segmentId === segment.id)
-              .map((window) => window.endSeconds - window.startSeconds),
-          );
-    return [{ segment, telegraph, invulnerable, duration }];
-  });
+): readonly Readonly<{ segment: Segment; measure: SegmentMeasure }>[] {
+  return segments.flatMap((segment) =>
+    study.boundaries.some((boundary) => boundary.segmentId === segment.id)
+      ? [{ segment, measure: measuredSegmentValues(study, segment.id) }]
+      : [],
+  );
 }
 
 /**
- * Plan V20 step 88.1-88.2: the Reconcile step. Warnings, measured segment
- * values beside the authored ones, a read-only list of the attack tracks, and
- * the export. The panel holds no study state; the route applies every accept.
+ * Plan V20 step 88.1-88.2, plan V23 Q13-Q17: the Reconcile step. Warnings, the
+ * measured segment values export writes beside the authored ones, a read-only
+ * list of the attack tracks, the export, and `children` (the parity panel).
  */
 export function ReconcilePanel({
   study,
   segments,
-  videoEndSeconds,
-  frameSeconds,
   warnings,
   fileText,
   fileName,
   variants,
-  onAccept,
   onSeek,
   onExportStudy,
+  children,
 }: Readonly<{
-  study: StudyV5;
+  study: StudyV6;
   segments: readonly Segment[];
-  videoEndSeconds: number;
-  /** One frame in seconds; zero without a frame rate. */
-  frameSeconds: number;
   warnings: readonly StudyWarning[];
   fileText: DraftResult<string>;
   fileName: string;
   variants: readonly Readonly<{ id: string; entry: Record<string, unknown> }>[];
-  onAccept: (segmentId: string, field: Field, value: number | undefined) => void;
   onSeek: (seconds: number) => void;
   onExportStudy: () => void;
+  children?: ReactNode;
 }>) {
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const copy = (text: string) => {
@@ -106,45 +67,17 @@ export function ReconcilePanel({
       () => setCopyNote("Copy the text above by hand."),
     );
   };
-  const measures = measuresOf(study, segments, videoEndSeconds, frameSeconds);
+  const measures = measuresOf(study, segments);
 
-  const cell = (
-    measure: SegmentMeasure,
-    field: Field,
-    name: string,
-    measured: number | null,
-    authored: number | null,
-  ) => {
-    const { segment } = measure;
-    const accepted = study.acceptedSegmentValues[segment.id]?.[field];
-    return (
-      <td>
-        <div>{measured === null ? "not measured" : seconds(measured)}</div>
-        <div className={styles.note}>
-          authored {authored === null ? "none" : seconds(authored)}
-          {accepted !== undefined && `, accepted ${seconds(accepted)}`}
-        </div>
-        {measured !== null && (
-          <button
-            type="button"
-            aria-label={`Accept ${name} for ${segment.label}`}
-            onClick={() => onAccept(segment.id, field, measured)}
-          >
-            Accept
-          </button>
-        )}
-        {accepted !== undefined && (
-          <button
-            type="button"
-            aria-label={`Clear ${name} for ${segment.label}`}
-            onClick={() => onAccept(segment.id, field, undefined)}
-          >
-            Clear
-          </button>
-        )}
-      </td>
-    );
-  };
+  const cell = (measured: number | null, authored: number | null) => (
+    <td>
+      <div>{measured === null ? "not measured" : seconds(measured)}</div>
+      <div className={styles.note}>
+        {measured === null ? "export keeps " : "authored "}
+        {authored === null ? "none" : seconds(authored)}
+      </div>
+    </td>
+  );
 
   return (
     <section className={styles.inspectorPanel} aria-labelledby="reconcile-title">
@@ -194,21 +127,15 @@ export function ReconcilePanel({
               </tr>
             </thead>
             <tbody>
-              {measures.map((measure) => (
-                <tr key={measure.segment.id} aria-label={measure.segment.label}>
-                  <th scope="row">{measure.segment.label}</th>
-                  {cell(measure, "telegraphSeconds", "telegraph", measure.telegraph, measure.segment.telegraphSeconds)}
-                  {cell(
-                    measure,
-                    "invulnerableOnEnterSeconds",
-                    "invulnerable",
-                    measure.invulnerable,
-                    measure.segment.invulnerableOnEnterSeconds,
-                  )}
-                  {measure.segment.ref.subPhaseId === null ? (
+              {measures.map(({ segment, measure }) => (
+                <tr key={segment.id} aria-label={segment.label}>
+                  <th scope="row">{segment.label}</th>
+                  {cell(measure.telegraphSeconds, segment.telegraphSeconds)}
+                  {cell(measure.invulnerableOnEnterSeconds, segment.invulnerableOnEnterSeconds)}
+                  {segment.ref.subPhaseId === null ? (
                     <td className={styles.note}>a phase has no duration</td>
                   ) : (
-                    cell(measure, "durationSeconds", "duration", measure.duration, measure.segment.durationSeconds)
+                    cell(measure.durationSeconds, segment.durationSeconds)
                   )}
                 </tr>
               ))}
@@ -226,36 +153,28 @@ export function ReconcilePanel({
             <tr>
               <th scope="col">Track</th>
               <th scope="col">Segment</th>
-              <th scope="col">Cadence from</th>
-              <th scope="col">Shots per burst</th>
-              <th scope="col">Shot interval</th>
-              <th scope="col">Cooldown</th>
-              <th scope="col">Initial delay</th>
+              <th scope="col">Volley marks</th>
+              <th scope="col">Period</th>
               <th scope="col">Flight time, range</th>
             </tr>
           </thead>
           <tbody>
             {study.tracks.map((track) => {
-              const { cadence } = track.attack;
-              const override = track.projectileOverride;
+              const travel = measuredTravelSeconds(track);
+              const range = measuredRangeTilesOf(track);
               return (
                 <tr key={track.id}>
                   <th scope="row">{track.id}</th>
                   <td>{segmentIdOf(track.location)}</td>
-                  <td>{track.cadenceSource}</td>
-                  <td>{cadence.shotsPerBurst}</td>
-                  <td>{seconds(cadence.shotIntervalSeconds)}</td>
-                  <td>{seconds(cadence.cooldownAfterLastShotSeconds)}</td>
-                  <td>{seconds(cadence.initialDelaySeconds)}</td>
+                  <td>{track.marks.filter((mark) => mark.kind === "volley").length}</td>
+                  <td>{track.periodSeconds === undefined ? "once" : seconds(track.periodSeconds)}</td>
                   <td>
-                    {override
-                      ? [
-                          override.travelSeconds === undefined ? null : seconds(override.travelSeconds),
-                          override.rangeTiles === undefined ? null : `${override.rangeTiles.toFixed(2)} tiles`,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")
-                      : ""}
+                    {[
+                      travel === null ? null : seconds(travel),
+                      range === null ? null : `${range.toFixed(2)} tiles`,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
                   </td>
                 </tr>
               );
@@ -263,6 +182,8 @@ export function ReconcilePanel({
           </tbody>
         </table>
       </div>
+
+      {children}
 
       <h3>Export</h3>
       <div className={styles.exportBox}>

@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
-import { segmentWindows, type Segment, type StudyV5 } from "./study";
+import { segmentWindows, type Segment, type StudyV6 } from "./study";
 import { StructurePanel } from "./StructurePanel";
 
 const segment = (id: string): Segment => {
@@ -17,8 +17,8 @@ const segment = (id: string): Segment => {
 };
 const segments = [segment("a"), segment("b/x"), segment("b/y")];
 
-const study: StudyV5 = {
-  schemaVersion: 5,
+const study: StudyV6 = {
+  schemaVersion: 6,
   encounterId: "e",
   archetypeId: "m",
   recordedAt: "2026-11-13T00:00:00.000Z",
@@ -30,7 +30,6 @@ const study: StudyV5 = {
   statusSpans: [{ kind: "invulnerable", inSeconds: 40, outSeconds: null }],
   tracks: [],
   scratch: [],
-  acceptedSegmentValues: {},
 };
 
 function renderPanel() {

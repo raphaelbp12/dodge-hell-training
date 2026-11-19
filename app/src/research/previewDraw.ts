@@ -9,9 +9,6 @@ import {
 } from "./previewView";
 
 /** M37: presentation choices for the research preview, not gameplay values. */
-/** E12: the opacity of a fitted (ghost) volley in the preview. */
-export const GHOST_ALPHA = 0.35;
-
 export const PREVIEW_COLORS = {
   background: "#000000",
   arenaOutline: "#4b5a78",
@@ -165,8 +162,6 @@ export function drawPreviewFrame(
   context.imageSmoothingEnabled = false;
   for (const projectile of frame.projectiles) {
     const { appearance } = projectile;
-    const alpha = context.globalAlpha;
-    if (projectile.ghost) context.globalAlpha = GHOST_ALPHA;
     const centre = toCanvas(projectile.positionTiles);
     const width = appearance.visualWidthTiles * scale;
     const height = appearance.visualHeightTiles * scale;
@@ -187,12 +182,9 @@ export function drawPreviewFrame(
         Math.max(width, height) / 2 + HIGHLIGHT_PADDING_CSS_PIXELS,
         PREVIEW_COLORS.highlight,
       );
-    context.globalAlpha = alpha;
   }
   for (const detonation of frame.detonations) {
     const centre = toCanvas(detonation.positionTiles);
-    const alpha = context.globalAlpha;
-    if (detonation.ghost) context.globalAlpha = GHOST_ALPHA;
     ring(
       context,
       centre.x,
@@ -202,6 +194,5 @@ export function drawPreviewFrame(
         ? PREVIEW_COLORS.highlight
         : PREVIEW_COLORS.detonation,
     );
-    context.globalAlpha = alpha;
   }
 }

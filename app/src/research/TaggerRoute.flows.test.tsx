@@ -5,7 +5,7 @@ import { AUTHORED_MONSTER_FILES } from "../game/config/data";
 import { encounterConfigOf } from "../game/config/encounter";
 import { STEP_GUIDES } from "./stepGuide";
 import { archetypeOf } from "../game/config/encounter";
-import { segmentsOfMonster, type StudyV5 } from "./study";
+import { segmentsOfMonster, type StudyV6 } from "./study";
 import { emptyStudy } from "./studyMigrate";
 import { monsterFileTextFromStudy } from "./studyExport";
 import { TaggerRoute } from "./TaggerRoute";
@@ -28,7 +28,7 @@ const base = emptyStudy({
   rawFile: AUTHORED_MONSTER_FILES[config.primaryArchetypeId],
 });
 const firstTrack = base.tracks[0];
-const study: StudyV5 = {
+const study: StudyV6 = {
   ...base,
   boundaries: [{ timeSeconds: 3, segmentId: segmentsOfMonster(archetypeOf(config, config.primaryArchetypeId))[0].id, telegraphEndSeconds: 3.5 }],
   tracks: base.tracks.map((track, index) =>
@@ -108,18 +108,28 @@ test("flow 2: editing an attack's cadence in the Attacks step keeps the typed va
       screen.getByRole("spinbutton", { name: `Cooldown after last shot (s) of ${firstTrack.attack.id}` }),
     ).toHaveValue(3.25),
   );
-  expect(within(tracks).getAllByRole("button")[0]).toHaveTextContent("typed");
 });
 
-test("flow 3: accepting a measured telegraph in the Reconcile step records it", async () => {
+test("flow 2b: making the selected track periodic shows its period (plan V23 Q06)", async () => {
+  const user = userEvent.setup();
+  await restoreStudy(user);
+  await goToStep(user, "attacks");
+  const tracks = screen.getByRole("list", { name: "Attack tracks" });
+  await user.click(within(tracks).getAllByRole("button")[0]);
+  await user.click(await screen.findByRole("checkbox", { name: /Periodic/ }));
+  expect(await screen.findByRole("spinbutton", { name: `Period (seconds) of ${firstTrack.id}` })).toHaveValue(1);
+  expect(within(tracks).getAllByRole("button")[0]).toHaveTextContent("every 1 s");
+});
+
+test("flow 3: the Reconcile step shows what export writes and the parity, with no Accept (plan V23)", async () => {
   const user = userEvent.setup();
   await restoreStudy(user);
   await goToStep(user, "reconcile");
-  const [accept] = await screen.findAllByRole("button", { name: /^Accept telegraph for / });
-  const row = accept.closest("tr")!;
-  await user.click(accept);
-  await waitFor(() => expect(row).toHaveTextContent(/accepted \d+\.\d{3} s/));
-  expect(within(row).getByRole("button", { name: /^Clear telegraph for / })).toBeInTheDocument();
+  const row = await screen.findByRole("row", { name: segmentsOfMonster(archetypeOf(config, config.primaryArchetypeId))[0].label });
+  expect(row).toHaveTextContent("0.500 s");
+  expect(screen.queryByRole("button", { name: /^Accept / })).toBeNull();
+  const parity = screen.getByRole("list", { name: "Track parity" });
+  expect(parity).toHaveTextContent(`${firstTrack.id}: matches`);
 });
 
 test("flow 4: Copy file puts exactly the exported monster file on the clipboard", async () => {

@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { cadenced } from "./test-support";
 import {
   ENCOUNTER_CONFIG,
   movementSpeedTilesPerSecond,
@@ -232,7 +233,7 @@ test("the full per-tick randomness draw order holds when wander, a timed spawn a
         },
         attacks: [
           {
-            ...PRIMARY_PHASE.attacks[0],
+            ...cadenced(PRIMARY_PHASE.attacks[0]),
             pattern: {
               kind: "scatter",
               shots: 2,

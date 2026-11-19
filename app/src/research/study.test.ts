@@ -8,12 +8,13 @@ import {
   segmentIdOf,
   segmentWindows,
   segmentsOfMonster,
-  validateStudyV5,
+  studyV6FromV5,
+  validateStudyV6,
   windowAt,
   windowsForTrack,
   type AttackTrack,
   type Segment,
-  type StudyV5,
+  type StudyV6,
 } from "./study";
 
 const queen = archetypeOf(encounterConfigOf("killer-bee-queen"), "killer-bee-queen");
@@ -31,9 +32,9 @@ function segment(id: string, telegraphSeconds = 0): Segment {
   };
 }
 
-function minimalStudy(overrides: Partial<StudyV5> = {}): StudyV5 {
+function minimalStudy(overrides: Partial<StudyV6> = {}): StudyV6 {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     encounterId: "killer-bee-queen",
     archetypeId: "killer-bee-queen",
     recordedAt: "2026-11-13T00:00:00.000Z",
@@ -42,7 +43,6 @@ function minimalStudy(overrides: Partial<StudyV5> = {}): StudyV5 {
     statusSpans: [],
     tracks: [],
     scratch: [],
-    acceptedSegmentValues: {},
     ...overrides,
   };
 }
@@ -146,7 +146,6 @@ describe("attackIdsInPhaseOf", () => {
       id,
       location: { phaseId, subPhaseId },
       attack: unsafeFixture<AttackTrack["attack"]>({ id: attackId }),
-      cadenceSource: "authored",
       marks: [],
     }) satisfies AttackTrack;
 
@@ -172,17 +171,16 @@ describe("attackIdsInPhaseOf", () => {
   });
 });
 
-describe("validateStudyV5", () => {
+describe("validateStudyV6", () => {
   test("accepts a minimal study and returns it unchanged", () => {
     const study = minimalStudy();
-    expect(validateStudyV5(study)).toBe(study);
+    expect(validateStudyV6(study)).toBe(study);
   });
 
   const track = (id: string, phaseId = "p") => ({
     id,
     location: { phaseId, subPhaseId: null },
     attack: {},
-    cadenceSource: "authored",
     marks: [],
   });
 
@@ -201,18 +199,60 @@ describe("validateStudyV5", () => {
     ["scratch\\[0\\].kind", { scratch: [{ timeSeconds: 1, kind: "burst" }] }],
     ["tracks\\[1\\].id", { tracks: [track("t"), track("t")] }],
     ["tracks\\[0\\].location.phaseId", { tracks: [track("t", " ")] }],
-    [
-      "acceptedSegmentValues.a.telegraphSeconds",
-      { acceptedSegmentValues: { a: { telegraphSeconds: -0.5 } } },
-    ],
+    ["tracks\\[0\\].periodSeconds", { tracks: [{ ...track("t"), periodSeconds: 0 }] }],
+    ["tracks\\[0\\].periodSeconds", { tracks: [{ ...track("t"), periodSeconds: Number.NaN }] }],
+    ["tracks\\[0\\].periodSeconds", { tracks: [{ ...track("t"), periodSeconds: "2" }] }],
   ])("rejects a fault at %s", (path, overrides) => {
-    expect(() => validateStudyV5({ ...minimalStudy(), ...overrides })).toThrow(new RegExp(path));
+    expect(() => validateStudyV6({ ...minimalStudy(), ...overrides })).toThrow(new RegExp(path));
+  });
+
+  test("a periodic track round-trips through JSON", () => {
+    const study = minimalStudy({ tracks: [{ ...track("t"), periodSeconds: 4 }] as never });
+    expect(validateStudyV6(JSON.parse(JSON.stringify(study)))).toEqual(study);
+  });
+});
+
+describe("studyV6FromV5 (plan V23 Q15)", () => {
+  test("drops accepted values, cadence sources, thresholds and bomb overrides", () => {
+    const v5 = {
+      ...minimalStudy(),
+      schemaVersion: 5,
+      acceptedSegmentValues: { a: { telegraphSeconds: 1 } },
+      tracks: [
+        {
+          id: "t",
+          location: { phaseId: "p", subPhaseId: null },
+          attack: { id: "t", cadence: { shotsPerBurst: 1 } },
+          cadenceSource: "fitted",
+          burstGapThresholdSeconds: 0.5,
+          projectileOverride: { travelSeconds: 1 },
+          marks: [],
+          measuredRangeTiles: [2],
+        },
+      ],
+    };
+    const converted = validateStudyV6(studyV6FromV5(v5));
+    expect(converted.schemaVersion).toBe(6);
+    expect(converted).not.toHaveProperty("acceptedSegmentValues");
+    expect(converted.tracks[0]).toEqual({
+      id: "t",
+      location: { phaseId: "p", subPhaseId: null },
+      attack: { id: "t", cadence: { shotsPerBurst: 1 } },
+      marks: [],
+      measuredRangeTiles: [2],
+    });
+  });
+
+  test("leaves anything that is not a schema 5 object unchanged", () => {
+    const v6 = minimalStudy();
+    expect(studyV6FromV5(v6)).toBe(v6);
+    expect(studyV6FromV5(null)).toBeNull();
   });
 
   test("accepts an open span", () => {
     const study = minimalStudy({
       statusSpans: [{ kind: "invulnerable", inSeconds: 3, outSeconds: null }],
     });
-    expect(validateStudyV5(study)).toBe(study);
+    expect(validateStudyV6(study)).toBe(study);
   });
 });

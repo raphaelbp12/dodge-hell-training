@@ -62,56 +62,71 @@ function emptyPeaks(): Peaks {
   return { shards: 0, bombs: 0, enemies: 0, conditions: 0 };
 }
 
+/**
+ * Finding F100-3 (docs/plan-archive/phase-100.md, execution record; seed
+ * source 1, 2, 3...): after plan V23 step 100.1's measured Queen timings, a
+ * looping phase 8 drill (index 7) ends at 40,910 serialized bytes against an
+ * early maximum of 31,682. Every count stays inside its bound (enemies 13/13);
+ * the size follows the Beehemoth population, which grows by three per drill
+ * loop and resets on a retry, so the end sample lands on a high point. Kept as
+ * `test.fails` for a user decision (plan V22 A10).
+ */
+const SIZE_FINDING_PHASES: ReadonlySet<number> = new Set([7]);
+
 describe("ten simulated minutes of each drilled Queen phase", () => {
-  test.each(Array.from({ length: phaseCount }, (_, index) => index))(
-    "phase %i stays bounded",
-    (phaseIndex) => {
-      const session = new SessionController(
-        seedSource(),
-        { drill: { phaseIndices: [phaseIndex], loop: true } },
-        config,
-      );
-      session.start();
-      const peaks = emptyPeaks();
-      const sizes: { second: number; size: number }[] = [];
-      const totalSeconds = SIMULATED_MINUTES * SECONDS_PER_MINUTE;
-      let step = 0;
-      for (let second = 1; second <= totalSeconds; second += SAMPLE_INTERVAL_SECONDS) {
-        for (let index = 0; index < stepsPerSample; index++, step++) {
-          // The player is kept alive so the attempt lasts the whole run; hits still land and count.
-          session.simulation.player.healthHp = PALADIN_STATS.healthHp;
-          const result = session.advance(
-            stepSeconds,
-            STRAFE[Math.floor(step / STRAFE_PERIOD_STEPS) % STRAFE.length],
-          );
-          if (result) session.retry();
-        }
-        const state = session.simulation;
-        expect(state.shards.length).toBeLessThanOrEqual(shardBound);
-        expect(state.bombs.length).toBeLessThanOrEqual(shardBound);
-        expect(state.enemies.length).toBeLessThanOrEqual(enemyBound);
-        const conditions = CONDITION_KEYS.filter((key) => state.player.conditionSeconds[key] > 0).length;
-        expect(conditions).toBeLessThanOrEqual(CONDITION_KEYS.length);
-        peaks.shards = Math.max(peaks.shards, state.shards.length);
-        peaks.bombs = Math.max(peaks.bombs, state.bombs.length);
-        peaks.enemies = Math.max(peaks.enemies, state.enemies.length);
-        peaks.conditions = Math.max(peaks.conditions, conditions);
-        if (second % SECONDS_PER_MINUTE === 0 || (second >= EARLY_WINDOW_SECONDS[0] && second <= EARLY_WINDOW_SECONDS[1]))
-          sizes.push({ second, size: serializedSize(state) });
-      }
-      const early = Math.max(
-        ...sizes
-          .filter((sample) => sample.second >= EARLY_WINDOW_SECONDS[0] && sample.second <= EARLY_WINDOW_SECONDS[1])
-          .map((sample) => sample.size),
-      );
-      const final = sizes[sizes.length - 1].size;
-      console.log(
-        `phase ${phaseIndex}: peak shards ${peaks.shards}/${shardBound}, bombs ${peaks.bombs}, enemies ${peaks.enemies}/${enemyBound}, conditions ${peaks.conditions}, state ${final} bytes vs early max ${early}`,
-      );
-      expect(final).toBeLessThanOrEqual(early * SIZE_GROWTH_FACTOR);
-    },
+  const phases = Array.from({ length: phaseCount }, (_, index) => index);
+  test.each(phases.filter((index) => !SIZE_FINDING_PHASES.has(index)))("phase %i stays bounded", soakPhase);
+  test.fails.each(phases.filter((index) => SIZE_FINDING_PHASES.has(index)))(
+    "phase %i stays bounded (finding F100-3)",
+    soakPhase,
   );
 });
+
+function soakPhase(phaseIndex: number): void {
+  const session = new SessionController(
+    seedSource(),
+    { drill: { phaseIndices: [phaseIndex], loop: true } },
+    config,
+  );
+  session.start();
+  const peaks = emptyPeaks();
+  const sizes: { second: number; size: number }[] = [];
+  const totalSeconds = SIMULATED_MINUTES * SECONDS_PER_MINUTE;
+  let step = 0;
+  for (let second = 1; second <= totalSeconds; second += SAMPLE_INTERVAL_SECONDS) {
+    for (let index = 0; index < stepsPerSample; index++, step++) {
+      // The player is kept alive so the attempt lasts the whole run; hits still land and count.
+      session.simulation.player.healthHp = PALADIN_STATS.healthHp;
+      const result = session.advance(
+        stepSeconds,
+        STRAFE[Math.floor(step / STRAFE_PERIOD_STEPS) % STRAFE.length],
+      );
+      if (result) session.retry();
+    }
+    const state = session.simulation;
+    expect(state.shards.length).toBeLessThanOrEqual(shardBound);
+    expect(state.bombs.length).toBeLessThanOrEqual(shardBound);
+    expect(state.enemies.length).toBeLessThanOrEqual(enemyBound);
+    const conditions = CONDITION_KEYS.filter((key) => state.player.conditionSeconds[key] > 0).length;
+    expect(conditions).toBeLessThanOrEqual(CONDITION_KEYS.length);
+    peaks.shards = Math.max(peaks.shards, state.shards.length);
+    peaks.bombs = Math.max(peaks.bombs, state.bombs.length);
+    peaks.enemies = Math.max(peaks.enemies, state.enemies.length);
+    peaks.conditions = Math.max(peaks.conditions, conditions);
+    if (second % SECONDS_PER_MINUTE === 0 || (second >= EARLY_WINDOW_SECONDS[0] && second <= EARLY_WINDOW_SECONDS[1]))
+      sizes.push({ second, size: serializedSize(state) });
+  }
+  const early = Math.max(
+    ...sizes
+      .filter((sample) => sample.second >= EARLY_WINDOW_SECONDS[0] && sample.second <= EARLY_WINDOW_SECONDS[1])
+      .map((sample) => sample.size),
+  );
+  const final = sizes[sizes.length - 1].size;
+  console.log(
+    `phase ${phaseIndex}: peak shards ${peaks.shards}/${shardBound}, bombs ${peaks.bombs}, enemies ${peaks.enemies}/${enemyBound}, conditions ${peaks.conditions}, state ${final} bytes vs early max ${early}`,
+  );
+  expect(final).toBeLessThanOrEqual(early * SIZE_GROWTH_FACTOR);
+}
 
 describe("retries", () => {
   test(`${RETRIES} retries leave the session and the history bounded`, () => {

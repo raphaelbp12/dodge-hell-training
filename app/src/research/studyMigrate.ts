@@ -3,7 +3,8 @@
  * study into a v5 study in memory (E02). The legacy validators in
  * `tagging.ts` stay the only entry for legacy files.
  */
-import type { AuthoredAttack } from "../game/config/data";
+import type { AuthoredAttack, CadencedAuthoredAttack } from "../game/config/data";
+import { NEW_ATTACK_DEFAULTS } from "./monsterDraft";
 import {
   archetypeOf,
   degreesToRadians,
@@ -24,7 +25,7 @@ import {
   type Boundary,
   type Mark,
   type SegmentRef,
-  type StudyV5,
+  type StudyV6,
 } from "./study";
 import {
   resolveTags,
@@ -312,7 +313,7 @@ function authoredAttackFromLegacyTag(
   config: EncounterConfig,
   archetypeId: string,
   savedAttack?: SavedAttack,
-): Readonly<{ attack: AuthoredAttack; isBomb: boolean }> | null {
+): Readonly<{ attack: CadencedAuthoredAttack }> | null {
   const match = matchTagAttack(tag, config, archetypeId);
   if (!match) return null;
   const { attack, pattern } = match;
@@ -323,9 +324,10 @@ function authoredAttackFromLegacyTag(
     pattern.aim === "player";
   const stem = savedAttack ? slugOf(savedAttack.name, savedAttack.id) : null;
   // S45: a linked tag's typed cadence replaces the match's; initial delay stays.
+  const matchedCadence = attack.cadence ?? NEW_ATTACK_DEFAULTS.cadence;
   const cadence = savedAttack
     ? {
-        ...attack.cadence,
+        ...matchedCadence,
         shotsPerBurst: savedAttack.cadence.shotsPerBurst,
         ...(savedAttack.cadence.shotsPerBurst > 1 &&
         savedAttack.cadence.shotIntervalSeconds !== undefined
@@ -333,7 +335,7 @@ function authoredAttackFromLegacyTag(
           : {}),
         cooldownAfterLastShotSeconds: savedAttack.cadence.cooldownAfterLastShotSeconds,
       }
-    : attack.cadence;
+    : matchedCadence;
   return {
     attack: {
       id: `${stem ?? attack.id}${EXPORT_ATTACK_ID_SUFFIX}`,
@@ -342,8 +344,7 @@ function authoredAttackFromLegacyTag(
       pattern: authoredPattern(pattern),
       cadence,
       ...(keepsTarget ? { target: "player" as const } : {}),
-    } as AuthoredAttack,
-    isBomb: config.projectiles[attack.projectileId]?.type === "bomb",
+    } as CadencedAuthoredAttack,
   };
 }
 
@@ -362,6 +363,17 @@ function uniqueId(base: string, taken: Set<string>): string {
 }
 
 /**
+ * A track's attack keeps a cadence (Q15). A marked attack from the file gets
+ * the new-attack defaults: it has no marks in the new study, so export either
+ * drops it or keeps the file's own attack for an unobserved segment (Q16).
+ */
+function cadencedAttack(attack: AuthoredAttack): CadencedAuthoredAttack {
+  if (attack.marks === undefined) return structuredClone(attack);
+  const { marks: _marks, ...rest } = structuredClone(attack);
+  return { ...rest, cadence: { ...NEW_ATTACK_DEFAULTS.cadence } };
+}
+
+/**
  * The tracks for attack lists in file order. A track id is its attack's id;
  * an attack id the file repeats in another list gets a numeric suffix on the
  * track only, so the attack itself stays byte-identical.
@@ -374,14 +386,13 @@ function tracksOfLists(
     attacks.map((attack) => ({
       id: uniqueId(attack.id, taken),
       location,
-      attack: structuredClone(attack),
-      cadenceSource: "authored" as const,
+      attack: cadencedAttack(attack),
       marks: [],
     })),
   );
 }
 
-/** E03: one track per authored attack, in file order, with `cadenceSource: "authored"` and no marks. */
+/** E03: one track per authored attack, in file order, with no marks. */
 export function tracksFromMonsterFile(rawFile: unknown): readonly AttackTrack[] {
   const phases = (rawFile as { phases: RawPhase[] }).phases;
   return tracksOfLists(
@@ -396,18 +407,18 @@ export function tracksFromMonsterFile(rawFile: unknown): readonly AttackTrack[] 
   );
 }
 
-/** A new, empty v5 study for a monster whose tracks come from its file. */
+/** A new, empty v6 study for a monster whose tracks come from its file. */
 export function emptyStudy(
   input: Readonly<{
     encounterId: string;
     archetypeId: string;
-    provenance: StudyV5["provenance"];
+    provenance: StudyV6["provenance"];
     recordedAt: string;
     rawFile: unknown;
   }>,
-): StudyV5 {
+): StudyV6 {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     encounterId: input.encounterId,
     archetypeId: input.archetypeId,
     recordedAt: input.recordedAt,
@@ -416,12 +427,11 @@ export function emptyStudy(
     statusSpans: [],
     tracks: tracksFromMonsterFile(input.rawFile),
     scratch: [],
-    acceptedSegmentValues: {},
   };
 }
 
 export type LegacyConversion = Readonly<{
-  study: StudyV5;
+  study: StudyV6;
   /** One sentence per thing the conversion could not keep, shown once after the load. */
   notices: readonly string[];
 }>;
@@ -432,9 +442,9 @@ const volleyMarks = (tags: readonly Tag[]): Mark[] =>
     .sort((first, second) => first.timeSeconds - second.timeSeconds);
 
 /**
- * The attack a legacy tag plays as, under the track's id. A typed bomb time
- * or range moves to the track's `projectileOverride` and the attack keeps the
- * catalog projectile; other typed projectile values have no home and drop.
+ * The attack a legacy tag plays as, under the track's id. The attack keeps the
+ * catalog projectile; typed projectile values have no home in a v6 study (Q15)
+ * and drop: bomb values are measured from the marks instead (Q14).
  */
 function attackOfTag(
   tag: Tag,
@@ -442,15 +452,9 @@ function attackOfTag(
   archetypeId: string,
   trackId: string,
   savedAttack?: SavedAttack,
-): Pick<AttackTrack, "attack" | "projectileOverride"> | null {
+): Pick<AttackTrack, "attack"> | null {
   const exported = authoredAttackFromLegacyTag(tag, config, archetypeId, savedAttack);
   if (exported === null) return null;
-  const range = tag.target === "player" ? undefined : tag.bombRangeTiles;
-  const override = {
-    ...(tag.bombTravelSeconds === undefined ? {} : { travelSeconds: tag.bombTravelSeconds }),
-    ...(range === undefined ? {} : { rangeTiles: range }),
-  };
-  const { isBomb } = exported;
   return {
     attack: {
       ...exported.attack,
@@ -459,7 +463,6 @@ function attackOfTag(
         ? { cadence: { ...exported.attack.cadence, initialDelaySeconds: 0 } }
         : {}),
     },
-    ...(isBomb && Object.keys(override).length > 0 ? { projectileOverride: override } : {}),
   };
 }
 
@@ -526,7 +529,6 @@ export function studyV5FromLegacy(
   const trackFromTags = (
     id: string,
     group: readonly Tag[],
-    cadenceSource: AttackTrack["cadenceSource"],
     noticeOf: (count: number) => string,
     savedAttack?: SavedAttack,
   ): void => {
@@ -546,7 +548,6 @@ export function studyV5FromLegacy(
       id,
       location: phaseLocation(sorted[0]),
       ...built,
-      cadenceSource,
       marks: volleyMarks(sorted),
       ...(ends.length > 0 ? { endSeconds: Math.max(...ends) } : {}),
     });
@@ -560,14 +561,13 @@ export function studyV5FromLegacy(
       const fallback = { timeSeconds: 0, phaseIndex: 0, ...attackFieldsOf(savedAttack) } as Tag;
       const built = attackOfTag(fallback, config, archetypeId, id, savedAttack);
       if (built)
-        tracks.push({ id, location: phaseLocation(undefined), ...built, cadenceSource: "typed", marks: [] });
+        tracks.push({ id, location: phaseLocation(undefined), ...built, marks: [] });
       else notices.push(`Saved attack ${savedAttack.name} matched no attack and was dropped.`);
       continue;
     }
     trackFromTags(
       id,
       linked,
-      "typed",
       (count) => `Saved attack ${savedAttack.name} matched no attack; its ${count} marks went to the scratch track.`,
       savedAttack,
     );
@@ -591,15 +591,14 @@ export function studyV5FromLegacy(
     trackFromTags(
       id,
       group,
-      "authored",
       (count) => `${count} tags matched no attack and went to the scratch track.`,
     );
   }
 
-  // 5 and 6: burst ids, typed sources and other estimates drop; nothing is accepted yet.
+  // 5 and 6: burst ids, typed sources and other estimates drop.
   return {
     study: {
-      schemaVersion: 5,
+      schemaVersion: 6,
       encounterId: legacy.encounterId,
       archetypeId,
       recordedAt: input.recordedAt,
@@ -608,7 +607,6 @@ export function studyV5FromLegacy(
       statusSpans: [],
       tracks,
       scratch: scratch.sort((first, second) => first.timeSeconds - second.timeSeconds),
-      acceptedSegmentValues: {},
     },
     notices,
   };

@@ -20,16 +20,12 @@ export type PreviewProjectile = Readonly<{
   appearance: ProjectileAppearanceSpec;
   positionTiles: Vector2;
   orientationRadians: number;
-  /** E12: a fitted volley, drawn faint. */
-  ghost?: boolean;
 }>;
 
 export type PreviewDetonation = Readonly<{
   tagIndex: number;
   positionTiles: Vector2;
   radiusTiles: number;
-  /** E12: a fitted volley's detonation, drawn faint. */
-  ghost?: boolean;
 }>;
 
 export type PreviewFrame = Readonly<{

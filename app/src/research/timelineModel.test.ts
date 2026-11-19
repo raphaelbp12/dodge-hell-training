@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { unsafeFixture } from "../test/fixture";
-import type { AuthoredAttack } from "../game/config/data";
-import type { Segment, StudyV5 } from "./study";
+import type { CadencedAuthoredAttack } from "../game/config/data";
+import type { Segment, StudyV6 } from "./study";
 import {
   markerFractions,
   timelineRows,
@@ -67,8 +67,8 @@ describe("timelineRows (plan V20 E20)", () => {
     invulnerableOnEnterSeconds: 0,
     durationSeconds: null,
   });
-  const study: StudyV5 = {
-    schemaVersion: 5,
+  const study: StudyV6 = {
+    schemaVersion: 6,
     encounterId: "e",
     archetypeId: "m",
     recordedAt: "2026-11-13T00:00:00.000Z",
@@ -82,17 +82,17 @@ describe("timelineRows (plan V20 E20)", () => {
       {
         id: "bee",
         location: { phaseId: "a", subPhaseId: null },
-        attack: unsafeFixture<AuthoredAttack>({ id: "bee" }),
-        cadenceSource: "authored",
+        attack: unsafeFixture<CadencedAuthoredAttack>({ id: "bee" }),
         marks: [
           { timeSeconds: 25, kind: "volley" },
           { timeSeconds: 30, kind: "detonation" },
         ],
         endSeconds: 40,
+        // Plan V23 Q18: cycles at 25 and 35; the one at 45 is after the stop at 40.
+        periodSeconds: 10,
       },
     ],
     scratch: [{ timeSeconds: 60, kind: "volley" }],
-    acceptedSegmentValues: {},
   };
 
   test("a structure, status, track and scratch row with their tick styles", () => {
@@ -100,7 +100,6 @@ describe("timelineRows (plan V20 E20)", () => {
       study,
       segments: [segment("a"), segment("b")],
       durationSeconds: 100,
-      predicted: { bee: [35] },
     });
     expect(TIMELINE_ROW_HEIGHT_PX).toBe(14);
     expect(rows.map((row) => row.id)).toEqual(["structure", "status", "bee", "scratch"]);
@@ -122,5 +121,27 @@ describe("timelineRows (plan V20 E20)", () => {
     ]);
     expect(track.bars).toEqual([{ fromFraction: 0.4, toFraction: 0.5 }]);
     expect(scratch.ticks).toEqual([{ fraction: 0.6, style: "solid" }]);
+  });
+
+  test("a track that plays once has no faint repeat ticks", () => {
+    const { periodSeconds: _period, ...once } = study.tracks[0];
+    const rows = timelineRows({
+      study: { ...study, tracks: [once] },
+      segments: [segment("a"), segment("b")],
+      durationSeconds: 100,
+    });
+    expect(rows[2].ticks.some((tick) => tick.style === "faint")).toBe(false);
+  });
+
+  test("a periodic track without a stop repeats to its window's end", () => {
+    const { endSeconds: _end, ...open } = study.tracks[0];
+    const rows = timelineRows({
+      study: { ...study, tracks: [open] },
+      segments: [segment("a"), segment("b")],
+      durationSeconds: 100,
+    });
+    expect(rows[2].ticks.filter((tick) => tick.style === "faint").map((tick) => tick.fraction)).toEqual([
+      0.35, 0.45,
+    ]);
   });
 });

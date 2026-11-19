@@ -70,13 +70,24 @@ export const HELP_INVULNERABLE =
 export const HELP_RECONCILE_WARNINGS =
   "Checks the study fails, such as a mark outside its segment's window. A warning informs and never blocks the export; choose one with a time to seek there.";
 export const HELP_RECONCILE_SEGMENTS =
-  "Each segment's measured telegraph, invulnerable time and duration from its boundaries and spans, beside the authored value. Accept a measured value to export it in place of the authored one.";
+  "Each segment's measured telegraph, invulnerable time and duration from its boundaries and spans, beside the authored value. Export writes every measured value; a segment with no measurement keeps the authored one.";
 export const HELP_RECONCILE_ATTACKS =
-  "Each attack track's segment, cadence and where its cadence came from. Edit them in the Attacks step.";
+  "Each attack track's segment, volley marks, period and measured bomb values. Edit them in the Attacks step.";
 export const HELP_COPY_FILE =
-  "Copies the monster file text, rewritten from the attack tracks and the accepted values. The tagger writes nothing; paste it over the file yourself.";
+  "Copies the monster file text, rewritten from the marked attack tracks and the measured values. The tagger writes nothing; paste it over the file yourself.";
 export const HELP_PROJECTILE_VARIANT =
-  "A copy of a catalog projectile with the accepted flight time or range, to paste into the projectile catalog by hand.";
+  "A copy of a catalog projectile with the measured flight time or range, to paste into the projectile catalog by hand.";
+export const HELP_PARITY =
+  "Whether the game will fire each exported track's marks, the tracks export drops, the segment values it changes and the later windows whose marks differ from the first. It never stops the export.";
+
+// ---- Timing (plan V23 phase 99) -------------------------------------------
+
+export const HELP_TIMING =
+  "How the game fires the selected track: its volley marks in its first window, counted from the segment's entry.";
+export const HELP_PERIODIC =
+  "Repeats the first window's marks every period, until the end mark or the segment's end. Unchecked, the marks play once.";
+export const HELP_PERIOD =
+  "Seconds from the first volley of one cycle to the first volley of the next. It may be shorter than the cycle.";
 
 export const HELP_BOUNDARY_SEGMENT =
   "The segment this boundary enters; change it when the guess is wrong, and every later mark follows.";

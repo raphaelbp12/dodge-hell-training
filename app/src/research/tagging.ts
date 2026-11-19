@@ -7,7 +7,7 @@
  * simulation/session layers so the derivation is testable as plain arithmetic.
  */
 import type { AuthoredAttack } from "../game/config/data";
-import { validateStudyV5, type StudyV5 } from "./study";
+import { studyV6FromV5, validateStudyV6, type StudyV6 } from "./study";
 
 /**
  * V18 L28: the monster draft a v4 study or session stored. Kept only so those
@@ -192,7 +192,7 @@ export type ObservationExportV4 = Readonly<{
 export type ObservationExport = ObservationExportV4;
 
 /** Plan V20 E02: a v5 study file is the timeline study itself. */
-export type ObservationExportV5 = StudyV5;
+export type ObservationExportV5 = StudyV6;
 
 type AnyObservationExport =
   | ObservationExportV1
@@ -613,9 +613,9 @@ export function validateObservationExport(
 ): AnyObservationExport {
   const source = record(value, "");
   const version = source.schemaVersion;
-  if (version === 5) return validateStudyV5(value);
+  if (version === 5 || version === 6) return validateStudyV6(studyV6FromV5(value));
   if (version !== undefined && version !== 2 && version !== 3 && version !== 4)
-    reject("schemaVersion", "must be 2, 3, 4 or 5 when present");
+    reject("schemaVersion", "must be 2, 3, 4, 5 or 6 when present");
   nonEmptyString(source.encounterId, "encounterId");
   provenance(source.provenance);
   isoDate(source.recordedAt, "recordedAt");
@@ -647,8 +647,8 @@ export function validateObservationExport(
  */
 export function studyFromExport(
   validated: AnyObservationExport,
-): StudyState | StudyV5 {
-  if ("schemaVersion" in validated && validated.schemaVersion === 5) return validated;
+): StudyState | StudyV6 {
+  if ("schemaVersion" in validated && validated.schemaVersion === 6) return validated;
   const { sourceUrl, fileName, durationSeconds } = validated.provenance;
   if ("schemaVersion" in validated)
     return {

@@ -1,4 +1,4 @@
-import type { AuthoredAttack } from "../game/config/data";
+import type { CadencedAuthoredAttack } from "../game/config/data";
 import type { EncounterConfig } from "../game/config/encounter";
 import { ProjectileSprite } from "../ui/ProjectileSprite";
 import { CommitInput } from "./CommitInput";
@@ -33,7 +33,7 @@ const CADENCE_HELP = {
 } as const;
 
 /**
- * Plan V20 step 86.1: the editor of one `AuthoredAttack`, moved from
+ * Plan V20 step 86.1: the editor of one `CadencedAuthoredAttack`, moved from
  * `DraftPanel.tsx` unchanged except that the delete button shows only when
  * `onDelete` is given.
  */
@@ -45,7 +45,7 @@ export function AttackEditor({
   confirmingDelete,
   onCancelDelete,
 }: Readonly<{
-  attack: AuthoredAttack;
+  attack: CadencedAuthoredAttack;
   config: EncounterConfig;
   apply: (change: AttackChange) => boolean;
   onDelete?: () => void;

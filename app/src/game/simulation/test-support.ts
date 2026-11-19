@@ -2,6 +2,8 @@
 // kind and by the bomb type, for property-test generators.
 import {
   ENCOUNTER_CONFIGS,
+  type AttackSpec,
+  type CadencedAttackSpec,
   type BombSpec,
   type BulletSpec,
   type EncounterConfig,
@@ -73,3 +75,9 @@ export function shippedBullets(
 }
 
 export const SHIPPED_BULLETS: readonly CatalogEntry<BulletSpec>[] = bullets;
+
+/** Narrows a shipped attack to its cadence form; throws on a marked attack (plan V23 Q10). */
+export function cadenced<T extends AttackSpec>(attack: T | undefined): T & CadencedAttackSpec {
+  if (!attack || attack.cadence === undefined) throw new Error("expected a cadence attack");
+  return attack as T & CadencedAttackSpec;
+}

@@ -14,11 +14,11 @@ import {
   studyMonsterProblem,
 } from "./studyLoad";
 import type { StudyState } from "./tagging";
-import type { StudyV5 } from "./study";
+import type { StudyV6 } from "./study";
 
 const KNOWN = ["killer-bee-queen"];
 
-const legacy = (study: StudyState | StudyV5): StudyState => {
+const legacy = (study: StudyState | StudyV6): StudyState => {
   if ("schemaVersion" in study) throw new Error("expected a legacy study");
   return study;
 };
@@ -60,8 +60,8 @@ describe("parseStudyFile", () => {
 
   test("accepts a v2 file as a legacy study and a v5 file unchanged", () => {
     expect("schemaVersion" in parseStudyFile(file(), KNOWN)).toBe(false);
-    const v5: StudyV5 = {
-      schemaVersion: 5,
+    const v5: StudyV6 = {
+      schemaVersion: 6,
       encounterId: "killer-bee-queen",
       archetypeId: "killer-bee-queen",
       recordedAt: "2026-11-13T00:00:00.000Z",
@@ -70,7 +70,6 @@ describe("parseStudyFile", () => {
       statusSpans: [],
       tracks: [],
       scratch: [{ timeSeconds: 2, kind: "volley" }],
-      acceptedSegmentValues: {},
     };
     expect(parseStudyFile(JSON.stringify(v5), KNOWN)).toEqual(v5);
     expect(() =>

@@ -453,6 +453,26 @@ Rules for this register:
 
 **Fidelity gap this leaves.** An attack that visibly stops mid-segment in the real game either keeps firing in the trainer or forces a sub-phase split that the real game does not have. The Reconcile step's warning names the case so it is never mistaken for a tagging error.
 
+### D46 - Sub-Phase Order Taken From The Video
+
+**What.** Let a phase with sub-phases enter them in the order a study recorded, for example the solo-nest video's phase 2 as yellow, red, yellow, its phase 5 as red, yellow, and its phase 7 as blue, red, blue, yellow, instead of cycling in authored order.
+
+**Why deferred.** Plan V23's Q20 keeps the authored cycle so that plan changes only shot timing. One video is weak evidence for a fixed order, and the order may vary between runs of the real fight.
+
+**Blocked on.** Two or more studies of the same monster whose recorded sub-phase orders agree, or a source that states the order, and a decision on how a fixed or a random order is authored, under a new rules version.
+
+**Fidelity gap this leaves.** The trainer's sub-phases arrive in a different order from the recorded fight. The attacks inside each sub-phase still fire as marked, but the sequence a player must read differs from the video.
+
+### D47 - Shots That Fire Further Shots
+
+**What.** Let a projectile fire projectiles of its own while flying or when it expires or detonates, a chain reaction whose later shots keep firing after their attack's stop mark.
+
+**Why deferred.** Plan V23's Q21 records only the rule that shots already fired outlive a stop mark. No projectile in the engine fires further shots, and no attack in the committed study needs one.
+
+**Blocked on.** A monster whose observed attack cannot be expressed without a chain shot, and a decision on its data shape and its once-only hit rule.
+
+**Fidelity gap this leaves.** An attack whose real shots split or spawn more shots cannot be reproduced; it must be approximated by separate attacks fired at the observed times.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.

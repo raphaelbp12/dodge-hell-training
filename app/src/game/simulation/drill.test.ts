@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { cadenced } from "./test-support";
 import {
   ENCOUNTER_CONFIG,
   primaryArchetype,
@@ -18,7 +19,7 @@ const idle: SimulationInput = {
 };
 const stepSeconds = ENCOUNTER_CONFIG.simulation.fixedStepSeconds;
 const PRIMARY = primaryArchetype(ENCOUNTER_CONFIG);
-const PRIMARY_ATTACK = PRIMARY.phases[0].attacks[0];
+const PRIMARY_ATTACK = cadenced(PRIMARY.phases[0].attacks[0]);
 const STATIONARY = { kind: "stationary" as const };
 const TEST_SEED = 20261102;
 const MINION_ID = "drill-minion";
