@@ -1,7 +1,4 @@
 {
-  "enabledMcpjsonServers": [
-    "codegraph"
-  ],
   "hooks": {
     "Stop": [
       {

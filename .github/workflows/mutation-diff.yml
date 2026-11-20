@@ -8,11 +8,12 @@ name: Mutation Tests (Pull Request)
 # 2026-11-19, see docs/quality-gates.md). The full scheduled run is
 # .github/workflows/mutation.yml.
 
+# Runs on every pull request, not behind a paths filter, because the main
+# ruleset requires this check and a required check that never reports blocks the
+# merge. The "changes" step skips the work when no app file and not this
+# workflow changed, and a job whose steps are skipped reports success.
 on:
   pull_request:
-    paths:
-      - app/**
-      - .github/workflows/mutation-diff.yml
 
 permissions:
   contents: read
@@ -36,28 +37,45 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      # Three-dot diff against the base, the same comparison a paths filter makes.
+      - name: Detect app changes
+        id: changes
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA"...HEAD -- app .github/workflows/mutation-diff.yml; then
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            echo "No app change: mutation testing skipped." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: ${{ steps.changes.outputs.app == 'true' }}
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Select pinned npm
+        if: ${{ steps.changes.outputs.app == 'true' }}
         run: npm install --global npm@12.2.1
       - name: Install dependencies
+        if: ${{ steps.changes.outputs.app == 'true' }}
         run: npm ci
       - name: Run mutation tests on changed files
+        if: ${{ steps.changes.outputs.app == 'true' }}
         run: npm run test:mutation:diff
       # The incremental file stands in for the report when the run was
       # interrupted at its time budget (DIFF_BUDGET_MINUTES).
       - name: Summarize
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.app == 'true' }}
         run: >-
           node scripts/mutation-summary.mjs
           reports/mutation/mutation.json
           reports/mutation/stryker-incremental.json
           --changed reports/mutation/changed-lines.json
       - name: Upload mutation report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.app == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: mutation-report-diff
