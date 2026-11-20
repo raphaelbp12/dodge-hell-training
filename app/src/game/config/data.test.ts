@@ -62,7 +62,7 @@ test("both authored arenas load with their approved values (W05)", () => {
     shape: {
       kind: "circle",
       centerTiles: { x: 0, y: 0 },
-      radiusTiles: 19.2,
+      radiusTiles: 8.645,
     },
     hazards: [],
   });

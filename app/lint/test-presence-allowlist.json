@@ -13,5 +13,6 @@
   "src/research/stepGuide.ts": "static guide copy, exercised by StepGuidePanel.test.tsx",
   "src/test/encounter-view.ts": "test support: an EncounterView builder",
   "src/test/fixture.ts": "test support: the typed cast for deliberately invalid fixtures",
+  "src/test/swarm-config.ts": "test support: the pre-V24 Crystal Worm swarm fixture, validated at import",
   "src/test/setup.ts": "test support: the jsdom setup file"
 }

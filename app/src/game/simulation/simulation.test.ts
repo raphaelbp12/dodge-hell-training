@@ -1,7 +1,6 @@
 import { expect, test } from "vitest";
 import { cadenced } from "./test-support";
 import {
-  ENCOUNTER_CONFIG,
   encounterConfigOf,
   liveShardBoundPerEnemy,
   primaryArchetype,
@@ -9,6 +8,11 @@ import {
   bulletOf,
   validateEncounterConfig,
 } from "../config/encounter";
+// Periodic spawning and the large arena are exercised on the pre-V24 swarm
+// fixture (DC-V24-12, plan V24).
+import { SWARM_CONFIG as ENCOUNTER_CONFIG } from "../../test/swarm-config";
+// The shipped worm, for tests of the debug build, which always rebuilds it.
+import { ENCOUNTER_CONFIG as SHIPPED_CONFIG } from "../config/encounter";
 import { PALADIN_DERIVED_STATS, PALADIN_STATS } from "../config/stats";
 import type { ShardState, SimulationInput, Vector2 } from "../models";
 import {
@@ -72,6 +76,7 @@ const ARENA_SHAPE = ENCOUNTER_CONFIG.arena.shape;
 // Spawn placement draws from the seeded generator, so these tests pin a seed.
 const TEST_SEED = 20261026;
 const freshSimulation = () => createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+const freshShippedSimulation = () => createSimulation(SHIPPED_CONFIG, TEST_SEED);
 /** Distance of an enemy from the arena centre, in tiles. */
 const ringDistance = (state: ReturnType<typeof createSimulation>): number =>
   Math.hypot(
@@ -120,15 +125,19 @@ test("matched player size controls shard collision instead of the old larger pre
 });
 
 test("matched player size controls movement and immediate live-resize wall containment", () => {
-  const state = freshSimulation();
+  const state = freshShippedSimulation();
+  if (SHIPPED_CONFIG.arena.shape.kind !== "circle")
+    throw new RangeError("The Crystal Worm's arena must stay circular");
+  // 0.7 tiles inside the wall, as 18.5 was in the pre-V24 19.2-tile arena.
+  const nearWallX = SHIPPED_CONFIG.arena.shape.radiusTiles - 0.7;
   const selected = {
     ...loadSelectedDebugValues(DEFAULT_DEBUG_SETTINGS),
     godMode: true,
   };
   setDebugSettings(state, selected);
-  state.player.positionTiles = { x: 18.5, y: 0 };
+  state.player.positionTiles = { x: nearWallX, y: 0 };
   advanceSimulation(state, stepSeconds, east);
-  expect(state.player.positionTiles.x).toBeGreaterThan(18.5);
+  expect(state.player.positionTiles.x).toBeGreaterThan(nearWallX);
   setDebugSettings(state, { ...selected, headWidth: 5, headHeight: 5 });
   if (state.config.arena.shape.kind !== "circle")
     throw new RangeError("The Crystal Worm's arena must stay circular");
@@ -144,7 +153,7 @@ test("matched player size controls movement and immediate live-resize wall conta
 });
 
 test("live debug settings suppress accepted hits, stop pursuit and target the arena center", () => {
-  const state = freshSimulation();
+  const state = freshShippedSimulation();
   setDebugSettings(state, {
     ...DEFAULT_DEBUG_SETTINGS,
     godMode: true,
@@ -265,12 +274,15 @@ test("arena-center chase reaches the exact center and ignores the player silhoue
 });
 
 test("activates the selected v3 preset and eleven-volley first group atomically", () => {
-  expect(ENCOUNTER_CONFIG.rulesVersion).toBe(
-    "crystal-worm-child-swarm-paladin-v7",
+  expect(SHIPPED_CONFIG.rulesVersion).toBe(
+    "crystal-worm-child-solo-paladin-v1",
   );
-  expect(ARENA_SHAPE.radiusTiles).toBe(19.2);
-  expect(PRIMARY.spawnTiles).toEqual({ x: 0, y: -16.2 });
-  const state = freshSimulation();
+  expect(SHIPPED_CONFIG.arena.shape).toMatchObject({ radiusTiles: 8.645 });
+  expect(primaryArchetype(SHIPPED_CONFIG).spawnTiles).toEqual({
+    x: 0,
+    y: -7.29421875,
+  });
+  const state = freshShippedSimulation();
   for (let tick = 0; tick < 234; tick++) {
     state.player.healthHp = PALADIN_STATS.healthHp;
     advanceSimulation(state, stepSeconds, idle);
@@ -1677,7 +1689,9 @@ test("spawning is reproducible for a seed, including under catch-up", () => {
     // God mode, so the player cannot die partway through a multi-step update
     // and truncate the loop - that would be a property of the test, not of
     // spawning. Both runs reconcile identically.
-    setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
+    // Set directly: setDebugSettings would swap in the shipped single-worm
+    // config and drop the swarm fixture's cadence (plan V24).
+    state.debugSettings = { ...DEFAULT_DEBUG_SETTINGS, godMode: true };
     const seconds = 40;
     const updates = (seconds / stepSeconds) / stepsPerUpdate;
     for (let update = 0; update < updates; update++) {
@@ -1708,27 +1722,6 @@ test("a different seed opens from a different place but the same schedule", () =
       9,
     );
   }
-});
-
-test("lowering the concurrency cap despawns the newest enemies at once", () => {
-  const state = freshSimulation();
-  for (let tick = 0; tick < 60 * 35; tick++) {
-    advanceSimulation(state, stepSeconds, idle);
-    state.player.healthHp = PALADIN_STATS.healthHp;
-  }
-  expect(state.enemies).toHaveLength(4);
-  const keptIds = state.enemies.slice(0, 2).map((enemy) => enemy.id);
-  setDebugSettings(state, {
-    ...DEFAULT_DEBUG_SETTINGS,
-    maxConcurrentEnemies: 2,
-  });
-  expect(state.enemies.map((enemy) => enemy.id)).toEqual(keptIds);
-  // The cap keeps holding as time advances.
-  for (let tick = 0; tick < 60 * 30; tick++) {
-    advanceSimulation(state, stepSeconds, idle);
-    state.player.healthHp = PALADIN_STATS.healthHp;
-  }
-  expect(state.enemies.length).toBeLessThanOrEqual(2);
 });
 
 test("an archetype edit applies to every live enemy", () => {
@@ -1847,11 +1840,11 @@ test("a bomb whose detonation misses the player applies nothing", () => {
 });
 
 test("Crystal Worm debug reset restores the base config and rules", () => {
-  const state = createSimulation(ENCOUNTER_CONFIG, 1);
+  const state = createSimulation(SHIPPED_CONFIG, 1);
   setDebugSettings(state, { ...DEFAULT_DEBUG_SETTINGS, godMode: true });
-  expect(state.config).not.toBe(ENCOUNTER_CONFIG);
+  expect(state.config).not.toBe(SHIPPED_CONFIG);
   setDebugSettings(state, DEFAULT_DEBUG_SETTINGS);
-  expect(state.config).toBe(ENCOUNTER_CONFIG);
+  expect(state.config).toBe(SHIPPED_CONFIG);
   // Eligibility stays tainted until a retry rebuilds the simulation.
   expect(state.rulesVersion).toBe(DEBUG_RULES_VERSION);
 });

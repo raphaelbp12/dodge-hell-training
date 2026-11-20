@@ -116,7 +116,7 @@ test("debug panel exposes every parameter and sends live flags/sliders without r
   const user = userEvent.setup();
   render(<App />);
   await user.click(
-    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+    screen.getByRole("radio", { name: "Crystal Worm" }),
   );
   await user.click(screen.getByRole("button", { name: "Debug" }));
   for (const parameter of DEBUG_PARAMETERS)
@@ -323,7 +323,7 @@ test("?encounter= selects a known encounter and ignores an unknown one", () => {
   window.history.pushState({}, "", "?encounter=crystal-worm");
   const { unmount } = render(<App />);
   expect(
-    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+    screen.getByRole("radio", { name: "Crystal Worm" }),
   ).toBeChecked();
   unmount();
   window.history.pushState({}, "", "?encounter=not-a-real-encounter");
@@ -371,7 +371,7 @@ test("changing the encounter resets the selection to Full fight", async () => {
     screen.getByRole("checkbox", { name: "Phase 2 - Color Chase" }),
   );
   await user.click(
-    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+    screen.getByRole("radio", { name: "Crystal Worm" }),
   );
   expect(screen.getByRole("radio", { name: "Full fight" })).toBeChecked();
   await user.click(screen.getByRole("button", { name: "Start" }));
@@ -382,7 +382,7 @@ test("on Home the phase selector stays visible beside the debug aside", async ()
   const user = userEvent.setup();
   render(<App />);
   await user.click(
-    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+    screen.getByRole("radio", { name: "Crystal Worm" }),
   );
   expect(screen.getByLabelText("Phase selection")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Debug" }));
@@ -562,7 +562,7 @@ test("the live Debug and phase asides are mutually exclusive on the Crystal Worm
   const user = userEvent.setup();
   render(<App />);
   await user.click(
-    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+    screen.getByRole("radio", { name: "Crystal Worm" }),
   );
   await user.click(screen.getByRole("button", { name: "Debug" }));
   expect(screen.getByLabelText("Enemy debug tools")).toBeVisible();
@@ -610,7 +610,7 @@ test("Home includes description, accurate changelog, and delegated links", () =>
     screen.getByRole("radio", { name: "Killer Bee Queen" }),
   ).toBeChecked();
   expect(
-    screen.getByRole("radio", { name: "Crystal Worm Swarm" }),
+    screen.getByRole("radio", { name: "Crystal Worm" }),
   ).not.toBeChecked();
   expect(screen.getByRole("heading", { name: "Changelog" })).toBeVisible();
   expect(screen.getByRole("link", { name: "Enemy reference" })).toHaveAttribute(

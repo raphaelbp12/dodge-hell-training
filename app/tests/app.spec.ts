@@ -63,16 +63,17 @@ const shardColourValues = (() => {
 const controlledFrameMilliseconds = 250;
 // Spawn geometry (G11-G15), kept in step with app/src/game/data/encounter.json.
 const REPOSITORY_URL = "https://github.com/raphaelbp12/dodge-hell-training";
-const SPAWN_RING_TILES = 0.84375 * 19.2;
+const SPAWN_RING_TILES = 0.84375 * 8.645;
 // Pins spawn placement so the opening bearing is deterministic. This seed
-// reproduces the historical north opening at (0, -16.2) to six decimals.
+// reproduces the north opening at (0, -7.29421875) to six decimals (plan V24).
 const NORTH_SEED = 229521;
 // Step 23.1: the Home screen now defaults to the Killer Bee Queen (K14), but
 // this whole spec's shard counts, spawn geometry and timings are authored
 // against the Crystal Worm, so every navigation pins that encounter.
 const seededUrl = (path = "./") =>
   `${path}${path.includes("?") ? "&" : "?"}seed=${NORTH_SEED}&encounter=crystal-worm`;
-const MAX_CONCURRENT_ENEMIES = 4;
+// The Crystal Worm spawns one worm, never repeated (DC-V24-5, plan V24).
+const MAX_CONCURRENT_ENEMIES = 1;
 const LIVE_SHARD_BOUND_PER_ENEMY = 6 * 11 * Math.ceil(3 / 4.9);
 /** Distance of a position from the arena centre, in tiles. */
 const centreDistance = (point: Vector2) => Math.hypot(point.x, point.y);
@@ -392,7 +393,7 @@ test("the Home encounter list defaults to the Killer Bee Queen, is keyboard oper
 }) => {
   await page.goto(`./?seed=${NORTH_SEED}`);
   const queenRadio = page.getByRole("radio", { name: "Killer Bee Queen" });
-  const wormRadio = page.getByRole("radio", { name: "Crystal Worm Swarm" });
+  const wormRadio = page.getByRole("radio", { name: "Crystal Worm" });
   await expect(queenRadio).toBeChecked();
   await expect(wormRadio).not.toBeChecked();
   await wormRadio.focus();
@@ -439,8 +440,9 @@ for (const width of [1440, 390]) {
     };
     const sliders = page.getByRole("slider");
     // Tracks DEBUG_PARAMETERS: 17 tuning sliders after Spawn X/Y retired
-    // (G05), plus two player-size sliders (G08) and four spawn-rule sliders.
-    await expect(sliders).toHaveCount(23);
+    // (G05), plus two player-size sliders (G08) and the Spawn ring slider;
+    // plan V24 retired First spawn, Spawn interval and Max concurrent (DC-V24-8).
+    await expect(sliders).toHaveCount(20);
     await page.getByRole("button", { name: "Load selected values" }).click();
     await expect
       .poll(async () => (await inspect(page)).debugSettings)
@@ -479,7 +481,6 @@ for (const width of [1440, 390]) {
     // east. The canvas is only ~8 tiles tall at 1440 and far less at 390, so
     // vertical separation would put a body off-screen. Shards draw above
     // bodies, so shrink and expire them first to leave clean silhouettes.
-    await setRange("Max concurrent", 1);
     await setRange("Emitter count", 1);
     await setRange("Projectile lifetime", 0.1);
     await setRange("Projectile width", 0.1);
@@ -1604,7 +1605,7 @@ test("sustained play for 60 seconds and 25 retries retain bounded runtime resour
     expect(state.hitNumbers.length).toBeLessThanOrEqual(16);
     expect(state.audio.activeVoices).toBeLessThanOrEqual(4);
     expect(state.audio.requests).toBe(state.hitsTaken);
-    // Spawning is active, so the bound scales with the concurrency cap.
+    // The bound scales with the concurrency cap.
     expect(state.enemies.length).toBeLessThanOrEqual(MAX_CONCURRENT_ENEMIES);
     expect(state.shards.length).toBeLessThanOrEqual(
       LIVE_SHARD_BOUND_PER_ENEMY * MAX_CONCURRENT_ENEMIES,
@@ -1862,7 +1863,7 @@ test("launches one Phaser canvas and cleans it up across repeated mounts", async
 
   await page.goto(seededUrl());
   await expect(
-    page.getByRole("heading", { name: "Crystal Worm Swarm", level: 1 }),
+    page.getByRole("heading", { name: "Crystal Worm", level: 1 }),
   ).toBeVisible();
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.getByRole("button", { name: "Start", exact: true }).click();
@@ -1926,7 +1927,7 @@ test("WASD uses world speed and camera stays centered at the arena edge through 
   // arena clamps that vertex against the wall.
   await expect
     .poll(async () => (await inspect(page)).player.positionTiles.x)
-    .toBeCloseTo(Math.sqrt(19.2 ** 2 - 0.375 ** 2) - 0.625, 5);
+    .toBeCloseTo(Math.sqrt(8.645 ** 2 - 0.375 ** 2) - 0.625, 5);
   await page.keyboard.up("d");
   const edge = await inspect(page);
   expect(edge.camera.x).toBeCloseTo(edge.player.positionTiles.x, 6);

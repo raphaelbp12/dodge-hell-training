@@ -27,16 +27,16 @@
   "defaultEncounter": "killer-bee-queen",
   "encounters": {
     "crystal-worm": {
-      "rulesVersion": "crystal-worm-child-swarm-paladin-v7",
-      "displayName": "Crystal Worm Swarm",
+      "rulesVersion": "crystal-worm-child-solo-paladin-v1",
+      "displayName": "Crystal Worm",
       "primaryArchetype": "crystal-worm-child-head",
       "arenaId": "crystal-worm-circle",
       "spawns": {
-        "comment": "Opening enemy at t=0 is schedule index 0; firstSpawnSeconds is the first additional spawn, so spawns land at 0, 10, 20 and 30 seconds. ringRadiusFraction 0.84375 is exactly 16.2/19.2, the approved spawn distance.",
+        "comment": "A single worm at t=0, never repeated (DC-V24-5, plan V24). ringRadiusFraction 0.84375 now places it 0.84375 * 8.645 = 7.29421875 tiles from the centre (DC-V24-6); goldenAngleDegrees has no effect with one worm.",
         "archetype": "crystal-worm-child-head",
-        "firstSpawnSeconds": 10,
-        "everySeconds": 10,
-        "maxConcurrent": 4,
+        "firstSpawnSeconds": 0,
+        "everySeconds": null,
+        "maxConcurrent": 1,
         "placement": {
           "ringRadiusFraction": 0.84375,
           "rule": "farthest-from-player",

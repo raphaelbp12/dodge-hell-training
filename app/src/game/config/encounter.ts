@@ -432,13 +432,6 @@ const authoredProjectile = AUTHORED_PROJECTILES[AUTHORED_PROJECTILE_ID];
 if (authoredProjectile.type !== "bullet" || authoredProjectile.motion.kind !== "boomerang")
   throw new RangeError("The debug-tunable projectile must use boomerang motion");
 const authoredBoomerangMotion = authoredProjectile.motion;
-// The debug panel's spawn-rate slider edits a real cadence; the debug-tunable
-// encounter must author one, unlike the Queen's single never-repeated spawn.
-if (AUTHORED_ENCOUNTER.spawns.everySeconds === null)
-  throw new RangeError(
-    "The debug-tunable encounter must author a repeating spawn cadence",
-  );
-const authoredPrimaryEverySeconds = AUTHORED_ENCOUNTER.spawns.everySeconds;
 
 export function scaleBody(
   vertices: readonly Vector2[],
@@ -533,9 +526,6 @@ export type TuningValues = Readonly<{
   lifetimeSeconds: number;
   projectileWidth: number;
   projectileHeight: number;
-  firstSpawnSeconds: number;
-  spawnEverySeconds: number;
-  maxConcurrentEnemies: number;
   spawnRingFraction: number;
 }>;
 
@@ -562,9 +552,6 @@ export const AUTHORED_TUNING: TuningValues = Object.freeze({
   lifetimeSeconds: authoredBoomerangMotion.lifetimeSeconds,
   projectileWidth: authoredProjectile.body!.widthTiles,
   projectileHeight: authoredProjectile.body!.heightTiles,
-  firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
-  spawnEverySeconds: authoredPrimaryEverySeconds,
-  maxConcurrentEnemies: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
   // The debug-tunable encounter is hardwired to the Crystal Worm, which
   // keeps the approved farthest-from-player rule unchanged (step 40.1).
   spawnRingFraction:
@@ -707,9 +694,10 @@ export function buildEncounterConfig(
     rulesVersion: options.rulesVersion,
     spawns: {
       archetypeId: AUTHORED_ENCOUNTER.spawns.archetype,
-      firstSpawnSeconds: values.firstSpawnSeconds,
-      everySeconds: values.spawnEverySeconds,
-      maxConcurrent: values.maxConcurrentEnemies,
+      // The spawn schedule is authored, not tunable (DC-V24-8, plan V24).
+      firstSpawnSeconds: AUTHORED_ENCOUNTER.spawns.firstSpawnSeconds,
+      everySeconds: AUTHORED_ENCOUNTER.spawns.everySeconds,
+      maxConcurrent: AUTHORED_ENCOUNTER.spawns.maxConcurrent,
       goldenAngleRadians: degreesToRadians(
         authoredGoldenAngleDegrees(AUTHORED_ENCOUNTER.spawns.placement),
       ),
@@ -717,7 +705,13 @@ export function buildEncounterConfig(
       // keeps the approved farthest-from-player rule unchanged (step 40.1).
       placement: {
         rule: "farthest-from-player",
-        ringRadiusTiles: values.spawnRingFraction * ARENA_SHAPE.radiusTiles,
+        // Clamp like the spawn point above: in the 8.645-tile arena (plan V24)
+        // a large head on a wide ring would otherwise cross the wall.
+        ringRadiusTiles: Math.min(
+          values.spawnRingFraction * ARENA_SHAPE.radiusTiles,
+          ARENA_SHAPE.radiusTiles -
+            Math.max(...verticesTiles.map((vertex) => Math.hypot(vertex.x, vertex.y))),
+        ),
       },
     },
     maxConcurrentMinions: AUTHORED_ENCOUNTER.maxConcurrentMinions,
