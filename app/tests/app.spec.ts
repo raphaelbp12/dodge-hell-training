@@ -141,6 +141,7 @@ type Inspection = {
   result: AttemptResult | null;
   paused: boolean;
   zoom: number;
+  cameraRotationRadians: number;
   camera: Vector2;
   viewport: { width: number; height: number };
   keydownListeners: number;
@@ -3171,4 +3172,32 @@ test.describe("live phase preview", () => {
     await expect(page.locator("canvas")).toHaveCount(1);
     await expect(page.locator("[data-phase-preview]")).toHaveCount(0);
   });
+});
+
+test("holding E turns the camera at the module's rate and Z resets it", async ({
+  page,
+}) => {
+  await launch(page);
+  const rate = (await sourceExport(
+    page,
+    "src/game/phaser/camera-rotation.ts",
+    "CAMERA_ROTATION_RADIANS_PER_SECOND",
+  )) as number;
+  await page
+    .getByRole("region", { name: "Encounter", exact: true })
+    .evaluate((element) => (element as HTMLElement).focus());
+  expect((await inspect(page)).cameraRotationRadians).toBe(0);
+  const before = await inspect(page);
+  await page.keyboard.down("e");
+  await page.waitForTimeout(400);
+  await page.keyboard.up("e");
+  const after = await inspect(page);
+  const heldSeconds = after.elapsedSeconds - before.elapsedSeconds;
+  expect(heldSeconds).toBeGreaterThan(0.2);
+  expect(after.cameraRotationRadians).toBeGreaterThan(0);
+  // Simulation time and rotation advance from the same frame deltas; the
+  // slack covers the frame in which each key edge lands.
+  expect(after.cameraRotationRadians).toBeCloseTo(rate * heldSeconds, 0);
+  await page.keyboard.press("z");
+  expect((await inspect(page)).cameraRotationRadians).toBe(0);
 });

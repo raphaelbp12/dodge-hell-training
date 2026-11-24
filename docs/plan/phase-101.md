@@ -4,7 +4,7 @@
 
 ### Step 101.1 - The Rotation Model
 
-Status: pending. Dependencies: none.
+Status: complete. Dependencies: none.
 
 **Implementation prompt**
 
@@ -13,6 +13,12 @@ Create `app/src/game/phaser/camera-rotation.ts`, a pure module with no Phaser, D
 **Focused checks:** a failing-first test file covering: one second of `E` turns 3.0 rad; `Q` turns the opposite way; both keys leave the angle unchanged; no keys leave it unchanged; the angle wraps past a full turn and stays in range; stepping 1 s as one call or as sixty 1/60 s calls gives the same angle within floating tolerance; reset returns 0 from any angle; a zero or tiny elapsed time changes nothing.
 
 **Acceptance:** the focused test passes; `npx tsc -b` passes; the module imports nothing from Phaser, React or the DOM (the boundaries lint passes); mutation diff reports no surviving mutant on the new module.
+
+**Execution and verification**
+
+- Changed: new `app/src/game/phaser/camera-rotation.ts` (rate constant 3.0 rad/s, state, step, reset, and `rotationInputOf` mapping held `Q`/`E` to flags) and `camera-rotation.test.ts`. Positive angle is a clockwise camera turn (`E`); Phaser's camera rotation is the negation (comment in the module).
+- Checks: `npx vitest run src/game/phaser/camera-rotation.test.ts` failed first (module missing), then passed; `npx tsc -b` and `npx oxlint --deny-warnings` pass.
+- Mutation diff: `src/game/phaser/` is not in the Stryker mutate globs (`app/stryker.config.mjs`), so there is no mutant to report; not run.
 
 ### Step 101.2 - Rotate The Camera In The Encounter
 
@@ -26,6 +32,12 @@ In `app/src/game/phaser/encounter.ts`, register `Q`, `E` and `Z` next to the WAS
 
 **Acceptance:** with keys held during play the angle follows the model; pause, focus loss and a new run clear or reset it; labels stay upright in a manual check at several angles (record as performed or blocked); simulation, characterization and fingerprint tests pass unchanged; `graphify update .` run.
 
+**Execution and verification** (step stays `pending`: three criteria below are not yet met)
+
+- Changed: `encounter.ts` registers `Q`/`E` (Phaser keys) and `Z` (keydown), steps the model while `playing`, applies `setRotation(-angle)` in `centerCamera`, resets on retry and drill, suppresses `Q`/`E` like movement keys (debug tools, `clearMovement`), and adds `cameraRotationRadians` to `inspect()`. New `camera-upright.ts` (+ test, failed first then passed) places the health bar, condition chips, chip texts and hit numbers so they stay upright; bar and chips are drawn relative to the player in a counter-rotated Graphics.
+- Ran: `npx vitest run src/game/phaser src/ui/ControlsDialog.test.tsx` pass; `npx tsc -b` and `npx oxlint --deny-warnings` pass.
+- Not met: manual upright check at several angles blocked (no browser run); simulation, characterization and fingerprint tests not run (no simulation file touched); `graphify update .` blocked (`graphify` not installed). The snapshot field has no unit test (the scene is not unit-testable); the step-101.3 Playwright test covers it.
+
 ### Step 101.3 - Controls Rows And The Browser Test
 
 Status: pending. Dependencies: 101.2.
@@ -37,3 +49,9 @@ Add rows to `app/src/ui/ControlsDialog.tsx` for `Q` (rotate camera counter-clock
 **Focused checks:** the Controls dialog test lists the three new keys; the Playwright test fails before 101.2's integration and passes after.
 
 **Acceptance:** the dialog test and the Playwright test pass; `npm run verify` passes; the `verifier` ran the full non-soak browser suite before the branch is pushed; nothing is committed without authorization.
+
+**Execution and verification** (step stays `pending`: Playwright, verify and the browser suite have not run)
+
+- Changed: `ControlsDialog.tsx` rows for `Q`, `E`, `Z`; `ControlsDialog.test.tsx` test (failed first, then passed); `tests/app.spec.ts` gains `cameraRotationRadians` in the `Inspection` type and one test, "holding E turns the camera at the module's rate and Z resets it", reading the rate through `sourceExport`. The Playwright test was written, not run.
+
+**Orchestrator addendum.** `npm run verify` from `app/` passed (lint, typecheck, test, build) after this step was written. The Playwright test could not run in the agent environment: the Chromium headless shell is installed but fails to start for the missing system library `libatk-1.0.so.0`. The full non-soak browser suite, the manual upright check and `graphify update .` also did not run. `camera-rotation.ts` is outside the Stryker mutate globs, so no mutation check applies to it. Steps 101.2 and 101.3 stay `pending` until the browser test passes in CI or the owner's environment.

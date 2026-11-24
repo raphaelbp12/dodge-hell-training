@@ -30,7 +30,7 @@ This file is the reusable process for every planning effort in this repository: 
 | V21 | 89 | complete | B | [`docs/plan-v21.md`](docs/plan-v21.md) |
 | V22 | 90-96 | complete | A | [`docs/plan-v22.md`](docs/plan-v22.md) |
 | V23 | 97-100 | 97-99 complete; 100 implemented, findings await a decision | Q | [`docs/plan-v23.md`](docs/plan-v23.md) |
-| V24 | 101 | drafted | D-24 | [`docs/plan-v24.md`](docs/plan-v24.md) |
+| V24 | 101 | in progress | D-24 | [`docs/plan-v24.md`](docs/plan-v24.md) |
 
 (V3 was superseded before archiving; see the V4 archive's own history if that gap matters.) The active row holds the decisions, confirmed design, data shapes, scope and phase index that are specific to that effort; read it, not this file, for what that plan's phases actually build. When no plan is active, the newest archive holds the same information.
 

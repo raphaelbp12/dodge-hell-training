@@ -84,6 +84,6 @@ Review gates:
 
 [Step prompts](plan/phase-101.md).
 
-- 101.1 - The Rotation Model: pending. Dependencies: none.
+- 101.1 - The Rotation Model: complete. Dependencies: none.
 - 101.2 - Rotate The Camera In The Encounter: pending. Dependencies: 101.1.
 - 101.3 - Controls Rows And The Browser Test: pending. Dependencies: 101.2.

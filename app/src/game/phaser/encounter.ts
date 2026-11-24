@@ -23,6 +23,13 @@ import { SessionController, type AttemptResult } from "../session/session";
 import type { DetonationEvent } from "../simulation/simulation";
 import { HitAudio } from "./hit-audio";
 import { phaseViewOf, type PhaseView } from "./view";
+import {
+  initialCameraRotation,
+  resetCameraRotation,
+  rotationInputOf,
+  stepCameraRotation,
+} from "./camera-rotation";
+import { uprightPlacement } from "./camera-upright";
 import { ArenaRenderer } from "./arena-renderer";
 import { pixelsPerTile, presentation } from "./presentation";
 
@@ -104,10 +111,11 @@ class EncounterScene extends Phaser.Scene {
   );
   private unlockAudio = (): void => this.hitAudio.unlock();
   private keys!: Record<
-    "north" | "south" | "east" | "west",
+    "north" | "south" | "east" | "west" | "rotateLeft" | "rotateRight",
     Phaser.Input.Keyboard.Key
   >;
   private zoom: number;
+  private rotation = initialCameraRotation();
   private heldControls = new Set<string>();
   private controlsOpen = false;
   private suppressedMovement = new Set<string>();
@@ -149,7 +157,14 @@ class EncounterScene extends Phaser.Scene {
     this.conditionChips = this.add.graphics().setDepth(3);
     const keyboard = this.input.keyboard!;
     this.keys = keyboard.addKeys(
-      { north: "W", south: "S", east: "D", west: "A" },
+      {
+        north: "W",
+        south: "S",
+        east: "D",
+        west: "A",
+        rotateLeft: "Q",
+        rotateRight: "E",
+      },
       false,
       false,
     ) as typeof this.keys;
@@ -179,7 +194,7 @@ class EncounterScene extends Phaser.Scene {
         "[data-debug-tools]",
       )
     ) {
-      if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code))
+      if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE"].includes(event.code))
         this.suppressedMovement.add(event.code);
       return;
     }
@@ -210,11 +225,25 @@ class EncounterScene extends Phaser.Scene {
       !["countdown", "playing"].includes(this.session.phase)
     )
       return;
-    if (!["KeyW", "KeyA", "KeyS", "KeyD", "KeyO", "KeyP"].includes(event.code))
+    if (
+      ![
+        "KeyW",
+        "KeyA",
+        "KeyS",
+        "KeyD",
+        "KeyO",
+        "KeyP",
+        "KeyQ",
+        "KeyE",
+        "KeyZ",
+      ].includes(event.code)
+    )
       return;
     event.preventDefault();
     if (event.repeat) return;
     this.suppressedMovement.delete(event.code);
+    if (event.code === "KeyZ" && this.session.phase === "playing")
+      this.rotation = resetCameraRotation();
     const { minZoom, maxZoom, zoomStep } = ENCOUNTER_CONFIG.camera;
     const previousZoom = this.zoom;
     if (event.code === "KeyO")
@@ -242,6 +271,8 @@ class EncounterScene extends Phaser.Scene {
       south: "KeyS",
       east: "KeyD",
       west: "KeyA",
+      rotateLeft: "KeyQ",
+      rotateRight: "KeyE",
     })) {
       if (this.keys[direction as keyof typeof this.keys].isDown)
         this.suppressedMovement.add(code);
@@ -327,6 +358,7 @@ class EncounterScene extends Phaser.Scene {
     this.hitAudio.reset();
     this.hitAudio.unlock();
     this.finalHitAmounts = [];
+    this.rotation = resetCameraRotation();
     this.clearMovement();
     this.hudRemainingMilliseconds = 0;
   }
@@ -392,6 +424,16 @@ class EncounterScene extends Phaser.Scene {
     const previousSeconds = this.state.elapsedSeconds;
     const currentHits: AcceptedHit[] = [];
     const newDetonations: DetonationEvent[] = [];
+    if (this.session.phase === "playing")
+      this.rotation = stepCameraRotation(
+        this.rotation,
+        rotationInputOf(
+          { q: this.keys.rotateLeft.isDown, e: this.keys.rotateRight.isDown },
+          gameplayFocused,
+          this.suppressedMovement,
+        ),
+        delta / presentation.millisecondsPerSecond,
+      );
     const result = this.session.advance(
       delta / presentation.millisecondsPerSecond,
       {
@@ -467,10 +509,16 @@ class EncounterScene extends Phaser.Scene {
     });
   }
 
+  /** Phaser rotates the world, so a clockwise camera turn is a negative rotation. */
+  private get cameraRotation(): number {
+    return 0 - this.rotation.angleRadians;
+  }
+
   private centerCamera(): void {
     if (!this.cameras?.main) return;
     this.cameras.main
       .setZoom(this.zoom)
+      .setRotation(this.cameraRotation)
       .centerOn(
         this.state.player.positionTiles.x * pixelsPerTile,
         this.state.player.positionTiles.y * pixelsPerTile,
@@ -510,10 +558,17 @@ class EncounterScene extends Phaser.Scene {
     const bottom = Math.max(
       ...this.state.config.player.verticesTiles.map((vertex) => vertex.y),
     );
-    const left = player.positionTiles.x * pixelsPerTile - width / 2;
-    const top =
-      (player.positionTiles.y + bottom) * pixelsPerTile +
-      bar.gapCssPixels / this.zoom;
+    // The bar and chips are drawn relative to the player and counter-rotated,
+    // so they stay upright on screen at every camera angle (D-24-6).
+    const anchor = {
+      x: player.positionTiles.x * pixelsPerTile,
+      y: player.positionTiles.y * pixelsPerTile,
+    };
+    const upright = uprightPlacement(anchor, { x: 0, y: 0 }, this.cameraRotation);
+    this.healthBar.setPosition(anchor.x, anchor.y).setRotation(upright.rotation);
+    this.conditionChips.setPosition(anchor.x, anchor.y).setRotation(upright.rotation);
+    const left = -width / 2;
+    const top = bottom * pixelsPerTile + bar.gapCssPixels / this.zoom;
     this.healthBar
       .clear()
       .fillStyle(bar.border)
@@ -532,27 +587,37 @@ class EncounterScene extends Phaser.Scene {
         (width * player.healthHp) / PALADIN_STATS.healthHp,
         height,
       );
-    this.drawConditionChips(player, left, top + height, border);
+    this.drawConditionChips(player, anchor, left, top + height, border);
     const policy = presentation.hitNumbers;
     for (const number of this.hitNumbers) {
       const lane = (number.hit.shardId % policy.lanes) - (policy.lanes - 1) / 2;
-      number.text
-        .setScale(1 / this.zoom)
-        .setPosition(
-          number.hit.positionTiles.x * pixelsPerTile +
-            (lane * policy.laneWidthCssPixels) / this.zoom,
-          (number.hit.positionTiles.y - bottom) * pixelsPerTile -
+      const placed = uprightPlacement(
+        {
+          x: number.hit.positionTiles.x * pixelsPerTile,
+          y: number.hit.positionTiles.y * pixelsPerTile,
+        },
+        {
+          x: (lane * policy.laneWidthCssPixels) / this.zoom,
+          y:
+            -bottom * pixelsPerTile -
             (policy.gapCssPixels +
               (policy.riseCssPixels * number.ageSeconds) /
                 policy.lifetimeSeconds) /
               this.zoom,
-        );
+        },
+        this.cameraRotation,
+      );
+      number.text
+        .setScale(1 / this.zoom)
+        .setRotation(placed.rotation)
+        .setPosition(placed.x, placed.y);
     }
   }
 
   /** Draws one labelled chip per active-or-visible condition, below the health bar. */
   private drawConditionChips(
     player: typeof this.state.player,
+    anchor: { x: number; y: number },
     left: number,
     topOfBar: number,
     border: number,
@@ -582,10 +647,15 @@ class EncounterScene extends Phaser.Scene {
       this.conditionChips
         .fillStyle(condition.inert ? policy.inertFill : policy.activeFill)
         .fillRect(left, top, width, height);
-      text.setPosition(
-        left + policy.horizontalPaddingCssPixels / this.zoom,
-        top + (height - text.height / this.zoom) / 2,
+      const placed = uprightPlacement(
+        anchor,
+        {
+          x: left + policy.horizontalPaddingCssPixels / this.zoom,
+          y: top + (height - text.height / this.zoom) / 2,
+        },
+        this.cameraRotation,
       );
+      text.setRotation(placed.rotation).setPosition(placed.x, placed.y);
       this.conditionChipTexts.push(text);
       top += height + policy.gapBetweenCssPixels / this.zoom;
     }
@@ -618,6 +688,7 @@ class EncounterScene extends Phaser.Scene {
       countdownRemainingSeconds: this.session.countdownRemainingSeconds,
       result: this.session.result ? { ...this.session.result } : null,
       zoom: this.zoom,
+      cameraRotationRadians: this.rotation.angleRadians,
       camera: {
         x: this.cameras.main.midPoint.x / pixelsPerTile,
         y: this.cameras.main.midPoint.y / pixelsPerTile,
