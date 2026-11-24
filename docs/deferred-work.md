@@ -473,6 +473,26 @@ Rules for this register:
 
 **Fidelity gap this leaves.** An attack whose real shots split or spawn more shots cannot be reproduced; it must be approximated by separate attacks fired at the observed times.
 
+### D48 - Camera Rotation Speed Presets
+
+**What.** Slow (1.5 rad/s), Normal (3.0 rad/s) and Fast (4.5 rad/s) camera rotation speeds with a selector, as the user's issue describes ROTMG's options.
+
+**Why deferred.** Plan V24's D-24-1 builds only Normal; a selector needs settings UI and storage.
+
+**Blocked on.** A decision to add a player-facing settings surface and where its value is stored.
+
+**Fidelity gap this leaves.** Players cannot pick a slower or faster camera turn than Normal.
+
+### D49 - Movement Keys That Turn With The Camera
+
+**What.** Make WASD relative to the rotated camera, so W always moves away from the viewer.
+
+**Why deferred.** Plan V24's D-24-4 keeps movement tied to screen directions so rotation stays view-only and the input mapping is unchanged.
+
+**Blocked on.** A user-supplied statement of ROTMG's movement behaviour under rotation, and a decision on the input mapping and its tests.
+
+**Fidelity gap this leaves.** After rotating, W no longer means "away from the viewer", which may differ from ROTMG.
+
 ## Out Of Scope - Not Planned
 
 These are standing non-goals from the original draft and the confirmed design. They are listed so a step never proposes them as an improvement.
