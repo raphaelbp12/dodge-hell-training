@@ -116,6 +116,8 @@ class EncounterScene extends Phaser.Scene {
   >;
   private zoom: number;
   private rotation = initialCameraRotation();
+  /** Seconds of frame delta the rotation model was stepped with a net turn input since the last reset. */
+  private rotationTurningSeconds = 0;
   private heldControls = new Set<string>();
   private controlsOpen = false;
   private suppressedMovement = new Set<string>();
@@ -242,8 +244,10 @@ class EncounterScene extends Phaser.Scene {
     event.preventDefault();
     if (event.repeat) return;
     this.suppressedMovement.delete(event.code);
-    if (event.code === "KeyZ" && this.session.phase === "playing")
+    if (event.code === "KeyZ" && this.session.phase === "playing") {
       this.rotation = resetCameraRotation();
+      this.rotationTurningSeconds = 0;
+    }
     const { minZoom, maxZoom, zoomStep } = ENCOUNTER_CONFIG.camera;
     const previousZoom = this.zoom;
     if (event.code === "KeyO")
@@ -359,6 +363,7 @@ class EncounterScene extends Phaser.Scene {
     this.hitAudio.unlock();
     this.finalHitAmounts = [];
     this.rotation = resetCameraRotation();
+    this.rotationTurningSeconds = 0;
     this.clearMovement();
     this.hudRemainingMilliseconds = 0;
   }
@@ -424,16 +429,21 @@ class EncounterScene extends Phaser.Scene {
     const previousSeconds = this.state.elapsedSeconds;
     const currentHits: AcceptedHit[] = [];
     const newDetonations: DetonationEvent[] = [];
-    if (this.session.phase === "playing")
+    if (this.session.phase === "playing") {
+      const rotationInput = rotationInputOf(
+        { q: this.keys.rotateLeft.isDown, e: this.keys.rotateRight.isDown },
+        gameplayFocused,
+        this.suppressedMovement,
+      );
+      const rotationSeconds = delta / presentation.millisecondsPerSecond;
+      if (rotationInput.clockwise !== rotationInput.counterClockwise)
+        this.rotationTurningSeconds += rotationSeconds;
       this.rotation = stepCameraRotation(
         this.rotation,
-        rotationInputOf(
-          { q: this.keys.rotateLeft.isDown, e: this.keys.rotateRight.isDown },
-          gameplayFocused,
-          this.suppressedMovement,
-        ),
-        delta / presentation.millisecondsPerSecond,
+        rotationInput,
+        rotationSeconds,
       );
+    }
     const result = this.session.advance(
       delta / presentation.millisecondsPerSecond,
       {
@@ -689,6 +699,7 @@ class EncounterScene extends Phaser.Scene {
       result: this.session.result ? { ...this.session.result } : null,
       zoom: this.zoom,
       cameraRotationRadians: this.rotation.angleRadians,
+      cameraRotationTurningSeconds: this.rotationTurningSeconds,
       camera: {
         x: this.cameras.main.midPoint.x / pixelsPerTile,
         y: this.cameras.main.midPoint.y / pixelsPerTile,

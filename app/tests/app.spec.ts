@@ -142,6 +142,7 @@ type Inspection = {
   paused: boolean;
   zoom: number;
   cameraRotationRadians: number;
+  cameraRotationTurningSeconds: number;
   camera: Vector2;
   viewport: { width: number; height: number };
   keydownListeners: number;
@@ -3192,12 +3193,21 @@ test("holding E turns the camera at the module's rate and Z resets it", async ({
   await page.waitForTimeout(400);
   await page.keyboard.up("e");
   const after = await inspect(page);
-  const heldSeconds = after.elapsedSeconds - before.elapsedSeconds;
-  expect(heldSeconds).toBeGreaterThan(0.2);
-  expect(after.cameraRotationRadians).toBeGreaterThan(0);
-  // Simulation time and rotation advance from the same frame deltas; the
-  // slack covers the frame in which each key edge lands.
-  expect(after.cameraRotationRadians).toBeCloseTo(rate * heldSeconds, 0);
+  // The rotation model's own clock: the frame deltas it was stepped with.
+  const turningSeconds =
+    after.cameraRotationTurningSeconds - before.cameraRotationTurningSeconds;
+  expect(turningSeconds).toBeGreaterThan(0.2);
+  expect(after.cameraRotationRadians).toBeGreaterThan(
+    rate * turningSeconds * 0.99,
+  );
+  expect(after.cameraRotationRadians).toBeLessThan(
+    rate * turningSeconds * 1.01,
+  );
+  // Wall-clock sanity: the held time is about the 400 ms waited.
+  expect(turningSeconds).toBeGreaterThan(0.4 * 0.85);
+  expect(turningSeconds).toBeLessThan(0.4 * 1.15 + 0.1);
   await page.keyboard.press("z");
-  expect((await inspect(page)).cameraRotationRadians).toBe(0);
+  const reset = await inspect(page);
+  expect(reset.cameraRotationRadians).toBe(0);
+  expect(reset.cameraRotationTurningSeconds).toBe(0);
 });

@@ -39,13 +39,15 @@ export function stepCameraRotation(
   input: CameraRotationInput,
   elapsedSeconds: number,
 ): CameraRotationState {
+  if (!Number.isFinite(elapsedSeconds)) return state;
   const direction = Number(input.clockwise) - Number(input.counterClockwise);
   const angle =
     state.angleRadians +
     direction * CAMERA_ROTATION_RADIANS_PER_SECOND * elapsedSeconds;
-  const wrapped = ((angle % FULL_TURN_RADIANS) + FULL_TURN_RADIANS) % FULL_TURN_RADIANS;
-  // Adding a tiny negative angle to 0 can round up to exactly 2 pi.
-  return { angleRadians: wrapped >= FULL_TURN_RADIANS ? 0 : wrapped };
+  const wrapped =
+    ((angle % FULL_TURN_RADIANS) + FULL_TURN_RADIANS) % FULL_TURN_RADIANS;
+  // `%` by 2 pi is always below 2 pi, even when a tiny negative angle plus 2 pi rounds to 2 pi.
+  return { angleRadians: wrapped };
 }
 
 /**

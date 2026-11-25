@@ -59,6 +59,28 @@ test("one 1 s step equals sixty 1/60 s steps", () => {
 
 test("reset returns angle 0 from any angle", () => {
   expect(resetCameraRotation()).toEqual({ angleRadians: 0 });
+  for (const input of [clockwise, counterClockwise]) {
+    const turned = stepCameraRotation(initialCameraRotation(), input, 0.7);
+    expect(turned.angleRadians).not.toBe(0);
+    expect(resetCameraRotation()).toEqual({ angleRadians: 0 });
+  }
+});
+
+test("a tiny negative step from 0 wraps into [0, 2 pi) and never reaches 2 pi", () => {
+  const next = stepCameraRotation(
+    initialCameraRotation(),
+    counterClockwise,
+    1e-20,
+  );
+  expect(next.angleRadians).toBeGreaterThanOrEqual(0);
+  expect(next.angleRadians).toBeLessThan(turn);
+});
+
+test("non-finite elapsed time is ignored and keeps the angle in range", () => {
+  const state = { angleRadians: 2 };
+  for (const elapsed of [Infinity, -Infinity, NaN])
+    for (const input of [clockwise, counterClockwise])
+      expect(stepCameraRotation(state, input, elapsed)).toEqual(state);
 });
 
 test("zero elapsed time changes nothing, tiny elapsed time barely moves", () => {
