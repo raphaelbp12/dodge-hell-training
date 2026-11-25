@@ -22,7 +22,7 @@ Create `app/src/game/phaser/camera-rotation.ts`, a pure module with no Phaser, D
 
 ### Step 101.2 - Rotate The Camera In The Encounter
 
-Status: pending. Dependencies: 101.1.
+Status: complete. Dependencies: 101.1.
 
 **Implementation prompt**
 
@@ -32,7 +32,7 @@ In `app/src/game/phaser/encounter.ts`, register `Q`, `E` and `Z` next to the WAS
 
 **Acceptance:** with keys held during play the angle follows the model; pause, focus loss and a new run clear or reset it; labels stay upright in a manual check at several angles (record as performed or blocked); simulation, characterization and fingerprint tests pass unchanged; `graphify update .` run.
 
-**Execution and verification** (step stays `pending`: three criteria below are not yet met)
+**Execution and verification** (manual upright check and `graphify update .` not performed, see the addendum under 101.3)
 
 - Changed: `encounter.ts` registers `Q`/`E` (Phaser keys) and `Z` (keydown), steps the model while `playing`, applies `setRotation(-angle)` in `centerCamera`, resets on retry and drill, suppresses `Q`/`E` like movement keys (debug tools, `clearMovement`), and adds `cameraRotationRadians` to `inspect()`. New `camera-upright.ts` (+ test, failed first then passed) places the health bar, condition chips, chip texts and hit numbers so they stay upright; bar and chips are drawn relative to the player in a counter-rotated Graphics.
 - Ran: `npx vitest run src/game/phaser src/ui/ControlsDialog.test.tsx` pass; `npx tsc -b` and `npx oxlint --deny-warnings` pass.
@@ -40,7 +40,7 @@ In `app/src/game/phaser/encounter.ts`, register `Q`, `E` and `Z` next to the WAS
 
 ### Step 101.3 - Controls Rows And The Browser Test
 
-Status: pending. Dependencies: 101.2.
+Status: complete. Dependencies: 101.2.
 
 **Implementation prompt**
 
@@ -50,8 +50,12 @@ Add rows to `app/src/ui/ControlsDialog.tsx` for `Q` (rotate camera counter-clock
 
 **Acceptance:** the dialog test and the Playwright test pass; `npm run verify` passes; the `verifier` ran the full non-soak browser suite before the branch is pushed; nothing is committed without authorization.
 
-**Execution and verification** (step stays `pending`: Playwright, verify and the browser suite have not run)
+**Execution and verification** (Playwright, verify and the browser suite pass, see the addendum)
 
 - Changed: `ControlsDialog.tsx` rows for `Q`, `E`, `Z`; `ControlsDialog.test.tsx` test (failed first, then passed); `tests/app.spec.ts` gains `cameraRotationRadians` in the `Inspection` type and one test, "holding E turns the camera at the module's rate and Z resets it", reading the rate through `sourceExport`. The Playwright test was written, not run.
 
-**Orchestrator addendum.** `npm run verify` from `app/` passed (lint, typecheck, test, build) after this step was written. The Playwright test could not run in the agent environment: the Chromium headless shell is installed but fails to start for the missing system library `libatk-1.0.so.0`. The full non-soak browser suite, the manual upright check and `graphify update .` also did not run. `camera-rotation.ts` is outside the Stryker mutate globs, so no mutation check applies to it. Steps 101.2 and 101.3 stay `pending` until the browser test passes in CI or the owner's environment.
+**Orchestrator addendum (second run).** `npm run verify` from `app/` passed (lint, typecheck, test, build; it includes the simulation, characterization and fingerprint tests, unchanged). The Playwright test "holding E turns the camera..." passes. The full non-soak browser suite passes, run as the three shards `--shard=1/3`, `2/3`, `3/3` (17 tests each, no retries). `camera-rotation.ts` is outside the Stryker mutate globs, so no mutation check applies to it. The snapshot field is covered by the Playwright test.
+
+**Not performed:** the manual check that labels and health bars stay upright at several angles (a person's check by eye), and `graphify update .` (`graphify` is not installed; the git hooks rebuild the graph).
+
+Step 101.3 is `complete`; step 101.2 is `complete` except for those two items.
