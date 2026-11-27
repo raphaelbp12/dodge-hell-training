@@ -66,5 +66,5 @@ Review gates:
 
 [Step prompts](plan/phase-103.md).
 
-- 103.1 - Skip Doc-Only Pull Requests In Pages: pending. Dependencies: none.
+- 103.1 - Skip Doc-Only Pull Requests In Pages: complete. Dependencies: none.
 - 103.2 - Document The Skip: pending. Dependencies: 103.1.

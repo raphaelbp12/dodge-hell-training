@@ -4,7 +4,7 @@
 
 ### Step 103.1 - Skip Doc-Only Pull Requests In Pages
 
-Status: pending. Dependencies: none.
+Status: complete. Dependencies: none.
 
 **Implementation prompt**
 
@@ -13,6 +13,14 @@ In `.github/workflows/pages.yml`, make the jobs `checks`, `audit`, `build` and `
 **Focused checks:** parse the YAML locally and confirm each of the four jobs has a detection step and that no other step in it is unguarded; check the detection script against sample file lists: only `docs/plan-v26.md`; `docs/plan-v26.md` plus `app/src/x.ts`; `.claude/skills/a/SKILL.md` only; `app/package.json` only; a JSON file under `docs/`; empty.
 
 **Acceptance:** the sample lists give run, skip and run as D-26-2 requires; check job names and matrix names are unchanged; the YAML parses; `bench`, `deploy` and the other workflows are untouched.
+
+**Execution and verification**
+
+Changed `.github/workflows/pages.yml`: `checks`, `audit`, `build` and `browser` check out with `fetch-depth: 0`, run a `Detect code changes` step (id `changes`, output `run`) and guard every later step with `steps.changes.outputs.run == 'true'`; the header comment is rewritten. Checks: a throwaway script (outside the repository) parsed the YAML, failed first with no detection step in any of the four jobs, then passed. It confirmed no unguarded step, no job-level `if`, and ran the detection script in temporary git repositories: only `docs/plan-v26.md` skip; that plus `app/src/x.ts` run; `.claude/skills/a/SKILL.md` only skip; `app/package.json` only run; `docs/data.json` run; empty diff skip; push run.
+
+- Sample lists give skip, run, skip, run, run, skip: met (script output).
+- Job and matrix names, `bench`, `deploy` and other workflows unchanged: met (diff).
+- YAML parses: met.
 
 ### Step 103.2 - Document The Skip
 
@@ -25,3 +33,7 @@ Add one sentence to `docs/quality-gates.md`, next to the description of the requ
 **Focused checks:** none beyond reading the diff.
 
 **Acceptance:** one added sentence, no other change. After the change is merged, a doc-only pull request shows every required check green with its install, test and build steps skipped; record the result as performed or blocked (D-26-5).
+
+**Execution and verification**
+
+Added one sentence under the gates table in `docs/quality-gates.md`; nothing else changed. The check on a doc-only pull request (D-26-5) is blocked until this change is merged: not performed.
