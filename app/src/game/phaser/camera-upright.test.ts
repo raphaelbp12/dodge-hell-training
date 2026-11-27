@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { screenHeading, uprightPlacement, uprightRotation } from "./camera-upright";
+import {
+  screenHeading,
+  uprightPlacement,
+  uprightRotation,
+} from "./camera-upright";
 
 /** Where a world point lands on screen under a camera turned by `rotation`. */
 function toScreen(x: number, y: number, rotation: number) {

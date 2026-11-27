@@ -1,5 +1,5 @@
-import { cameraRelativeInput } from "./camera-relative-input";
 import Phaser from "phaser";
+import { cameraRelativeInput } from "./camera-relative-input";
 import {
   archetypeOf,
   ENCOUNTER_CONFIG,

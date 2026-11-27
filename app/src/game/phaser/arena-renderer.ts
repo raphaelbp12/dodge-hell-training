@@ -318,8 +318,8 @@ export class ArenaRenderer {
     }
   }
 
-  /** Draws bodies, projectiles and explosions. Zoom only scales line widths. */
   /**
+   * Draws bodies, projectiles and explosions. Zoom only scales line widths.
    * Entity sprites stay upright under the rotated camera (D-28-4); a
    * sprite's own heading is turned by the camera angle (D-28-6). The arena
    * floor, walls and boundary are drawn elsewhere and keep rotating.

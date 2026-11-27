@@ -326,5 +326,6 @@ test("confused swaps an analogue moveVector the way it swaps the booleans", () =
   player.conditionSeconds.confused = 1;
   const out = effectiveInput(player, { ...idle, moveVector: { x: 1, y: 0 } });
   // East becomes north: (1, 0) -> (0, -1).
-  expect(out.moveVector).toEqual({ x: -0, y: -1 });
+  expect(out.moveVector?.x).toBeCloseTo(0, 12);
+  expect(out.moveVector?.y).toBeCloseTo(-1, 12);
 });

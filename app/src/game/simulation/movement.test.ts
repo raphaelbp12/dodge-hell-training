@@ -442,3 +442,15 @@ test("a moveVector takes precedence over the booleans, and a zero vector stands 
   });
   expect(state.player.positionTiles).toEqual(start);
 });
+
+test("a non-finite moveVector component is treated as the zero vector", () => {
+  for (const moveVector of [
+    { x: Number.NaN, y: 0 },
+    { x: 1, y: Number.POSITIVE_INFINITY },
+  ]) {
+    const state = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+    const start = { ...state.player.positionTiles };
+    advanceSimulation(state, stepSeconds, { ...idle, east: true, moveVector });
+    expect(state.player.positionTiles).toEqual(start);
+  }
+});

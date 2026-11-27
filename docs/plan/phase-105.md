@@ -54,7 +54,7 @@ In `app/src/game/phaser/encounter.ts`, pass the `WASD` vector through the 105.1 
 **Execution and verification (105.3)**
 
 - Tests seen failing first, then passing: `movement.test.ts` (vector equals booleans incl. diagonal speed, zero vector, precedence), `conditions.test.ts` (Confused swap on the vector), `camera-relative-input.test.ts` (`cameraRelativeInput` equals the mapped vector). Added optional `moveVector` to `SimulationInput` (`models.ts`), used in `simulation.ts` `updateMovement` and `effectiveInput`; encounter wired. `ControlsDialog.tsx` says only "Move", unchanged.
-- `npx vitest run src/game` (59 files, 1437 tests, incl. unchanged simulation, characterization, fingerprint) passes; `npx tsc -b` and oxlint pass. `npm run verify` not run (per instruction). Manual quarter-turn check: blocked, no browser.
+- `npx vitest run src/game` (59 files, 1437 tests, incl. unchanged simulation, characterization, fingerprint) passes; `npx tsc -b` and oxlint pass. `npm run verify` was run and passed (lint, typecheck, test, build); re-run after the review fixes (non-finite `moveVector` treated as zero, doc and test tidy-ups) and passed again. Manual quarter-turn check: blocked, no browser.
 
 ### Step 105.4 - Browser Test
 
@@ -72,3 +72,4 @@ Add one Playwright test in `app/tests/app.spec.ts`: start a run, hold `E` to tur
 
 - Added a test to `app/tests/app.spec.ts` ("with the camera turned, A moves the player to the screen-left, not along world x"): turns with `E` to a rate-derived angle, holds `A`, and asserts the displacement direction from the debug snapshot equals screen-left turned by the camera angle. Rate read from `camera-rotation.ts` via `sourceExport`.
 - Run in the agent environment: the new test passes (`npx playwright test -g "camera turned"`). It first exposed a defect: the encounter passed Phaser's negated rotation to the mapping, so `A` moved the wrong way; fixed to pass the camera angle. The test releases `E` at 0.6 rad. Full non-soak suite: 51 passed, 1 flaky (`death results, keyboard/button Retry and Home work at 1440px`, passed on retry, unrelated). Not run: manual check at several camera angles.
+- Before/after evidence: with the encounter wiring temporarily reverted to world-fixed booleans (no `moveVector`), `CI=true npx playwright test -g "camera turned"` failed (the screen-left direction assertion; 1 failed after retries). With the wiring restored (`encounter.ts` diff is import order only) the same command passed (1 passed).

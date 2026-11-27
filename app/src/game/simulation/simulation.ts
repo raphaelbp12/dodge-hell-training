@@ -660,11 +660,19 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   const config = state.config;
   const stepSeconds = config.simulation.fixedStepSeconds;
   const conditionedInput = effectiveInput(state.player, input);
-  const directionX = conditionedInput.moveVector
-    ? conditionedInput.moveVector.x
+  const vector = conditionedInput.moveVector;
+  // A non-finite vector component means no analogue direction: stand still.
+  const vectorUsable =
+    vector !== undefined && Number.isFinite(vector.x) && Number.isFinite(vector.y);
+  const directionX = vector
+    ? vectorUsable
+      ? vector.x
+      : 0
     : Number(conditionedInput.east) - Number(conditionedInput.west);
-  const directionY = conditionedInput.moveVector
-    ? conditionedInput.moveVector.y
+  const directionY = vector
+    ? vectorUsable
+      ? vector.y
+      : 0
     : Number(conditionedInput.south) - Number(conditionedInput.north);
   const directionLength = Math.hypot(directionX, directionY) || 1;
   const playerTravel = playerTravelTiles(state.player, stepSeconds);

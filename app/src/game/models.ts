@@ -70,10 +70,12 @@ export type SimulationInput = Readonly<{
   east: boolean;
   west: boolean;
   /**
-   * Optional analogue movement direction (y down). When present it drives
-   * player movement instead of the four booleans; it is normalised like
-   * them, so speed never exceeds the boolean speed. Absent, behaviour is
-   * exactly the boolean path.
+   * Optional movement direction (y down). When present it drives player
+   * movement instead of the four booleans. Only the direction counts: any
+   * non-zero vector is normalised to unit length and its magnitude is
+   * ignored, so speed never exceeds the boolean speed. Components must be
+   * finite; a non-finite component is treated as the zero vector. Absent,
+   * behaviour is exactly the boolean path.
    */
   moveVector?: Vector2;
 }>;
