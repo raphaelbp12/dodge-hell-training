@@ -4,7 +4,7 @@
 
 ### Step 102.1 - Free-Port Helper And `dev:worktree`
 
-Status: pending. Dependencies: none.
+Status: complete. Dependencies: none.
 
 **Implementation prompt**
 
@@ -14,9 +14,14 @@ Create `app/scripts/free-port.mjs`, exporting an async function that returns a f
 
 **Acceptance:** the focused tests pass; `npx tsc -b` and lint pass; two worktrees run `npm run dev:worktree` at once on different ports and each URL serves the page; `npm run dev` still binds 5173 unchanged.
 
+**Execution and verification**
+
+Added `app/scripts/free-port.mjs` (with `.d.mts`), `app/scripts/dev-worktree.mjs`, `app/scripts/free-port.test.mjs` (listed in the node Vitest project), the `dev:worktree` script and the `.dev-port` ignore. Tests seen failing first (module missing), then 6 pass. `npx tsc -b` passes. A live `npm run dev:worktree` served the page (HTTP 200) on a random port, wrote `.dev-port` and removed it on exit; `dev` unchanged. Lint passes. Two concurrent `npm run dev:worktree` processes served HTTP 200 on different random ports (41479, 43189), checked by the orchestrator.
+
+
 ### Step 102.2 - Random Playwright Ports
 
-Status: pending. Dependencies: 102.1.
+Status: complete. Dependencies: 102.1.
 
 **Implementation prompt**
 
@@ -25,3 +30,8 @@ In `app/playwright.config.ts`, replace the constants `testPort` and `previewPort
 **Focused checks:** a unit test of the parent/worker port-sharing logic (first call draws, later calls read the environment). One Playwright test run alone with `--grep` passes.
 
 **Acceptance:** two worktrees run `CI=true npm run test:e2e -- --grep "<one test>"` at the same time without a port clash; the `verifier` ran the full non-soak suite before the branch is pushed; `npm run verify` passes.
+
+**Execution and verification**
+
+`playwright.config.ts` takes both ports from `sharedFreePort` (parent draws, later evaluations read `PLAYWRIGHT_TEST_PORT` and `PLAYWRIGHT_PREVIEW_PORT`); the sharing logic is tested in `free-port.test.mjs`. README updated; no spec or workflow hard-codes 4173/4174 (older plan documents keep the historical values). Two simultaneous `CI=true npx playwright test --project chromium --grep "selected values are the scored defaults"` runs started without a port clash. Both ran in one directory, so one hit an ENOENT on the shared `test-results/` folder and passed on retry; that is a shared output directory, not a port clash, and separate worktrees do not share it. `npm run verify` passes (lint, typecheck, test, build). The full non-soak suite (`CI=true npm run test:e2e -- --grep-invert @soak`) passed, 50 tests, run by the orchestrator rather than the `verifier` subagent. Stryker mutate globs do not cover `app/scripts/`.
+
