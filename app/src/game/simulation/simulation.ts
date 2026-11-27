@@ -660,20 +660,36 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   const config = state.config;
   const stepSeconds = config.simulation.fixedStepSeconds;
   const conditionedInput = effectiveInput(state.player, input);
-  const directionX =
-    Number(conditionedInput.east) - Number(conditionedInput.west);
-  const directionY =
-    Number(conditionedInput.south) - Number(conditionedInput.north);
-  const directionLength = Math.hypot(directionX, directionY) || 1;
+  const vector = conditionedInput.moveVector;
+  // A non-finite vector component means no analogue direction: stand still.
+  const vectorUsable =
+    vector !== undefined && Number.isFinite(vector.x) && Number.isFinite(vector.y);
+  const directionX = vector
+    ? vectorUsable
+      ? vector.x
+      : 0
+    : Number(conditionedInput.east) - Number(conditionedInput.west);
+  const directionY = vector
+    ? vectorUsable
+      ? vector.y
+      : 0
+    : Number(conditionedInput.south) - Number(conditionedInput.north);
+  // Scale by the largest component first so a finite huge vector cannot
+  // overflow Math.hypot to Infinity.
+  const directionScale =
+    Math.max(Math.abs(directionX), Math.abs(directionY)) || 1;
+  const unitX = directionX / directionScale;
+  const unitY = directionY / directionScale;
+  const directionLength = Math.hypot(unitX, unitY) || 1;
   const playerTravel = playerTravelTiles(state.player, stepSeconds);
   state.player.positionTiles = constrainToArena(
     {
       x:
         state.player.positionTiles.x +
-        (directionX / directionLength) * playerTravel,
+        (unitX / directionLength) * playerTravel,
       y:
         state.player.positionTiles.y +
-        (directionY / directionLength) * playerTravel,
+        (unitY / directionLength) * playerTravel,
     },
     config.player.verticesTiles,
     config.arena,

@@ -160,12 +160,16 @@ export function effectiveInput(
   input: SimulationInput,
 ): SimulationInput {
   if (!hasCondition(player, "confused")) return input;
-  return {
+  const swapped = {
     north: input.east,
     east: input.north,
     south: input.west,
     west: input.south,
   };
+  // An analogue `moveVector` is a final world vector and is NOT swapped here:
+  // the input layer (`cameraRelativeInput`) swaps in screen space before the
+  // camera rotation, so the swap reflects about the screen diagonal.
+  return { ...input, ...swapped };
 }
 
 export function playerTravelTiles(

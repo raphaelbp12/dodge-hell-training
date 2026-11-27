@@ -320,3 +320,10 @@ test("visibleConditions orders active before inert, matching declaration order, 
   ]);
   expect(ACTIVE_CONDITIONS.includes("paralyzed")).toBe(true);
 });
+
+test("confused leaves an analogue moveVector alone (the input layer swaps it in screen space)", () => {
+  const player = createSimulation(ENCOUNTER_CONFIG, 123).player;
+  player.conditionSeconds.confused = 1;
+  const out = effectiveInput(player, { ...idle, moveVector: { x: 1, y: 0 } });
+  expect(out.moveVector).toEqual({ x: 1, y: 0 });
+});

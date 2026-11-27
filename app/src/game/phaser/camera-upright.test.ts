@@ -1,5 +1,10 @@
 import { expect, test } from "vitest";
-import { uprightPlacement } from "./camera-upright";
+import {
+  screenHeading,
+  uprightOrientation,
+  uprightPlacement,
+  uprightRotation,
+} from "./camera-upright";
 
 /** Where a world point lands on screen under a camera turned by `rotation`. */
 function toScreen(x: number, y: number, rotation: number) {
@@ -33,3 +38,43 @@ test.each([0.7, Math.PI / 2, Math.PI, -2.4])(
     expect(placed.rotation + cameraRotation).toBeCloseTo(0, 10);
   },
 );
+
+const ANGLES = [0, 0.7, Math.PI / 2, Math.PI, -2.4, 7];
+
+test.each(ANGLES)(
+  "the upright rotation is minus the camera rotation at %f",
+  (cameraRotation) => {
+    expect(uprightRotation(cameraRotation)).toBe(0 - cameraRotation);
+  },
+);
+
+test.each(ANGLES)(
+  "a world heading and camera rotation %f give the same on-screen heading as turning the world vector",
+  (cameraRotation) => {
+    const heading = 1.1;
+    const screen = toScreen(Math.cos(heading), Math.sin(heading), cameraRotation);
+    const onScreen = screenHeading(heading, cameraRotation);
+    expect(Math.cos(onScreen)).toBeCloseTo(screen.x, 10);
+    expect(Math.sin(onScreen)).toBeCloseTo(screen.y, 10);
+    // A sprite counter-rotated and then given that heading is drawn at the world heading,
+    // so the camera turns it onto the on-screen heading.
+    expect(uprightRotation(cameraRotation) + onScreen).toBeCloseTo(heading, 10);
+  },
+);
+
+test("camera rotation 0 changes no heading", () => {
+  expect(screenHeading(1.1, 0)).toBe(1.1);
+  expect(uprightRotation(0)).toBe(0);
+});
+
+test.each(ANGLES)("uprightOrientation %f keeps sprites upright and bullets at their on-screen heading", (cameraRotation) => {
+  // No heading: drawn counter-rotated, so the camera leaves it upright.
+  expect(uprightOrientation(cameraRotation) + cameraRotation).toBeCloseTo(0, 10);
+  // With a heading: the camera turns the drawn rotation onto the on-screen heading.
+  const heading = 0.7;
+  const drawn = uprightOrientation(cameraRotation, heading);
+  const screen = toScreen(Math.cos(drawn), Math.sin(drawn), cameraRotation);
+  const expected = screenHeading(heading, cameraRotation);
+  expect(screen.x).toBeCloseTo(Math.cos(expected), 10);
+  expect(screen.y).toBeCloseTo(Math.sin(expected), 10);
+});
