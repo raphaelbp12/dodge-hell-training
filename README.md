@@ -445,7 +445,7 @@ npx.cmd playwright install chromium
 
 On other platforms, use `npx` instead of `npx.cmd`; Linux may also need Playwright's [browser system dependencies](https://playwright.dev/docs/browsers#install-system-dependencies). Browser binaries are cached outside the repository. `npm ci` alone does not install them.
 
-With `PLAYWRIGHT_LIVE_URL` unset, build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server on port 4173 and production preview on 4174, both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. Keep both ports free: `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Default runs never navigate to external websites; hosted verification is an explicit opt-in below. Failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
+With `PLAYWRIGHT_LIVE_URL` unset, build before running `test:e2e`: its production project requires current `app/dist/` output. Playwright starts a Vite development server and a production preview, each on a random free port chosen once per run (stored in `PLAYWRIGHT_TEST_PORT` and `PLAYWRIGHT_PREVIEW_PORT`), both under `/dodge-hell-training/`, deriving the prefix from Vite configuration. `reuseExistingServer: false` and `--strictPort` reject occupied ports instead of testing unrelated servers, so worktrees can run browser tests at the same time. The development project retains diagnostic imports; the production project tests only public UI and built assets. Local runs default to two Chromium workers; CI uses one. To reproduce that setting locally, use `npm.cmd run test:e2e -- --workers=1`. The runner stops both of its servers afterward. Default runs never navigate to external websites; hosted verification is an explicit opt-in below. Failure traces, screenshots, and soak metrics live in ignored `app/test-results/`.
 
 ### Slow-Renderer Regression
 
@@ -501,7 +501,7 @@ To serve the production build locally, run:
 npm.cmd run preview -- --host 127.0.0.1
 ```
 
-Use the URL printed by the preview command. Preview also defaults to port 4173, so stop it before running browser tests.
+Use the URL printed by the preview command. Preview defaults to port 4173. To serve a worktree's development build on a random free port, run `npm run dev:worktree` from `app/`: it prints the URL and writes the port to the ignored `app/.dev-port`.
 
 ## GitHub Pages Setup
 

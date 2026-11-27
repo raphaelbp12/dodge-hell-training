@@ -2,9 +2,12 @@ name: Validate And Deploy Pages
 
 # A change to Markdown or agent instruction files alone cannot change the site
 # or a test result (the tests read only JSON under docs/), so a push of one to
-# main starts no run. A pull request always runs, because branch protection
-# requires its checks and a required check that never runs stays pending for
-# ever (trust plan 2026-11-19, T3).
+# main starts no run. A pull request always starts the run, because branch
+# protection requires its checks and a required check that never runs stays
+# pending for ever (trust plan 2026-11-19, T3). When every file a pull request
+# changes is `*.md` or under `.claude/`, each job detects that in its first
+# step and skips its remaining steps, so the required checks still report
+# success under their own names (plan V26).
 on:
   pull_request:
   push:
@@ -44,17 +47,47 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      # A pull request that changes only Markdown or agent instruction files
+      # skips every later step of the job but still reports success under the
+      # job's own name (D-26-1). Three-dot diff against the base.
+      - name: Detect code changes
+        id: changes
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          run=true
+          if [ "$EVENT_NAME" = pull_request ]; then
+            run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
+            while IFS= read -r file; do
+              case "$file" in
+                "" | *.md | .claude/*) ;;
+                *) run=true; break ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            echo "Doc-only change: checks skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: ${{ steps.changes.outputs.run == 'true' }}
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Select pinned npm
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm install --global npm@12.2.1
       - name: Install dependencies
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm ci
       - name: Run check
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm run ${{ matrix.script }}
 
   audit:
@@ -68,15 +101,44 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      # A pull request that changes only Markdown or agent instruction files
+      # skips every later step of the job but still reports success under the
+      # job's own name (D-26-1). Three-dot diff against the base.
+      - name: Detect code changes
+        id: changes
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          run=true
+          if [ "$EVENT_NAME" = pull_request ]; then
+            run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
+            while IFS= read -r file; do
+              case "$file" in
+                "" | *.md | .claude/*) ;;
+                *) run=true; break ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            echo "Doc-only change: checks skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: ${{ steps.changes.outputs.run == 'true' }}
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Select pinned npm
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm install --global npm@12.2.1
       - name: Audit production dependencies
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm run audit
 
   bench:
@@ -168,19 +230,50 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      # A pull request that changes only Markdown or agent instruction files
+      # skips every later step of the job but still reports success under the
+      # job's own name (D-26-1). Three-dot diff against the base.
+      - name: Detect code changes
+        id: changes
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          run=true
+          if [ "$EVENT_NAME" = pull_request ]; then
+            run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
+            while IFS= read -r file; do
+              case "$file" in
+                "" | *.md | .claude/*) ;;
+                *) run=true; break ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            echo "Doc-only change: checks skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: ${{ steps.changes.outputs.run == 'true' }}
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Select pinned npm
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm install --global npm@12.2.1
       - name: Install dependencies
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm ci
       - name: Production build
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm run build
       - name: Share production build
+        if: ${{ steps.changes.outputs.run == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: production-build
@@ -212,27 +305,59 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      # A pull request that changes only Markdown or agent instruction files
+      # skips every later step of the job but still reports success under the
+      # job's own name (D-26-1). Three-dot diff against the base.
+      - name: Detect code changes
+        id: changes
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          run=true
+          if [ "$EVENT_NAME" = pull_request ]; then
+            run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
+            while IFS= read -r file; do
+              case "$file" in
+                "" | *.md | .claude/*) ;;
+                *) run=true; break ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" = false ]; then
+            echo "Doc-only change: checks skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: ${{ steps.changes.outputs.run == 'true' }}
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Select pinned npm
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm install --global npm@12.2.1
       - name: Install dependencies
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm ci
       - name: Download production build
+        if: ${{ steps.changes.outputs.run == 'true' }}
         uses: actions/download-artifact@v8
         with:
           name: production-build
           path: app/dist
       - name: Install Chromium and system dependencies
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npx playwright install --with-deps chromium
       - name: Browser loops and production-path smoke
+        if: ${{ steps.changes.outputs.run == 'true' }}
         run: npm run test:e2e -- ${{ matrix.select }} --shard=${{ matrix.shard }}
       - name: Retain browser evidence
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.run == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: browser-results-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}-${{ strategy.job-index }}

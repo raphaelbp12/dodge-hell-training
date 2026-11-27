@@ -1,0 +1,42 @@
+# Phase 102: Per-Worktree Dev Server
+
+> Step prompts and execution records for phase 102 of [plan v25](../plan-v25.md), whose general sections stay the authority for how to work; [the implementation plan](../../implementation-plan.md) covers the reusable process. Read only this introduction and the requested step: grep `^### Step 102.`
+
+### Step 102.1 - Free-Port Helper And `dev:worktree`
+
+Status: complete. Dependencies: none.
+
+**Implementation prompt**
+
+Create `app/scripts/free-port.mjs`, exporting an async function that returns a free TCP port by listening on port 0 and closing the server (D-25-3). Create `app/scripts/dev-worktree.mjs`: get a free port, start Vite (`node_modules/vite/bin/vite.js --host 0.0.0.0 --port <port> --strictPort`) with the app directory as its working directory, write the port to `app/.dev-port` (D-25-6), print the URL with the Vite `base` from `vite.config.ts`, and delete `.dev-port` when the process exits or is signalled. Add `"dev:worktree": "node scripts/dev-worktree.mjs"` to `app/package.json` (D-25-4) and `.dev-port` to `app/.gitignore`. Do not touch the `dev` script, run no `npm ci` (D-25-8), add no Multica environment entry (D-25-7). The script must start with no argument or prompt (D-25-1).
+
+**Focused checks:** a failing-first test file `app/scripts/free-port.test.mjs` covering: the returned port is a valid unused port; two calls while the first port is still held return different ports. A test of the port-file logic (written, then removed on exit) with Vite replaced by a stub.
+
+**Acceptance:** the focused tests pass; `npx tsc -b` and lint pass; two worktrees run `npm run dev:worktree` at once on different ports and each URL serves the page; `npm run dev` still binds 5173 unchanged.
+
+**Execution and verification**
+
+Added `app/scripts/free-port.mjs` (with `.d.mts`), `app/scripts/dev-worktree.mjs`, `app/scripts/free-port.test.mjs` (listed in the node Vitest project), the `dev:worktree` script and the `.dev-port` ignore. Tests seen failing first (module missing), then 6 pass. `npx tsc -b` passes. A live `npm run dev:worktree` served the page (HTTP 200) on a random port, wrote `.dev-port` and removed it on exit; `dev` unchanged. Lint passes. Two concurrent `npm run dev:worktree` processes served HTTP 200 on different random ports (41479, 43189), checked by the orchestrator. Both processes ran in ONE directory (not two worktrees), and they ran before the stale-file guard was added (that guard has since been removed).
+
+
+Port-file handling: `dev:worktree` always overwrites `.dev-port` once Vite listens (a stale file, even one naming a reused port, never blocks startup). On exit the file is removed only if it still holds this process's port. SIGINT, SIGTERM, SIGHUP, uncaughtException and unhandledRejection stop the child; the last two also remove the port file and exit 1.
+
+### Step 102.2 - Random Playwright Ports
+
+Status: complete. Dependencies: 102.1.
+
+**Implementation prompt**
+
+In `app/playwright.config.ts`, replace the constants `testPort` and `previewPort` (4173, 4174) with free ports from the helper (D-25-5). The config is evaluated again in each worker, so choose the ports once in the parent process, store them in environment variables, and have every later evaluation read them. Keep the `--strictPort` flags, `reuseExistingServer: false` and the `PLAYWRIGHT_LIVE_URL` path unchanged. Confirm no spec, workflow or document hard-codes 4173 or 4174 and update any that does, reading the value from the config.
+
+**Focused checks:** a unit test of the parent/worker port-sharing logic (first call draws, later calls read the environment). One Playwright test run alone with `--grep` passes.
+
+**Acceptance:** two worktrees run `CI=true npm run test:e2e -- --grep "<one test>"` at the same time without a port clash; the `verifier` ran the full non-soak suite before the branch is pushed; `npm run verify` passes.
+
+**Execution and verification**
+
+`playwright.config.ts` takes both ports from `sharedFreePort` (parent draws, later evaluations read `PLAYWRIGHT_TEST_PORT` and `PLAYWRIGHT_PREVIEW_PORT`); the sharing logic is tested in `free-port.test.mjs`. README updated; no spec or workflow hard-codes 4173/4174 (older plan documents keep the historical values). Two simultaneous `CI=true npx playwright test --project chromium --grep "selected values are the scored defaults"` runs were started in one directory; their ports differed and neither hit a port clash. One hit an ENOENT on the shared `test-results/` folder and passed on retry (a shared output directory, not a port clash). A run from two separate directories was not possible here, so the cross-worktree concurrent case is verified only by the independence of the port draws, not by an actual two-worktree run. `dev:worktree` announces the URL and writes `.dev-port` only once the port accepts connections; a SIGKILL of the parent cannot clean up the port file, which is an accepted limit (the child is not tied to the parent). `npm run verify` passes (lint, typecheck, test, build). The full non-soak suite (`CI=true npm run test:e2e -- --grep-invert @soak`) passed, 50 tests, run by the orchestrator rather than the `verifier` subagent.
+
+**Deviation:** the "`verifier` ran the full non-soak suite" criterion was met by an orchestrator run; the `verifier` subagent type is unavailable in this run, so the verifier run did not happen. Stryker mutate globs do not cover `app/scripts/`.
+
+**Second-review follow-up.** Two separate git worktrees (each with its own `npm ci` and `test-results/`) ran `CI=true npx playwright test --grep "selected values are the scored defaults"` at the same time: both passed on the first attempt, no retry, no port clash. The full non-soak suite was run by the orchestrator, because the `verifier` subagent type is not available in this run; this differs from the criterion as written.

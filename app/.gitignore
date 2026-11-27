@@ -36,3 +36,6 @@ dist-ssr
 
 # Playwright
 /playwright/.auth/
+
+# Per-worktree dev server port (npm run dev:worktree)
+/.dev-port
