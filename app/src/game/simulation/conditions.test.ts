@@ -321,11 +321,9 @@ test("visibleConditions orders active before inert, matching declaration order, 
   expect(ACTIVE_CONDITIONS.includes("paralyzed")).toBe(true);
 });
 
-test("confused swaps an analogue moveVector the way it swaps the booleans", () => {
+test("confused leaves an analogue moveVector alone (the input layer swaps it in screen space)", () => {
   const player = createSimulation(ENCOUNTER_CONFIG, 123).player;
   player.conditionSeconds.confused = 1;
   const out = effectiveInput(player, { ...idle, moveVector: { x: 1, y: 0 } });
-  // East becomes north: (1, 0) -> (0, -1).
-  expect(out.moveVector?.x).toBeCloseTo(0, 12);
-  expect(out.moveVector?.y).toBeCloseTo(-1, 12);
+  expect(out.moveVector).toEqual({ x: 1, y: 0 });
 });

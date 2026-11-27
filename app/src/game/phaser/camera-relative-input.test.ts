@@ -74,6 +74,22 @@ describe("cameraRelativeInput", () => {
     expect(input.moveVector?.y).toBeCloseTo(mapped.y, 12);
   });
 
+  test("Confused swaps in screen space, then the camera rotates the result", () => {
+    // D held at 90 degrees: screen east swaps to screen north (0, -1), then
+    // turns clockwise by 90 degrees to world (1, 0).
+    const input = cameraRelativeInput({ ...keys, east: true }, Math.PI / 2, true);
+    expect(input.moveVector?.x).toBeCloseTo(1, 12);
+    expect(input.moveVector?.y).toBeCloseTo(0, 12);
+    expect(cameraRelativeInput({ ...keys, east: true }, 0, true).moveVector).toEqual({
+      x: -0,
+      y: -1,
+    });
+    expect(cameraRelativeInput({ ...keys, east: true }, 0, false).moveVector).toEqual({
+      x: 1,
+      y: 0,
+    });
+  });
+
   test("opposing keys cancel and the booleans pass through", () => {
     const input = cameraRelativeInput({ ...keys, east: true, west: true }, 1);
     expect(input.moveVector).toEqual({ x: 0, y: 0 });

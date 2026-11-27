@@ -674,16 +674,22 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
       ? vector.y
       : 0
     : Number(conditionedInput.south) - Number(conditionedInput.north);
-  const directionLength = Math.hypot(directionX, directionY) || 1;
+  // Scale by the largest component first so a finite huge vector cannot
+  // overflow Math.hypot to Infinity.
+  const directionScale =
+    Math.max(Math.abs(directionX), Math.abs(directionY)) || 1;
+  const unitX = directionX / directionScale;
+  const unitY = directionY / directionScale;
+  const directionLength = Math.hypot(unitX, unitY) || 1;
   const playerTravel = playerTravelTiles(state.player, stepSeconds);
   state.player.positionTiles = constrainToArena(
     {
       x:
         state.player.positionTiles.x +
-        (directionX / directionLength) * playerTravel,
+        (unitX / directionLength) * playerTravel,
       y:
         state.player.positionTiles.y +
-        (directionY / directionLength) * playerTravel,
+        (unitY / directionLength) * playerTravel,
     },
     config.player.verticesTiles,
     config.arena,

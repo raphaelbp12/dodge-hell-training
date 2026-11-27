@@ -16,6 +16,7 @@ import {
   visibleConditions,
   type VisibleCondition,
 } from "../simulation/conditions";
+import { hasCondition } from "../simulation/conditions";
 import { currentPhaseOf, forceNextSubPhase } from "../simulation/phases";
 import type { CreateSimulationOptions } from "../simulation/simulation";
 import { arbitrarySeed } from "../simulation/random";
@@ -467,6 +468,7 @@ class EncounterScene extends Phaser.Scene {
             !this.suppressedMovement.has("KeyA"),
         },
         this.rotation.angleRadians,
+        hasCondition(this.state.player, "confused"),
       ),
       (hit) => {
         currentHits.push(hit);

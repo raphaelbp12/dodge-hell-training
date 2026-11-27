@@ -166,12 +166,10 @@ export function effectiveInput(
     south: input.west,
     west: input.south,
   };
-  if (!input.moveVector) return swapped;
-  // The same swap on a vector: east<->north and west<->south is (x, y) -> (-y, -x).
-  return {
-    ...swapped,
-    moveVector: { x: -input.moveVector.y, y: -input.moveVector.x },
-  };
+  // An analogue `moveVector` is a final world vector and is NOT swapped here:
+  // the input layer (`cameraRelativeInput`) swaps in screen space before the
+  // camera rotation, so the swap reflects about the screen diagonal.
+  return { ...input, ...swapped };
 }
 
 export function playerTravelTiles(

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { screenHeading, uprightRotation } from "./camera-upright";
+import { uprightOrientation } from "./camera-upright";
 import {
   archetypeOf,
   bombOf,
@@ -456,10 +456,7 @@ export class ArenaRenderer {
 
   /** Drawn rotation of a sprite with world `heading`: counter-rotated, then given its on-screen heading. */
   private uprightOrientation(heading?: number): number {
-    const upright = uprightRotation(this.cameraRotation);
-    return heading === undefined
-      ? upright
-      : upright + screenHeading(heading, this.cameraRotation);
+    return uprightOrientation(this.cameraRotation, heading);
   }
 
   private drawShardImage(

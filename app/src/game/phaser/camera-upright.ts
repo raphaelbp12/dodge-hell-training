@@ -29,6 +29,17 @@ export function uprightRotation(cameraRotation: number): number {
   return 0 - cameraRotation;
 }
 
+/** Drawn rotation of a sprite with world `heading` under a camera rotated by `cameraRotation`: counter-rotated upright, then given its on-screen heading. */
+export function uprightOrientation(
+  cameraRotation: number,
+  heading?: number,
+): number {
+  const upright = uprightRotation(cameraRotation);
+  return heading === undefined
+    ? upright
+    : upright + screenHeading(heading, cameraRotation);
+}
+
 /**
  * A sprite's own world heading as it appears on screen under a camera
  * rotated by `cameraRotation` (D-28-6). A sprite drawn at

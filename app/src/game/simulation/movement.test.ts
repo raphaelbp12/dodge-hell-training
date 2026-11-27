@@ -443,6 +443,13 @@ test("a moveVector takes precedence over the booleans, and a zero vector stands 
   expect(state.player.positionTiles).toEqual(start);
 });
 
+test("a finite huge moveVector keeps its direction", () => {
+  const state = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  const start = { ...state.player.positionTiles };
+  advanceSimulation(state, stepSeconds, { ...idle, moveVector: { x: 1.7e308, y: 1.7e308 } });
+  expect(state.player.positionTiles.x).toBeGreaterThan(start.x);
+});
+
 test("a non-finite moveVector component is treated as the zero vector", () => {
   for (const moveVector of [
     { x: Number.NaN, y: 0 },

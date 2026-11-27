@@ -32,10 +32,14 @@ export function cameraRelativeMovement(
 export function cameraRelativeInput(
   keys: Pick<SimulationInput, "north" | "south" | "east" | "west">,
   angleRadians: number,
+  confused = false,
 ): SimulationInput {
-  const screen = {
+  const held = {
     x: Number(keys.east) - Number(keys.west),
     y: Number(keys.south) - Number(keys.north),
   };
+  // Confused swaps east<->north and west<->south on screen, before the camera
+  // turns the result: (x, y) -> (-y, -x).
+  const screen = confused ? { x: -held.y, y: -held.x } : held;
   return { ...keys, moveVector: cameraRelativeMovement(screen, angleRadians) };
 }

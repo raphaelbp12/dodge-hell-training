@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   screenHeading,
+  uprightOrientation,
   uprightPlacement,
   uprightRotation,
 } from "./camera-upright";
@@ -64,4 +65,16 @@ test.each(ANGLES)(
 test("camera rotation 0 changes no heading", () => {
   expect(screenHeading(1.1, 0)).toBe(1.1);
   expect(uprightRotation(0)).toBe(0);
+});
+
+test.each(ANGLES)("uprightOrientation %f keeps sprites upright and bullets at their on-screen heading", (cameraRotation) => {
+  // No heading: drawn counter-rotated, so the camera leaves it upright.
+  expect(uprightOrientation(cameraRotation) + cameraRotation).toBeCloseTo(0, 10);
+  // With a heading: the camera turns the drawn rotation onto the on-screen heading.
+  const heading = 0.7;
+  const drawn = uprightOrientation(cameraRotation, heading);
+  const screen = toScreen(Math.cos(drawn), Math.sin(drawn), cameraRotation);
+  const expected = screenHeading(heading, cameraRotation);
+  expect(screen.x).toBeCloseTo(Math.cos(expected), 10);
+  expect(screen.y).toBeCloseTo(Math.sin(expected), 10);
 });
