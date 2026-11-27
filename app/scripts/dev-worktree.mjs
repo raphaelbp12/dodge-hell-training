@@ -3,7 +3,7 @@
 // port in `.dev-port` once the server accepts connections. It runs no install
 // (D-25-8).
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,26 @@ import { freePort } from "./free-port.mjs";
 
 const appDir = fileURLToPath(new URL("..", import.meta.url));
 const SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"];
+const FATAL = ["uncaughtException", "unhandledRejection"];
+
+/**
+ * Registers cleanup on a process-like emitter: signals stop the child; a fatal
+ * error also removes the port file and exits 1. Returns the uninstall function.
+ */
+export function installCleanup(run, proc = process) {
+  const onSignal = () => run.stop();
+  const onFatal = () => {
+    run.stop();
+    run.removePortFile();
+    proc.exit(1);
+  };
+  for (const signal of SIGNALS) proc.on(signal, onSignal);
+  for (const event of FATAL) proc.on(event, onFatal);
+  return () => {
+    for (const signal of SIGNALS) proc.off(signal, onSignal);
+    for (const event of FATAL) proc.off(event, onFatal);
+  };
+}
 
 const accepts = (port) =>
   new Promise((resolve) => {
@@ -33,25 +53,6 @@ export async function startDevWorktree({
   log = console.log,
   pollMs = 50,
 }) {
-  if (existsSync(portFile)) {
-    const existing = Number(readFileSync(portFile, "utf8").trim());
-    if (
-      Number.isInteger(existing) &&
-      existing > 0 &&
-      (await accepts(existing))
-    ) {
-      log(
-        `A dev server is already running here: http://localhost:${existing}${base}`,
-      );
-      return {
-        port: existing,
-        ready: Promise.resolve(false),
-        done: Promise.resolve(1),
-        stop() {},
-      };
-    }
-    rmSync(portFile, { force: true });
-  }
   const port = await getPort();
   let stopping = false;
   const state = { exited: false };
@@ -59,7 +60,13 @@ export async function startDevWorktree({
     stopping = true;
     child.kill("SIGTERM");
   };
-  for (const signal of SIGNALS) process.on(signal, stop);
+  const removePortFile = () => {
+    try {
+      if (Number(readFileSync(portFile, "utf8").trim()) === port)
+        rmSync(portFile, { force: true });
+    } catch {}
+  };
+  const uninstall = installCleanup({ stop, removePortFile });
   const child = spawn(
     process.execPath,
     [viteEntry, "--host", "0.0.0.0", "--port", String(port), "--strictPort"],
@@ -68,11 +75,8 @@ export async function startDevWorktree({
   const done = new Promise((resolve) => {
     const finish = (code) => {
       state.exited = true;
-      for (const signal of SIGNALS) process.off(signal, stop);
-      try {
-        if (Number(readFileSync(portFile, "utf8").trim()) === port)
-          rmSync(portFile, { force: true });
-      } catch {}
+      uninstall();
+      removePortFile();
       resolve(code);
     };
     child.once("error", () => finish(1));

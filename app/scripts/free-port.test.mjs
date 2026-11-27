@@ -5,6 +5,7 @@ import {
   realpathSync,
   writeFileSync,
 } from "node:fs";
+import { EventEmitter } from "node:events";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,7 +17,7 @@ import {
   sharedFreePort,
   TEST_PORT_ENV,
 } from "./free-port.mjs";
-import { readViteBase, startDevWorktree } from "./dev-worktree.mjs";
+import { installCleanup, readViteBase, startDevWorktree } from "./dev-worktree.mjs";
 
 const listen = (port) =>
   new Promise((resolve, reject) => {
@@ -57,6 +58,7 @@ test("sharedFreePort draws once, stores the port in the environment and then rea
 });
 
 const LISTEN_STUB = `
+import { EventEmitter } from "node:events";
 import { createServer } from "node:net";
 import { writeFileSync } from "node:fs";
 const port = Number(process.argv[process.argv.indexOf("--port") + 1]);
@@ -141,21 +143,32 @@ test("dev-worktree treats a stop it requested as a clean exit and removes the po
   expect(existsSync(portFile)).toBe(false);
 });
 
-test("playwright.config.ts builds each port from its env-name constant", () => {
-  const text = readFileSync(
-    new URL("../playwright.config.ts", import.meta.url),
-    "utf8",
-  )
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "");
-  expect(text).toMatch(
-    /testPort\s*=\s*await\s+sharedFreePort\(\s*TEST_PORT_ENV\b/,
-  );
-  expect(text).toMatch(
-    /previewPort\s*=\s*await\s+sharedFreePort\(\s*PREVIEW_PORT_ENV\b[^)]*testPort/,
-  );
-  expect(TEST_PORT_ENV).toBe("PLAYWRIGHT_TEST_PORT");
-  expect(PREVIEW_PORT_ENV).toBe("PLAYWRIGHT_PREVIEW_PORT");
+test("playwright.config.ts uses the env ports and keeps them distinct", async () => {
+  const configUrl = new URL("../playwright.config.ts", import.meta.url).href;
+  const load = async (test, preview, tag) => {
+    process.env[TEST_PORT_ENV] = test;
+    process.env[PREVIEW_PORT_ENV] = preview;
+    const mod = await import(`${configUrl}?${tag}`);
+    return mod.default.webServer.map((server) => new URL(server.url).port);
+  };
+  const saved = [process.env[TEST_PORT_ENV], process.env[PREVIEW_PORT_ENV]];
+  try {
+    expect(await load("41111", "42222", "distinct")).toEqual([
+      "41111",
+      "42222",
+    ]);
+    const [a, b] = await load("43333", "43333", "equal");
+    expect(a).toBe("43333");
+    expect(b).not.toBe(a);
+  } finally {
+    for (const [name, value] of [
+      [TEST_PORT_ENV, saved[0]],
+      [PREVIEW_PORT_ENV, saved[1]],
+    ]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
 });
 
 test("readViteBase returns the base of the real vite config", async () => {
@@ -177,52 +190,56 @@ test("sharedFreePort redraws until the drawn port is not avoided", async () => {
   );
 });
 
-test("dev-worktree refuses to start while .dev-port names a live server", async () => {
-  const { dir, stub, portFile } = setup(LISTEN_STUB);
+test("dev-worktree overwrites a stale .dev-port, even one naming a live port, and keeps a file another process rewrote", async () => {
+  const { dir, stub, portFile } = setup(
+    LISTEN_STUB.replace("process.exit(0), 1500", "process.exit(0), 1000"),
+  );
   const live = await listen(0);
-  const livePort = live.address().port;
-  writeFileSync(portFile, `${livePort}\n`);
-  const lines = [];
   try {
+    writeFileSync(portFile, `${live.address().port}\n`);
+    const port = await freePort();
     const run = await startDevWorktree({
       appDir: dir,
       viteEntry: stub,
       portFile,
       base: "/",
-      log: (l) => lines.push(l),
+      getPort: async () => port,
+      log: () => {},
       pollMs: 20,
     });
-    expect(await run.done).toBe(1);
-    expect(await run.ready).toBe(false);
-    expect(lines.join("\n")).toContain(`http://localhost:${livePort}/`);
-    expect(readFileSync(portFile, "utf8").trim()).toBe(String(livePort));
-    expect(existsSync(join(dir, "args.json"))).toBe(false);
+    expect(await run.ready).toBe(true);
+    expect(readFileSync(portFile, "utf8").trim()).toBe(String(port));
+    writeFileSync(portFile, "1\n");
+    expect(await run.done).toBe(0);
+    expect(readFileSync(portFile, "utf8").trim()).toBe("1");
   } finally {
     await close(live);
   }
 });
 
-test("dev-worktree replaces a stale .dev-port and keeps a file another process rewrote", async () => {
-  const { dir, stub, portFile } = setup(
-    LISTEN_STUB.replace("process.exit(0), 1500", "process.exit(0), 1000"),
-  );
-  const dead = await freePort();
-  writeFileSync(portFile, `${dead}\n`);
-  const port = await freePort();
-  const run = await startDevWorktree({
-    appDir: dir,
-    viteEntry: stub,
-    portFile,
-    base: "/",
-    getPort: async () => port,
-    log: () => {},
-    pollMs: 20,
-  });
-  expect(existsSync(portFile)).toBe(false);
-  expect(await run.ready).toBe(true);
-  writeFileSync(portFile, "1\n");
-  expect(await run.done).toBe(0);
-  expect(readFileSync(portFile, "utf8").trim()).toBe("1");
+test("installCleanup stops on each signal, cleans up and exits 1 on fatal errors, and uninstalls", () => {
+  for (const event of [
+    "SIGINT",
+    "SIGTERM",
+    "SIGHUP",
+    "uncaughtException",
+    "unhandledRejection",
+  ]) {
+    const proc = new EventEmitter();
+    proc.exit = (code) => calls.push(`exit${code}`);
+    const calls = [];
+    const uninstall = installCleanup(
+      { stop: () => calls.push("stop"), removePortFile: () => calls.push("rm") },
+      proc,
+    );
+    expect(proc.listenerCount(event)).toBe(1);
+    proc.emit(event);
+    expect(calls).toEqual(
+      event.startsWith("SIG") ? ["stop"] : ["stop", "rm", "exit1"],
+    );
+    uninstall();
+    expect(proc.eventNames()).toEqual([]);
+  }
 });
 
 test("sharedFreePort replaces stored values that are not ports", async () => {
