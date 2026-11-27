@@ -70,11 +70,11 @@ Review gates:
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 102 | Per-Worktree Dev Server | pending | None |
+| 102 | Per-Worktree Dev Server | complete | None |
 
 ## Phase 102: Per-Worktree Dev Server
 
 [Step prompts](plan/phase-102.md).
 
-- 102.1 - Free-Port Helper And `dev:worktree`: pending. Dependencies: none.
-- 102.2 - Random Playwright Ports: pending. Dependencies: 102.1.
+- 102.1 - Free-Port Helper And `dev:worktree`: complete. Dependencies: none.
+- 102.2 - Random Playwright Ports: complete. Dependencies: 102.1.

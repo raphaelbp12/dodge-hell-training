@@ -48,6 +48,7 @@ export default mergeConfig(
               "scripts/bench-gate.test.mjs",
               "scripts/mutation-shards.test.mjs",
               "scripts/slow-test-reporter.test.mjs",
+              "scripts/free-port.test.mjs",
             ],
             // The simulated soak runs in its own project (`npm run test:soak:sim`).
             exclude: ["src/**/*.soak.test.ts", "node_modules/**"],
