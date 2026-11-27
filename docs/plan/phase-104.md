@@ -34,4 +34,6 @@ In `app/src/ui/EncounterScreen.tsx`, add a private `createRuntimeId()` that retu
 
 Added private `createRuntimeId()` in `app/src/ui/EncounterScreen.tsx` and used it for `runtimeId`; added tests for the v4 fallback format and for using `randomUUID` when present (history id `<uuid>:7`). `npx vitest run src/ui/EncounterScreen.test.tsx`: 17 passed; `npx tsc -b`: clean. Not yet run: `npm run verify` and the non-soak browser suite (left to the verifier), so the step stays pending.
 
+Review repair: `createRuntimeId()` no longer throws when `crypto` is undefined or lacks both `randomUUID` and `getRandomValues`; it fills the 16 bytes with `Math.random` as a last resort (the id is only a history key, not security-sensitive), keeping the v4 format; two tests added.
+
 Full non-soak browser suite (`CI=true npm run test:e2e -- --grep-invert @soak`): 50 passed; `npm run verify` passed (lint, typecheck, test, build).

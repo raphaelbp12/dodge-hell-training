@@ -43,8 +43,12 @@ function readSeedFromLocation(): number | undefined {
 
 // crypto.randomUUID exists only in secure contexts; plain HTTP pages lack it.
 function createRuntimeId(): string {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const source = typeof crypto === "undefined" ? undefined : crypto;
+  if (typeof source?.randomUUID === "function") return source.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (typeof source?.getRandomValues === "function") source.getRandomValues(bytes);
+  // Last resort: the id is only a history key, not security-sensitive.
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");

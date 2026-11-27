@@ -226,6 +226,24 @@ test("mounts when crypto.randomUUID is unavailable", () => {
   }
 });
 
+test("mounts when crypto is undefined", () => {
+  vi.stubGlobal("crypto", undefined);
+  try {
+    expect(() => mount()).not.toThrow();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("mounts when randomUUID is not a function and getRandomValues is missing", () => {
+  vi.stubGlobal("crypto", { randomUUID: "x" });
+  try {
+    expect(() => mount()).not.toThrow();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 function savedId(): string {
   const { onHistoryChange } = mount();
   act(() => options.onResult?.({ attemptId: 7, rulesVersion: config.rulesVersion, elapsedSeconds: 1, hitsTaken: 0, outcome: "death" }));
