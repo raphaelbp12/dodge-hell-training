@@ -216,3 +216,57 @@ test("unmounting destroys the encounter and clears the shared handle", () => {
   expect(handle.destroy).toHaveBeenCalledTimes(1);
   expect(props.encounterHandle.current).toBeNull();
 });
+
+test("mounts when crypto.randomUUID is unavailable", () => {
+  vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+  try {
+    expect(() => mount()).not.toThrow();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("mounts when crypto is undefined", () => {
+  vi.stubGlobal("crypto", undefined);
+  try {
+    expect(() => mount()).not.toThrow();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("mounts when randomUUID is not a function and getRandomValues is missing", () => {
+  vi.stubGlobal("crypto", { randomUUID: "x" });
+  try {
+    expect(() => mount()).not.toThrow();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+function savedId(): string {
+  const { onHistoryChange } = mount();
+  act(() => options.onResult?.({ attemptId: 7, rulesVersion: config.rulesVersion, elapsedSeconds: 1, hitsTaken: 0, outcome: "death" }));
+  return onHistoryChange.mock.calls[0][0].records[0].id;
+}
+
+test("falls back to a version 4 uuid built from getRandomValues", () => {
+  const getRandomValues = vi.fn((bytes: Uint8Array) => bytes.fill(0xab));
+  vi.stubGlobal("crypto", { getRandomValues });
+  try {
+    // 0xab bytes, with the version nibble forced to 4 and the variant bits to 10.
+    expect(savedId()).toBe("abababab-abab-4bab-abab-abababababab:7");
+    expect(getRandomValues).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("uses crypto.randomUUID when it exists", () => {
+  vi.stubGlobal("crypto", { randomUUID: () => "fixed-uuid", getRandomValues: crypto.getRandomValues.bind(crypto) });
+  try {
+    expect(savedId()).toBe("fixed-uuid:7");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
