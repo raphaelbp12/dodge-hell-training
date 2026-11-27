@@ -4,7 +4,7 @@
 
 ### Step 105.1 - The View-Relative Movement Mapping
 
-Status: pending. Dependencies: phase 101.
+Status: complete. Dependencies: phase 101.
 
 **Implementation prompt**
 
@@ -13,6 +13,11 @@ Create `app/src/game/phaser/camera-relative-input.ts`, a pure module with no Pha
 **Focused checks:** a failing-first test file: angle 0 is identity; at a quarter turn each of `W`, `A`, `S`, `D` maps to the expected world axis for both turn directions; the zero vector stays zero; length is preserved at several angles including a full turn and values past it; applying the camera rotation to the result gives back the screen vector within floating tolerance.
 
 **Acceptance:** the focused test passes; `npx tsc -b` passes; the boundaries lint passes; no simulation file changes.
+
+**Execution and verification**
+
+- Added `app/src/game/phaser/camera-relative-input.ts` (`cameraRelativeMovement`, a clockwise rotation by the camera angle) and its test file, seen failing first (module missing).
+- `npx vitest run src/game/phaser`: 71 passed. `npx tsc -b`: passes. `npx oxlint --deny-warnings src/game/phaser`: passes (the separate boundaries lint was not run). No simulation file changed.
 
 ### Step 105.2 - Upright Entity Sprites
 
@@ -25,6 +30,12 @@ In `app/src/game/phaser/camera-upright.ts`, add pure helpers that, for a camera 
 **Focused checks:** a failing-first test: the counter-rotation equals minus the camera rotation at several angles; a heading is turned by the camera angle so that a world heading and the camera angle give the same on-screen heading at every angle; angle 0 changes nothing.
 
 **Acceptance:** the focused test passes; `npx tsc -b` passes; in a manual check at several angles sprites stay upright and bullets point along their on-screen motion (record as performed or blocked); simulation, characterization and fingerprint tests pass unchanged.
+
+**Execution and verification**
+
+- Added `uprightRotation` and `screenHeading` to `camera-upright.ts` (tests seen failing first: "not a function"). `arena-renderer.ts` `drawWorld(zoom, cameraRotation = 0)` now draws player, enemy and bomb/shard bodies and shard images counter-rotated; directional shards and bombs are drawn at their world heading, which the camera turns onto the on-screen heading. `encounter.ts` passes `this.cameraRotation`. The arena floor, walls and boundary are untouched. The game has no pickups. Facing logic unchanged.
+- `npx vitest run src/game/phaser`: 71 passed; `npx tsc -b` and oxlint pass.
+- Manual check at several angles: blocked (no browser in the agent environment). Simulation, characterization and fingerprint tests were not run (no simulation file changed). Status stays pending until the manual check and those tests are done.
 
 ### Step 105.3 - Wire Movement In The Encounter
 

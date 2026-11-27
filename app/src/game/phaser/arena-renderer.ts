@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { screenHeading, uprightRotation } from "./camera-upright";
 import {
   archetypeOf,
   bombOf,
@@ -318,7 +319,13 @@ export class ArenaRenderer {
   }
 
   /** Draws bodies, projectiles and explosions. Zoom only scales line widths. */
-  drawWorld(zoom: number): void {
+  /**
+   * Entity sprites stay upright under the rotated camera (D-28-4); a
+   * sprite's own heading is turned by the camera angle (D-28-6). The arena
+   * floor, walls and boundary are drawn elsewhere and keep rotating.
+   */
+  drawWorld(zoom: number, cameraRotation = 0): void {
+    this.cameraRotation = cameraRotation;
     const state = this.getState();
     const { player, enemies, shards, bombs } = state;
     this.bodies.clear();
@@ -327,8 +334,9 @@ export class ArenaRenderer {
       vertices: readonly Vector2[],
       position: Vector2,
       color: number,
-      orientation = 0,
+      heading?: number,
     ) => {
+      const orientation = this.uprightOrientation(heading);
       const points = transformBodyVertices(vertices, position, orientation).map(
         (vertex) =>
           new Phaser.Math.Vector2(
@@ -409,7 +417,7 @@ export class ArenaRenderer {
       const keyline = transformBodyVertices(
         projectile.verticesTiles,
         bomb.positionTiles,
-        bomb.orientationRadians,
+        this.uprightOrientation(bomb.orientationRadians),
       ).map(
         (vertex) =>
           new Phaser.Math.Vector2(
@@ -444,6 +452,16 @@ export class ArenaRenderer {
     this.drawBombExplosions();
   }
 
+  private cameraRotation = 0;
+
+  /** Drawn rotation of a sprite with world `heading`: counter-rotated, then given its on-screen heading. */
+  private uprightOrientation(heading?: number): number {
+    const upright = uprightRotation(this.cameraRotation);
+    return heading === undefined
+      ? upright
+      : upright + screenHeading(heading, this.cameraRotation);
+  }
+
   private drawShardImage(
     appearance: ProjectileAppearanceSpec,
     shard: ShardState,
@@ -471,7 +489,7 @@ export class ArenaRenderer {
         shard.positionTiles.x * pixelsPerTile,
         shard.positionTiles.y * pixelsPerTile,
       )
-      .setRotation(shard.orientationRadians)
+      .setRotation(this.uprightOrientation(shard.orientationRadians))
       .setScale(pixelsPerTile / appearance.pixelsPerTile)
       .setVisible(true);
     this.shardImageUse.set(key, index + 1);

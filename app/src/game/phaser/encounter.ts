@@ -560,7 +560,7 @@ class EncounterScene extends Phaser.Scene {
 
   private drawEntities(): void {
     const { player } = this.state;
-    this.arenaRenderer.drawWorld(this.zoom);
+    this.arenaRenderer.drawWorld(this.zoom, this.cameraRotation);
     const bar = presentation.healthBar;
     const width = bar.widthCssPixels / this.zoom;
     const height = bar.heightCssPixels / this.zoom;
