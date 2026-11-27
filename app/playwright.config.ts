@@ -11,7 +11,12 @@ import viteConfig from "./vite.config.ts";
 // every worker: the parent draws the ports and stores them in the environment,
 // and later evaluations read them back.
 const testPort = await sharedFreePort(TEST_PORT_ENV);
-const previewPort = await sharedFreePort(PREVIEW_PORT_ENV);
+const previewPort = await sharedFreePort(
+  PREVIEW_PORT_ENV,
+  process.env,
+  undefined,
+  [testPort],
+);
 const baseURL = new URL(viteConfig.base ?? "/", `http://127.0.0.1:${testPort}`)
   .href;
 const previewURL = new URL(

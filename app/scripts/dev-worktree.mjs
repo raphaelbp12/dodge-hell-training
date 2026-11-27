@@ -3,7 +3,7 @@
 // port in `.dev-port` once the server accepts connections. It runs no install
 // (D-25-8).
 import { spawn } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,25 @@ export async function startDevWorktree({
   log = console.log,
   pollMs = 50,
 }) {
+  if (existsSync(portFile)) {
+    const existing = Number(readFileSync(portFile, "utf8").trim());
+    if (
+      Number.isInteger(existing) &&
+      existing > 0 &&
+      (await accepts(existing))
+    ) {
+      log(
+        `A dev server is already running here: http://localhost:${existing}${base}`,
+      );
+      return {
+        port: existing,
+        ready: Promise.resolve(false),
+        done: Promise.resolve(1),
+        stop() {},
+      };
+    }
+    rmSync(portFile, { force: true });
+  }
   const port = await getPort();
   let stopping = false;
   const state = { exited: false };
@@ -50,7 +69,10 @@ export async function startDevWorktree({
     const finish = (code) => {
       state.exited = true;
       for (const signal of SIGNALS) process.off(signal, stop);
-      rmSync(portFile, { force: true });
+      try {
+        if (Number(readFileSync(portFile, "utf8").trim()) === port)
+          rmSync(portFile, { force: true });
+      } catch {}
       resolve(code);
     };
     child.once("error", () => finish(1));
@@ -71,13 +93,21 @@ export async function startDevWorktree({
   return { port, ready, done, stop };
 }
 
-async function main() {
+/** Reads the Vite `base` from `vite.config.ts` in `appDir`, "/" when unset. */
+export async function readViteBase(dir) {
   const { loadConfigFromFile } = await import("vite");
   const loaded = await loadConfigFromFile(
     { command: "serve", mode: "development" },
-    join(appDir, "vite.config.ts"),
+    join(dir, "vite.config.ts"),
   );
-  const run = await startDevWorktree({ appDir, base: loaded?.config.base ?? "/" });
+  return loaded?.config.base ?? "/";
+}
+
+async function main() {
+  const run = await startDevWorktree({
+    appDir,
+    base: await readViteBase(appDir),
+  });
   process.exitCode = await run.done;
 }
 

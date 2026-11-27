@@ -19,6 +19,8 @@ Create `app/scripts/free-port.mjs`, exporting an async function that returns a f
 Added `app/scripts/free-port.mjs` (with `.d.mts`), `app/scripts/dev-worktree.mjs`, `app/scripts/free-port.test.mjs` (listed in the node Vitest project), the `dev:worktree` script and the `.dev-port` ignore. Tests seen failing first (module missing), then 6 pass. `npx tsc -b` passes. A live `npm run dev:worktree` served the page (HTTP 200) on a random port, wrote `.dev-port` and removed it on exit; `dev` unchanged. Lint passes. Two concurrent `npm run dev:worktree` processes served HTTP 200 on different random ports (41479, 43189), checked by the orchestrator.
 
 
+Stale-file handling: `dev:worktree` refuses to start (prints the existing URL, exit 1) when `.dev-port` names a port that still accepts connections; a dead port's file is deleted and startup continues. On exit the file is removed only if it still holds this process's port.
+
 ### Step 102.2 - Random Playwright Ports
 
 Status: complete. Dependencies: 102.1.
