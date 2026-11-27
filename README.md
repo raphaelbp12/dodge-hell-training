@@ -501,7 +501,7 @@ To serve the production build locally, run:
 npm.cmd run preview -- --host 127.0.0.1
 ```
 
-Use the URL printed by the preview command. To serve a worktree's development build on a random free port, run `npm run dev:worktree` from `app/`: it prints the URL and writes the port to the ignored `app/.dev-port`.
+Use the URL printed by the preview command. Preview defaults to port 4173. To serve a worktree's development build on a random free port, run `npm run dev:worktree` from `app/`: it prints the URL and writes the port to the ignored `app/.dev-port`.
 
 ## GitHub Pages Setup
 

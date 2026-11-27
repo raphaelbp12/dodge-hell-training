@@ -1,13 +1,17 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { sharedFreePort } from "./scripts/free-port.mjs";
+import {
+  PREVIEW_PORT_ENV,
+  sharedFreePort,
+  TEST_PORT_ENV,
+} from "./scripts/free-port.mjs";
 import viteConfig from "./vite.config.ts";
 
 // Random free ports (plan V25 D-25-5). Playwright evaluates this config again in
 // every worker: the parent draws the ports and stores them in the environment,
 // and later evaluations read them back.
-const testPort = await sharedFreePort("PLAYWRIGHT_TEST_PORT");
-const previewPort = await sharedFreePort("PLAYWRIGHT_PREVIEW_PORT");
+const testPort = await sharedFreePort(TEST_PORT_ENV);
+const previewPort = await sharedFreePort(PREVIEW_PORT_ENV);
 const baseURL = new URL(viteConfig.base ?? "/", `http://127.0.0.1:${testPort}`)
   .href;
 const previewURL = new URL(

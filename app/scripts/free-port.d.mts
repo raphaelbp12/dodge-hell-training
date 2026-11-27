@@ -4,3 +4,5 @@ export function sharedFreePort(
   env?: Record<string, string | undefined>,
   draw?: () => Promise<number>,
 ): Promise<number>;
+export const TEST_PORT_ENV: string;
+export const PREVIEW_PORT_ENV: string;

@@ -2,6 +2,10 @@
 // TCP port by listening on port 0, then releases it.
 import { createServer } from "node:net";
 
+/** Environment variable names that carry the shared Playwright ports. */
+export const TEST_PORT_ENV = "PLAYWRIGHT_TEST_PORT";
+export const PREVIEW_PORT_ENV = "PLAYWRIGHT_PREVIEW_PORT";
+
 /** Returns a free TCP port, chosen by the operating system. */
 export function freePort() {
   return new Promise((resolve, reject) => {
@@ -22,7 +26,8 @@ export function freePort() {
  */
 export async function sharedFreePort(name, env = process.env, draw = freePort) {
   const stored = env[name];
-  if (stored) return Number(stored);
+  const value = Number(stored);
+  if (stored && Number.isInteger(value) && value >= 1 && value <= 65535) return value;
   const port = await draw();
   env[name] = String(port);
   return port;
