@@ -16,6 +16,8 @@ One reference for every gate that raises trust in a change before it is committe
 | Simulated soak | `npm run test:soak:sim` | CI `Simulated Soak` check |
 | Browser soak | `PLAYWRIGHT_SOAK=1 npm run test:e2e -- --grep @soak` | CI Playwright `soak` job |
 
+A pull request that changes only `*.md` or `.claude/**` files runs the Pages checks as no-ops that report success, because branch protection requires each check by name and a required check that never runs would block the merge.
+
 ## Lint boundaries (A01)
 
 **Catches:** the simulation core (`src/game/models.ts`, `config/`, `simulation/`, `session/`) importing React, Phaser, CSS, UI, research, Phaser-layer or storage modules or reading `window`, `document`, `localStorage`, `sessionStorage`, `navigator` or `requestAnimationFrame`; `src/game/phaser/` importing `src/research/` (T13); `src/storage/` importing React or Phaser. Test files are exempt.
