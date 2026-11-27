@@ -141,6 +141,8 @@ type Inspection = {
   result: AttemptResult | null;
   paused: boolean;
   zoom: number;
+  cameraRotationRadians: number;
+  cameraRotationTurningSeconds: number;
   camera: Vector2;
   viewport: { width: number; height: number };
   keydownListeners: number;
@@ -3171,4 +3173,41 @@ test.describe("live phase preview", () => {
     await expect(page.locator("canvas")).toHaveCount(1);
     await expect(page.locator("[data-phase-preview]")).toHaveCount(0);
   });
+});
+
+test("holding E turns the camera at the module's rate and Z resets it", async ({
+  page,
+}) => {
+  await launch(page);
+  const rate = (await sourceExport(
+    page,
+    "src/game/phaser/camera-rotation.ts",
+    "CAMERA_ROTATION_RADIANS_PER_SECOND",
+  )) as number;
+  await page
+    .getByRole("region", { name: "Encounter", exact: true })
+    .evaluate((element) => (element as HTMLElement).focus());
+  expect((await inspect(page)).cameraRotationRadians).toBe(0);
+  const before = await inspect(page);
+  await page.keyboard.down("e");
+  await page.waitForTimeout(400);
+  await page.keyboard.up("e");
+  const after = await inspect(page);
+  // The rotation model's own clock: the frame deltas it was stepped with.
+  const turningSeconds =
+    after.cameraRotationTurningSeconds - before.cameraRotationTurningSeconds;
+  expect(turningSeconds).toBeGreaterThan(0.2);
+  expect(after.cameraRotationRadians).toBeGreaterThan(
+    rate * turningSeconds * 0.99,
+  );
+  expect(after.cameraRotationRadians).toBeLessThan(
+    rate * turningSeconds * 1.01,
+  );
+  // Wall-clock sanity: the held time is about the 400 ms waited.
+  expect(turningSeconds).toBeGreaterThan(0.4 * 0.85);
+  expect(turningSeconds).toBeLessThan(0.4 * 1.15 + 0.1);
+  await page.keyboard.press("z");
+  const reset = await inspect(page);
+  expect(reset.cameraRotationRadians).toBe(0);
+  expect(reset.cameraRotationTurningSeconds).toBe(0);
 });

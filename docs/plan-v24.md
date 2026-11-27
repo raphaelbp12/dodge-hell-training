@@ -78,12 +78,12 @@ Review gates:
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 101 | Camera Rotation | pending | None |
+| 101 | Camera Rotation | complete | None |
 
 ## Phase 101: Camera Rotation
 
 [Step prompts](plan/phase-101.md).
 
-- 101.1 - The Rotation Model: pending. Dependencies: none.
-- 101.2 - Rotate The Camera In The Encounter: pending. Dependencies: 101.1.
-- 101.3 - Controls Rows And The Browser Test: pending. Dependencies: 101.2.
+- 101.1 - The Rotation Model: complete. Dependencies: none.
+- 101.2 - Rotate The Camera In The Encounter: complete. Dependencies: 101.1.
+- 101.3 - Controls Rows And The Browser Test: complete. Dependencies: 101.2.

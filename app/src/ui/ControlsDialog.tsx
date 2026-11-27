@@ -58,6 +58,18 @@ export function ControlsDialog({ onClose }: { onClose: () => void }) {
         </dt>
         <dd>Zoom out / in</dd>
         <dt>
+          <kbd>Q</kbd>
+        </dt>
+        <dd>Rotate camera counter-clockwise</dd>
+        <dt>
+          <kbd>E</kbd>
+        </dt>
+        <dd>Rotate camera clockwise</dd>
+        <dt>
+          <kbd>Z</kbd>
+        </dt>
+        <dd>Reset camera angle</dd>
+        <dt>
           <kbd>Escape</kbd>
         </dt>
         <dd>Pause / resume, or close Controls</dd>

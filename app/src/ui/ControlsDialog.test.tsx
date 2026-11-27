@@ -22,6 +22,16 @@ test("opens as a modal dialog titled Controls and lists the keys", () => {
   expect(screen.getByText("Immediate retry")).toBeInTheDocument();
 });
 
+test("lists the camera rotation keys", () => {
+  render(<ControlsDialog onClose={vi.fn()} />);
+  expect(screen.getByText("Q")).toBeInTheDocument();
+  expect(screen.getByText("Rotate camera counter-clockwise")).toBeInTheDocument();
+  expect(screen.getByText("E")).toBeInTheDocument();
+  expect(screen.getByText("Rotate camera clockwise")).toBeInTheDocument();
+  expect(screen.getByText("Z")).toBeInTheDocument();
+  expect(screen.getByText("Reset camera angle")).toBeInTheDocument();
+});
+
 test("describes every status effect, marking inert ones", () => {
   render(<ControlsDialog onClose={vi.fn()} />);
   for (const key of CONDITION_KEYS) {

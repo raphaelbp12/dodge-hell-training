@@ -30,7 +30,7 @@ This file is the reusable process for every planning effort in this repository: 
 | V21 | 89 | complete | B | [`docs/plan-v21.md`](docs/plan-v21.md) |
 | V22 | 90-96 | complete | A | [`docs/plan-v22.md`](docs/plan-v22.md) |
 | V23 | 97-100 | 97-99 complete; 100 implemented, findings await a decision | Q | [`docs/plan-v23.md`](docs/plan-v23.md) |
-| V24 | 101 | drafted | D-24 | [`docs/plan-v24.md`](docs/plan-v24.md) |
+| V24 | 101 | complete | D-24 | [`docs/plan-v24.md`](docs/plan-v24.md) |
 | V25 | 102 | drafted | D-25 | [`docs/plan-v25.md`](docs/plan-v25.md) |
 | V26 | 103 | in progress | D-26 | [`docs/plan-v26.md`](docs/plan-v26.md) |
 | V27 | 104 | drafted | D-27 | [`docs/plan-v27.md`](docs/plan-v27.md) |
