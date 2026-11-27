@@ -1,3 +1,4 @@
+import { cameraRelativeInput } from "./camera-relative-input";
 import Phaser from "phaser";
 import {
   archetypeOf,
@@ -446,24 +447,27 @@ class EncounterScene extends Phaser.Scene {
     }
     const result = this.session.advance(
       delta / presentation.millisecondsPerSecond,
-      {
-        north:
-          gameplayFocused &&
-          this.keys.north.isDown &&
-          !this.suppressedMovement.has("KeyW"),
-        south:
-          gameplayFocused &&
-          this.keys.south.isDown &&
-          !this.suppressedMovement.has("KeyS"),
-        east:
-          gameplayFocused &&
-          this.keys.east.isDown &&
-          !this.suppressedMovement.has("KeyD"),
-        west:
-          gameplayFocused &&
-          this.keys.west.isDown &&
-          !this.suppressedMovement.has("KeyA"),
-      },
+      cameraRelativeInput(
+        {
+          north:
+            gameplayFocused &&
+            this.keys.north.isDown &&
+            !this.suppressedMovement.has("KeyW"),
+          south:
+            gameplayFocused &&
+            this.keys.south.isDown &&
+            !this.suppressedMovement.has("KeyS"),
+          east:
+            gameplayFocused &&
+            this.keys.east.isDown &&
+            !this.suppressedMovement.has("KeyD"),
+          west:
+            gameplayFocused &&
+            this.keys.west.isDown &&
+            !this.suppressedMovement.has("KeyA"),
+        },
+        this.rotation.angleRadians,
+      ),
       (hit) => {
         currentHits.push(hit);
         this.addHitNumber(hit);

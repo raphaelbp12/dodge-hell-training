@@ -660,10 +660,12 @@ function updateMovement(state: SimulationState, input: SimulationInput): void {
   const config = state.config;
   const stepSeconds = config.simulation.fixedStepSeconds;
   const conditionedInput = effectiveInput(state.player, input);
-  const directionX =
-    Number(conditionedInput.east) - Number(conditionedInput.west);
-  const directionY =
-    Number(conditionedInput.south) - Number(conditionedInput.north);
+  const directionX = conditionedInput.moveVector
+    ? conditionedInput.moveVector.x
+    : Number(conditionedInput.east) - Number(conditionedInput.west);
+  const directionY = conditionedInput.moveVector
+    ? conditionedInput.moveVector.y
+    : Number(conditionedInput.south) - Number(conditionedInput.north);
   const directionLength = Math.hypot(directionX, directionY) || 1;
   const playerTravel = playerTravelTiles(state.player, stepSeconds);
   state.player.positionTiles = constrainToArena(

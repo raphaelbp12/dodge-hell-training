@@ -1,5 +1,8 @@
-import { expect, test } from "vitest";
-import { cameraRelativeMovement } from "./camera-relative-input";
+import { describe, expect, test } from "vitest";
+import {
+  cameraRelativeInput,
+  cameraRelativeMovement,
+} from "./camera-relative-input";
 
 const QUARTER = Math.PI / 2;
 const W = { x: 0, y: -1 };
@@ -53,3 +56,27 @@ test.each([0, 0.4, QUARTER, Math.PI, Math.PI * 2, 9.5, -3])(
     expectVector(screen, input.x, input.y);
   },
 );
+
+describe("cameraRelativeInput", () => {
+  const keys = { north: false, south: false, east: false, west: false };
+
+  test("at angle 0 the vector is the plain screen vector", () => {
+    expect(cameraRelativeInput({ ...keys, west: true }, 0).moveVector).toEqual({
+      x: -1,
+      y: 0,
+    });
+  });
+
+  test("the vector reaching the simulation equals the mapped vector", () => {
+    const input = cameraRelativeInput({ ...keys, west: true }, Math.PI / 2);
+    const mapped = cameraRelativeMovement({ x: -1, y: 0 }, Math.PI / 2);
+    expect(input.moveVector?.x).toBeCloseTo(mapped.x, 12);
+    expect(input.moveVector?.y).toBeCloseTo(mapped.y, 12);
+  });
+
+  test("opposing keys cancel and the booleans pass through", () => {
+    const input = cameraRelativeInput({ ...keys, east: true, west: true }, 1);
+    expect(input.moveVector).toEqual({ x: 0, y: 0 });
+    expect(input.east).toBe(true);
+  });
+});

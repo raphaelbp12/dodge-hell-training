@@ -69,6 +69,13 @@ export type SimulationInput = Readonly<{
   south: boolean;
   east: boolean;
   west: boolean;
+  /**
+   * Optional analogue movement direction (y down). When present it drives
+   * player movement instead of the four booleans; it is normalised like
+   * them, so speed never exceeds the boolean speed. Absent, behaviour is
+   * exactly the boolean path.
+   */
+  moveVector?: Vector2;
 }>;
 
 export type PlayerState = {

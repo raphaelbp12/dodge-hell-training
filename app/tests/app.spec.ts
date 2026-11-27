@@ -3211,3 +3211,36 @@ test("holding E turns the camera at the module's rate and Z resets it", async ({
   expect(reset.cameraRotationRadians).toBe(0);
   expect(reset.cameraRotationTurningSeconds).toBe(0);
 });
+
+test("with the camera turned, A moves the player to the screen-left, not along world x", async ({
+  page,
+}) => {
+  await launch(page);
+  await page
+    .getByRole("region", { name: "Encounter", exact: true })
+    .evaluate((element) => (element as HTMLElement).focus());
+  await page.keyboard.down("e");
+  await expect
+    .poll(async () => (await inspect(page)).cameraRotationRadians)
+    .toBeGreaterThan(0.6);
+  await page.keyboard.up("e");
+  const turned = await inspect(page);
+  const angle = turned.cameraRotationRadians;
+  // Released early at 0.6 rad so poll lag cannot carry the angle near π.
+  expect(Math.sin(angle)).toBeGreaterThan(0.3);
+  await page.keyboard.down("a");
+  await page.waitForTimeout(300);
+  await page.keyboard.up("a");
+  const moved = await inspect(page);
+  const dx = moved.player.positionTiles.x - turned.player.positionTiles.x;
+  const dy = moved.player.positionTiles.y - turned.player.positionTiles.y;
+  const distance = Math.hypot(dx, dy);
+  expect(distance).toBeGreaterThan(0.5);
+  // Screen-left (-1, 0) turned clockwise by the camera angle (y down).
+  const expectedX = -Math.cos(angle);
+  const expectedY = -Math.sin(angle);
+  expect(dx / distance).toBeCloseTo(expectedX, 1);
+  expect(dy / distance).toBeCloseTo(expectedY, 1);
+  // Not the world-fixed direction: A at angle 0 would move along -x only.
+  expect(Math.abs(dy) / distance).toBeGreaterThan(0.3);
+});

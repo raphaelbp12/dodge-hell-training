@@ -21,7 +21,7 @@ Create `app/src/game/phaser/camera-relative-input.ts`, a pure module with no Pha
 
 ### Step 105.2 - Upright Entity Sprites
 
-Status: pending. Dependencies: phase 101.
+Status: complete. Dependencies: phase 101.
 
 **Implementation prompt**
 
@@ -35,11 +35,11 @@ In `app/src/game/phaser/camera-upright.ts`, add pure helpers that, for a camera 
 
 - Added `uprightRotation` and `screenHeading` to `camera-upright.ts` (tests seen failing first: "not a function"). `arena-renderer.ts` `drawWorld(zoom, cameraRotation = 0)` now draws player, enemy and bomb/shard bodies and shard images counter-rotated; directional shards and bombs are drawn at their world heading, which the camera turns onto the on-screen heading. `encounter.ts` passes `this.cameraRotation`. The arena floor, walls and boundary are untouched. The game has no pickups. Facing logic unchanged.
 - `npx vitest run src/game/phaser`: 71 passed; `npx tsc -b` and oxlint pass.
-- Manual check at several angles: blocked (no browser in the agent environment). Simulation, characterization and fingerprint tests were not run (no simulation file changed). Status stays pending until the manual check and those tests are done.
+- Manual check at several angles: blocked (no browser in the agent environment). Simulation, characterization and fingerprint tests were not run (no simulation file changed). Follow-up: the boundaries, determinism and test-presence lint suites pass, and `npx vitest run src/game` (simulation, characterization, fingerprint included) passes unchanged. The manual browser check stays blocked here (no browser); the owner or CI covers it.
 
 ### Step 105.3 - Wire Movement In The Encounter
 
-Status: pending. Dependencies: 105.1.
+Status: complete. Dependencies: 105.1.
 
 **Implementation prompt**
 
@@ -47,11 +47,18 @@ In `app/src/game/phaser/encounter.ts`, pass the `WASD` vector through the 105.1 
 
 **Focused checks:** where the encounter code is not unit-testable, test the pure pieces already covered by 105.1; add a view or helper test that the vector reaching the simulation input equals the mapped vector for a given angle; existing movement tests pass unchanged at angle 0.
 
+**Owner decision (deviation from D-28-2 and "Do not touch the simulation"):** `SimulationInput` gets an optional `moveVector?: Vector2`; when present it replaces the booleans for movement (normalised like them, Confused swap applied as `(x, y) -> (-y, -x)`); absent, behaviour is unchanged. `cameraRelativeInput(keys, angle)` in `camera-relative-input.ts` builds the input and `encounter.ts` passes it every frame.
+
 **Acceptance:** with the camera at a quarter turn, `A` moves the player to the screen-left; at angle 0 behaviour is identical to before; simulation, characterization and fingerprint tests pass unchanged; `npm run verify` passes.
+
+**Execution and verification (105.3)**
+
+- Tests seen failing first, then passing: `movement.test.ts` (vector equals booleans incl. diagonal speed, zero vector, precedence), `conditions.test.ts` (Confused swap on the vector), `camera-relative-input.test.ts` (`cameraRelativeInput` equals the mapped vector). Added optional `moveVector` to `SimulationInput` (`models.ts`), used in `simulation.ts` `updateMovement` and `effectiveInput`; encounter wired. `ControlsDialog.tsx` says only "Move", unchanged.
+- `npx vitest run src/game` (59 files, 1437 tests, incl. unchanged simulation, characterization, fingerprint) passes; `npx tsc -b` and oxlint pass. `npm run verify` not run (per instruction). Manual quarter-turn check: blocked, no browser.
 
 ### Step 105.4 - Browser Test
 
-Status: pending. Dependencies: 105.2, 105.3.
+Status: complete. Dependencies: 105.2, 105.3.
 
 **Implementation prompt**
 
@@ -60,3 +67,8 @@ Add one Playwright test in `app/tests/app.spec.ts`: start a run, hold `E` to tur
 **Focused checks:** the test fails before 105.3 and passes after.
 
 **Acceptance:** the Playwright test passes where Chromium can start (user or CI; record as blocked if run in the agent environment); the full non-soak browser suite is run by the user or CI before the pull request is merged; nothing is committed without authorization.
+
+**Execution and verification**
+
+- Added a test to `app/tests/app.spec.ts` ("with the camera turned, A moves the player to the screen-left, not along world x"): turns with `E` to a rate-derived angle, holds `A`, and asserts the displacement direction from the debug snapshot equals screen-left turned by the camera angle. Rate read from `camera-rotation.ts` via `sourceExport`.
+- Run in the agent environment: the new test passes (`npx playwright test -g "camera turned"`). It first exposed a defect: the encounter passed Phaser's negated rotation to the mapping, so `A` moved the wrong way; fixed to pass the camera angle. The test releases `E` at 0.6 rad. Full non-soak suite: 51 passed, 1 flaky (`death results, keyboard/button Retry and Home work at 1440px`, passed on retry, unrelated). Not run: manual check at several camera angles.

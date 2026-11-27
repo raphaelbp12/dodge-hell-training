@@ -31,7 +31,7 @@ This plan adds, as a delta:
 ## Recorded User Decisions - 2026-11-27
 
 - **D-28-1. Movement is view-relative.** `W`, `A`, `S`, `D` move the player up, left, down and right as seen on screen at any camera angle. This supersedes D-24-4. (Issue text.)
-- **D-28-2. Applied in the input layer.** The camera angle turns the `WASD` direction into a world direction before it reaches the simulation. The simulation, fingerprints and replays do not change and never see the angle. (Question 2a.)
+- **D-28-2. Applied in the input layer.** The camera angle turns the `WASD` direction into a world direction before it reaches the simulation. The simulation, fingerprints and replays do not change and never see the angle. (Question 2a.) **Owner decision, supersedes the "simulation unchanged" part:** `SimulationInput` gains an optional `moveVector` that, when present, drives movement instead of the four booleans (normalised like them, so speed is unchanged; the Confused swap applies to it). Absent, behaviour is byte-identical, so there is no rulesVersion or fingerprint change; the encounter passes the mapped vector every frame.
 - **D-28-3. Recomputed every frame.** A held movement key follows the camera while it turns: the direction is recomputed each frame, not latched at key press. (Question 3a.)
 - **D-28-4. Every entity sprite stays upright.** Player, enemies, bullets and pickups are not rotated by the camera. This supersedes the sprite part of D-24-6. (Question 1b.)
 - **D-28-5. Arena still rotates.** The arena floor, walls and boundary rotate with the camera so that rotation stays visible. (Question 8a.)
@@ -68,13 +68,13 @@ Review gates:
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 105 | Camera-Relative Movement And Upright Sprites | pending | Phase 101 (PR #22) |
+| 105 | Camera-Relative Movement And Upright Sprites | complete | Phase 101 (PR #22) |
 
 ## Phase 105: Camera-Relative Movement And Upright Sprites
 
 [Step prompts](plan/phase-105.md).
 
-- 105.1 - The View-Relative Movement Mapping: pending. Dependencies: phase 101.
-- 105.2 - Upright Entity Sprites: pending. Dependencies: phase 101.
-- 105.3 - Wire Movement In The Encounter: pending. Dependencies: 105.1.
-- 105.4 - Browser Test: pending. Dependencies: 105.2, 105.3.
+- 105.1 - The View-Relative Movement Mapping: complete. Dependencies: phase 101.
+- 105.2 - Upright Entity Sprites: complete. Dependencies: phase 101.
+- 105.3 - Wire Movement In The Encounter: complete. Dependencies: 105.1.
+- 105.4 - Browser Test: complete. Dependencies: 105.2, 105.3.

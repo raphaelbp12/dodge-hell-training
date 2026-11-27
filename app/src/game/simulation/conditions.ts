@@ -160,11 +160,17 @@ export function effectiveInput(
   input: SimulationInput,
 ): SimulationInput {
   if (!hasCondition(player, "confused")) return input;
-  return {
+  const swapped = {
     north: input.east,
     east: input.north,
     south: input.west,
     west: input.south,
+  };
+  if (!input.moveVector) return swapped;
+  // The same swap on a vector: east<->north and west<->south is (x, y) -> (-y, -x).
+  return {
+    ...swapped,
+    moveVector: { x: -input.moveVector.y, y: -input.moveVector.x },
   };
 }
 

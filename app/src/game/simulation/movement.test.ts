@@ -412,3 +412,33 @@ test("the heading is identical at 30, 60 and 120 Hz", () => {
   expect(headings[1]).toBeCloseTo(headings[0], 12);
   expect(headings[2]).toBeCloseTo(headings[0], 12);
 });
+
+test("an analogue moveVector drives movement like the equivalent booleans, with no diagonal speedup", () => {
+  const boolState = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  const vectorState = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  const start = { ...boolState.player.positionTiles };
+  advanceSimulation(boolState, stepSeconds, { ...idle, north: true, east: true });
+  advanceSimulation(vectorState, stepSeconds, {
+    ...idle,
+    moveVector: { x: 1, y: -1 },
+  });
+  expect(vectorState.player.positionTiles).toEqual(boolState.player.positionTiles);
+  const travelled = Math.hypot(
+    vectorState.player.positionTiles.x - start.x,
+    vectorState.player.positionTiles.y - start.y,
+  );
+  const straight = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  advanceSimulation(straight, stepSeconds, { ...idle, east: true });
+  expect(travelled).toBeCloseTo(straight.player.positionTiles.x - start.x, 9);
+});
+
+test("a moveVector takes precedence over the booleans, and a zero vector stands still", () => {
+  const state = createSimulation(ENCOUNTER_CONFIG, TEST_SEED);
+  const start = { ...state.player.positionTiles };
+  advanceSimulation(state, stepSeconds, {
+    ...idle,
+    west: true,
+    moveVector: { x: 0, y: 0 },
+  });
+  expect(state.player.positionTiles).toEqual(start);
+});

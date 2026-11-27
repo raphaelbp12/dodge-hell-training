@@ -1,3 +1,5 @@
+import type { SimulationInput } from "../models";
+
 /**
  * Pure view-relative movement mapping (plan V28, D-28-1, D-28-2): no Phaser,
  * DOM or React.
@@ -20,4 +22,20 @@ export function cameraRelativeMovement(
     x: screenVector.x * cos - screenVector.y * sin,
     y: screenVector.x * sin + screenVector.y * cos,
   };
+}
+
+/**
+ * The simulation input for one frame (D-28-2, owner decision): the held keys
+ * unchanged, plus the analogue `moveVector` of the key direction turned by the
+ * camera angle. Opposing keys cancel to the zero vector.
+ */
+export function cameraRelativeInput(
+  keys: Pick<SimulationInput, "north" | "south" | "east" | "west">,
+  angleRadians: number,
+): SimulationInput {
+  const screen = {
+    x: Number(keys.east) - Number(keys.west),
+    y: Number(keys.south) - Number(keys.north),
+  };
+  return { ...keys, moveVector: cameraRelativeMovement(screen, angleRadians) };
 }
