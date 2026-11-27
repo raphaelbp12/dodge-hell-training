@@ -37,3 +37,5 @@ Add one sentence to `docs/quality-gates.md`, next to the description of the requ
 **Execution and verification**
 
 Added one sentence under the gates table in `docs/quality-gates.md`; nothing else changed. The check on a doc-only pull request (D-26-5) is blocked until this change is merged: not performed.
+
+Review fix (PR #27): all four "Detect code changes" scripts now use `git diff --no-renames` and capture the diff in `files` first; a failing diff (empty or unknown base) keeps `run=true` instead of reading as doc-only. Verified in temp repos: rename `a.ts` to `a.md` gives run=true, `BASE_SHA=deadbeef` gives run=true, a pure `.md` change gives run=false. YAML parses.

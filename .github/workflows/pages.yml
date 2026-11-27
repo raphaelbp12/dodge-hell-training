@@ -62,12 +62,13 @@ jobs:
           run=true
           if [ "$EVENT_NAME" = pull_request ]; then
             run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
             while IFS= read -r file; do
               case "$file" in
                 "" | *.md | .claude/*) ;;
                 *) run=true; break ;;
               esac
-            done <<< "$(git diff --name-only "$BASE_SHA"...HEAD)"
+            done <<< "$files"
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" = false ]; then
@@ -115,12 +116,13 @@ jobs:
           run=true
           if [ "$EVENT_NAME" = pull_request ]; then
             run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
             while IFS= read -r file; do
               case "$file" in
                 "" | *.md | .claude/*) ;;
                 *) run=true; break ;;
               esac
-            done <<< "$(git diff --name-only "$BASE_SHA"...HEAD)"
+            done <<< "$files"
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" = false ]; then
@@ -243,12 +245,13 @@ jobs:
           run=true
           if [ "$EVENT_NAME" = pull_request ]; then
             run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
             while IFS= read -r file; do
               case "$file" in
                 "" | *.md | .claude/*) ;;
                 *) run=true; break ;;
               esac
-            done <<< "$(git diff --name-only "$BASE_SHA"...HEAD)"
+            done <<< "$files"
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" = false ]; then
@@ -317,12 +320,13 @@ jobs:
           run=true
           if [ "$EVENT_NAME" = pull_request ]; then
             run=false
+            files=$(git diff --no-renames --name-only "$BASE_SHA"...HEAD) || { run=true; files=; }
             while IFS= read -r file; do
               case "$file" in
                 "" | *.md | .claude/*) ;;
                 *) run=true; break ;;
               esac
-            done <<< "$(git diff --name-only "$BASE_SHA"...HEAD)"
+            done <<< "$files"
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           if [ "$run" = false ]; then
