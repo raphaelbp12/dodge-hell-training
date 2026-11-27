@@ -251,9 +251,12 @@ function savedId(): string {
 }
 
 test("falls back to a version 4 uuid built from getRandomValues", () => {
-  vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+  const getRandomValues = vi.fn((bytes: Uint8Array) => bytes.fill(0xab));
+  vi.stubGlobal("crypto", { getRandomValues });
   try {
-    expect(savedId()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:7$/);
+    // 0xab bytes, with the version nibble forced to 4 and the variant bits to 10.
+    expect(savedId()).toBe("abababab-abab-4bab-abab-abababababab:7");
+    expect(getRandomValues).toHaveBeenCalledTimes(1);
   } finally {
     vi.unstubAllGlobals();
   }
