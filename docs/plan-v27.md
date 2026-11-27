@@ -57,11 +57,11 @@ Review gates:
 
 | Phase | Title | Status | Dependencies |
 | ----- | ----- | ------ | ------------ |
-| 104 | Encounter Page Opens Over Plain HTTP | pending | None |
+| 104 | Encounter Page Opens Over Plain HTTP | complete | None |
 
 ## Phase 104: Encounter Page Opens Over Plain HTTP
 
 [Step prompts](plan/phase-104.md).
 
-- 104.1 - Reproduce The Missing randomUUID Failure: pending. Dependencies: none.
-- 104.2 - Fall Back To getRandomValues: pending. Dependencies: 104.1.
+- 104.1 - Reproduce The Missing randomUUID Failure: complete. Dependencies: none.
+- 104.2 - Fall Back To getRandomValues: complete. Dependencies: 104.1.

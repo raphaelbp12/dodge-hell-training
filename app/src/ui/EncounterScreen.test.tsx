@@ -216,3 +216,36 @@ test("unmounting destroys the encounter and clears the shared handle", () => {
   expect(handle.destroy).toHaveBeenCalledTimes(1);
   expect(props.encounterHandle.current).toBeNull();
 });
+
+test("mounts when crypto.randomUUID is unavailable", () => {
+  vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+  try {
+    expect(() => mount()).not.toThrow();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+function savedId(): string {
+  const { onHistoryChange } = mount();
+  act(() => options.onResult?.({ attemptId: 7, rulesVersion: config.rulesVersion, elapsedSeconds: 1, hitsTaken: 0, outcome: "death" }));
+  return onHistoryChange.mock.calls[0][0].records[0].id;
+}
+
+test("falls back to a version 4 uuid built from getRandomValues", () => {
+  vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+  try {
+    expect(savedId()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:7$/);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("uses crypto.randomUUID when it exists", () => {
+  vi.stubGlobal("crypto", { randomUUID: () => "fixed-uuid", getRandomValues: crypto.getRandomValues.bind(crypto) });
+  try {
+    expect(savedId()).toBe("fixed-uuid:7");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
